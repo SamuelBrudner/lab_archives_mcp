@@ -1,0 +1,271 @@
+# LabArchives MCP Server - Development Docker Compose Configuration
+# This file defines the development environment for the LabArchives MCP Server
+# Optimized for rapid iteration, live code reloading, and developer convenience
+# NOT INTENDED FOR PRODUCTION USE
+
+version: '3.8'
+
+# Global configuration for the development environment
+x-common-variables: &common-variables
+  PYTHONUNBUFFERED: "1"
+  PYTHONDONTWRITEBYTECODE: "1"
+  PYTHONPATH: "/app"
+  LOG_LEVEL: "DEBUG"
+
+services:
+  # LabArchives MCP Server - Main service for development
+  labarchives-mcp-server:
+    # Image configuration - built from local development context
+    image: labarchives-mcp:dev
+    build:
+      context: ../src/cli
+      dockerfile: Dockerfile
+      args:
+        # Use Python 3.11 slim bookworm as base image for development
+        # Provides latest Python bugfixes and optimal performance
+        - PYTHON_VERSION=3.11-slim-bookworm
+        - INSTALL_DEV_DEPS=true
+    
+    # Container naming for easy identification in development
+    container_name: labarchives-mcp-server-dev
+    
+    # Development-optimized command with verbose logging and file output
+    # Enables comprehensive debugging and development monitoring
+    command: >
+      labarchives-mcp 
+      --verbose 
+      --log-file /logs/dev.log
+      --log-level DEBUG
+    
+    # Volume mounts for development workflow
+    volumes:
+      # Mount source code for live reloading - enables rapid iteration
+      # Uses cached mount for better performance on macOS/Windows
+      - ../src/cli:/app:cached
+      
+      # Mount environment configuration (read-only for security)
+      # Developers should create their own .env file for sensitive credentials
+      - ./.env.example:/app/.env:ro
+      
+      # Mount logs directory for easy access to development logs
+      - ./logs:/logs
+      
+      # Optional: Mount development tools and utilities
+      - ~/.gitconfig:/root/.gitconfig:ro
+    
+    # Environment file configuration
+    # Load environment variables from .env.example by default
+    # Developers should create .env file for local overrides
+    env_file:
+      - ./.env.example
+    
+    # Environment variables for development configuration
+    environment:
+      <<: *common-variables
+      
+      # LabArchives API Configuration
+      # Override these in .env file for actual development
+      LABARCHIVES_AKID: ${LABARCHIVES_AKID}
+      LABARCHIVES_SECRET: ${LABARCHIVES_SECRET}
+      LABARCHIVES_USER: ${LABARCHIVES_USER:-}
+      LABARCHIVES_API_BASE: ${LABARCHIVES_API_BASE:-https://api.labarchives.com/api}
+      
+      # Development-specific configuration
+      ENVIRONMENT: "development"
+      DEBUG: "true"
+      
+      # Logging configuration for development
+      LOG_FORMAT: "detailed"
+      LOG_TIMESTAMPS: "true"
+      
+      # MCP Server configuration
+      MCP_SERVER_NAME: "labarchives-mcp-server-dev"
+      MCP_SERVER_VERSION: "0.1.0-dev"
+      
+      # Development feature flags
+      ENABLE_HEALTH_CHECKS: "true"
+      ENABLE_PERFORMANCE_MONITORING: "true"
+      ENABLE_REQUEST_TRACING: "true"
+    
+    # Port mapping for local development testing
+    # Port 8080 exposed for potential HTTP health checks
+    # Note: MCP typically uses stdio for Claude Desktop integration
+    ports:
+      - "8080:8080"
+    
+    # Network configuration for service isolation
+    networks:
+      - labarchives-mcp-dev
+    
+    # Restart policy for development resilience
+    # Container restarts unless explicitly stopped by developer
+    restart: unless-stopped
+    
+    # Health check configuration for development monitoring
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8080/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    # Development-specific labels for container management
+    labels:
+      - "com.labarchives.mcp.environment=development"
+      - "com.labarchives.mcp.component=server"
+      - "com.labarchives.mcp.version=0.1.0-dev"
+      - "com.labarchives.mcp.maintainer=dev-team"
+    
+    # Resource limits for development environment
+    # Generous limits to allow for debugging and development overhead
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 128M
+    
+    # Development dependencies and tools
+    depends_on:
+      - logs-volume-init
+    
+    # Development-specific configuration
+    tty: true
+    stdin_open: true
+    
+    # User configuration for development
+    # Run as current user to avoid permission issues with mounted volumes
+    user: "${UID:-1000}:${GID:-1000}"
+
+  # Utility service to initialize log volume with proper permissions
+  logs-volume-init:
+    image: alpine:latest
+    command: >
+      sh -c "
+        mkdir -p /logs &&
+        chmod 755 /logs &&
+        chown ${UID:-1000}:${GID:-1000} /logs
+      "
+    volumes:
+      - logs:/logs
+    labels:
+      - "com.labarchives.mcp.utility=logs-init"
+
+# Network configuration for development environment
+networks:
+  # Dedicated bridge network for development isolation
+  labarchives-mcp-dev:
+    driver: bridge
+    driver_opts:
+      # Enable ICC (Inter-Container Communication) for development
+      com.docker.network.bridge.enable_icc: "true"
+      # Enable IP masquerading for external access
+      com.docker.network.bridge.enable_ip_masquerade: "true"
+    
+    # Network labels for development environment
+    labels:
+      - "com.labarchives.mcp.network=development"
+      - "com.labarchives.mcp.environment=dev"
+    
+    # IPAM configuration for predictable IP addressing in development
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.0.0/16
+          gateway: 172.20.0.1
+
+# Volume configuration for development data persistence
+volumes:
+  # Logs volume for development log persistence
+  logs:
+    driver: local
+    driver_opts:
+      # Use local filesystem for development convenience
+      type: none
+      device: ${PWD}/logs
+      o: bind
+    
+    # Volume labels for development environment
+    labels:
+      - "com.labarchives.mcp.volume=logs"
+      - "com.labarchives.mcp.environment=development"
+      - "com.labarchives.mcp.purpose=logging"
+
+# Development-specific configuration overrides
+# These can be used with docker-compose.override.yml for local customization
+x-development-overrides:
+  # Additional development services that can be uncommented as needed
+  
+  # Development database for testing (optional)
+  # postgres-dev:
+  #   image: postgres:15-alpine
+  #   environment:
+  #     POSTGRES_DB: labarchives_mcp_dev
+  #     POSTGRES_USER: dev_user
+  #     POSTGRES_PASSWORD: dev_password
+  #   volumes:
+  #     - postgres-dev-data:/var/lib/postgresql/data
+  #   networks:
+  #     - labarchives-mcp-dev
+  
+  # Redis for caching during development (optional)
+  # redis-dev:
+  #   image: redis:7-alpine
+  #   command: redis-server --appendonly yes
+  #   volumes:
+  #     - redis-dev-data:/data
+  #   networks:
+  #     - labarchives-mcp-dev
+  
+  # Development tools container (optional)
+  # dev-tools:
+  #   image: labarchives-mcp:dev
+  #   command: tail -f /dev/null
+  #   volumes:
+  #     - ../src/cli:/app:cached
+  #   networks:
+  #     - labarchives-mcp-dev
+  #   profiles:
+  #     - tools
+
+# Development environment documentation
+x-development-documentation:
+  description: |
+    LabArchives MCP Server Development Environment
+    
+    This Docker Compose configuration provides a complete development environment
+    for the LabArchives MCP Server with the following features:
+    
+    - Live code reloading through volume mounts
+    - Comprehensive debug logging
+    - Environment variable configuration
+    - Health monitoring and status checks
+    - Development-optimized resource allocation
+    - Isolated network environment
+    - Persistent log storage
+    
+    Usage:
+      docker-compose up -d                    # Start development environment
+      docker-compose logs -f                  # Follow logs
+      docker-compose exec labarchives-mcp-server bash  # Access container
+      docker-compose down                     # Stop environment
+      docker-compose down -v                  # Stop and remove volumes
+    
+    Environment Configuration:
+      Copy .env.example to .env and customize with your LabArchives credentials
+      Set LABARCHIVES_AKID and LABARCHIVES_SECRET for API access
+      Configure logging and debugging options as needed
+    
+    Security Notes:
+      - This configuration is for development only
+      - Never use in production environments
+      - Credentials should be stored in .env file (not committed to version control)
+      - Log files may contain sensitive information in debug mode
+    
+    Troubleshooting:
+      - Check logs: docker-compose logs labarchives-mcp-server
+      - Verify environment: docker-compose exec labarchives-mcp-server env
+      - Test API connectivity: docker-compose exec labarchives-mcp-server python -c "import requests; print(requests.get('https://api.labarchives.com/api').status_code)"
+      - Monitor resources: docker stats
