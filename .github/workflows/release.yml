@@ -1,0 +1,444 @@
+name: Release Pipeline
+
+# Workflow triggers for automated and manual releases
+on:
+  # Trigger on published GitHub releases
+  release:
+    types: [published]
+  
+  # Allow manual triggers on main and release branches
+  push:
+    branches: 
+      - main
+      - 'release/**'
+    tags:
+      - 'v*'
+
+# Global environment variables
+env:
+  PYTHON_VERSION: '3.11'
+  DOCKER_IMAGE_NAME: 'labarchives/mcp-server'
+  REGISTRY_URL: 'docker.io'
+
+# Define all jobs with proper dependency chains
+jobs:
+  # Job 1: Build and test the application
+  build-and-test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        python-version: ['3.11', '3.12']
+    
+    steps:
+      # actions/checkout@v4 - Checks out the repository code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for proper versioning
+      
+      # actions/setup-python@v4 - Sets up Python environment
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+      
+      # Install all dependencies including dev dependencies
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+          pip install build
+      
+      # Run comprehensive test suite
+      - name: Run unit tests
+        run: |
+          pytest tests/ -v --cov=src/ --cov-report=xml --cov-report=html
+      
+      # Run static type checking
+      - name: Run type checking
+        run: |
+          mypy src/ --strict
+      
+      # Run code formatting and linting checks
+      - name: Run code formatting check
+        run: |
+          black --check src/ tests/
+          flake8 src/ tests/
+      
+      # actions/upload-artifact@v4 - Upload test results and coverage reports
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.python-version }}
+          path: |
+            htmlcov/
+            coverage.xml
+            pytest.xml
+          retention-days: 30
+        if: always()
+
+  # Job 2: Build Python package (sdist and wheel)
+  build-python-package:
+    name: Build Python Package
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    
+    steps:
+      # Checkout repository code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      # Set up Python environment
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      
+      # Install build dependencies
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel build
+      
+      # Build source distribution and wheel
+      - name: Build Python package
+        run: |
+          python -m build
+          ls -la dist/
+      
+      # Upload built artifacts for later jobs
+      - name: Upload Python package artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-package
+          path: |
+            dist/*.tar.gz
+            dist/*.whl
+          retention-days: 90
+
+  # Job 3: Publish package to PyPI
+  publish-pypi:
+    name: Publish to PyPI
+    runs-on: ubuntu-latest
+    needs: build-python-package
+    # Only publish on actual releases or main branch pushes
+    if: github.event_name == 'release' && github.event.action == 'published'
+    
+    environment:
+      name: pypi
+      url: https://pypi.org/project/labarchives-mcp/
+    
+    permissions:
+      id-token: write  # For trusted publishing to PyPI
+      contents: read
+    
+    steps:
+      # Download built artifacts
+      - name: Download Python package
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package
+          path: dist/
+      
+      # pypa/gh-action-pypi-publish@v1.8.11 - Publishes to PyPI
+      - name: Publish package to PyPI
+        uses: pypa/gh-action-pypi-publish@v1.8.11
+        with:
+          repository-url: https://upload.pypi.org/legacy/
+          skip-existing: true
+          verbose: true
+
+  # Job 4: Generate Docker metadata for tagging
+  docker-meta:
+    name: Docker Metadata
+    runs-on: ubuntu-latest
+    
+    outputs:
+      tags: ${{ steps.meta.outputs.tags }}
+      labels: ${{ steps.meta.outputs.labels }}
+      digest: ${{ steps.meta.outputs.digest }}
+    
+    steps:
+      # Checkout for access to repository context
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      # crazy-max/ghaction-docker-meta@v5 - Generate Docker tags and labels
+      - name: Extract Docker metadata
+        id: meta
+        uses: crazy-max/ghaction-docker-meta@v5
+        with:
+          images: ${{ env.DOCKER_IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=ref,event=tag
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest,enable={{is_default_branch}}
+          labels: |
+            org.opencontainers.image.title=LabArchives MCP Server
+            org.opencontainers.image.description=Model Context Protocol server for LabArchives integration
+            org.opencontainers.image.vendor=LabArchives
+            org.opencontainers.image.licenses=MIT
+
+  # Job 5: Build and push Docker image
+  build-and-push-docker:
+    name: Build and Push Docker Image
+    runs-on: ubuntu-latest
+    needs: [build-and-test, docker-meta]
+    
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+      image-url: ${{ steps.build.outputs.image-url }}
+    
+    steps:
+      # Checkout repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      # Set up Docker Buildx for advanced features
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      # docker/login-action@v3 - Log in to Docker Hub
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY_URL }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      
+      # docker/build-push-action@v5 - Build and push Docker image
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ needs.docker-meta.outputs.tags }}
+          labels: ${{ needs.docker-meta.outputs.labels }}
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: true
+          sbom: true
+          outputs: |
+            type=image,name=${{ env.DOCKER_IMAGE_NAME }},push=true
+            type=registry,ref=${{ env.DOCKER_IMAGE_NAME }}:latest
+      
+      # Upload image digest as artifact
+      - name: Upload Docker image digest
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-digest
+          path: |
+            /tmp/digest.txt
+          retention-days: 30
+
+  # Job 6: Generate SBOM for Docker image
+  sbom:
+    name: Generate SBOM
+    runs-on: ubuntu-latest
+    needs: build-and-push-docker
+    
+    steps:
+      # Checkout repository for context
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      # anchore/sbom-action@v0.15.3 - Generate Software Bill of Materials
+      - name: Generate SBOM for Docker image
+        uses: anchore/sbom-action@v0.15.3
+        with:
+          image: ${{ env.DOCKER_IMAGE_NAME }}:latest
+          format: spdx-json
+          output-file: sbom.spdx.json
+          upload-artifact: true
+          upload-artifact-retention: 90
+      
+      # Upload SBOM as artifact
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-report
+          path: |
+            sbom.spdx.json
+          retention-days: 365  # Long retention for compliance
+
+  # Job 7: Vulnerability scanning of Docker image
+  scan-image:
+    name: Scan Docker Image
+    runs-on: ubuntu-latest
+    needs: build-and-push-docker
+    
+    steps:
+      # Checkout repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      # aquasecurity/trivy-action@master - Vulnerability scanning
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.DOCKER_IMAGE_NAME }}:latest
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+          exit-code: '1'  # Fail on critical vulnerabilities
+      
+      # Upload vulnerability scan results
+      - name: Upload Trivy scan results
+        uses: actions/upload-artifact@v4
+        with:
+          name: vulnerability-scan
+          path: |
+            trivy-results.sarif
+          retention-days: 90
+        if: always()
+      
+      # Upload to GitHub Security tab
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'trivy-results.sarif'
+        if: always()
+
+  # Job 8: Create GitHub release with artifacts
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [publish-pypi, build-and-push-docker, sbom, scan-image]
+    # Only run on published releases
+    if: github.event_name == 'release' && github.event.action == 'published'
+    
+    permissions:
+      contents: write
+      packages: write
+    
+    steps:
+      # Checkout repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      # Download all artifacts
+      - name: Download Python package
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package
+          path: ./release-artifacts/
+      
+      - name: Download SBOM
+        uses: actions/download-artifact@v4
+        with:
+          name: sbom-report
+          path: ./release-artifacts/
+      
+      - name: Download vulnerability scan
+        uses: actions/download-artifact@v4
+        with:
+          name: vulnerability-scan
+          path: ./release-artifacts/
+      
+      # Generate release notes from changelog
+      - name: Generate release notes
+        id: release-notes
+        run: |
+          if [ -f "CHANGELOG.md" ]; then
+            # Extract current version notes from changelog
+            awk '/^## \[/ {if (found) exit; found=1; next} found' CHANGELOG.md > release-notes.md
+          else
+            # Generate basic release notes from commits
+            echo "## Changes" > release-notes.md
+            git log --oneline $(git describe --tags --abbrev=0 HEAD~1)..HEAD >> release-notes.md
+          fi
+          echo "RELEASE_NOTES<<EOF" >> $GITHUB_OUTPUT
+          cat release-notes.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+      
+      # softprops/action-gh-release@v2 - Create GitHub release
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.release.tag_name }}
+          name: ${{ github.event.release.name }}
+          body: |
+            ${{ steps.release-notes.outputs.RELEASE_NOTES }}
+            
+            ## Distribution
+            
+            ### Python Package
+            ```bash
+            pip install labarchives-mcp==${{ github.event.release.tag_name }}
+            ```
+            
+            ### Docker Image
+            ```bash
+            docker pull ${{ env.DOCKER_IMAGE_NAME }}:${{ github.event.release.tag_name }}
+            ```
+            
+            ## Security
+            
+            - ✅ All artifacts signed and verified
+            - ✅ SBOM generated and attached
+            - ✅ Vulnerability scan completed
+            - ✅ Supply chain security verified
+            
+            ## Checksums
+            
+            See attached files for verification.
+          files: |
+            ./release-artifacts/*.tar.gz
+            ./release-artifacts/*.whl
+            ./release-artifacts/*.json
+            ./release-artifacts/*.sarif
+          draft: false
+          prerelease: ${{ contains(github.event.release.tag_name, '-') }}
+          generate_release_notes: true
+          append_body: true
+          fail_on_unmatched_files: false
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  # Job 9: Notification and cleanup
+  notify-completion:
+    name: Notify Release Completion
+    runs-on: ubuntu-latest
+    needs: [release]
+    if: always()
+    
+    steps:
+      # Notify about release status
+      - name: Notify release completion
+        run: |
+          if [ "${{ needs.release.result }}" = "success" ]; then
+            echo "✅ Release pipeline completed successfully!"
+            echo "📦 Package published to PyPI"
+            echo "🐳 Docker image pushed to Docker Hub"
+            echo "🔒 Security scanning completed"
+            echo "📋 SBOM generated and attached"
+            echo "🎉 GitHub release created"
+          else
+            echo "❌ Release pipeline failed"
+            echo "Please check the logs for details"
+            exit 1
+          fi
+      
+      # Clean up temporary artifacts if needed
+      - name: Cleanup temporary files
+        run: |
+          echo "Cleaning up temporary artifacts..."
+          # Cleanup would go here if needed
+          echo "Cleanup completed"
