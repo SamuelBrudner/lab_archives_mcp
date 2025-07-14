@@ -1,0 +1,94 @@
+# LabArchives MCP Server - Docker Compose Configuration
+# Provides containerized deployment for the LabArchives Model Context Protocol server
+# enabling secure, scalable access to electronic lab notebook data for AI applications
+
+version: '3.8'
+
+# Global variables for configuration management
+x-global-vars:
+  # Docker image for the MCP server container
+  MCP_SERVER_IMAGE: &mcp-server-image labarchives-mcp:latest
+  # Volume mapping for persistent log storage
+  LOGS_VOLUME: &logs-volume ./logs:/app/logs
+
+services:
+  # LabArchives MCP Server - Main service container
+  labarchives-mcp-server:
+    # Container image configuration
+    image: *mcp-server-image
+    
+    # Build configuration for local development
+    build:
+      context: ../src/cli
+      dockerfile: Dockerfile
+      
+    # Container identification and restart policy
+    container_name: labarchives-mcp-server
+    restart: unless-stopped
+    
+    # Environment variables for LabArchives API integration
+    # All sensitive credentials are injected at runtime via environment variables
+    environment:
+      # LabArchives API Access Key ID - required for authentication
+      - LABARCHIVES_AKID=${LABARCHIVES_AKID}
+      # LabArchives API Secret/Password - required for authentication
+      - LABARCHIVES_SECRET=${LABARCHIVES_SECRET}
+      # LabArchives username - required for SSO token authentication
+      - LABARCHIVES_USER=${LABARCHIVES_USER}
+      # LabArchives API base URL - varies by region (api.labarchives.com, auapi.labarchives.com)
+      - LABARCHIVES_API_BASE=${LABARCHIVES_API_BASE}
+      # Target notebook name for scope limitation
+      - LABARCHIVES_NOTEBOOK=${LABARCHIVES_NOTEBOOK}
+      # Logging verbosity level with default fallback
+      - LABARCHIVES_LOG_LEVEL=${LABARCHIVES_LOG_LEVEL:-INFO}
+    
+    # Volume mounts for persistent logging and audit trail
+    volumes:
+      - *logs-volume
+    
+    # Health check configuration for container orchestration
+    # Ensures MCP server is responsive and healthy
+    healthcheck:
+      # Health check command using curl to validate HTTP endpoint
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      # Health check frequency
+      interval: 30s
+      # Maximum time to wait for health check response
+      timeout: 10s
+      # Number of consecutive failures before container is marked unhealthy
+      retries: 3
+      # Initial delay before starting health checks
+      start_period: 10s
+    
+    # Port mapping for MCP protocol communication
+    # Exposes server on port 8080 for client connections
+    ports:
+      - "8080:8080"
+    
+    # Network configuration for service communication
+    networks:
+      - mcpnet
+    
+    # Container startup command with MCP server configuration
+    command: 
+      - labarchives-mcp
+      - --notebook-name
+      - ${LABARCHIVES_NOTEBOOK}
+      - --log-file
+      - /app/logs/server.log
+
+# Network configuration for MCP services
+networks:
+  # Bridge network for MCP server and potential future services
+  mcpnet:
+    driver: bridge
+    # Network configuration allows for future expansion
+    # such as reverse proxy, monitoring, or additional MCP clients
+
+# Volume configuration for data persistence
+volumes:
+  # Named volume for log persistence across container restarts
+  logs:
+    driver: local
+    # Local driver ensures logs are stored on the host filesystem
+    # Volume can be configured for external log aggregation systems
