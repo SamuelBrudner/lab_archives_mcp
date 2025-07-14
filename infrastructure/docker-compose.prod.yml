@@ -1,0 +1,273 @@
+version: '3.9'
+
+# Production Docker Compose configuration for LabArchives MCP Server
+# Provides containerized deployment with secure credential management,
+# comprehensive logging, health monitoring, and production-grade settings
+
+services:
+  labarchives-mcp-server:
+    # Primary service running the LabArchives MCP Server in production mode
+    image: labarchives-mcp:latest
+    
+    # Build configuration for local development and testing
+    build:
+      context: ../src/cli
+      dockerfile: Dockerfile
+      args:
+        PYTHON_VERSION: "3.11-slim-bookworm"
+    
+    # Container restart policy for production reliability
+    restart: unless-stopped
+    
+    # Environment variables for secure credential injection and configuration
+    environment:
+      # Required LabArchives API credentials (injected via external .env file)
+      - LABARCHIVES_AKID=${LABARCHIVES_AKID}
+      - LABARCHIVES_SECRET=${LABARCHIVES_SECRET}
+      - LABARCHIVES_USER=${LABARCHIVES_USER}
+      
+      # LabArchives API configuration with regional support
+      - LABARCHIVES_API_BASE=${LABARCHIVES_API_BASE:-https://api.labarchives.com/api}
+      
+      # MCP Server operational configuration
+      - MCP_SERVER_LOG_LEVEL=${MCP_SERVER_LOG_LEVEL:-INFO}
+      - MCP_SERVER_SCOPE_NOTEBOOK=${MCP_SERVER_SCOPE_NOTEBOOK:-}
+      - MCP_SERVER_JSON_LD=${MCP_SERVER_JSON_LD:-false}
+      
+      # Production-specific settings
+      - MCP_SERVER_ENVIRONMENT=production
+      - MCP_SERVER_METRICS_ENABLED=true
+      - MCP_SERVER_AUDIT_ENABLED=true
+      
+      # Security and compliance settings
+      - MCP_SERVER_SECURE_HEADERS=true
+      - MCP_SERVER_RATE_LIMITING=true
+      
+      # Container-specific configuration
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+    
+    # Network configuration for secure inter-container communication
+    networks:
+      - mcp-prod
+    
+    # Volume mounts for persistent logging and configuration
+    volumes:
+      # Persistent logging directory for audit compliance
+      - logs:/app/logs
+      # Optional: Mount configuration files for advanced setups
+      - ./config:/app/config:ro
+      # Optional: Mount certificates for enhanced security
+      - ./certs:/app/certs:ro
+    
+    # Health check configuration for production monitoring
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    # Port mapping for health check endpoints and potential monitoring
+    ports:
+      - "8080:8080"
+    
+    # Production logging configuration with rotation
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+        compress: "true"
+        labels: "service=labarchives-mcp-server,environment=production"
+    
+    # Resource limits for production stability
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 256M
+        reservations:
+          cpus: '0.5'
+          memory: 128M
+    
+    # Security configuration
+    security_opt:
+      - no-new-privileges:true
+    
+    # User configuration for security (non-root execution)
+    user: "1001:1001"
+    
+    # Read-only root filesystem for enhanced security
+    read_only: true
+    
+    # Temporary filesystems for writable directories
+    tmpfs:
+      - /tmp:rw,exec,nosuid,nodev,size=50m
+      - /var/tmp:rw,exec,nosuid,nodev,size=50m
+    
+    # Labels for container management and monitoring
+    labels:
+      - "com.labarchives.mcp.service=server"
+      - "com.labarchives.mcp.environment=production"
+      - "com.labarchives.mcp.version=0.1.0"
+      - "traefik.enable=false"  # Disable external routing for security
+    
+    # Dependency management for startup ordering
+    depends_on:
+      - log-rotator
+    
+    # Process management for graceful shutdown
+    stop_grace_period: 30s
+    stop_signal: SIGTERM
+
+  # Log rotation service for audit compliance and disk space management
+  log-rotator:
+    image: alpine:latest
+    restart: unless-stopped
+    
+    # Log rotation configuration
+    command: >
+      sh -c '
+        apk add --no-cache logrotate &&
+        echo "
+        /app/logs/*.log {
+          daily
+          rotate 30
+          compress
+          delaycompress
+          missingok
+          notifempty
+          create 644 1001 1001
+          postrotate
+            kill -USR1 \$(pgrep -f labarchives-mcp) 2>/dev/null || true
+          endscript
+        }" > /etc/logrotate.d/labarchives-mcp &&
+        while true; do
+          logrotate -f /etc/logrotate.d/labarchives-mcp
+          sleep 86400
+        done
+      '
+    
+    volumes:
+      - logs:/app/logs
+    
+    networks:
+      - mcp-prod
+    
+    labels:
+      - "com.labarchives.mcp.service=log-rotator"
+      - "com.labarchives.mcp.environment=production"
+
+  # Optional: Monitoring and metrics collection service
+  monitoring:
+    image: prom/prometheus:latest
+    restart: unless-stopped
+    
+    # Prometheus configuration for MCP server metrics
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    
+    networks:
+      - mcp-prod
+    
+    ports:
+      - "9090:9090"
+    
+    labels:
+      - "com.labarchives.mcp.service=monitoring"
+      - "com.labarchives.mcp.environment=production"
+    
+    # Only start if monitoring is enabled
+    profiles:
+      - monitoring
+
+# Network configuration for secure inter-container communication
+networks:
+  mcp-prod:
+    driver: bridge
+    driver_opts:
+      com.docker.network.enable_ipv6: "false"
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.0.0/16
+    labels:
+      - "com.labarchives.mcp.network=production"
+
+# Volume definitions for persistent data storage
+volumes:
+  # Persistent logging volume for audit compliance
+  logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${PWD}/logs
+    labels:
+      - "com.labarchives.mcp.volume=logs"
+      - "com.labarchives.mcp.environment=production"
+  
+  # Prometheus data volume (optional, for monitoring profile)
+  prometheus-data:
+    driver: local
+    labels:
+      - "com.labarchives.mcp.volume=prometheus"
+      - "com.labarchives.mcp.environment=production"
+
+# Global configuration and metadata
+x-production-config:
+  # Production deployment notes and configuration guidance
+  notes: |
+    Production Docker Compose Configuration for LabArchives MCP Server
+    
+    Prerequisites:
+    1. Create .env file with required environment variables:
+       - LABARCHIVES_AKID=your_access_key_id
+       - LABARCHIVES_SECRET=your_access_secret
+       - LABARCHIVES_USER=your_username
+    
+    2. Ensure proper directory structure:
+       - ./logs (for persistent logging)
+       - ./config (for configuration files)
+       - ./certs (for SSL certificates, if needed)
+    
+    3. Build or pull the labarchives-mcp image:
+       docker-compose -f docker-compose.prod.yml build
+    
+    Deployment Commands:
+    - Start: docker-compose -f docker-compose.prod.yml up -d
+    - Stop: docker-compose -f docker-compose.prod.yml down
+    - Logs: docker-compose -f docker-compose.prod.yml logs -f
+    - Monitor: docker-compose -f docker-compose.prod.yml --profile monitoring up -d
+    
+    Security Considerations:
+    - Credentials are injected via environment variables
+    - Non-root user execution (UID 1001)
+    - Read-only root filesystem
+    - Resource limits enforced
+    - Network isolation via dedicated bridge network
+    
+    Scaling:
+    - Horizontal scaling: docker-compose -f docker-compose.prod.yml up -d --scale labarchives-mcp-server=3
+    - Load balancing can be added via external proxy (Traefik, nginx)
+    
+    Monitoring:
+    - Health checks enabled for container orchestration
+    - Prometheus metrics available on port 9090 (with monitoring profile)
+    - Structured logging with JSON format
+    - Log rotation configured for long-term retention
+    
+    Compliance:
+    - Audit logs retained for 30 days with compression
+    - No sensitive data logged or persisted
+    - Stateless operation for data privacy
+    - Security headers and rate limiting enabled

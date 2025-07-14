@@ -1,0 +1,127 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: labarchives-mcp-server
+  labels:
+    app: labarchives-mcp
+    version: "0.1.0"
+    component: mcp-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: labarchives-mcp
+  template:
+    metadata:
+      labels:
+        app: labarchives-mcp
+        version: "0.1.0"
+        component: mcp-server
+    spec:
+      containers:
+      - name: labarchives-mcp
+        image: labarchives/mcp-server:0.1.0  # labarchives-mcp:0.1.0
+        imagePullPolicy: IfNotPresent
+        env:
+        # LabArchives API credentials from Secret
+        - name: LABARCHIVES_AKID
+          valueFrom:
+            secretKeyRef:
+              name: labarchives-mcp-secret
+              key: LABARCHIVES_AKID
+        - name: LABARCHIVES_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: labarchives-mcp-secret
+              key: LABARCHIVES_SECRET
+        - name: LABARCHIVES_USER
+          valueFrom:
+            secretKeyRef:
+              name: labarchives-mcp-secret
+              key: LABARCHIVES_USER
+        # Non-sensitive configuration from ConfigMap
+        - name: LABARCHIVES_API_BASE
+          valueFrom:
+            configMapKeyRef:
+              name: labarchives-mcp-config
+              key: LABARCHIVES_API_BASE
+        - name: LABARCHIVES_NOTEBOOK
+          valueFrom:
+            configMapKeyRef:
+              name: labarchives-mcp-config
+              key: LABARCHIVES_NOTEBOOK
+        # Direct environment variables
+        - name: LOG_LEVEL
+          value: "INFO"
+        args:
+        - "--notebook-name"
+        - "$(LABARCHIVES_NOTEBOOK)"
+        - "--verbose"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        # Health probes for Kubernetes lifecycle management
+        livenessProbe:
+          httpGet:
+            path: /health/live
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 30
+          timeoutSeconds: 2
+          failureThreshold: 3
+          successThreshold: 1
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 2
+          failureThreshold: 3
+          successThreshold: 1
+        # Security context for containerized deployment
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          runAsGroup: 1000
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        # Volume mounts for temporary storage
+        volumeMounts:
+        - name: tmp-volume
+          mountPath: /tmp
+        - name: app-logs
+          mountPath: /app/logs
+      # Pod-level security context
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      # Volumes for temporary storage (stateless design)
+      volumes:
+      - name: tmp-volume
+        emptyDir: {}
+      - name: app-logs
+        emptyDir: {}
+      # Restart policy for stateless application
+      restartPolicy: Always
+      # DNS policy for external API access
+      dnsPolicy: ClusterFirst
+      # Service account for minimal permissions
+      serviceAccountName: default
+      # Termination grace period for graceful shutdown
+      terminationGracePeriodSeconds: 30

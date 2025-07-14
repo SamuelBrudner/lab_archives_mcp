@@ -1,0 +1,227 @@
+# Kubernetes Ingress resource for LabArchives MCP Server
+# Provides external HTTP(S) access to the MCP server service with TLS termination
+# Supports SOC2, ISO 27001, HIPAA, and GDPR compliance requirements through secure transport
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: labarchives-mcp-server-ingress
+  namespace: default
+  labels:
+    app: labarchives-mcp
+    version: "0.1.0"
+    component: mcp-server
+    managed-by: kubernetes
+  annotations:
+    # Ingress controller configuration
+    kubernetes.io/ingress.class: "nginx"
+    
+    # Nginx-specific annotations for optimal MCP server performance
+    nginx.ingress.kubernetes.io/proxy-body-size: "16m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "10"
+    
+    # Security configurations
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+    nginx.ingress.kubernetes.io/ssl-protocols: "TLSv1.2 TLSv1.3"
+    nginx.ingress.kubernetes.io/ssl-ciphers: "ECDHE-ECDSA-AES128-GCM-SHA256,ECDHE-RSA-AES128-GCM-SHA256,ECDHE-ECDSA-AES256-GCM-SHA384,ECDHE-RSA-AES256-GCM-SHA384"
+    
+    # Additional security headers for compliance
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "X-Content-Type-Options: nosniff";
+      more_set_headers "X-Frame-Options: DENY";
+      more_set_headers "X-XSS-Protection: 1; mode=block";
+      more_set_headers "Strict-Transport-Security: max-age=31536000; includeSubDomains";
+      more_set_headers "Referrer-Policy: strict-origin-when-cross-origin";
+      more_set_headers "Content-Security-Policy: default-src 'self'";
+    
+    # TLS certificate management using cert-manager
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    cert-manager.io/acme-challenge-type: "http01"
+    
+    # Rate limiting for security and stability
+    nginx.ingress.kubernetes.io/rate-limit-rps: "10"
+    nginx.ingress.kubernetes.io/rate-limit-connections: "5"
+    
+    # Compliance and audit annotations
+    security.kubernetes.io/access-control: "external-https-only"
+    security.kubernetes.io/data-classification: "confidential"
+    compliance.kubernetes.io/soc2: "enabled"
+    compliance.kubernetes.io/iso27001: "enabled"
+    compliance.kubernetes.io/hipaa: "enabled"
+    compliance.kubernetes.io/gdpr: "enabled"
+    
+    # Operational annotations
+    description: "Kubernetes Ingress for LabArchives MCP Server. Provides secure external access to the MCP server via HTTPS with TLS termination."
+    kubernetes.io/managed-by: "labarchives-mcp-operator"
+    
+    # Documentation and support
+    documentation.kubernetes.io/deployment-guide: "https://github.com/org/labarchives-mcp-server/blob/main/docs/deployment.md"
+    support.kubernetes.io/contact: "team@lab.org"
+    
+    # Monitoring and observability
+    monitoring.kubernetes.io/scrape: "true"
+    monitoring.kubernetes.io/path: "/metrics"
+    
+spec:
+  # TLS configuration for secure HTTPS access
+  tls:
+  - hosts:
+    - labarchives-mcp.example.com
+    secretName: labarchives-mcp-tls
+  
+  # Ingress rules for routing HTTP(S) traffic
+  rules:
+  - host: labarchives-mcp.example.com
+    http:
+      paths:
+      # Main application path - routes all traffic to MCP server
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: labarchives-mcp  # References the service defined in service.yaml
+            port:
+              number: 8080
+      
+      # Health check endpoint for load balancer probes
+      - path: /health
+        pathType: Prefix
+        backend:
+          service:
+            name: labarchives-mcp
+            port:
+              number: 8080
+      
+      # Metrics endpoint for monitoring (if enabled)
+      - path: /metrics
+        pathType: Prefix
+        backend:
+          service:
+            name: labarchives-mcp
+            port:
+              number: 8080
+      
+      # API endpoints for MCP protocol communication
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: labarchives-mcp
+            port:
+              number: 8080
+
+---
+# Optional: IngressClass definition for explicit controller specification
+apiVersion: networking.k8s.io/v1
+kind: IngressClass
+metadata:
+  name: nginx-labarchives-mcp
+  labels:
+    app: labarchives-mcp
+    version: "0.1.0"
+    component: mcp-server
+  annotations:
+    ingressclass.kubernetes.io/is-default-class: "false"
+    description: "Nginx Ingress Class for LabArchives MCP Server with security optimizations"
+spec:
+  controller: k8s.io/ingress-nginx
+  parameters:
+    apiGroup: k8s.io
+    kind: ConfigMap
+    name: nginx-labarchives-mcp-config
+    namespace: default
+
+---
+# Optional: ConfigMap for nginx-specific configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-labarchives-mcp-config
+  namespace: default
+  labels:
+    app: labarchives-mcp
+    version: "0.1.0"
+    component: mcp-server
+  annotations:
+    description: "Nginx configuration for LabArchives MCP Server Ingress"
+data:
+  # Custom nginx configuration for MCP server optimization
+  server-snippet: |
+    # Enable HTTP/2 for better performance
+    listen 443 ssl http2;
+    
+    # Custom logging for audit and compliance
+    access_log /var/log/nginx/labarchives-mcp-access.log combined;
+    error_log /var/log/nginx/labarchives-mcp-error.log warn;
+    
+    # Enhanced security headers
+    add_header X-Request-ID $request_id always;
+    add_header X-Server-Name $hostname always;
+    
+  # Rate limiting configuration
+  limit-rate: "1m"
+  limit-rate-after: "1m"
+  
+  # SSL/TLS configuration
+  ssl-protocols: "TLSv1.2 TLSv1.3"
+  ssl-prefer-server-ciphers: "on"
+  ssl-session-cache: "shared:SSL:10m"
+  ssl-session-timeout: "10m"
+  
+  # Proxy configuration for MCP server
+  proxy-buffer-size: "16k"
+  proxy-buffers: "8 16k"
+  proxy-busy-buffers-size: "32k"
+  
+  # Connection keep-alive for performance
+  upstream-keepalive-connections: "32"
+  upstream-keepalive-requests: "100"
+  upstream-keepalive-timeout: "60s"
+
+---
+# Optional: NetworkPolicy for Ingress traffic control
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: labarchives-mcp-ingress-policy
+  namespace: default
+  labels:
+    app: labarchives-mcp
+    version: "0.1.0"
+    component: mcp-server
+  annotations:
+    description: "Network policy for LabArchives MCP Server Ingress traffic"
+spec:
+  podSelector:
+    matchLabels:
+      app: labarchives-mcp
+  policyTypes:
+  - Ingress
+  ingress:
+  # Allow traffic from nginx ingress controller
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 8080
+  
+  # Allow traffic from cert-manager for ACME challenges
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: cert-manager
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: cert-manager
+    ports:
+    - protocol: TCP
+      port: 8080

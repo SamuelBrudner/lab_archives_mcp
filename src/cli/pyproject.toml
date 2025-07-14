@@ -1,0 +1,277 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "labarchives-mcp"
+version = "0.1.0"
+description = "LabArchives MCP Server for AI integration via the Model Context Protocol."
+authors = [
+    {name = "LabArchives MCP Team", email = "team@labarchives.com"}
+]
+license = {text = "MIT"}
+readme = "README.md"
+requires-python = ">=3.11"
+keywords = ["labarchives", "mcp", "model-context-protocol", "ai", "research", "notebook"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+    "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
+    "Topic :: Database :: Front-Ends",
+    "Topic :: System :: Archiving",
+    "Framework :: AsyncIO",
+    "Environment :: Console",
+    "Natural Language :: English"
+]
+dependencies = [
+    "mcp>=1.0.0",
+    "fastmcp>=1.0.0",
+    "pydantic>=2.11.7",
+    "pydantic-settings>=2.10.1",
+    "requests>=2.31.0",
+    "urllib3>=2.0.0"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-mock>=3.10.0",
+    "black>=23.0.0",
+    "mypy>=1.0.0",
+    "ruff>=0.1.0",
+    "pre-commit>=3.0.0",
+    "isort>=5.12.0"
+]
+test = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-mock>=3.10.0",
+    "httpx>=0.24.0",
+    "respx>=0.20.0"
+]
+docs = [
+    "mkdocs>=1.5.0",
+    "mkdocs-material>=9.0.0",
+    "mkdocstrings[python]>=0.22.0"
+]
+
+[project.urls]
+Homepage = "https://github.com/org/labarchives-mcp-server"
+Documentation = "https://github.com/org/labarchives-mcp-server#readme"
+Source = "https://github.com/org/labarchives-mcp-server"
+Tracker = "https://github.com/org/labarchives-mcp-server/issues"
+Changelog = "https://github.com/org/labarchives-mcp-server/blob/main/CHANGELOG.md"
+
+[project.scripts]
+labarchives-mcp = "labarchives_mcp.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["labarchives_mcp*"]
+exclude = ["tests*"]
+
+[tool.setuptools.package-dir]
+"" = "src"
+
+[tool.pytest.ini_options]
+addopts = "--cov=src/cli --cov-report=term-missing --cov-report=html --cov-report=xml --strict-markers --strict-config"
+testpaths = ["src/cli/tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+markers = [
+    "unit: Unit tests",
+    "integration: Integration tests",
+    "e2e: End-to-end tests",
+    "slow: Slow running tests",
+    "network: Tests requiring network access"
+]
+filterwarnings = [
+    "error",
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning"
+]
+log_cli = true
+log_cli_level = "INFO"
+log_cli_format = "%(asctime)s [%(levelname)8s] %(name)s: %(message)s"
+log_cli_date_format = "%Y-%m-%d %H:%M:%S"
+asyncio_mode = "auto"
+
+[tool.coverage.run]
+source = ["src/cli"]
+omit = [
+    "*/tests/*",
+    "*/test_*",
+    "*/conftest.py",
+    "*/venv/*",
+    "*/.venv/*",
+    "*/build/*",
+    "*/dist/*"
+]
+branch = true
+parallel = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod"
+]
+ignore_errors = true
+show_missing = true
+precision = 2
+
+[tool.black]
+line-length = 100
+target-version = ['py311']
+skip-string-normalization = true
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+    \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+  | __pycache__
+)/
+'''
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+strict = true
+files = ["src/cli"]
+exclude = [
+    "build/",
+    "dist/",
+    "venv/",
+    ".venv/",
+    "__pycache__/",
+    "*.egg-info/",
+    ".mypy_cache/",
+    ".pytest_cache/"
+]
+warn_return_any = true
+warn_unused_configs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_unreachable = true
+strict_equality = true
+strict_optional = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+disallow_untyped_decorators = true
+disallow_any_generics = true
+disallow_subclassing_any = true
+no_implicit_optional = true
+check_untyped_defs = true
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "C",   # flake8-comprehensions
+    "B",   # flake8-bugbear
+    "UP",  # pyupgrade
+    "N",   # pep8-naming
+    "S",   # bandit
+    "T20", # flake8-print
+    "PT",  # flake8-pytest-style
+    "Q",   # flake8-quotes
+    "RSE", # flake8-raise
+    "RET", # flake8-return
+    "SIM", # flake8-simplify
+    "TCH", # flake8-type-checking
+    "ARG", # flake8-unused-arguments
+    "PTH", # flake8-use-pathlib
+    "ERA", # eradicate
+    "PL",  # pylint
+    "TRY", # tryceratops
+    "RUF", # ruff-specific rules
+]
+ignore = [
+    "S101",   # Use of assert
+    "S603",   # subprocess call with shell=True
+    "S607",   # Starting a process with a partial executable path
+    "PLR0913", # Too many arguments in function definition
+    "PLR0915", # Too many statements
+    "TRY003",  # Avoid specifying long messages outside the exception class
+    "PT004",   # Missing return value type annotation for fixture
+    "PT005",   # Fixture return type annotation should be `yield`
+]
+unfixable = [
+    "ERA001", # Don't remove commented code
+    "F401",   # Don't remove unused imports
+    "F841",   # Don't remove unused variables
+]
+
+[tool.ruff.per-file-ignores]
+"tests/*" = [
+    "S101",    # Use of assert
+    "PLR2004", # Magic value used in comparison
+    "S105",    # Hardcoded password
+    "S106",    # Hardcoded password
+    "ARG001",  # Unused function argument
+    "ARG002",  # Unused method argument
+]
+
+[tool.ruff.isort]
+known-first-party = ["labarchives_mcp"]
+force-single-line = true
+force-sort-within-sections = true
+lines-after-imports = 2
+
+[tool.ruff.flake8-quotes]
+docstring-quotes = "double"
+inline-quotes = "single"
+multiline-quotes = "double"
+
+[tool.ruff.flake8-pytest-style]
+fixture-parentheses = false
+mark-parentheses = false
+parametrize-names-type = "tuple"
+parametrize-values-type = "tuple"
+parametrize-values-row-type = "tuple"
+
+[tool.isort]
+profile = "black"
+line_length = 100
+known_first_party = ["labarchives_mcp"]
+force_single_line = true
+force_sort_within_sections = true
+lines_after_imports = 2
+skip_glob = ["**/migrations/*", "**/venv/*", "**/.venv/*"]
+
+[tool.bandit]
+exclude_dirs = ["tests", "venv", ".venv", "build", "dist"]
+skips = ["B101", "B601", "B603", "B607"]
+
+[tool.bandit.assert_used]
+skips = ["*/test_*.py", "*/*_test.py"]
