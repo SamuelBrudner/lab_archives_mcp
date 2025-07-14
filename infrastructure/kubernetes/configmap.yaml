@@ -1,0 +1,150 @@
+# LabArchives MCP Server ConfigMap
+# Provides non-sensitive configuration data for the MCP server container(s)
+# deployed in a Kubernetes cluster, supporting externalized configuration
+# and twelve-factor app principles for stateless deployments.
+#
+# Security Note: This ConfigMap contains only non-sensitive configuration.
+# Sensitive credentials (LABARCHIVES_AKID, LABARCHIVES_SECRET) must be
+# provided via a separate Kubernetes Secret resource.
+#
+# Usage: This ConfigMap is typically referenced in deployment.yaml under
+# the 'envFrom' section to inject all configuration as environment variables.
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  # ConfigMap name - must match references in deployment manifests
+  name: labarchives-mcp-config
+  
+  # Labels for resource management and selection
+  labels:
+    app: labarchives-mcp-server
+    component: configuration
+    version: "0.1.0"
+    tier: infrastructure
+    managed-by: kubernetes
+    
+  # Annotations for operational metadata
+  annotations:
+    description: "Non-sensitive configuration for LabArchives MCP Server"
+    documentation: "https://github.com/org/labarchives-mcp-server"
+    config.kubernetes.io/local-config: "true"
+    
+# Configuration data as key-value pairs
+# All values are strings as required by Kubernetes ConfigMap specification
+data:
+  # LabArchives API Configuration
+  # Regional API base URL - may vary by region (e.g., auapi.labarchives.com for Australia)
+  LABARCHIVES_API_BASE: "https://api.labarchives.com/api"
+  
+  # Default notebook name for scoped access
+  # Can be overridden via CLI or environment-specific ConfigMaps
+  LABARCHIVES_NOTEBOOK: "Research Lab Notebook"
+  
+  # Logging Configuration
+  # Log level for application logging (DEBUG, INFO, WARN, ERROR)
+  LABARCHIVES_LOG_LEVEL: "INFO"
+  
+  # JSON-LD context support flag
+  # Set to "true" to enable semantic context in MCP responses
+  LABARCHIVES_JSON_LD: "false"
+  
+  # Application log file path within container
+  # Ensure the directory exists and is writable by the container user
+  LABARCHIVES_LOG_FILE: "/var/log/labarchives_mcp.log"
+  
+  # MCP Server Configuration
+  # Server identification for MCP protocol handshake
+  MCP_SERVER_NAME: "labarchives-mcp-server"
+  
+  # Server version for capability negotiation
+  MCP_SERVER_VERSION: "0.1.0"
+  
+  # Health check endpoint path for Kubernetes probes
+  # Used by liveness and readiness probes in deployment
+  MCP_HEALTHCHECK_PATH: "/health"
+  
+  # Audit log file path for compliance and security monitoring
+  # Separate from application logs for security and compliance requirements
+  MCP_AUDIT_LOG_PATH: "/var/log/labarchives_mcp_audit.log"
+  
+  # Container Environment Configuration
+  # Python environment settings for optimal performance
+  PYTHONUNBUFFERED: "1"
+  PYTHONDONTWRITEBYTECODE: "1"
+  
+  # Timezone configuration for consistent logging
+  TZ: "UTC"
+  
+  # Application-specific settings
+  # Request timeout for LabArchives API calls (in seconds)
+  LABARCHIVES_REQUEST_TIMEOUT: "30"
+  
+  # Maximum number of concurrent API requests
+  LABARCHIVES_MAX_CONCURRENT_REQUESTS: "10"
+  
+  # Enable performance monitoring and metrics collection
+  ENABLE_METRICS: "true"
+  
+  # Metrics endpoint path for monitoring integration
+  METRICS_PATH: "/metrics"
+  
+  # Log format configuration (json, text)
+  LOG_FORMAT: "json"
+  
+  # Enable structured logging for better observability
+  STRUCTURED_LOGGING: "true"
+  
+  # Rate limiting configuration
+  # Maximum requests per minute per client
+  RATE_LIMIT_PER_MINUTE: "60"
+  
+  # Enable request tracing for debugging
+  ENABLE_TRACING: "false"
+  
+  # Configuration validation settings
+  # Strict validation mode for production deployments
+  STRICT_VALIDATION: "true"
+  
+  # Feature flags for gradual rollout
+  # Enable new features through configuration
+  FEATURE_JSON_LD_SUPPORT: "false"
+  FEATURE_ENHANCED_LOGGING: "true"
+  FEATURE_METRICS_COLLECTION: "true"
+  
+  # Operational settings
+  # Graceful shutdown timeout (in seconds)
+  GRACEFUL_SHUTDOWN_TIMEOUT: "30"
+  
+  # Worker process configuration
+  # Number of worker processes (typically 1 for MCP servers)
+  WORKER_PROCESSES: "1"
+  
+  # Memory limits and optimization
+  # Maximum memory usage before garbage collection
+  MAX_MEMORY_MB: "512"
+  
+  # Cache configuration
+  # TTL for cached responses (in seconds)
+  CACHE_TTL_SECONDS: "300"
+  
+  # Enable response caching for performance
+  ENABLE_CACHING: "true"
+  
+  # Security settings (non-sensitive)
+  # Enable security headers in HTTP responses
+  ENABLE_SECURITY_HEADERS: "true"
+  
+  # CORS configuration for web clients
+  CORS_ENABLED: "false"
+  
+  # API versioning
+  # API version for compatibility management
+  API_VERSION: "v1"
+  
+  # Client compatibility settings
+  # Minimum supported MCP protocol version
+  MIN_MCP_VERSION: "2024-11-05"
+  
+  # Maximum supported MCP protocol version
+  MAX_MCP_VERSION: "2024-11-05"
