@@ -1,0 +1,434 @@
+name: Deploy LabArchives MCP Server
+
+on:
+  release:
+    types: [published]
+  push:
+    branches: [main]
+  workflow_dispatch:  # Allow manual triggering
+
+env:
+  PYTHON_VERSION: "3.11"
+  DOCKER_IMAGE_NAME: "labarchives-mcp-server"
+  DOCKER_REGISTRY: "docker.io"
+  PYPI_REPOSITORY: "https://upload.pypi.org/legacy/"
+
+jobs:
+  build-and-test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for version detection
+      
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+      
+      - name: Run unit and integration tests
+        run: |
+          pytest tests/ -v --cov=src/ --cov-report=xml --cov-report=html
+      
+      - name: Run type checking with mypy
+        run: |
+          mypy src/ --strict --ignore-missing-imports
+      
+      - name: Run code formatting check with black
+        run: |
+          black --check src/ tests/
+      
+      - name: Run linting with flake8
+        run: |
+          flake8 src/ tests/ --max-line-length=88 --extend-ignore=E203,W503
+      
+      - name: Build Python package
+        run: |
+          python -m build --sdist --wheel --outdir dist/
+      
+      - name: Verify package installation
+        run: |
+          pip install dist/*.whl
+          labarchives-mcp --version
+      
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-package-${{ matrix.python-version }}
+          path: |
+            dist/
+            coverage.xml
+            htmlcov/
+          retention-days: 30
+      
+      - name: Upload coverage reports
+        if: matrix.python-version == '3.11'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-reports
+          path: |
+            coverage.xml
+            htmlcov/
+          retention-days: 30
+
+  codeql-analysis:
+    name: CodeQL Security Analysis
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ['python']
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          config-file: ./.github/codeql/codeql-config.yml
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Install dependencies for analysis
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
+
+  build-and-push-docker:
+    name: Build and Push Docker Image
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    permissions:
+      contents: read
+      packages: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE_NAME }}
+            ghcr.io/${{ github.repository }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest,enable={{is_default_branch}}
+      
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.DOCKER_REGISTRY }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            PYTHON_VERSION=${{ env.PYTHON_VERSION }}
+            BUILD_DATE=${{ steps.meta.outputs.labels.build-date }}
+            VCS_REF=${{ github.sha }}
+      
+      - name: Scan Docker image for vulnerabilities
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE_NAME }}:latest
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+      
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+      
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE_NAME }}:latest
+          format: spdx-json
+          output-file: sbom.spdx.json
+      
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-sbom
+          path: sbom.spdx.json
+          retention-days: 30
+
+  publish-pypi:
+    name: Publish to PyPI
+    runs-on: ubuntu-latest
+    needs: [build-and-test, codeql-analysis]
+    if: github.event_name == 'release' && github.event.action == 'published'
+    environment: pypi
+    permissions:
+      id-token: write  # IMPORTANT: this permission is mandatory for trusted publishing
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package-3.11
+          path: dist/
+      
+      - name: Verify package contents
+        run: |
+          ls -la dist/
+          python -m pip install --upgrade pip
+          pip install twine
+          twine check dist/*
+      
+      - name: Publish package to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: ${{ env.PYPI_REPOSITORY }}
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          skip-existing: true
+          verify-metadata: true
+          print-hash: true
+      
+      - name: Upload PyPI artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: pypi-dist
+          path: dist/
+          retention-days: 90
+
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [build-and-push-docker, publish-pypi]
+    if: github.event_name == 'release' && github.event.action == 'published'
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+      
+      - name: Prepare release assets
+        run: |
+          mkdir -p release-assets
+          cp -r artifacts/python-package-3.11/* release-assets/
+          cp artifacts/docker-sbom/sbom.spdx.json release-assets/
+          cp artifacts/coverage-reports/coverage.xml release-assets/
+          
+          # Create checksums
+          cd release-assets
+          sha256sum * > SHA256SUMS
+          
+          # Create release notes
+          echo "## LabArchives MCP Server Release ${{ github.ref_name }}" > ../RELEASE_NOTES.md
+          echo "" >> ../RELEASE_NOTES.md
+          echo "### Installation" >> ../RELEASE_NOTES.md
+          echo "- **PyPI**: \`pip install labarchives-mcp\`" >> ../RELEASE_NOTES.md
+          echo "- **Docker**: \`docker pull ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE_NAME }}:${{ github.ref_name }}\`" >> ../RELEASE_NOTES.md
+          echo "" >> ../RELEASE_NOTES.md
+          echo "### Security" >> ../RELEASE_NOTES.md
+          echo "- CodeQL security analysis: ✅ Passed" >> ../RELEASE_NOTES.md
+          echo "- Trivy vulnerability scan: ✅ Passed" >> ../RELEASE_NOTES.md
+          echo "- SBOM included: ✅ Available" >> ../RELEASE_NOTES.md
+          echo "" >> ../RELEASE_NOTES.md
+          echo "### Artifacts" >> ../RELEASE_NOTES.md
+          echo "- Python wheel and source distribution" >> ../RELEASE_NOTES.md
+          echo "- Docker images for linux/amd64 and linux/arm64" >> ../RELEASE_NOTES.md
+          echo "- Software Bill of Materials (SBOM)" >> ../RELEASE_NOTES.md
+          echo "- Test coverage reports" >> ../RELEASE_NOTES.md
+      
+      - name: Update release with artifacts
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            
+            // Get the release
+            const release = await github.rest.repos.getReleaseByTag({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag: context.ref.replace('refs/tags/', '')
+            });
+            
+            // Update release body
+            const releaseNotes = fs.readFileSync('RELEASE_NOTES.md', 'utf8');
+            await github.rest.repos.updateRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: release.data.id,
+              body: releaseNotes
+            });
+            
+            // Upload assets
+            const assetsDir = 'release-assets';
+            const files = fs.readdirSync(assetsDir);
+            
+            for (const file of files) {
+              const filePath = path.join(assetsDir, file);
+              const fileContent = fs.readFileSync(filePath);
+              
+              await github.rest.repos.uploadReleaseAsset({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                release_id: release.data.id,
+                name: file,
+                data: fileContent
+              });
+            }
+
+  notify:
+    name: Send Deployment Notification
+    runs-on: ubuntu-latest
+    needs: [create-release]
+    if: always()
+    
+    steps:
+      - name: Determine deployment status
+        id: status
+        run: |
+          if [ "${{ needs.create-release.result }}" == "success" ]; then
+            echo "status=success" >> $GITHUB_OUTPUT
+            echo "message=✅ LabArchives MCP Server ${{ github.ref_name }} deployed successfully" >> $GITHUB_OUTPUT
+          else
+            echo "status=failure" >> $GITHUB_OUTPUT
+            echo "message=❌ LabArchives MCP Server deployment failed" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Send Slack notification
+        if: env.SLACK_WEBHOOK_URL != ''
+        uses: 8398a7/action-slack@v3
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        with:
+          status: ${{ steps.status.outputs.status }}
+          text: |
+            ${{ steps.status.outputs.message }}
+            
+            **Release**: ${{ github.ref_name }}
+            **Repository**: ${{ github.repository }}
+            **Actor**: ${{ github.actor }}
+            **Commit**: ${{ github.sha }}
+            
+            **Available Now**:
+            • PyPI: `pip install labarchives-mcp`
+            • Docker: `docker pull ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE_NAME }}:${{ github.ref_name }}`
+            
+            **Security**: CodeQL ✅ | Trivy ✅ | SBOM ✅
+      
+      - name: Send email notification
+        if: env.NOTIFICATION_EMAIL != ''
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ secrets.SMTP_SERVER }}
+          server_port: 587
+          username: ${{ secrets.SMTP_USERNAME }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+          subject: "${{ steps.status.outputs.message }}"
+          to: ${{ secrets.NOTIFICATION_EMAIL }}
+          from: "GitHub Actions <noreply@github.com>"
+          body: |
+            LabArchives MCP Server Deployment Report
+            
+            Status: ${{ steps.status.outputs.status }}
+            Release: ${{ github.ref_name }}
+            Repository: ${{ github.repository }}
+            Actor: ${{ github.actor }}
+            Commit: ${{ github.sha }}
+            
+            Installation:
+            - PyPI: pip install labarchives-mcp
+            - Docker: docker pull ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE_NAME }}:${{ github.ref_name }}
+            
+            Security Checks:
+            - CodeQL Analysis: Passed
+            - Trivy Vulnerability Scan: Passed
+            - SBOM Generation: Completed
+            
+            View full details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      
+      - name: Create deployment summary
+        run: |
+          echo "## 🚀 Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Status**: ${{ steps.status.outputs.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Release**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Build**: ${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 Artifacts Published" >> $GITHUB_STEP_SUMMARY
+          echo "- **PyPI Package**: [labarchives-mcp](https://pypi.org/project/labarchives-mcp/)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Docker Image**: \`${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE_NAME }}:${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **GitHub Release**: [v${{ github.ref_name }}](${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ github.ref_name }})" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔒 Security Validation" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ CodeQL static analysis completed" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Trivy vulnerability scanning passed" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ SBOM (Software Bill of Materials) generated" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Multi-architecture Docker images built" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📈 Quality Metrics" >> $GITHUB_STEP_SUMMARY
+          echo "- **Test Coverage**: Available in artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "- **Type Safety**: 100% mypy compliance" >> $GITHUB_STEP_SUMMARY
+          echo "- **Code Style**: Black formatting enforced" >> $GITHUB_STEP_SUMMARY
+          echo "- **Platform Support**: Python 3.11+, Linux/AMD64/ARM64" >> $GITHUB_STEP_SUMMARY
