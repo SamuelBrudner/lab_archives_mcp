@@ -52,6 +52,9 @@ from src.cli.commands.start import start_command
 # Internal imports for version information
 from src.cli.constants import MCP_SERVER_VERSION
 
+# Internal imports for utility functions
+from src.cli.utils import sanitize_argv
+
 # =============================================================================
 # Global Constants and Configuration
 # =============================================================================
@@ -190,14 +193,14 @@ def build_cli_parser() -> argparse.ArgumentParser:
         
         # Add start-specific arguments
         start_parser.add_argument(
-            '--access-key-id',
+            '-k', '--access-key-id',
             type=str,
             help='LabArchives API access key ID. Can also be set via '
                  'LABARCHIVES_AKID environment variable. Required for authentication.'
         )
         
         start_parser.add_argument(
-            '--access-secret',
+            '-p', '--access-secret',
             type=str,
             help='LabArchives API access secret or user token. Can also be set via '
                  'LABARCHIVES_SECRET environment variable. Required for authentication.'
@@ -265,14 +268,14 @@ def build_cli_parser() -> argparse.ArgumentParser:
         
         # Add authenticate-specific arguments (same as start for credential validation)
         auth_parser.add_argument(
-            '--access-key-id',
+            '-k', '--access-key-id',
             type=str,
             help='LabArchives API access key ID. Can also be set via '
                  'LABARCHIVES_AKID environment variable. Required for authentication.'
         )
         
         auth_parser.add_argument(
-            '--access-secret',
+            '-p', '--access-secret',
             type=str,
             help='LabArchives API access secret or user token. Can also be set via '
                  'LABARCHIVES_SECRET environment variable. Required for authentication.'
@@ -438,7 +441,7 @@ def parse_and_dispatch_cli(argv: list[str] = None) -> int:
                 extra={
                     "event": "cli_command_start",
                     "command": args.command,
-                    "argv": argv,
+                    "argv": sanitize_argv(argv),  # Sanitize sensitive arguments
                     "config_file": args.config_file,
                     "verbose": getattr(args, 'verbose', False),
                     "quiet": getattr(args, 'quiet', False)
