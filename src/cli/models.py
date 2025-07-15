@@ -102,7 +102,7 @@ class AuthenticationConfig(BaseModel):
         # Use enum values for better serialization
         use_enum_values = True
         # Provide example values for documentation
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "access_key_id": "AKID1234567890ABCDEF",
                 "access_secret": "your-api-password-or-token",
@@ -195,7 +195,7 @@ class ScopeConfig(BaseModel):
         """Pydantic configuration for ScopeConfig model."""
         validate_assignment = True
         use_enum_values = True
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "notebook_id": "notebook_12345",
                 "notebook_name": None,
@@ -242,7 +242,7 @@ class OutputConfig(BaseModel):
         """Pydantic configuration for OutputConfig model."""
         validate_assignment = True
         use_enum_values = True
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "json_ld_enabled": False,
                 "structured_output": True
@@ -285,7 +285,7 @@ class LoggingConfig(BaseModel):
     log_level: str = Field(
         default=DEFAULT_LOG_LEVEL,
         description="Logging level - controls verbosity of log output",
-        regex=r"^(DEBUG|INFO|WARNING|ERROR|CRITICAL)$",
+        pattern=r"^(DEBUG|INFO|WARNING|ERROR|CRITICAL)$",
         example="INFO"
     )
     
@@ -329,7 +329,7 @@ class LoggingConfig(BaseModel):
         """Pydantic configuration for LoggingConfig model."""
         validate_assignment = True
         use_enum_values = True
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "log_file": "labarchives_mcp.log",
                 "log_level": "INFO",
@@ -414,8 +414,8 @@ class ServerConfiguration(BaseModel):
         validate_assignment = True
         use_enum_values = True
         # Prevent modification after initialization for security
-        allow_mutation = False
-        schema_extra = {
+
+        json_schema_extra = {
             "example": {
                 "authentication": {
                     "access_key_id": "AKID1234567890ABCDEF",
