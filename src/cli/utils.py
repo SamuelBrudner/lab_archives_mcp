@@ -24,6 +24,7 @@ configuration management, authentication systems, and audit logging requirements
 
 import os  # builtin - Provides file system operations, path expansion, and environment variable access
 import json  # builtin - Used for reading and writing JSON configuration and state files
+import re  # builtin - Used for regex operations in environment variable sanitization
 from typing import Any, Optional, Union  # builtin - Supports type annotations for utility function signatures
 
 from src.cli.exceptions import LabArchivesMCPException
@@ -693,3 +694,218 @@ def is_valid_json_file(file_path: str) -> bool:
         # Handle any unexpected errors by returning False
         # This ensures the function never raises exceptions, maintaining its contract
         return False
+
+
+def sanitize_env_var(var_name: str) -> str:
+    """
+    Sanitizes environment variable names by stripping whitespace, converting to uppercase,
+    and replacing invalid characters with underscores.
+    
+    Args:
+        var_name (str): The environment variable name to sanitize.
+    
+    Returns:
+        str: The sanitized environment variable name.
+    
+    Examples:
+        >>> sanitize_env_var("  DATABASE_URL  ")
+        'DATABASE_URL'
+        >>> sanitize_env_var("api_key")
+        'API_KEY'
+        >>> sanitize_env_var("with-dashes")
+        'WITH_DASHES'
+    """
+    if var_name is None:
+        raise TypeError("Variable name cannot be None")
+    
+    if not isinstance(var_name, str):
+        raise TypeError("Variable name must be a string")
+    
+    # Strip whitespace and convert to uppercase
+    cleaned = var_name.strip().upper()
+    
+    # Replace sequences of invalid characters with a single underscore
+    # This preserves existing underscores but collapses sequences of special chars
+    cleaned = re.sub(r'[^A-Z0-9_]+', '_', cleaned)
+    
+    return cleaned
+
+
+def deep_merge_dicts(dict1: dict, dict2: dict) -> dict:
+    """
+    Recursively merges two dictionaries, with dict2 values taking precedence.
+    
+    Args:
+        dict1 (dict): The base dictionary.
+        dict2 (dict): The dictionary to merge into dict1.
+    
+    Returns:
+        dict: The merged dictionary.
+    """
+    result = dict1.copy()
+    
+    for key, value in dict2.items():
+        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+            result[key] = deep_merge_dicts(result[key], value)
+        else:
+            result[key] = value
+    
+    return result
+
+
+def parse_iso_datetime(datetime_str: str):
+    """
+    Parses an ISO datetime string into a datetime object.
+    
+    Args:
+        datetime_str (str): The ISO datetime string to parse.
+    
+    Returns:
+        datetime: The parsed datetime object.
+    """
+    from datetime import datetime
+    
+    if datetime_str is None:
+        raise TypeError("datetime_str cannot be None")
+    
+    if not isinstance(datetime_str, str):
+        raise TypeError("datetime_str must be a string")
+    
+    if not datetime_str.strip():
+        raise ValueError("datetime_str cannot be empty")
+    
+    try:
+        # Try parsing with timezone info
+        return datetime.fromisoformat(datetime_str.replace('Z', '+00:00'))
+    except ValueError:
+        # Fallback to basic parsing
+        return datetime.fromisoformat(datetime_str)
+
+
+def flatten_dict(d: dict, parent_key: str = '', sep: str = '.', separator: str = None) -> dict:
+    """
+    Flattens a nested dictionary into a single-level dictionary.
+    
+    Args:
+        d (dict): The dictionary to flatten.
+        parent_key (str): The parent key prefix.
+        sep (str): The separator to use between keys.
+        separator (str): Alternative name for sep parameter (for backward compatibility).
+    
+    Returns:
+        dict: The flattened dictionary.
+    """
+    if d is None:
+        raise TypeError("Dictionary cannot be None")
+    
+    if not isinstance(d, dict):
+        raise TypeError("Input must be a dictionary")
+    
+    # Handle separator parameter for backward compatibility
+    if separator is not None:
+        sep = separator
+    
+    items = []
+    
+    for k, v in d.items():
+        new_key = f"{parent_key}{sep}{k}" if parent_key else k
+        
+        if isinstance(v, dict):
+            items.extend(flatten_dict(v, new_key, sep=sep).items())
+        else:
+            items.append((new_key, v))
+    
+    return dict(items)
+
+
+def safe_serialize(obj: Any) -> str:
+    """
+    Serializes objects to JSON for logging and error reporting, handling non-serializable 
+    fields gracefully.
+    
+    Args:
+        obj (Any): The object to serialize to JSON.
+    
+    Returns:
+        str: JSON string representation of the object.
+    """
+    def json_serializer(obj: Any) -> Any:
+        """Custom JSON serializer that handles non-serializable objects gracefully."""
+        try:
+            # Handle datetime objects
+            if hasattr(obj, 'isoformat'):
+                return obj.isoformat()
+            
+            # Handle Pydantic models
+            if hasattr(obj, 'model_dump'):
+                return obj.model_dump()
+            
+            # Handle exceptions
+            if isinstance(obj, Exception):
+                return {
+                    'error_type': type(obj).__name__,
+                    'message': str(obj)
+                }
+            
+            # Handle other objects by converting to string
+            return str(obj)
+        except Exception:
+            return "<non-serializable>"
+    
+    try:
+        return json.dumps(obj, default=json_serializer, indent=2)
+    except Exception:
+        return f"<serialization-error: {type(obj).__name__}>"
+
+
+def sanitize_argv(argv: list) -> list:
+    """
+    Sanitizes command-line arguments to prevent sensitive credentials from appearing in logs.
+    
+    This function replaces values for sensitive arguments like --access-key-id, --access-secret,
+    and their short forms with '[REDACTED]' markers while preserving the argument structure.
+    
+    Args:
+        argv (list): List of command-line arguments to sanitize.
+    
+    Returns:
+        list: Sanitized list of arguments with sensitive values replaced.
+    
+    Examples:
+        >>> sanitize_argv(['--access-key-id', 'secret123', '--verbose'])
+        ['--access-key-id', '[REDACTED]', '--verbose']
+    """
+    if not argv:
+        return []
+    
+    sanitized = []
+    sensitive_args = {
+        '--access-key-id', '-k',
+        '--access-secret', '-p',
+        '--password',
+        '--token',
+        '--secret',
+        '--key',
+        '--credential'
+    }
+    
+    i = 0
+    while i < len(argv):
+        arg = argv[i]
+        sanitized.append(arg)
+        
+        # Check if this is a sensitive argument
+        if arg in sensitive_args:
+            # If there's a next argument and it's not another flag, redact it
+            if i + 1 < len(argv) and not argv[i + 1].startswith('-'):
+                sanitized.append('[REDACTED]')
+                i += 1  # Skip the original value
+        # Check for --arg=value format
+        elif '=' in arg:
+            key, value = arg.split('=', 1)
+            if key in sensitive_args:
+                sanitized[-1] = f"{key}=[REDACTED]"
+        
+        i += 1
+    
+    return sanitized
