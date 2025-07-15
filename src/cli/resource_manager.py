@@ -371,11 +371,17 @@ class ResourceManager:
             # Get page list for the notebook to check folder containment
             page_list_response = self.api_client.list_pages(notebook.id)
             
-            # Check if any page is in the specified folder path
+            # Check if any page is in the specified folder path using proper path hierarchy validation
             for page in page_list_response.pages:
-                if page.folder_path and folder_path in page.folder_path:
-                    self.logger.debug(f"Notebook {notebook.id} contains folder {folder_path} via page {page.id}")
-                    return True
+                if page.folder_path and page.folder_path.strip() and folder_path and folder_path.strip():
+                    # Normalize both paths for comparison
+                    normalized_folder = folder_path.rstrip('/')
+                    normalized_page_path = page.folder_path.rstrip('/')
+                    
+                    # Check if page is within folder using proper path prefix matching
+                    if normalized_page_path.startswith(normalized_folder + '/') or normalized_page_path == normalized_folder:
+                        self.logger.debug(f"Notebook {notebook.id} contains folder {folder_path} via page {page.id}")
+                        return True
             
             # No pages found in the specified folder
             self.logger.debug(f"Notebook {notebook.id} does not contain folder {folder_path}")
@@ -430,8 +436,16 @@ class ResourceManager:
                     # Get page list for the specified notebook
                     page_list_response = self.api_client.list_pages(notebook_id)
                     
+                    # Apply folder filtering if configured
+                    pages_to_process = page_list_response.pages
+                    if folder_path and folder_path.strip():
+                        pages_to_process = [p for p in page_list_response.pages 
+                                          if p.folder_path and p.folder_path.strip() and 
+                                          (p.folder_path.rstrip('/').startswith(folder_path.rstrip('/') + '/') or 
+                                           p.folder_path.rstrip('/') == folder_path.rstrip('/'))]
+                    
                     # Transform each page to MCP resource
-                    for page in page_list_response.pages:
+                    for page in pages_to_process:
                         # Create parent URI for hierarchical context
                         parent_uri = f"{MCP_RESOURCE_URI_SCHEME}notebook/{notebook_id}"
                         
@@ -480,8 +494,16 @@ class ResourceManager:
                     # List pages for the found notebook
                     page_list_response = self.api_client.list_pages(target_notebook.id)
                     
+                    # Apply folder filtering if configured
+                    pages_to_process = page_list_response.pages
+                    if folder_path and folder_path.strip():
+                        pages_to_process = [p for p in page_list_response.pages 
+                                          if p.folder_path and p.folder_path.strip() and 
+                                          (p.folder_path.rstrip('/').startswith(folder_path.rstrip('/') + '/') or 
+                                           p.folder_path.rstrip('/') == folder_path.rstrip('/'))]
+                    
                     # Transform each page to MCP resource
-                    for page in page_list_response.pages:
+                    for page in pages_to_process:
                         # Create parent URI for hierarchical context
                         parent_uri = f"{MCP_RESOURCE_URI_SCHEME}notebook/{target_notebook.id}"
                         
@@ -639,6 +661,15 @@ class ResourceManager:
                     # Get page list for the notebook
                     page_list_response = self.api_client.list_pages(notebook_id)
                     
+                    # Apply folder filtering if configured
+                    pages_to_include = page_list_response.pages
+                    folder_path = self.scope_config.get('folder_path')
+                    if folder_path and folder_path.strip():
+                        pages_to_include = [p for p in page_list_response.pages 
+                                          if p.folder_path and p.folder_path.strip() and 
+                                          (p.folder_path.rstrip('/').startswith(folder_path.rstrip('/') + '/') or 
+                                           p.folder_path.rstrip('/') == folder_path.rstrip('/'))]
+                    
                     # Create comprehensive notebook content
                     notebook_content = {
                         "id": target_notebook.id,
@@ -659,7 +690,7 @@ class ResourceManager:
                                 "modified": page.last_modified.isoformat(),
                                 "entry_count": page.entry_count
                             }
-                            for page in page_list_response.pages
+                            for page in pages_to_include
                         ]
                     }
                     
@@ -730,6 +761,21 @@ class ResourceManager:
                             code=404,
                             context={"page_id": page_id, "notebook_id": notebook_id}
                         )
+                    
+                    # Validate folder scope for pages
+                    folder_path = self.scope_config.get('folder_path')
+                    if folder_path and folder_path.strip() and target_page.folder_path and target_page.folder_path.strip():
+                        normalized_folder = folder_path.rstrip('/')
+                        normalized_page_path = target_page.folder_path.rstrip('/')
+                        
+                        if not (normalized_page_path.startswith(normalized_folder + '/') or 
+                                normalized_page_path == normalized_folder):
+                            self.logger.warning(f"Page access denied - outside folder scope: {target_page.folder_path}")
+                            raise LabArchivesMCPException(
+                                message="Page access denied - outside folder scope",
+                                code=403,
+                                context={"page_id": page_id, "folder_path": target_page.folder_path, "scope_folder": folder_path}
+                            )
                     
                     # Get entry list for the page
                     entry_list_response = self.api_client.list_entries(page_id)
@@ -824,6 +870,39 @@ class ResourceManager:
                     
                     # Get the entry (should be only one)
                     entry = entry_response.entries[0]
+                    
+                    # Validate folder scope for entries by checking their parent page
+                    folder_path = self.scope_config.get('folder_path')
+                    if folder_path and folder_path.strip() and entry.page_id:
+                        try:
+                            # Get the parent page to check its folder_path
+                            page_list_response = self.api_client.list_pages(entry.notebook_id)
+                            entry_page = None
+                            for page in page_list_response.pages:
+                                if page.id == entry.page_id:
+                                    entry_page = page
+                                    break
+                            
+                            if entry_page and entry_page.folder_path and entry_page.folder_path.strip():
+                                normalized_folder = folder_path.rstrip('/')
+                                normalized_page_path = entry_page.folder_path.rstrip('/')
+                                
+                                if not (normalized_page_path.startswith(normalized_folder + '/') or 
+                                        normalized_page_path == normalized_folder):
+                                    self.logger.warning(f"Entry access denied - parent page outside folder scope: {entry_page.folder_path}")
+                                    raise LabArchivesMCPException(
+                                        message="Entry access denied - parent page outside folder scope",
+                                        code=403,
+                                        context={"entry_id": entry_id, "page_folder_path": entry_page.folder_path, "scope_folder": folder_path}
+                                    )
+                        except APIError as api_error:
+                            # If we can't validate the folder scope, deny access for security
+                            self.logger.error(f"Unable to validate folder scope for entry {entry_id}: {api_error}")
+                            raise LabArchivesMCPException(
+                                message="Unable to validate folder scope for entry",
+                                code=500,
+                                context={"entry_id": entry_id, "error": str(api_error)}
+                            )
                     
                     # Transform to MCP resource content using the existing function
                     resource_content = labarchives_to_mcp_resource(entry)
