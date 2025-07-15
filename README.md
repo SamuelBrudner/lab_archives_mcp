@@ -157,7 +157,7 @@ docker run -e LABARCHIVES_AKID=AKID123 -e LABARCHIVES_SECRET=token \
 
 | Option | Short | Purpose | Example |
 |--------|-------|---------|---------|
-| `--access-key` | `-k` | LabArchives API Access Key ID | `-k ABCD1234` |
+| `--access-key-id` | `-k` | LabArchives API Access Key ID | `-k ABCD1234` |
 | `--access-secret` | `-p` | API Password/Token | `-p secret_token` |
 | `--username` | `-u` | Username for token auth | `-u user@lab.edu` |
 | `--notebook-name` | `-n` | Scope to specific notebook | `-n "Lab Notebook A"` |
@@ -261,7 +261,7 @@ The system maintains compliance with institutional and regulatory requirements:
 
 ```bash
 # Test authentication
-labarchives-mcp --access-key AKID123 --access-secret token --username user@lab.edu
+labarchives-mcp --access-key-id AKID123 --access-secret token --username user@lab.edu
 ```
 
 #### Connection Issues
