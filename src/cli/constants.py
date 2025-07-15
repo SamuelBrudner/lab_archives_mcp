@@ -7,9 +7,24 @@ including default values, URLs, timeouts, and other configuration constants.
 
 # Default LabArchives API configuration
 DEFAULT_API_BASE_URL = "https://api.labarchives.com"
+AU_API_BASE_URL = "https://auapi.labarchives.com"
+UK_API_BASE_URL = "https://ukapi.labarchives.com"
 DEFAULT_TIMEOUT_SECONDS = 30
 DEFAULT_RETRY_COUNT = 3
 DEFAULT_RETRY_BACKOFF = 2
+
+# Supported regions
+SUPPORTED_REGIONS = ["US", "AU", "UK"]
+
+# Region API base URLs mapping
+REGION_API_BASE_URLS = {
+    "US": DEFAULT_API_BASE_URL,
+    "AU": AU_API_BASE_URL,
+    "UK": UK_API_BASE_URL
+}
+
+# Supported scope types
+SUPPORTED_SCOPE_TYPES = ["notebook_id", "notebook_name", "folder_path"]
 
 # MCP Resource URI Scheme
 MCP_RESOURCE_URI_SCHEME = "labarchives://"
