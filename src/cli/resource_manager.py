@@ -352,6 +352,40 @@ class ResourceManager:
             "api_client_configured": bool(api_client)
         })
     
+    def _notebook_contains_folder(self, notebook, folder_path: str) -> bool:
+        """
+        Check if a notebook contains pages in the specified folder path.
+        
+        This method enforces folder-scoped access control by checking if any pages
+        within the notebook reside in the specified folder path. It makes an API call
+        to list pages for the notebook and examines their folder_path metadata.
+        
+        Args:
+            notebook: The notebook object to check
+            folder_path (str): The folder path to check for
+            
+        Returns:
+            bool: True if the notebook contains pages in the folder path, False otherwise
+        """
+        try:
+            # Get page list for the notebook to check folder containment
+            page_list_response = self.api_client.list_pages(notebook.id)
+            
+            # Check if any page is in the specified folder path
+            for page in page_list_response.pages:
+                if page.folder_path and folder_path in page.folder_path:
+                    self.logger.debug(f"Notebook {notebook.id} contains folder {folder_path} via page {page.id}")
+                    return True
+            
+            # No pages found in the specified folder
+            self.logger.debug(f"Notebook {notebook.id} does not contain folder {folder_path}")
+            return False
+            
+        except Exception as e:
+            # Log error but don't fail - allow notebook to be included for safety
+            self.logger.warning(f"Error checking folder containment for notebook {notebook.id}: {e}")
+            return True
+    
     def list_resources(self) -> List[MCPResource]:
         """
         Enumerates available MCP resources (notebooks, pages, entries) within the configured scope.
@@ -480,12 +514,9 @@ class ResourceManager:
                         
                         # Apply folder scope filtering if configured
                         if folder_path:
-                            # For folder scope, we need to check if the notebook contains pages
-                            # in the specified folder. This is a simplified implementation
-                            # that filters based on notebook-level metadata.
-                            # A more sophisticated implementation would examine page folder_path
-                            # metadata, but that requires additional API calls.
-                            pass  # Allow all notebooks for now, folder filtering happens during page listing
+                            # Skip notebooks that don't contain the folder
+                            if not self._notebook_contains_folder(notebook, folder_path):
+                                continue
                         
                         resources.append(mcp_resource)
                         self.logger.debug(f"Added notebook resource: {mcp_resource.uri}")
