@@ -208,7 +208,7 @@ def main() -> None:
         logger.info("Starting LabArchives MCP Server CLI", extra={
             'operation': 'main',
             'event': 'startup_initiated',
-            'version': VERSION
+            'version': __version__
         })
         
         try:
