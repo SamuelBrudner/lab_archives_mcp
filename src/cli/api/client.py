@@ -175,7 +175,7 @@ class LabArchivesAPIClient:
             total=MAX_RETRIES,
             backoff_factor=RETRY_BACKOFF_SECONDS,
             status_forcelist=[429, 500, 502, 503, 504],
-            method_whitelist=["GET", "POST"]
+            allowed_methods=["GET", "POST"]
         )
         
         # Mount HTTP adapter with retry strategy
