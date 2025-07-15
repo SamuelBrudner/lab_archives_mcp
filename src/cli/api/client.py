@@ -491,9 +491,13 @@ class LabArchivesAPIClient:
                 auth_params["email"] = self.username
                 auth_params["token"] = self.access_password
             else:
-                # For direct API key authentication, we need to make a test call
-                # to validate credentials and get user info
-                pass
+                # For direct API key authentication, use HMAC signature
+                auth_params["ts"] = str(int(time.time()))
+                auth_params["sig"] = self._generate_signature(
+                    "GET", 
+                    LABARCHIVES_API_ENDPOINTS["user_info"], 
+                    auth_params
+                )
             
             # Make authentication request
             response = self._make_request(
