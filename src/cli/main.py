@@ -27,7 +27,7 @@ import logging  # builtin - Standard logging interface for error and status repo
 import os  # builtin - Operating system interface for environment variables and process management
 
 # Internal imports - CLI argument parsing functionality
-from src.cli.cli_parser import parse_cli_args
+from src.cli.cli_parser import parse_and_dispatch_cli
 
 # Internal imports - Configuration management and loading
 from src.cli.config import load_configuration
@@ -36,13 +36,13 @@ from src.cli.config import load_configuration
 from src.cli.logging_setup import setup_logging
 
 # Internal imports - Authentication management for LabArchives API
-from src.cli.auth_manager import AuthManager
+from src.cli.auth_manager import AuthenticationManager
 
 # Internal imports - Resource management for MCP protocol handlers
 from src.cli.resource_manager import ResourceManager
 
 # Internal imports - MCP server implementation using FastMCP
-from src.cli.mcp_server import LabArchivesMCPServer
+from src.cli.mcp_server import main as mcp_server_main
 
 # Internal imports - Exception handling for structured error management
 from src.cli.exceptions import (
@@ -52,7 +52,7 @@ from src.cli.exceptions import (
 )
 
 # Internal imports - Version information for display and logging
-from src.cli.version import VERSION
+from src.cli.version import __version__
 
 # =============================================================================
 # Global Variables
@@ -163,15 +163,15 @@ def main() -> None:
     authentication, resource management, and MCP server initialization.
     
     The function implements a comprehensive startup sequence:
-    1. Parse CLI arguments using parse_cli_args() from cli_parser
+    1. Parse CLI arguments using parse_and_dispatch_cli() from cli_parser
     2. Handle special cases like --help and --version display
     3. Load and validate configuration using load_configuration() from config
     4. Initialize logging using setup_logging() from logging_setup
     5. Log startup banner with version and configuration summary
-    6. Initialize AuthManager with loaded configuration
-    7. Authenticate with LabArchives API using AuthManager
+    6. Initialize AuthenticationManager with loaded configuration
+    7. Authenticate with LabArchives API using AuthenticationManager
     8. Initialize ResourceManager with authenticated session context
-    9. Instantiate LabArchivesMCPServer with resource handlers
+    9. Launch MCP server with resource handlers
     10. Register signal handlers for graceful shutdown
     11. Start the MCP server event loop using asyncio
     12. Handle all errors with appropriate logging and exit codes
@@ -204,7 +204,7 @@ def main() -> None:
     exit_code = 0
     
     try:
-        # Step 1: Parse CLI arguments using parse_cli_args() from cli_parser
+        # Step 1: Parse CLI arguments using parse_and_dispatch_cli() from cli_parser
         logger.info("Starting LabArchives MCP Server CLI", extra={
             'operation': 'main',
             'event': 'startup_initiated',
@@ -212,7 +212,7 @@ def main() -> None:
         })
         
         try:
-            args = parse_cli_args()
+            args = parse_and_dispatch_cli()
             
             # Log successful argument parsing
             logger.debug("CLI arguments parsed successfully", extra={
@@ -246,8 +246,18 @@ def main() -> None:
             })
             sys.exit(1)
         
-        # Step 2: Handle special cases (already handled by parse_cli_args)
+        # Step 2: Handle special cases (already handled by parse_and_dispatch_cli)
         # --help and --version are handled by argparse and cause SystemExit
+        
+        # Check if authenticate command - handle separately
+        if hasattr(args, 'command') and args.command == 'authenticate':
+            from src.cli.commands.authenticate import authenticate_command
+            try:
+                exit_code = authenticate_command(args)
+                sys.exit(exit_code)
+            except Exception as e:
+                print(f"Authentication check failed: {str(e)}", file=sys.stderr)
+                sys.exit(2)
         
         # Step 3: Load and validate configuration using load_configuration() from config
         logger.info("Loading server configuration", extra={
@@ -311,7 +321,7 @@ def main() -> None:
             # Log to audit logger
             audit_logger.info("LabArchives MCP Server startup initiated", extra={
                 'event': 'server_startup',
-                'version': VERSION,
+                'version': __version__,
                 'config_source': 'cli_args' if cli_args_dict else 'defaults'
             })
             
@@ -322,7 +332,7 @@ def main() -> None:
         
         # Step 5: Log startup banner with version and configuration summary
         logger.info("=" * 60)
-        logger.info(f"LabArchives MCP Server v{VERSION}")
+        logger.info(f"LabArchives MCP Server v{__version__}")
         logger.info("=" * 60)
         logger.info("Configuration Summary:")
         logger.info(f"  API Base URL: {config.authentication.api_base_url}")
@@ -332,14 +342,14 @@ def main() -> None:
         logger.info(f"  Log Level: {config.logging.log_level}")
         logger.info("=" * 60)
         
-        # Step 6: Initialize AuthManager with loaded configuration
+        # Step 6: Initialize AuthenticationManager with loaded configuration
         logger.info("Initializing authentication manager", extra={
             'operation': 'main',
             'event': 'auth_manager_init'
         })
         
         try:
-            auth_manager = AuthManager(config.authentication)
+            auth_manager = AuthenticationManager(config.authentication)
             
             logger.info("Authentication manager initialized successfully", extra={
                 'operation': 'main',
@@ -357,7 +367,7 @@ def main() -> None:
             })
             raise StartupError(f"Failed to initialize authentication manager: {str(e)}")
         
-        # Step 7: Authenticate with LabArchives API using AuthManager
+        # Step 7: Authenticate with LabArchives API using AuthenticationManager
         logger.info("Authenticating with LabArchives API", extra={
             'operation': 'main',
             'event': 'authentication_start'
@@ -428,35 +438,32 @@ def main() -> None:
             })
             raise StartupError(f"Failed to initialize resource manager: {str(e)}")
         
-        # Step 9: Instantiate LabArchivesMCPServer with resource handlers
+        # Step 9: Launch MCP server with resource handlers
         logger.info("Initializing MCP server", extra={
             'operation': 'main',
             'event': 'mcp_server_init'
         })
         
         try:
-            # Create the MCP server instance
-            server_instance = LabArchivesMCPServer(
-                resource_manager=resource_manager,
-                server_name=config.server_name,
-                server_version=config.server_version
-            )
+            # Launch the MCP server
+            exit_code = mcp_server_main()
             
-            logger.info("MCP server initialized successfully", extra={
+            logger.info("MCP server completed", extra={
                 'operation': 'main',
-                'event': 'mcp_server_initialized',
-                'server_name': config.server_name,
-                'server_version': config.server_version
+                'event': 'mcp_server_completed',
+                'exit_code': exit_code
             })
             
+            return exit_code
+            
         except Exception as e:
-            logger.error(f"Failed to initialize MCP server: {str(e)}", extra={
+            logger.error(f"Failed to run MCP server: {str(e)}", extra={
                 'operation': 'main',
-                'event': 'mcp_server_init_error',
+                'event': 'mcp_server_error',
                 'error': str(e),
                 'error_type': type(e).__name__
             })
-            raise StartupError(f"Failed to initialize MCP server: {str(e)}")
+            raise StartupError(f"Failed to run MCP server: {str(e)}")
         
         # Step 10: Register signal handlers for graceful shutdown
         logger.info("Registering signal handlers for graceful shutdown", extra={
