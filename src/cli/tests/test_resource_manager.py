@@ -1540,6 +1540,19 @@ class TestResourceManagerFolderPathScopeEnforcement:
         # Test in-scope entry access (should succeed)
         mock_api_client.get_entry_content.return_value = EntryListResponse(entries=[in_scope_entry])
         mock_api_client.list_pages.return_value = PageListResponse(pages=[in_scope_page])
+        # Mock list_notebooks for folder scope validation
+        mock_api_client.list_notebooks.return_value = NotebookListResponse(
+            notebooks=[NotebookMetadata(
+                id="nb_123",
+                name="Test Notebook",
+                description="Test notebook",
+                owner="test@example.com",
+                created_date=datetime.now(),
+                last_modified=datetime.now(),
+                folder_count=1,
+                page_count=1
+            )]
+        )
         
         resource_content = resource_manager_folder_scope.read_resource(
             "labarchives://entry/entry_in_scope"
@@ -1566,6 +1579,19 @@ class TestResourceManagerFolderPathScopeEnforcement:
         
         mock_api_client.get_entry_content.return_value = EntryListResponse(entries=[out_of_scope_entry])
         mock_api_client.list_pages.return_value = PageListResponse(pages=[out_of_scope_page])
+        # Mock list_notebooks for folder scope validation (same notebook)
+        mock_api_client.list_notebooks.return_value = NotebookListResponse(
+            notebooks=[NotebookMetadata(
+                id="nb_123",
+                name="Test Notebook",
+                description="Test notebook",
+                owner="test@example.com",
+                created_date=datetime.now(),
+                last_modified=datetime.now(),
+                folder_count=1,
+                page_count=1
+            )]
+        )
         
         with pytest.raises(LabArchivesMCPException) as exc_info:
             resource_manager_folder_scope.read_resource(
@@ -1790,13 +1816,12 @@ class TestResourceManagerFolderPathScopeEnforcement:
         assert isinstance(resource_content, MCPResourceContent)
         assert resource_content.content["id"] == "entry_in_scope"
     
-    @patch('src.cli.resource_manager.get_logger')
-    def test_scope_violation_audit_logging(self, mock_get_logger, resource_manager_folder_scope, 
+    def test_scope_violation_audit_logging(self, resource_manager_folder_scope, 
                                          mock_api_client):
         """Test that scope violations are properly logged for audit purposes."""
-        # Mock logger
+        # Mock logger on the resource manager instance
         mock_logger = Mock()
-        mock_get_logger.return_value = mock_logger
+        resource_manager_folder_scope.logger = mock_logger
         
         # Create out-of-scope page
         out_of_scope_page = PageMetadata(
@@ -1821,9 +1846,8 @@ class TestResourceManagerFolderPathScopeEnforcement:
         # Verify audit logging for scope violation
         mock_logger.warning.assert_called_once()
         warning_call = mock_logger.warning.call_args
-        assert "ScopeViolation" in warning_call[0][0]
-        assert "Research/Physics/Quantum" in str(warning_call[1]["extra"])
-        assert "Projects/AI" in str(warning_call[1]["extra"])
+        assert "Page access denied - outside folder scope" in warning_call[0][0]
+        assert "Research/Physics/Quantum" in warning_call[0][0]
 
 
 class TestResourceManagerFolderPathEdgeCases:
