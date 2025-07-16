@@ -22,6 +22,7 @@ with support for log rotation, structured output, and comprehensive audit trails
 import logging
 import logging.handlers  # builtin - Provides RotatingFileHandler for log rotation
 import os  # builtin - Used for file path expansion and directory creation
+import sys  # builtin - Used for accessing sys.argv for early argument scrubbing
 import json
 from typing import Tuple, Optional
 
@@ -34,6 +35,7 @@ from src.cli.constants import (
     AUDIT_LOG_FORMAT_STRING
 )
 from src.cli.models import LoggingConfig
+from src.cli.utils import scrub_argv
 
 # =============================================================================
 # Global State Management
@@ -183,6 +185,12 @@ def setup_logging(logging_config: LoggingConfig) -> Tuple[logging.Logger, loggin
         ValueError: If log level is invalid
     """
     global _LOGGERS_INITIALIZED, _MAIN_LOGGER, _AUDIT_LOGGER
+    
+    # CRITICAL: Scrub argv before any logging configuration occurs to prevent
+    # credential leakage in logs. This must be the first operation to ensure
+    # complete secret redaction from all logging paths per Section 0.2.1 requirement.
+    # Update sys.argv in place to ensure scrubbed version is used throughout the application.
+    sys.argv[:] = scrub_argv(sys.argv)
     
     # Check if logging has already been initialized to prevent duplicate handlers
     if _LOGGERS_INITIALIZED and _MAIN_LOGGER and _AUDIT_LOGGER:
