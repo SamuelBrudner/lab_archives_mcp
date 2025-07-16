@@ -105,31 +105,29 @@ EDGE_CASE_CONFIG_SAMPLE = {
 }
 
 # =============================================================================
-# Pytest Fixture Functions
+# Direct Access Functions (for import by other test modules)
 # =============================================================================
 
-@pytest.fixture
 def get_valid_config() -> ServerConfiguration:
     """
-    Returns a valid ServerConfiguration object for use in tests, with all required 
-    fields populated with typical values.
+    Returns a valid ServerConfiguration object for direct use in tests.
     
-    This fixture creates a complete, valid configuration that passes all validation
-    rules and can be used for testing normal operation scenarios. All configuration
-    sections are properly instantiated with realistic values.
+    This function creates a complete, valid configuration that passes all validation
+    rules and can be used for testing normal operation scenarios. Unlike the pytest
+    fixture variant, this function can be imported directly by other test modules.
     
     Returns:
         ServerConfiguration: A valid configuration object ready for use in test cases.
-                           Contains valid authentication, scope, output, and logging
-                           configurations with all required fields populated.
+                            Contains valid authentication, scope, output, and logging
+                            configurations with all required fields populated.
     
     Example:
-        def test_server_initialization(get_valid_config):
-            config = get_valid_config
+        from src.cli.tests.fixtures.config_samples import get_valid_config
+        
+        def test_folder_path_validation():
+            config = get_valid_config()
             assert config.authentication.access_key_id == "AKID1234567890ABCDEF"
             assert config.scope.notebook_id == "notebook_12345"
-            assert config.output.structured_output is True
-            assert config.logging.log_level == "INFO"
     """
     # Instantiate AuthenticationConfig with valid credentials and API endpoint
     auth_config = AuthenticationConfig(
@@ -169,6 +167,37 @@ def get_valid_config() -> ServerConfiguration:
         server_name=MCP_SERVER_NAME,
         server_version=MCP_SERVER_VERSION
     )
+
+
+# =============================================================================
+# Pytest Fixture Functions
+# =============================================================================
+
+@pytest.fixture
+def valid_config() -> ServerConfiguration:
+    """
+    Returns a valid ServerConfiguration object for use in tests, with all required 
+    fields populated with typical values.
+    
+    This fixture creates a complete, valid configuration that passes all validation
+    rules and can be used for testing normal operation scenarios. All configuration
+    sections are properly instantiated with realistic values.
+    
+    Returns:
+        ServerConfiguration: A valid configuration object ready for use in test cases.
+                           Contains valid authentication, scope, output, and logging
+                           configurations with all required fields populated.
+    
+    Example:
+        def test_server_initialization(valid_config):
+            config = valid_config
+            assert config.authentication.access_key_id == "AKID1234567890ABCDEF"
+            assert config.scope.notebook_id == "notebook_12345"
+            assert config.output.structured_output is True
+            assert config.logging.log_level == "INFO"
+    """
+    # Use the direct function to avoid code duplication
+    return get_valid_config()
 
 
 @pytest.fixture
