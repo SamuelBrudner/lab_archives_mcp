@@ -108,26 +108,15 @@ EDGE_CASE_CONFIG_SAMPLE = {
 # Direct Access Functions (for import by other test modules)
 # =============================================================================
 
-def get_valid_config() -> ServerConfiguration:
+def _create_valid_config_instance() -> ServerConfiguration:
     """
-    Returns a valid ServerConfiguration object for direct use in tests.
+    Internal helper function to create a valid ServerConfiguration instance.
     
-    This function creates a complete, valid configuration that passes all validation
-    rules and can be used for testing normal operation scenarios. Unlike the pytest
-    fixture variant, this function can be imported directly by other test modules.
+    This function contains the actual logic for creating a valid configuration
+    and is used by both the direct function and the pytest fixture.
     
     Returns:
-        ServerConfiguration: A valid configuration object ready for use in test cases.
-                            Contains valid authentication, scope, output, and logging
-                            configurations with all required fields populated.
-    
-    Example:
-        from src.cli.tests.fixtures.config_samples import get_valid_config
-        
-        def test_folder_path_validation():
-            config = get_valid_config()
-            assert config.authentication.access_key_id == "AKID1234567890ABCDEF"
-            assert config.scope.notebook_id == "notebook_12345"
+        ServerConfiguration: A valid configuration object.
     """
     # Instantiate AuthenticationConfig with valid credentials and API endpoint
     auth_config = AuthenticationConfig(
@@ -169,6 +158,33 @@ def get_valid_config() -> ServerConfiguration:
     )
 
 
+def create_valid_config() -> ServerConfiguration:
+    """
+    Returns a valid ServerConfiguration object for direct use in tests.
+    
+    This function creates a complete, valid configuration that passes all validation
+    rules and can be used for testing normal operation scenarios. Unlike the pytest
+    fixture variant, this function can be imported directly by other test modules.
+    
+    Returns:
+        ServerConfiguration: A valid configuration object ready for use in test cases.
+                            Contains valid authentication, scope, output, and logging
+                            configurations with all required fields populated.
+    
+    Example:
+        from src.cli.tests.fixtures.config_samples import create_valid_config
+        
+        def test_folder_path_validation():
+            config = create_valid_config()
+            assert config.authentication.access_key_id == "AKID1234567890ABCDEF"
+            assert config.scope.notebook_id == "notebook_12345"
+    """
+    return _create_valid_config_instance()
+
+
+
+
+
 # =============================================================================
 # Pytest Fixture Functions
 # =============================================================================
@@ -196,11 +212,10 @@ def valid_config() -> ServerConfiguration:
             assert config.output.structured_output is True
             assert config.logging.log_level == "INFO"
     """
-    # Use the direct function to avoid code duplication
-    return get_valid_config()
+    # Use the helper function to avoid code duplication
+    return _create_valid_config_instance()
 
 
-@pytest.fixture
 def get_invalid_config() -> ServerConfiguration:
     """
     Returns an invalid ServerConfiguration object for use in negative test cases, 
@@ -263,7 +278,6 @@ def get_invalid_config() -> ServerConfiguration:
     return server_config
 
 
-@pytest.fixture
 def get_edge_case_config() -> ServerConfiguration:
     """
     Returns a ServerConfiguration object with edge-case values to test the limits 
@@ -322,3 +336,48 @@ def get_edge_case_config() -> ServerConfiguration:
         server_name="labarchives-mcp-server-with-very-long-name-for-testing",
         server_version="999.999.999-beta.1+build.123"
     )
+
+
+# =============================================================================
+# Additional Pytest Fixtures for Backward Compatibility
+# =============================================================================
+
+@pytest.fixture
+def invalid_config() -> ServerConfiguration:
+    """
+    Pytest fixture version of get_invalid_config() for backward compatibility.
+    
+    Returns:
+        ServerConfiguration: An invalid configuration object for negative test cases.
+    """
+    return get_invalid_config()
+
+
+@pytest.fixture
+def edge_case_config() -> ServerConfiguration:
+    """
+    Pytest fixture version of get_edge_case_config() for backward compatibility.
+    
+    Returns:
+        ServerConfiguration: A configuration object with edge-case values.
+    """
+    return get_edge_case_config()
+
+
+@pytest.fixture
+def get_valid_config() -> ServerConfiguration:
+    """
+    Pytest fixture version of create_valid_config() function for test compatibility.
+    
+    This fixture provides a valid configuration object for pytest test cases that
+    require a fixture-based approach to configuration management.
+    
+    Returns:
+        ServerConfiguration: A valid configuration object for test cases.
+    """
+    return _create_valid_config_instance()
+
+
+
+
+
