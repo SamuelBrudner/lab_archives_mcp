@@ -29,7 +29,7 @@ from typing import List, Dict, Any
 from src.cli.resource_manager import ResourceManager, parse_resource_uri, is_resource_in_scope
 
 # Import FolderPath for scope enforcement testing
-from src.cli.models.scoping import FolderPath
+from src.cli.data_models.scoping import FolderPath
 
 # Import API client and models for mocking
 from src.cli.api.client import LabArchivesAPIClient
