@@ -193,10 +193,12 @@ def build_cli_parser() -> argparse.ArgumentParser:
         
         # Add start-specific arguments
         start_parser.add_argument(
-            '-k', '--access-key-id',
+            '-k', '--access-key', '--access-key-id',
+            dest='access_key_id',
             type=str,
-            help='LabArchives API access key ID. Can also be set via '
-                 'LABARCHIVES_AKID environment variable. Required for authentication.'
+            help='LabArchives API access key. Can also be set via '
+                 'LABARCHIVES_AKID environment variable. Required for authentication. '
+                 'Accepts both -k/--access-key (primary) and --access-key-id (legacy).'
         )
         
         start_parser.add_argument(
@@ -268,10 +270,12 @@ def build_cli_parser() -> argparse.ArgumentParser:
         
         # Add authenticate-specific arguments (same as start for credential validation)
         auth_parser.add_argument(
-            '-k', '--access-key-id',
+            '-k', '--access-key', '--access-key-id',
+            dest='access_key_id',
             type=str,
-            help='LabArchives API access key ID. Can also be set via '
-                 'LABARCHIVES_AKID environment variable. Required for authentication.'
+            help='LabArchives API access key. Can also be set via '
+                 'LABARCHIVES_AKID environment variable. Required for authentication. '
+                 'Accepts both -k/--access-key (primary) and --access-key-id (legacy).'
         )
         
         auth_parser.add_argument(
@@ -375,7 +379,7 @@ def parse_and_dispatch_cli(argv: list[str] = None) -> int:
         >>> print(f"Command completed with exit code: {exit_code}")
         
         >>> # Handle authentication command
-        >>> exit_code = parse_and_dispatch_cli(['authenticate', '--access-key-id', 'AKID123'])
+        >>> exit_code = parse_and_dispatch_cli(['authenticate', '-k', 'AKID123'])
         >>> if exit_code == 0:
         ...     print("Authentication successful")
     """

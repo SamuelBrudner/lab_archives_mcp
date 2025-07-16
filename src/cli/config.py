@@ -28,13 +28,21 @@ import os  # builtin - Operating system interface for environment variables and 
 from typing import Dict, Any, Optional, Union  # builtin - Type annotations for function signatures
 
 # Internal imports - Configuration models and structured data
-from src.cli.models import (
-    AuthenticationConfig,
-    ScopeConfig,
-    OutputConfig,
-    LoggingConfig,
-    ServerConfiguration
-)
+# Import from models.py file (not models package) for configuration classes
+import importlib.util
+import sys
+
+# Load models.py directly to avoid import conflicts with models package
+models_spec = importlib.util.spec_from_file_location("models", "src/cli/models.py")
+models_module = importlib.util.module_from_spec(models_spec)
+models_spec.loader.exec_module(models_module)
+
+# Import configuration classes from the loaded module
+AuthenticationConfig = models_module.AuthenticationConfig
+ScopeConfig = models_module.ScopeConfig
+OutputConfig = models_module.OutputConfig
+LoggingConfig = models_module.LoggingConfig
+ServerConfiguration = models_module.ServerConfiguration
 
 # Internal imports - Configuration validators for comprehensive validation
 from src.cli.validators import (

@@ -22,6 +22,7 @@ with support for log rotation, structured output, and comprehensive audit trails
 import logging
 import logging.handlers  # builtin - Provides RotatingFileHandler for log rotation
 import os  # builtin - Used for file path expansion and directory creation
+import sys  # builtin - Used for accessing sys.argv for early argument scrubbing
 import json
 from typing import Tuple, Optional
 
@@ -33,7 +34,17 @@ from src.cli.constants import (
     LOG_FORMAT_STRING,
     AUDIT_LOG_FORMAT_STRING
 )
-from src.cli.models import LoggingConfig
+# Import LoggingConfig directly from models.py to avoid circular import with models package
+import importlib.util
+import os
+
+# Load LoggingConfig directly from models.py file
+_models_path = os.path.join(os.path.dirname(__file__), 'models.py')
+_spec = importlib.util.spec_from_file_location("models_direct", _models_path)
+_models_module = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_models_module)
+LoggingConfig = _models_module.LoggingConfig
+from src.cli.utils import scrub_argv
 
 # =============================================================================
 # Global State Management
@@ -115,7 +126,13 @@ class StructuredFormatter(logging.Formatter):
                 'thread', 'threadName', 'processName', 'process', 'message',
                 'asctime'
             }:
-                context[attr_name] = getattr(record, attr_name)
+                attr_value = getattr(record, attr_name)
+                # Only include JSON-serializable attributes
+                if isinstance(attr_value, (str, int, float, bool, type(None), list, dict)):
+                    context[attr_name] = attr_value
+                elif hasattr(attr_value, '__str__'):
+                    # Convert other types to string representation
+                    context[attr_name] = str(attr_value)
         
         # Format as JSON for machine parsing
         if self.use_json:
@@ -183,6 +200,12 @@ def setup_logging(logging_config: LoggingConfig) -> Tuple[logging.Logger, loggin
         ValueError: If log level is invalid
     """
     global _LOGGERS_INITIALIZED, _MAIN_LOGGER, _AUDIT_LOGGER
+    
+    # CRITICAL: Scrub argv before any logging configuration occurs to prevent
+    # credential leakage in logs. This must be the first operation to ensure
+    # complete secret redaction from all logging paths per Section 0.2.1 requirement.
+    # Update sys.argv in place to ensure scrubbed version is used throughout the application.
+    sys.argv[:] = scrub_argv(sys.argv)
     
     # Check if logging has already been initialized to prevent duplicate handlers
     if _LOGGERS_INITIALIZED and _MAIN_LOGGER and _AUDIT_LOGGER:
