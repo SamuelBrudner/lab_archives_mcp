@@ -28,7 +28,7 @@ import pytest
 from dataclasses import FrozenInstanceError, fields
 from typing import Optional, List, Tuple, Any
 
-from src.cli.models.scoping import FolderPath
+from src.cli.data_models.scoping import FolderPath
 from src.cli.exceptions import LabArchivesMCPException
 from src.cli.tests.fixtures.config_samples import create_valid_config
 
