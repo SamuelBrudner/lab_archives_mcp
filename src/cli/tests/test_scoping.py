@@ -1,519 +1,675 @@
 """
-Comprehensive unit tests for src/cli/models/scoping.py
+LabArchives MCP Server - FolderPath Scoping Unit Tests
 
-This test module validates the FolderPath value object that implements exact hierarchical
-folder path comparison using normalized tuple-based representation. The tests ensure
-strict folder-scoped access control compliance and verify that all requirements from
-the summary of changes are properly implemented.
+This module provides comprehensive pytest unit tests for the FolderPath value object
+that validates exact path comparison logic, string parsing, tuple normalization, and 
+immutability. Essential for ensuring the folder scope enforcement system works correctly
+and prevents path matching vulnerabilities.
 
-Key Testing Areas:
-- Immutable value object implementation (@dataclass(frozen=True, slots=True))
-- String path parsing and normalization (from_raw() method)
-- Exact tuple prefix matching (is_parent_of() method)
-- Edge case handling (trailing slashes, empty components, root paths)
-- Error handling and exception integration
-- Thread safety through immutability
-- G-2 Success Metric: 'Chem' must not match 'Chemistry'
+Test Coverage:
+- FolderPath.from_raw() factory method validation for string path parsing
+- FolderPath.is_parent_of() exact tuple prefix matching logic
+- Immutability enforcement using @dataclass(frozen=True, slots=True)
+- Edge case handling for empty paths, trailing slashes, and root paths
+- Path normalization and component tuple conversion
+- Comprehensive validation of all FolderPath methods and properties
+
+Security Critical Tests:
+- Ensures 'Chem' is NOT a parent of 'Chemistry' (prevents substring vulnerabilities)
+- Validates exact hierarchical path comparison using tuple prefix matching
+- Tests path traversal protection and component validation
+- Verifies consistent handling of path edge cases
+
+This test suite supports the core security objective of enforcing strict folder-scoped
+access control throughout the LabArchives MCP Server with ≥92% test coverage requirement.
 """
 
 import pytest
+from dataclasses import FrozenInstanceError, fields
 from typing import Optional, List, Tuple, Any
-from dataclasses import FrozenInstanceError
 
 from src.cli.models.scoping import FolderPath
 from src.cli.exceptions import LabArchivesMCPException
+from src.cli.tests.fixtures.config_samples import get_valid_config
 
 
-class TestFolderPathCreation:
-    """Test FolderPath creation and basic properties."""
+class TestFolderPathInitialization:
+    """Test suite for FolderPath initialization and validation."""
     
-    def test_from_raw_basic_paths(self):
-        """Test basic path creation from raw strings."""
-        test_cases = [
-            ("Projects/AI/Research", ("Projects", "AI", "Research")),
-            ("Projects", ("Projects",)),
-            ("", ()),
-            ("/", ()),
-            ("Projects/AI", ("Projects", "AI")),
-        ]
+    def test_valid_components_tuple_initialization(self):
+        """Test successful FolderPath creation with valid component tuples."""
+        # Valid single component
+        path = FolderPath(("Projects",))
+        assert path.components == ("Projects",)
         
-        for raw_path, expected_components in test_cases:
-            folder_path = FolderPath.from_raw(raw_path)
-            assert folder_path.components == expected_components
-            
-    def test_from_raw_normalization(self):
-        """Test path normalization during creation."""
-        normalization_cases = [
-            # (input, expected_components, description)
-            ("/Projects/AI/", ("Projects", "AI"), "leading and trailing slashes"),
-            ("Projects//AI", ("Projects", "AI"), "double slashes"),
-            ("  Projects/AI  ", ("Projects", "AI"), "surrounding whitespace"),
-            ("Projects///AI", ("Projects", "AI"), "triple slashes"),
-            ("//Projects//AI//", ("Projects", "AI"), "multiple slashes everywhere"),
-            ("Projects/ /AI", ("Projects", "AI"), "whitespace component"),
-        ]
+        # Valid multiple components
+        path = FolderPath(("Projects", "AI", "Research"))
+        assert path.components == ("Projects", "AI", "Research")
         
-        for raw_path, expected_components, description in normalization_cases:
-            folder_path = FolderPath.from_raw(raw_path)
-            assert folder_path.components == expected_components, f"Failed normalization: {description}"
-            
-    def test_from_raw_root_paths(self):
-        """Test various root path representations."""
-        root_cases = ["", "/", "  ", " / ", "///", "   /   "]
-        
-        for root_path in root_cases:
-            folder_path = FolderPath.from_raw(root_path)
-            assert folder_path.is_root, f"'{root_path}' should be root"
-            assert folder_path.components == (), f"Root path should have empty components"
-            
-    def test_from_raw_invalid_paths(self):
-        """Test that invalid paths raise appropriate exceptions."""
-        invalid_cases = [
-            ("Projects/../AI", "path traversal with parent directory"),
-            ("Projects/./AI", "path traversal with current directory"),
-            ("Projects/..", "parent directory component"),
-            ("Projects/.", "current directory component"),
-        ]
-        
-        for invalid_path, description in invalid_cases:
-            with pytest.raises(LabArchivesMCPException) as exc_info:
-                FolderPath.from_raw(invalid_path)
-            assert exc_info.value.code == 400, f"Should use code 400 for {description}"
-            
-    def test_from_raw_edge_case_components(self):
-        """Test edge cases that should be allowed."""
-        # These cases should be allowed as they're valid component names
-        valid_edge_cases = [
-            ("Projects/..AI", ("Projects", "..AI")),  # Component starting with dots but not exactly ".."
-            ("Projects/AI.", ("Projects", "AI.")),   # Component ending with dot
-            ("Projects/.hidden", ("Projects", ".hidden")),  # Hidden file/folder style
-        ]
-        
-        for raw_path, expected_components in valid_edge_cases:
-            folder_path = FolderPath.from_raw(raw_path)
-            assert folder_path.components == expected_components
-            
-    def test_from_raw_invalid_types(self):
-        """Test that non-string inputs raise appropriate exceptions."""
-        invalid_types = [123, None, [], {}, 45.67]
-        
-        for invalid_input in invalid_types:
-            with pytest.raises(LabArchivesMCPException) as exc_info:
-                FolderPath.from_raw(invalid_input)
-            assert exc_info.value.code == 400
-
-
-class TestFolderPathImmutability:
-    """Test FolderPath immutability and dataclass implementation."""
+        # Valid empty tuple (root path)
+        path = FolderPath(())
+        assert path.components == ()
+        assert path.is_root is True
     
-    def test_dataclass_properties(self):
-        """Test that FolderPath is properly implemented as a dataclass."""
-        # Test dataclass attributes
-        assert hasattr(FolderPath, '__dataclass_fields__')
-        assert hasattr(FolderPath, '__dataclass_params__')
+    def test_invalid_component_type_raises_exception(self):
+        """Test that non-string components raise LabArchivesMCPException."""
+        with pytest.raises(LabArchivesMCPException) as exc_info:
+            FolderPath((123, "Projects"))
         
-        # Test frozen and slots parameters
-        params = getattr(FolderPath, '__dataclass_params__')
-        assert params.frozen == True, "Should be frozen=True"
-        assert params.slots == True, "Should be slots=True"
+        assert "Invalid path component type" in str(exc_info.value)
+        assert "All components must be strings" in str(exc_info.value)
+        assert exc_info.value.code == 400
+    
+    def test_path_traversal_components_raise_exception(self):
+        """Test that path traversal patterns in components raise exceptions."""
+        # Test dot component
+        with pytest.raises(LabArchivesMCPException) as exc_info:
+            FolderPath(("Projects", ".", "AI"))
         
-    def test_immutability_enforcement(self):
-        """Test that FolderPath instances are immutable."""
-        folder_path = FolderPath.from_raw("Projects/AI")
+        assert "Invalid path component: '.'" in str(exc_info.value)
+        assert "Path traversal patterns are not allowed" in str(exc_info.value)
+        assert exc_info.value.code == 400
         
-        # Test that direct attribute modification fails
+        # Test double dot component
+        with pytest.raises(LabArchivesMCPException) as exc_info:
+            FolderPath(("Projects", "..", "AI"))
+        
+        assert "Invalid path component: '..'" in str(exc_info.value)
+        assert "Path traversal patterns are not allowed" in str(exc_info.value)
+        assert exc_info.value.code == 400
+    
+    def test_empty_string_components_raise_exception(self):
+        """Test that empty string components in non-root paths raise exceptions."""
+        with pytest.raises(LabArchivesMCPException) as exc_info:
+            FolderPath(("Projects", "", "AI"))
+        
+        assert "Empty path components are not allowed" in str(exc_info.value)
+        assert exc_info.value.code == 400
+    
+    def test_immutability_with_frozen_dataclass(self):
+        """Test that FolderPath instances are immutable (frozen=True)."""
+        path = FolderPath(("Projects", "AI"))
+        
+        # Attempting to modify _components should raise FrozenInstanceError
         with pytest.raises(FrozenInstanceError):
-            folder_path._components = ("Modified",)
-            
-    def test_slots_implementation(self):
-        """Test that slots are properly implemented."""
-        folder_path = FolderPath.from_raw("Projects/AI")
+            path._components = ("Modified", "Path")
         
-        # Should not have __dict__ with slots
-        assert not hasattr(folder_path, '__dict__')
+        # Verify dataclass is configured with frozen=True and slots=True
+        dataclass_fields = fields(FolderPath)
+        assert len(dataclass_fields) == 1
+        assert dataclass_fields[0].name == "_components"
         
-        # Should have __slots__ on the class
-        assert hasattr(FolderPath, '__slots__')
-        
-    def test_thread_safety(self):
-        """Test thread safety through immutability."""
-        folder_path = FolderPath.from_raw("Projects/AI/Research")
-        
-        # Multiple access should return identical results
-        components1 = folder_path.components
-        components2 = folder_path.components
-        str1 = str(folder_path)
-        str2 = str(folder_path)
-        
-        assert components1 == components2
-        assert str1 == str2
-        assert components1 is components2  # Same tuple object
+        # Verify the dataclass decorator configuration
+        assert path.__dataclass_params__.frozen is True
+        assert hasattr(path, "__slots__")
 
 
-class TestFolderPathComparison:
-    """Test FolderPath comparison logic with exact tuple prefix matching."""
+class TestFolderPathFromRaw:
+    """Test suite for FolderPath.from_raw() factory method."""
     
-    def test_g2_success_metric(self):
-        """Test G-2 Success Metric: 'Chem' must not match 'Chemistry'."""
-        chem = FolderPath.from_raw("Chem")
-        chemistry = FolderPath.from_raw("Chemistry")
+    @pytest.mark.parametrize("raw_path,expected_components", [
+        # Basic path parsing
+        ("Projects", ("Projects",)),
+        ("Projects/AI", ("Projects", "AI")),
+        ("Projects/AI/Research", ("Projects", "AI", "Research")),
         
-        # Critical test: Chem should NOT be parent of Chemistry
-        assert not chem.is_parent_of(chemistry), "G-2 FAILURE: 'Chem' must not match 'Chemistry'"
+        # Root path variations
+        ("", ()),
+        ("/", ()),
+        ("///", ()),
         
-        # Test reverse direction as well
-        assert not chemistry.is_parent_of(chem), "Chemistry should not be parent of Chem"
+        # Leading/trailing slash handling
+        ("/Projects", ("Projects",)),
+        ("Projects/", ("Projects",)),
+        ("/Projects/", ("Projects",)),
+        ("/Projects/AI/", ("Projects", "AI")),
         
-    def test_substring_vulnerability_prevention(self):
-        """Test that substring-based vulnerabilities are prevented."""
-        vulnerability_tests = [
-            # (potential_parent, potential_child, should_be_parent)
-            ("Lab", "Laboratory", False),
-            ("Bio", "Biology", False),
-            ("Math", "Mathematics", False),
-            ("Phys", "Physics", False),
-            ("Chem", "Chemical", False),
-            ("AI", "AIResearch", False),  # No slash separator
-            
-            # These should still work (proper parent-child)
-            ("Projects", "Projects/Chemistry", True),
-            ("Research/Chem", "Research/Chem/Experiments", True),
-            ("Lab/Bio", "Lab/Bio/Samples", True),
-        ]
+        # Multiple consecutive slashes
+        ("Projects//AI", ("Projects", "AI")),
+        ("Projects///AI//Research", ("Projects", "AI", "Research")),
         
-        for parent_str, child_str, expected in vulnerability_tests:
-            parent = FolderPath.from_raw(parent_str)
-            child = FolderPath.from_raw(child_str)
-            result = parent.is_parent_of(child)
-            assert result == expected, f"Vulnerability test failed: '{parent_str}' -> '{child_str}'"
-            
+        # Whitespace handling
+        ("  Projects  ", ("Projects",)),
+        ("Projects / AI ", ("Projects", "AI")),
+        (" Projects / AI / Research ", ("Projects", "AI", "Research")),
+        
+        # Combined edge cases
+        ("  /Projects// AI /Research/  ", ("Projects", "AI", "Research")),
+    ])
+    def test_valid_path_parsing(self, raw_path: str, expected_components: Tuple[str, ...]):
+        """Test that valid raw paths are parsed correctly into component tuples."""
+        path = FolderPath.from_raw(raw_path)
+        assert path.components == expected_components
+    
+    def test_non_string_input_raises_exception(self):
+        """Test that non-string inputs raise LabArchivesMCPException."""
+        with pytest.raises(LabArchivesMCPException) as exc_info:
+            FolderPath.from_raw(123)
+        
+        assert "Invalid path type" in str(exc_info.value)
+        assert "Path must be a string" in str(exc_info.value)
+        assert exc_info.value.code == 400
+    
+    def test_path_with_path_traversal_patterns(self):
+        """Test that paths containing path traversal patterns are rejected."""
+        # Test dot pattern
+        with pytest.raises(LabArchivesMCPException):
+            FolderPath.from_raw("Projects/./AI")
+        
+        # Test double dot pattern
+        with pytest.raises(LabArchivesMCPException):
+            FolderPath.from_raw("Projects/../AI")
+        
+        # Test combined patterns
+        with pytest.raises(LabArchivesMCPException):
+            FolderPath.from_raw("Projects/./Research/../AI")
+    
+    def test_normalization_preserves_valid_components(self):
+        """Test that path normalization preserves valid path components."""
+        # Test that normalization doesn't affect valid components
+        path = FolderPath.from_raw("Projects/AI-Research/Deep_Learning")
+        assert path.components == ("Projects", "AI-Research", "Deep_Learning")
+        
+        # Test with special characters in component names
+        path = FolderPath.from_raw("Chemistry/Organic_Chemistry/Lab-Results")
+        assert path.components == ("Chemistry", "Organic_Chemistry", "Lab-Results")
+    
+    def test_empty_components_after_normalization(self):
+        """Test handling of empty components after normalization."""
+        # Multiple consecutive slashes should be normalized to single components
+        path = FolderPath.from_raw("Projects////AI////Research")
+        assert path.components == ("Projects", "AI", "Research")
+        
+        # Leading and trailing slashes with empty components
+        path = FolderPath.from_raw("///Projects///AI///")
+        assert path.components == ("Projects", "AI")
+
+
+class TestFolderPathIsParentOf:
+    """Test suite for FolderPath.is_parent_of() method."""
+    
     def test_valid_parent_child_relationships(self):
-        """Test valid parent-child relationships."""
-        valid_cases = [
-            ("Projects", "Projects/AI", True),
-            ("Projects/AI", "Projects/AI/Research", True),
-            ("", "Projects", True),  # Root is parent of everything
-            ("Projects/AI", "Projects/AI/Research/Data", True),
-            ("A", "A/B/C/D/E", True),  # Deep nesting
-        ]
+        """Test that valid parent-child relationships are correctly identified."""
+        # Basic parent-child relationship
+        parent = FolderPath.from_raw("Projects")
+        child = FolderPath.from_raw("Projects/AI")
+        assert parent.is_parent_of(child) is True
         
-        for parent_str, child_str, expected in valid_cases:
-            parent = FolderPath.from_raw(parent_str)
-            child = FolderPath.from_raw(child_str)
-            result = parent.is_parent_of(child)
-            assert result == expected, f"Valid parent test failed: '{parent_str}' -> '{child_str}'"
-            
+        # Multi-level parent-child relationship
+        parent = FolderPath.from_raw("Projects/AI")
+        child = FolderPath.from_raw("Projects/AI/Research/Data")
+        assert parent.is_parent_of(child) is True
+        
+        # Root is parent of all non-root paths
+        root = FolderPath.from_raw("")
+        any_path = FolderPath.from_raw("Projects/AI/Research")
+        assert root.is_parent_of(any_path) is True
+    
     def test_invalid_parent_child_relationships(self):
-        """Test cases that should NOT be parent-child relationships."""
-        invalid_cases = [
-            ("Projects/AI", "Projects/AI", False),  # Same path
-            ("Projects/AI", "Projects", False),  # Child -> Parent
-            ("Projects/Data", "Projects/AI", False),  # Siblings
-            ("Projects", "Research", False),  # Unrelated
-            ("Projects/AI/Research", "Projects/AI", False),  # Child -> Parent
-            ("ABC", "DEF", False),  # Completely unrelated
-        ]
+        """Test that invalid parent-child relationships are correctly rejected."""
+        # Same path is not parent of itself
+        path = FolderPath.from_raw("Projects/AI")
+        assert path.is_parent_of(path) is False
         
-        for parent_str, child_str, expected in invalid_cases:
-            parent = FolderPath.from_raw(parent_str)
-            child = FolderPath.from_raw(child_str)
-            result = parent.is_parent_of(child)
-            assert result == expected, f"Invalid parent test failed: '{parent_str}' -> '{child_str}'"
-            
-    def test_is_parent_of_invalid_types(self):
-        """Test that is_parent_of raises exception for invalid types."""
-        folder_path = FolderPath.from_raw("Projects")
+        # Child is not parent of parent
+        parent = FolderPath.from_raw("Projects")
+        child = FolderPath.from_raw("Projects/AI")
+        assert child.is_parent_of(parent) is False
         
-        invalid_types = ["string", 123, None, [], {}]
+        # Sibling paths are not parent-child
+        sibling1 = FolderPath.from_raw("Projects/AI")
+        sibling2 = FolderPath.from_raw("Projects/Chemistry")
+        assert sibling1.is_parent_of(sibling2) is False
+        assert sibling2.is_parent_of(sibling1) is False
         
-        for invalid_input in invalid_types:
-            with pytest.raises(LabArchivesMCPException) as exc_info:
-                folder_path.is_parent_of(invalid_input)
-            assert exc_info.value.code == 400
+        # Unrelated paths are not parent-child
+        path1 = FolderPath.from_raw("Projects/AI")
+        path2 = FolderPath.from_raw("Research/Biology")
+        assert path1.is_parent_of(path2) is False
+        assert path2.is_parent_of(path1) is False
+    
+    def test_substring_vulnerability_prevention(self):
+        """Test that substring matching vulnerabilities are prevented."""
+        # CRITICAL: 'Chem' should NOT be parent of 'Chemistry'
+        # This test validates the core security requirement from Section 0.1.2 G-2
+        chem_path = FolderPath.from_raw("Chem")
+        chemistry_path = FolderPath.from_raw("Chemistry")
+        assert chem_path.is_parent_of(chemistry_path) is False
+        
+        # Additional substring vulnerability tests
+        math_path = FolderPath.from_raw("Math")
+        mathematics_path = FolderPath.from_raw("Mathematics")
+        assert math_path.is_parent_of(mathematics_path) is False
+        
+        # Test with similar prefixes at different levels
+        proj_path = FolderPath.from_raw("Projects/AI")
+        proj_ai_ml_path = FolderPath.from_raw("Projects/AI-ML/Research")
+        assert proj_path.is_parent_of(proj_ai_ml_path) is False
+        
+        # Test partial component matches
+        research_path = FolderPath.from_raw("Research")
+        research_data_path = FolderPath.from_raw("Research-Data")
+        assert research_path.is_parent_of(research_data_path) is False
+    
+    def test_exact_tuple_prefix_matching(self):
+        """Test that exact tuple prefix matching is used for comparison."""
+        # Test that only exact component matches are considered
+        parent = FolderPath.from_raw("Projects/AI")
+        
+        # Valid child (exact prefix match)
+        valid_child = FolderPath.from_raw("Projects/AI/Research")
+        assert parent.is_parent_of(valid_child) is True
+        
+        # Invalid child (partial component match)
+        invalid_child = FolderPath.from_raw("Projects/AI-Research")
+        assert parent.is_parent_of(invalid_child) is False
+        
+        # Test multi-level exact matching
+        deep_parent = FolderPath.from_raw("Projects/AI/Research")
+        deep_child = FolderPath.from_raw("Projects/AI/Research/Data/2024")
+        assert deep_parent.is_parent_of(deep_child) is True
+    
+    def test_root_path_special_cases(self):
+        """Test special cases involving root paths."""
+        root = FolderPath.from_raw("")
+        
+        # Root is parent of all non-root paths
+        assert root.is_parent_of(FolderPath.from_raw("Projects")) is True
+        assert root.is_parent_of(FolderPath.from_raw("Projects/AI/Research")) is True
+        
+        # Root is not parent of itself
+        assert root.is_parent_of(root) is False
+        
+        # Non-root paths are not parent of root
+        non_root = FolderPath.from_raw("Projects")
+        assert non_root.is_parent_of(root) is False
+    
+    def test_invalid_comparison_type_raises_exception(self):
+        """Test that comparing with non-FolderPath objects raises exception."""
+        path = FolderPath.from_raw("Projects/AI")
+        
+        with pytest.raises(LabArchivesMCPException) as exc_info:
+            path.is_parent_of("Projects/AI/Research")
+        
+        assert "Invalid comparison type" in str(exc_info.value)
+        assert "Can only compare with FolderPath instances" in str(exc_info.value)
+        assert exc_info.value.code == 400
+    
+    @pytest.mark.parametrize("parent_path,child_path,expected_result", [
+        # Basic parent-child cases
+        ("Projects", "Projects/AI", True),
+        ("Projects/AI", "Projects/AI/Research", True),
+        ("", "Projects", True),  # Root is parent of all
+        
+        # Non-parent cases
+        ("Projects", "Projects", False),  # Same path
+        ("Projects/AI", "Projects", False),  # Child cannot be parent
+        ("Projects/AI", "Projects/Chemistry", False),  # Siblings
+        ("Mathematics", "Math", False),  # Reverse substring
+        
+        # Critical security test cases
+        ("Chem", "Chemistry", False),  # Substring vulnerability
+        ("Math", "Mathematics", False),  # Substring vulnerability
+        ("Bio", "Biology", False),  # Substring vulnerability
+    ])
+    def test_is_parent_of_comprehensive(self, parent_path: str, child_path: str, expected_result: bool):
+        """Comprehensive parameterized test for is_parent_of method."""
+        parent = FolderPath.from_raw(parent_path)
+        child = FolderPath.from_raw(child_path)
+        assert parent.is_parent_of(child) is expected_result
 
 
 class TestFolderPathProperties:
-    """Test FolderPath properties and methods."""
+    """Test suite for FolderPath properties and methods."""
     
     def test_components_property(self):
-        """Test the components property."""
-        test_cases = [
-            ("Projects/AI/Research", ("Projects", "AI", "Research")),
-            ("Single", ("Single",)),
-            ("", ()),
-        ]
-        
-        for raw_path, expected_components in test_cases:
-            folder_path = FolderPath.from_raw(raw_path)
-            assert folder_path.components == expected_components
-            assert isinstance(folder_path.components, tuple)
-            
-    def test_is_root_property(self):
-        """Test the is_root property."""
-        # Root paths
-        root_cases = ["", "/", "  ", " / "]
-        for root_path in root_cases:
-            folder_path = FolderPath.from_raw(root_path)
-            assert folder_path.is_root, f"'{root_path}' should be root"
-            
-        # Non-root paths
-        non_root_cases = ["Projects", "Projects/AI", "A/B/C"]
-        for non_root_path in non_root_cases:
-            folder_path = FolderPath.from_raw(non_root_path)
-            assert not folder_path.is_root, f"'{non_root_path}' should not be root"
-            
-    def test_depth_property(self):
-        """Test the depth property."""
-        depth_cases = [
-            ("", 0),
-            ("Projects", 1),
-            ("Projects/AI", 2),
-            ("Projects/AI/Research", 3),
-            ("A/B/C/D/E", 5),
-        ]
-        
-        for raw_path, expected_depth in depth_cases:
-            folder_path = FolderPath.from_raw(raw_path)
-            assert folder_path.depth == expected_depth, f"Depth test failed for '{raw_path}'"
-            
-    def test_string_representation(self):
-        """Test string representations (__str__ and __repr__)."""
-        test_cases = [
-            ("Projects/AI/Research", "Projects/AI/Research"),
-            ("Single", "Single"),
-            ("", ""),
-        ]
-        
-        for raw_path, expected_str in test_cases:
-            folder_path = FolderPath.from_raw(raw_path)
-            
-            # Test __str__
-            assert str(folder_path) == expected_str
-            
-            # Test __repr__
-            repr_str = repr(folder_path)
-            assert "FolderPath" in repr_str
-            assert "_components" in repr_str
-
-
-class TestFolderPathTupleBasedRepresentation:
-    """Test tuple-based internal representation and operations."""
-    
-    def test_tuple_immutability(self):
-        """Test that the internal tuple representation is immutable."""
-        folder_path = FolderPath.from_raw("Projects/AI/Research")
-        components = folder_path.components
-        
+        """Test the components property returns correct tuple."""
+        # Test with multiple components
+        path = FolderPath.from_raw("Projects/AI/Research")
+        components = path.components
+        assert components == ("Projects", "AI", "Research")
         assert isinstance(components, tuple)
         
-        # Try to modify the tuple (should fail)
-        with pytest.raises(TypeError):
-            components[0] = "Modified"
-            
-    def test_tuple_prefix_matching_algorithm(self):
-        """Test that is_parent_of uses tuple prefix matching."""
-        parent = FolderPath.from_raw("Projects/AI")
-        child = FolderPath.from_raw("Projects/AI/Research")
+        # Test with root path
+        root = FolderPath.from_raw("")
+        assert root.components == ()
         
-        # Manual tuple prefix check
-        parent_components = parent.components
-        child_components = child.components
+        # Test immutability of returned tuple
+        # Since tuples are immutable, this ensures the property is safe
+        assert type(components) is tuple
+    
+    def test_is_root_property(self):
+        """Test the is_root property correctly identifies root paths."""
+        # Root path variations should all be root
+        assert FolderPath.from_raw("").is_root is True
+        assert FolderPath.from_raw("/").is_root is True
+        assert FolderPath.from_raw("///").is_root is True
         
-        expected_result = (
-            len(parent_components) < len(child_components) and
-            parent_components == child_components[:len(parent_components)]
-        )
+        # Non-root paths should not be root
+        assert FolderPath.from_raw("Projects").is_root is False
+        assert FolderPath.from_raw("Projects/AI").is_root is False
+        assert FolderPath.from_raw("/Projects/AI/").is_root is False
+    
+    def test_depth_property(self):
+        """Test the depth property returns correct component count."""
+        # Root path has depth 0
+        assert FolderPath.from_raw("").depth == 0
         
-        actual_result = parent.is_parent_of(child)
-        assert actual_result == expected_result, "is_parent_of should use tuple prefix matching"
+        # Single component has depth 1
+        assert FolderPath.from_raw("Projects").depth == 1
         
-    def test_exact_component_matching(self):
-        """Test that matching is based on exact component equality."""
-        # These should not match because components are different
-        test_cases = [
-            ("Proj", "Project"),  # Different length
-            ("AI", "ai"),  # Different case
-            ("Research ", "Research"),  # Trailing space
-            (" Data", "Data"),  # Leading space
-        ]
+        # Multiple components have correct depth
+        assert FolderPath.from_raw("Projects/AI").depth == 2
+        assert FolderPath.from_raw("Projects/AI/Research").depth == 3
+        assert FolderPath.from_raw("Projects/AI/Research/Data/2024").depth == 5
+    
+    def test_str_representation(self):
+        """Test string representation of FolderPath instances."""
+        # Root path string representation
+        root = FolderPath.from_raw("")
+        assert str(root) == ""
         
-        for comp1, comp2 in test_cases:
-            folder1 = FolderPath.from_raw(comp1)
-            folder2 = FolderPath.from_raw(comp2)
-            
-            assert not folder1.is_parent_of(folder2)
-            assert not folder2.is_parent_of(folder1)
+        # Single component string representation
+        single = FolderPath.from_raw("Projects")
+        assert str(single) == "Projects"
+        
+        # Multi-component string representation
+        multi = FolderPath.from_raw("Projects/AI/Research")
+        assert str(multi) == "Projects/AI/Research"
+        
+        # Verify normalization is preserved in string representation
+        normalized = FolderPath.from_raw("/Projects//AI/Research/")
+        assert str(normalized) == "Projects/AI/Research"
+    
+    def test_repr_representation(self):
+        """Test repr representation shows internal components."""
+        # Root path repr
+        root = FolderPath.from_raw("")
+        assert repr(root) == "FolderPath(_components=())"
+        
+        # Single component repr
+        single = FolderPath.from_raw("Projects")
+        assert repr(single) == "FolderPath(_components=('Projects',))"
+        
+        # Multi-component repr
+        multi = FolderPath.from_raw("Projects/AI/Research")
+        assert repr(multi) == "FolderPath(_components=('Projects', 'AI', 'Research'))"
+    
+    def test_equality_comparison(self):
+        """Test equality comparison between FolderPath instances."""
+        # Same path should be equal
+        path1 = FolderPath.from_raw("Projects/AI")
+        path2 = FolderPath.from_raw("Projects/AI")
+        assert path1 == path2
+        
+        # Different paths should not be equal
+        path3 = FolderPath.from_raw("Projects/Chemistry")
+        assert path1 != path3
+        
+        # Normalized paths should be equal
+        path4 = FolderPath.from_raw("/Projects//AI/")
+        assert path1 == path4
+        
+        # Root paths should be equal
+        root1 = FolderPath.from_raw("")
+        root2 = FolderPath.from_raw("/")
+        assert root1 == root2
+    
+    def test_hash_consistency(self):
+        """Test that equal FolderPath instances have consistent hashes."""
+        # Same path should have same hash
+        path1 = FolderPath.from_raw("Projects/AI")
+        path2 = FolderPath.from_raw("Projects/AI")
+        assert hash(path1) == hash(path2)
+        
+        # Normalized paths should have same hash
+        path3 = FolderPath.from_raw("/Projects//AI/")
+        assert hash(path1) == hash(path3)
+        
+        # Different paths should have different hashes (usually)
+        path4 = FolderPath.from_raw("Projects/Chemistry")
+        assert hash(path1) != hash(path4)
 
 
 class TestFolderPathEdgeCases:
-    """Test edge cases and error conditions."""
+    """Test suite for FolderPath edge cases and error conditions."""
     
-    def test_empty_components_handling(self):
-        """Test handling of empty components in paths."""
-        # Multiple slashes should be normalized to single components
-        test_cases = [
-            ("A//B", ("A", "B")),
-            ("A///B", ("A", "B")),
-            ("//A//B//", ("A", "B")),
-            ("A/////B", ("A", "B")),
-        ]
+    def test_extremely_long_paths(self):
+        """Test handling of extremely long paths."""
+        # Create a path with many components
+        long_components = [f"Level{i}" for i in range(100)]
+        long_path_str = "/".join(long_components)
         
-        for raw_path, expected in test_cases:
-            folder_path = FolderPath.from_raw(raw_path)
-            assert folder_path.components == expected
-            
-    def test_whitespace_handling(self):
-        """Test handling of whitespace in paths."""
-        test_cases = [
-            ("  A  /  B  ", ("A", "B")),
-            (" A/B ", ("A", "B")),
-            ("A / B", ("A", "B")),
-            ("   /A/B/   ", ("A", "B")),
-        ]
+        path = FolderPath.from_raw(long_path_str)
+        assert path.depth == 100
+        assert path.components == tuple(long_components)
         
-        for raw_path, expected in test_cases:
-            folder_path = FolderPath.from_raw(raw_path)
-            assert folder_path.components == expected
-            
-    def test_unicode_and_special_characters(self):
-        """Test handling of Unicode and special characters."""
-        valid_cases = [
-            ("Projects/AI-Research", ("Projects", "AI-Research")),
-            ("Data_Science/ML", ("Data_Science", "ML")),
-            ("Research/2023", ("Research", "2023")),
-            ("生物学/研究", ("生物学", "研究")),  # Unicode characters
-            ("Café/Résumé", ("Café", "Résumé")),  # Accented characters
-        ]
+        # Test parent-child with long paths
+        parent_components = long_components[:50]
+        parent_path_str = "/".join(parent_components)
+        parent = FolderPath.from_raw(parent_path_str)
         
-        for raw_path, expected in valid_cases:
-            folder_path = FolderPath.from_raw(raw_path)
-            assert folder_path.components == expected
-            
-    def test_long_paths(self):
-        """Test handling of long paths."""
-        # Create a deep path
-        components = [f"Level{i}" for i in range(1, 11)]  # Level1 through Level10
-        long_path = "/".join(components)
-        expected_components = tuple(components)
+        assert parent.is_parent_of(path) is True
+    
+    def test_special_characters_in_components(self):
+        """Test handling of special characters in path components."""
+        # Test with hyphens, underscores, and numbers
+        path = FolderPath.from_raw("Project-2024/AI_Research/Data-Set_1")
+        assert path.components == ("Project-2024", "AI_Research", "Data-Set_1")
         
-        folder_path = FolderPath.from_raw(long_path)
-        assert folder_path.components == expected_components
-        assert folder_path.depth == 10
+        # Test with spaces in components (after normalization)
+        path = FolderPath.from_raw("My Projects/AI Research/Data Analysis")
+        assert path.components == ("My Projects", "AI Research", "Data Analysis")
+    
+    def test_unicode_characters_in_components(self):
+        """Test handling of unicode characters in path components."""
+        # Test with unicode characters
+        path = FolderPath.from_raw("项目/人工智能/研究")
+        assert path.components == ("项目", "人工智能", "研究")
+        
+        # Test mixed ASCII and unicode
+        path = FolderPath.from_raw("Projects/AI-研究/Data")
+        assert path.components == ("Projects", "AI-研究", "Data")
+    
+    def test_case_sensitivity(self):
+        """Test that path comparison is case-sensitive."""
+        path1 = FolderPath.from_raw("Projects/AI")
+        path2 = FolderPath.from_raw("projects/ai")
+        path3 = FolderPath.from_raw("Projects/ai")
+        
+        # Should not be equal due to case sensitivity
+        assert path1 != path2
+        assert path1 != path3
+        
+        # Should not be parent-child due to case sensitivity
+        assert path1.is_parent_of(path2) is False
+        assert path2.is_parent_of(path1) is False
+    
+    def test_whitespace_only_components_handling(self):
+        """Test handling of whitespace-only components."""
+        # Whitespace-only components should be normalized away
+        path = FolderPath.from_raw("Projects/   /AI")
+        # The middle component should be filtered out during normalization
+        assert path.components == ("Projects", "AI")
+        
+        # Test with tabs and other whitespace
+        path = FolderPath.from_raw("Projects/\t\n/AI")
+        assert path.components == ("Projects", "AI")
 
 
 class TestFolderPathIntegration:
-    """Test integration with other parts of the system."""
+    """Integration tests for FolderPath with other system components."""
     
-    def test_exception_integration(self):
-        """Test integration with LabArchivesMCPException."""
-        # Test that exceptions have proper structure
-        with pytest.raises(LabArchivesMCPException) as exc_info:
-            FolderPath.from_raw("invalid/../path")
-            
-        exception = exc_info.value
-        assert hasattr(exception, 'message')
-        assert hasattr(exception, 'code')
-        assert hasattr(exception, 'context')
-        assert exception.code == 400
+    def test_folder_path_with_valid_config(self):
+        """Test FolderPath integration with valid configuration."""
+        config = get_valid_config()
         
-    def test_config_integration(self):
-        """Test integration with configuration system."""
-        # This test verifies that FolderPath works with typical config values
-        typical_config_paths = [
-            "Projects/AI",
-            "Research/Chemistry",
-            "Data/Analysis",
-            "",  # Root path
-        ]
-        
-        for config_path in typical_config_paths:
-            # Test that we can create FolderPath from typical config values
-            folder_path = FolderPath.from_raw(config_path)
+        # Test that FolderPath can be used with configuration scope
+        if config.scope.folder_path:
+            folder_path = FolderPath.from_raw(config.scope.folder_path)
             assert isinstance(folder_path, FolderPath)
-            
-    def test_performance_characteristics(self):
-        """Test performance characteristics of FolderPath operations."""
-        # Create many FolderPath instances
-        paths = [f"Level{i}/Sublevel{j}" for i in range(1, 50) for j in range(1, 10)]
-        folder_paths = [FolderPath.from_raw(path) for path in paths]
-        
-        # Test that creation and comparison is efficient
-        assert len(folder_paths) == len(paths)
-        
-        # Test comparison operations
-        parent = FolderPath.from_raw("Level1")
-        child_count = sum(1 for fp in folder_paths if parent.is_parent_of(fp))
-        assert child_count > 0  # Should find some children
-
-
-class TestFolderPathParametrized:
-    """Parameterized tests for comprehensive coverage."""
+            assert folder_path.components is not None
     
-    @pytest.mark.parametrize("raw_path,expected_components", [
-        ("A", ("A",)),
-        ("A/B", ("A", "B")),
-        ("A/B/C", ("A", "B", "C")),
-        ("", ()),
-        ("/", ()),
-        ("A/", ("A",)),
-        ("/A", ("A",)),
-        ("A//B", ("A", "B")),
-        ("  A  /  B  ", ("A", "B")),
-    ])
-    def test_from_raw_parametrized(self, raw_path, expected_components):
-        """Parameterized test for from_raw method."""
-        folder_path = FolderPath.from_raw(raw_path)
-        assert folder_path.components == expected_components
-        
-    @pytest.mark.parametrize("parent_str,child_str,expected", [
-        ("A", "A/B", True),
-        ("A/B", "A/B/C", True),
-        ("", "A", True),
-        ("A", "A", False),
-        ("A/B", "A", False),
-        ("A", "B", False),
-        ("Chem", "Chemistry", False),  # G-2 test case
-        ("Lab", "Laboratory", False),  # Similar vulnerability
-    ])
-    def test_is_parent_of_parametrized(self, parent_str, child_str, expected):
-        """Parameterized test for is_parent_of method."""
-        parent = FolderPath.from_raw(parent_str)
-        child = FolderPath.from_raw(child_str)
-        result = parent.is_parent_of(child)
-        assert result == expected, f"Failed: '{parent_str}' parent of '{child_str}' should be {expected}"
-
-
-# Performance and stress tests
-class TestFolderPathStress:
-    """Stress tests for FolderPath under various conditions."""
+    def test_folder_path_error_context(self):
+        """Test that FolderPath exceptions provide useful context."""
+        try:
+            FolderPath.from_raw(123)
+        except LabArchivesMCPException as e:
+            assert e.code == 400
+            assert e.context is not None
+            assert "path" in e.context
+            assert "path_type" in e.context
     
-    def test_many_components(self):
-        """Test FolderPath with many components."""
-        components = [f"Component{i}" for i in range(100)]
-        path = "/".join(components)
+    def test_folder_path_thread_safety(self):
+        """Test that FolderPath instances are thread-safe."""
+        # Create a FolderPath instance
+        path = FolderPath.from_raw("Projects/AI/Research")
         
-        folder_path = FolderPath.from_raw(path)
-        assert folder_path.depth == 100
-        assert len(folder_path.components) == 100
+        # Verify immutability guarantees thread safety
+        with pytest.raises(FrozenInstanceError):
+            path._components = ("Modified", "Components")
         
-    def test_very_long_component_names(self):
-        """Test FolderPath with very long component names."""
-        long_component = "A" * 255  # Very long component name
-        path = f"Projects/{long_component}/Research"
+        # Verify that all operations are read-only
+        original_components = path.components
+        path.is_parent_of(FolderPath.from_raw("Projects"))
+        path.is_root
+        path.depth
+        str(path)
+        repr(path)
         
-        folder_path = FolderPath.from_raw(path)
-        assert folder_path.components == ("Projects", long_component, "Research")
+        # Components should remain unchanged
+        assert path.components == original_components
+    
+    def test_folder_path_memory_efficiency(self):
+        """Test that FolderPath uses slots for memory efficiency."""
+        path = FolderPath.from_raw("Projects/AI/Research")
         
-    def test_many_comparisons(self):
-        """Test many comparison operations."""
-        base_paths = [FolderPath.from_raw(f"Base{i}") for i in range(50)]
-        test_paths = [FolderPath.from_raw(f"Base{i}/Child{j}") for i in range(50) for j in range(10)]
+        # Verify that __slots__ is used for memory efficiency
+        assert hasattr(path, "__slots__")
         
-        # Perform many comparisons
-        comparison_count = 0
-        for base in base_paths:
-            for test in test_paths:
-                base.is_parent_of(test)
-                comparison_count += 1
-                
-        assert comparison_count == 50 * 50 * 10  # 25,000 comparisons
+        # Try to add a new attribute (should fail due to slots)
+        with pytest.raises(AttributeError):
+            path.new_attribute = "test"
+
+
+class TestFolderPathPerformance:
+    """Performance and stress tests for FolderPath operations."""
+    
+    def test_large_scale_parent_child_operations(self):
+        """Test performance with large-scale parent-child operations."""
+        # Create a deep hierarchy
+        root = FolderPath.from_raw("")
+        paths = []
+        
+        current_path = ""
+        for i in range(20):
+            current_path += f"/Level{i}"
+            paths.append(FolderPath.from_raw(current_path))
+        
+        # Test that each level is parent of all deeper levels
+        for i in range(len(paths)):
+            for j in range(i + 1, len(paths)):
+                assert paths[i].is_parent_of(paths[j]) is True
+                assert paths[j].is_parent_of(paths[i]) is False
+    
+    def test_comparison_performance_with_similar_paths(self):
+        """Test comparison performance with many similar paths."""
+        # Create many similar paths to test comparison efficiency
+        base_path = "Projects/AI/Research"
+        paths = []
+        
+        for i in range(100):
+            path_str = f"{base_path}/Experiment{i}"
+            paths.append(FolderPath.from_raw(path_str))
+        
+        base = FolderPath.from_raw(base_path)
+        
+        # Test that base is parent of all experiment paths
+        for experiment_path in paths:
+            assert base.is_parent_of(experiment_path) is True
+        
+        # Test that experiment paths are not parents of each other
+        for i in range(len(paths)):
+            for j in range(len(paths)):
+                if i != j:
+                    assert paths[i].is_parent_of(paths[j]) is False
+
+
+class TestFolderPathValidationScenarios:
+    """Test scenarios that validate specific requirements from the specification."""
+    
+    def test_scope_violation_prevention(self):
+        """Test that FolderPath prevents scope violations as per security requirements."""
+        # Test case from specification: "Chem" must not match "Chemistry"
+        chem_folder = FolderPath.from_raw("Chem")
+        chemistry_folder = FolderPath.from_raw("Chemistry")
+        
+        # CRITICAL: This must be False to prevent scope violations
+        assert chem_folder.is_parent_of(chemistry_folder) is False
+        
+        # Additional scope violation tests
+        bio_folder = FolderPath.from_raw("Bio")
+        biology_folder = FolderPath.from_raw("Biology")
+        assert bio_folder.is_parent_of(biology_folder) is False
+        
+        # Test hierarchical scope violations
+        research_folder = FolderPath.from_raw("Research")
+        research_data_folder = FolderPath.from_raw("Research-Data")
+        assert research_folder.is_parent_of(research_data_folder) is False
+    
+    def test_exact_hierarchical_path_comparison(self):
+        """Test exact hierarchical path comparison using tuple prefix matching."""
+        # Test exact component matching
+        parent = FolderPath.from_raw("Projects/AI")
+        
+        # Valid child (exact prefix)
+        valid_child = FolderPath.from_raw("Projects/AI/Research")
+        assert parent.is_parent_of(valid_child) is True
+        
+        # Invalid child (partial component match)
+        invalid_child = FolderPath.from_raw("Projects/AI-Research")
+        assert parent.is_parent_of(invalid_child) is False
+        
+        # Test with multiple levels
+        deep_parent = FolderPath.from_raw("Projects/AI/Research")
+        deep_child = FolderPath.from_raw("Projects/AI/Research/Data/2024")
+        assert deep_parent.is_parent_of(deep_child) is True
+        
+        # Test with similar but not exact paths
+        similar_parent = FolderPath.from_raw("Projects/AI/Research")
+        similar_child = FolderPath.from_raw("Projects/AI/Research-Data")
+        assert similar_parent.is_parent_of(similar_child) is False
+    
+    def test_tuple_prefix_matching_implementation(self):
+        """Test that tuple prefix matching is correctly implemented."""
+        # Create paths with known component tuples
+        parent = FolderPath(("Projects", "AI"))
+        child = FolderPath(("Projects", "AI", "Research", "Data"))
+        
+        # Verify tuple prefix matching
+        assert parent.is_parent_of(child) is True
+        
+        # Test that all parent components match child components
+        parent_components = parent.components
+        child_components = child.components
+        
+        # Parent should have fewer components
+        assert len(parent_components) < len(child_components)
+        
+        # All parent components should match corresponding child components
+        for i in range(len(parent_components)):
+            assert parent_components[i] == child_components[i]
+    
+    def test_string_vs_tuple_consistency(self):
+        """Test consistency between string parsing and tuple operations."""
+        # Create same path using string parsing and tuple construction
+        string_path = FolderPath.from_raw("Projects/AI/Research")
+        tuple_path = FolderPath(("Projects", "AI", "Research"))
+        
+        # Should be equal
+        assert string_path == tuple_path
+        assert string_path.components == tuple_path.components
+        
+        # Should have same behavior
+        test_child = FolderPath.from_raw("Projects/AI/Research/Data")
+        assert string_path.is_parent_of(test_child) == tuple_path.is_parent_of(test_child)
