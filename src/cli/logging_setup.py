@@ -34,7 +34,16 @@ from src.cli.constants import (
     LOG_FORMAT_STRING,
     AUDIT_LOG_FORMAT_STRING
 )
-from src.cli.models import LoggingConfig
+# Import LoggingConfig directly from models.py to avoid circular import with models package
+import importlib.util
+import os
+
+# Load LoggingConfig directly from models.py file
+_models_path = os.path.join(os.path.dirname(__file__), 'models.py')
+_spec = importlib.util.spec_from_file_location("models_direct", _models_path)
+_models_module = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_models_module)
+LoggingConfig = _models_module.LoggingConfig
 from src.cli.utils import scrub_argv
 
 # =============================================================================
@@ -117,7 +126,13 @@ class StructuredFormatter(logging.Formatter):
                 'thread', 'threadName', 'processName', 'process', 'message',
                 'asctime'
             }:
-                context[attr_name] = getattr(record, attr_name)
+                attr_value = getattr(record, attr_name)
+                # Only include JSON-serializable attributes
+                if isinstance(attr_value, (str, int, float, bool, type(None), list, dict)):
+                    context[attr_name] = attr_value
+                elif hasattr(attr_value, '__str__'):
+                    # Convert other types to string representation
+                    context[attr_name] = str(attr_value)
         
         # Format as JSON for machine parsing
         if self.use_json:
