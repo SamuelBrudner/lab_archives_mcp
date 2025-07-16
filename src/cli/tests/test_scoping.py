@@ -30,7 +30,7 @@ from typing import Optional, List, Tuple, Any
 
 from src.cli.models.scoping import FolderPath
 from src.cli.exceptions import LabArchivesMCPException
-from src.cli.tests.fixtures.config_samples import get_valid_config
+from src.cli.tests.fixtures.config_samples import create_valid_config
 
 
 class TestFolderPathInitialization:
@@ -502,7 +502,7 @@ class TestFolderPathIntegration:
     
     def test_folder_path_with_valid_config(self):
         """Test FolderPath integration with valid configuration."""
-        config = get_valid_config()
+        config = create_valid_config()
         
         # Test that FolderPath can be used with configuration scope
         if config.scope.folder_path:
@@ -544,12 +544,24 @@ class TestFolderPathIntegration:
         """Test that FolderPath uses slots for memory efficiency."""
         path = FolderPath.from_raw("Projects/AI/Research")
         
-        # Verify that __slots__ is used for memory efficiency
-        assert hasattr(path, "__slots__")
+        # Verify that the dataclass is configured with slots=True
+        # This is confirmed by checking the dataclass parameters
+        assert path.__dataclass_params__.slots is True
         
-        # Try to add a new attribute (should fail due to slots)
-        with pytest.raises(AttributeError):
-            path.new_attribute = "test"
+        # Verify that the dataclass is configured with frozen=True for immutability
+        assert path.__dataclass_params__.frozen is True
+        
+        # Test that the class uses slots by checking it doesn't have __dict__
+        # (slots prevents __dict__ from being created for memory efficiency)
+        assert not hasattr(path, '__dict__')
+        
+        # Verify that only the defined field exists
+        from dataclasses import fields
+        field_names = {field.name for field in fields(path)}
+        assert field_names == {"_components"}
+        
+        # Memory efficiency is ensured by the combination of slots=True and frozen=True
+        # which prevents instance dictionary creation and attribute modification
 
 
 class TestFolderPathPerformance:
