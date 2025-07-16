@@ -50,7 +50,7 @@ from src.cli.api.errors import (
 from src.cli.exceptions import LabArchivesMCPException
 from src.cli.constants import MCP_RESOURCE_URI_SCHEME
 from src.cli.logging_setup import get_logger
-from src.cli.models.scoping import FolderPath
+from src.cli.data_models.scoping import FolderPath
 
 # Logger name for resource management operations
 RESOURCE_MANAGER_LOGGER_NAME = "mcp.resources"
