@@ -564,34 +564,85 @@ class ResourceManager:
                     )
             
             else:
-                # List all accessible notebooks (no scope limitation)
-                self.logger.debug("Listing all accessible notebooks")
-                
-                try:
-                    # Get all accessible notebooks
-                    notebook_list_response = self.api_client.list_notebooks()
+                # No specific notebook scope - check for folder scope
+                if folder_path and folder_path.strip():
+                    # Two-phase listing with folder scope: find notebooks containing pages in folder scope, then return filtered pages
+                    self.logger.debug(f"Performing two-phase listing with folder scope: {folder_path}")
                     
-                    # Transform each notebook to MCP resource
-                    for notebook in notebook_list_response.notebooks:
-                        # Transform to MCP resource
-                        mcp_resource = labarchives_to_mcp_resource(notebook)
+                    try:
+                        # Phase 1: Get all accessible notebooks and filter to those containing pages in folder scope
+                        notebook_list_response = self.api_client.list_notebooks()
                         
-                        # Apply folder scope filtering if configured
-                        if folder_path:
-                            # Skip notebooks that don't contain the folder
-                            if not self._notebook_contains_folder(notebook, folder_path):
+                        try:
+                            folder_scope = FolderPath.from_raw(folder_path)
+                        except Exception as e:
+                            self.logger.warning(f"Invalid folder path '{folder_path}': {e}")
+                            return []
+                        
+                        notebooks_with_scope = []
+                        for notebook in notebook_list_response.notebooks:
+                            if self._notebook_contains_folder(notebook, folder_path):
+                                notebooks_with_scope.append(notebook)
+                                self.logger.debug(f"Notebook {notebook.id} contains pages in folder {folder_path}")
+                        
+                        # Phase 2: For each notebook containing pages in scope, list and filter pages
+                        for notebook in notebooks_with_scope:
+                            try:
+                                page_list_response = self.api_client.list_pages(notebook.id)
+                                
+                                # Filter pages to only those within folder scope
+                                for page in page_list_response.pages:
+                                    if page.folder_path and page.folder_path.strip():
+                                        try:
+                                            page_folder = FolderPath.from_raw(page.folder_path)
+                                            # Include page if it's within the folder scope (exact parent-child relationship)
+                                            if folder_scope.is_parent_of(page_folder) or folder_scope.components == page_folder.components:
+                                                # Create parent URI for hierarchical context
+                                                parent_uri = f"{MCP_RESOURCE_URI_SCHEME}notebook/{notebook.id}"
+                                                
+                                                # Transform to MCP resource
+                                                mcp_resource = labarchives_to_mcp_resource(page, parent_uri)
+                                                resources.append(mcp_resource)
+                                                
+                                                self.logger.debug(f"Added page resource: {mcp_resource.uri}")
+                                        except Exception as e:
+                                            self.logger.warning(f"Error processing page folder path '{page.folder_path}': {e}")
+                                            continue
+                                            
+                            except APIError as e:
+                                self.logger.warning(f"API error listing pages for notebook {notebook.id}: {e}")
                                 continue
+                    
+                    except APIError as e:
+                        self.logger.error(f"API error during two-phase listing: {e}")
+                        raise LabArchivesMCPException(
+                            message="Failed to list resources with folder scope",
+                            code=500,
+                            context={"folder_path": folder_path, "error": str(e)}
+                        )
                         
-                        resources.append(mcp_resource)
-                        self.logger.debug(f"Added notebook resource: {mcp_resource.uri}")
-                
-                except APIError as e:
-                    self.logger.error(f"API error listing notebooks: {e}")
-                    raise LabArchivesMCPException(
-                        message="Failed to list notebooks",
-                        code=500,
-                        context={"error": str(e)}
-                    )
+                else:
+                    # No scope limitation - list all accessible notebooks
+                    self.logger.debug("Listing all accessible notebooks (no scope)")
+                    
+                    try:
+                        # Get all accessible notebooks
+                        notebook_list_response = self.api_client.list_notebooks()
+                        
+                        # Transform each notebook to MCP resource
+                        for notebook in notebook_list_response.notebooks:
+                            # Transform to MCP resource
+                            mcp_resource = labarchives_to_mcp_resource(notebook)
+                            resources.append(mcp_resource)
+                            self.logger.debug(f"Added notebook resource: {mcp_resource.uri}")
+                    
+                    except APIError as e:
+                        self.logger.error(f"API error listing notebooks: {e}")
+                        raise LabArchivesMCPException(
+                            message="Failed to list notebooks",
+                            code=500,
+                            context={"error": str(e)}
+                        )
             
             # Log successful completion
             self.logger.info(f"Resource listing completed successfully", extra={
@@ -830,7 +881,7 @@ class ResourceManager:
                                 raise LabArchivesMCPException(
                                     message="ScopeViolation",
                                     code=403,
-                                    context={"page_id": page_id, "folder_path": target_page.folder_path, "scope_folder": folder_path}
+                                    context={"requested": target_page.folder_path, "allowed": folder_path}
                                 )
                         except LabArchivesMCPException:
                             # Re-raise scope violations
@@ -941,13 +992,23 @@ class ResourceManager:
                     folder_path = self.scope_config.get('folder_path')
                     if folder_path and folder_path.strip() and entry.page_id:
                         try:
-                            # Get the parent page to check its folder_path
-                            page_list_response = self.api_client.list_pages(entry.notebook_id)
+                            # Find the parent page by searching through all notebooks
+                            # This is necessary because EntryContent doesn't contain notebook_id
                             entry_page = None
-                            for page in page_list_response.pages:
-                                if page.id == entry.page_id:
-                                    entry_page = page
-                                    break
+                            notebook_list_response = self.api_client.list_notebooks()
+                            
+                            for notebook in notebook_list_response.notebooks:
+                                try:
+                                    page_list_response = self.api_client.list_pages(notebook.id)
+                                    for page in page_list_response.pages:
+                                        if page.id == entry.page_id:
+                                            entry_page = page
+                                            break
+                                    if entry_page:
+                                        break
+                                except APIError:
+                                    # Continue searching in other notebooks if one fails
+                                    continue
                             
                             if entry_page and entry_page.folder_path and entry_page.folder_path.strip():
                                 try:
@@ -960,7 +1021,7 @@ class ResourceManager:
                                         raise LabArchivesMCPException(
                                             message="ScopeViolation",
                                             code=403,
-                                            context={"entry_id": entry_id, "page_folder_path": entry_page.folder_path, "scope_folder": folder_path}
+                                            context={"requested": entry_page.folder_path, "allowed": folder_path}
                                         )
                                 except LabArchivesMCPException:
                                     # Re-raise scope violations
