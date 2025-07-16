@@ -858,6 +858,79 @@ def safe_serialize(obj: Any) -> str:
         return f"<serialization-error: {type(obj).__name__}>"
 
 
+def scrub_argv(argv: list) -> list:
+    """
+    Scrubs command-line arguments to prevent sensitive credentials from appearing in logs.
+    
+    This function is specifically designed for logging integration and creates a sanitized
+    copy of argv with credential values replaced by '[REDACTED]' before any logging occurs.
+    It provides comprehensive credential scrubbing for all credential-passing flags to
+    guarantee that secrets never enter the logging pipeline.
+    
+    The function handles both flag-value pairs ('--access-key', 'secret123') and
+    --flag=value format ('--access-key=secret123') for comprehensive credential scrubbing.
+    This early argv scrubbing ensures complete compliance with security auditing requirements
+    by blocking any literal secret/token strings from appearing in logs.
+    
+    Args:
+        argv (list): List of command-line arguments to scrub. Can be None or empty.
+    
+    Returns:
+        list: Scrubbed copy of arguments with sensitive values replaced by '[REDACTED]'.
+              Returns empty list if argv is None or empty.
+    
+    Examples:
+        >>> scrub_argv(['--access-key', 'secret123', '--verbose'])
+        ['--access-key', '[REDACTED]', '--verbose']
+        
+        >>> scrub_argv(['--access-key=secret123', '--password=pass456'])
+        ['--access-key=[REDACTED]', '--password=[REDACTED]']
+        
+        >>> scrub_argv(['-k', 'key123', '-p', 'pass456'])
+        ['-k', '[REDACTED]', '-p', '[REDACTED]']
+    """
+    # Handle None or empty argv
+    if not argv:
+        return []
+    
+    # Create a copy to avoid modifying the original
+    scrubbed = []
+    
+    # Define all credential-passing flags that need redaction
+    credential_flags = {
+        '-k', '--access-key', '--access-key-id',
+        '-p', '--password',
+        '--token', '--secret', '--key', '--credential',
+        '--access-secret', '--api-key', '--api-secret'
+    }
+    
+    i = 0
+    while i < len(argv):
+        arg = argv[i]
+        
+        # Check for --flag=value format first
+        if '=' in arg:
+            key, value = arg.split('=', 1)
+            if key in credential_flags:
+                scrubbed.append(f"{key}=[REDACTED]")
+            else:
+                scrubbed.append(arg)
+        else:
+            # Add the current argument
+            scrubbed.append(arg)
+            
+            # Check if this is a credential flag with separate value
+            if arg in credential_flags:
+                # If there's a next argument and it's not another flag, redact it
+                if i + 1 < len(argv) and not argv[i + 1].startswith('-'):
+                    scrubbed.append('[REDACTED]')
+                    i += 1  # Skip the original value
+        
+        i += 1
+    
+    return scrubbed
+
+
 def sanitize_argv(argv: list) -> list:
     """
     Sanitizes command-line arguments to prevent sensitive credentials from appearing in logs.
