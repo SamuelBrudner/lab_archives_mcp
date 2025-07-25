@@ -563,8 +563,8 @@ class UserContextResponse(BaseModel):
         message: Optional response message or error description
     """
     
-    user: UserContext = Field(
-        description="User context object with profile and permissions",
+    user: User = Field(
+        description="User object with profile and permissions",
         example={
             "uid": "user_987654",
             "name": "Dr. Sarah Johnson",
