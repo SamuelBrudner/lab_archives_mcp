@@ -332,6 +332,27 @@ def build_cli_parser() -> argparse.ArgumentParser:
         )
 
 
+def parse_cli_args(argv: list[str] = None) -> argparse.Namespace:
+    """
+    Parse CLI arguments and return the parsed namespace.
+    
+    This function provides a simple interface to parse command-line arguments
+    without dispatching to subcommand handlers. It's primarily used for testing
+    and when only argument parsing is needed without execution.
+    
+    Args:
+        argv: List of command-line arguments. If None, uses sys.argv[1:]
+    
+    Returns:
+        argparse.Namespace: Parsed arguments namespace
+        
+    Raises:
+        SystemExit: If argument parsing fails or --help/--version is used
+    """
+    parser = build_cli_parser()
+    return parser.parse_args(argv)
+
+
 def parse_and_dispatch_cli(argv: list[str] = None) -> int:
     """
     Parses CLI arguments, dispatches to the appropriate subcommand handler, and manages error handling, logging, and exit codes.
