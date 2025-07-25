@@ -378,6 +378,102 @@ def get_valid_config() -> ServerConfiguration:
     return _create_valid_config_instance()
 
 
+@pytest.fixture
+def get_invalid_config() -> ServerConfiguration:
+    """
+    Pytest fixture version of get_invalid_config() function for test compatibility.
+    
+    Returns:
+        ServerConfiguration: An invalid configuration object for negative test cases.
+    """
+    # Call the non-fixture function implementation directly to avoid recursion
+    # Instantiate AuthenticationConfig with invalid credentials
+    # Using object.__setattr__ to bypass Pydantic validation for testing
+    auth_config = AuthenticationConfig.__new__(AuthenticationConfig)
+    object.__setattr__(auth_config, 'access_key_id', "")  # Invalid: empty string
+    object.__setattr__(auth_config, 'access_secret', None)  # Invalid: None value
+    object.__setattr__(auth_config, 'username', "not-an-email")  # Invalid: not email format
+    object.__setattr__(auth_config, 'api_base_url', "http://insecure.com")  # Invalid: not HTTPS
+    
+    # Instantiate ScopeConfig with conflicting values
+    scope_config = ScopeConfig.__new__(ScopeConfig)
+    object.__setattr__(scope_config, 'notebook_id', "notebook_12345")
+    object.__setattr__(scope_config, 'notebook_name', "Conflicting Notebook Name")  # Invalid: conflicts with notebook_id
+    object.__setattr__(scope_config, 'folder_path', None)
+    
+    # Instantiate OutputConfig with invalid type and conflicting settings
+    output_config = OutputConfig.__new__(OutputConfig)
+    object.__setattr__(output_config, 'json_ld_enabled', True)
+    object.__setattr__(output_config, 'structured_output', False)  # Invalid: JSON-LD requires structured output
+    
+    # Instantiate LoggingConfig with invalid values and conflicts
+    logging_config = LoggingConfig.__new__(LoggingConfig)
+    object.__setattr__(logging_config, 'log_file', "/root/inaccessible.log")  # Invalid: likely permission issues
+    object.__setattr__(logging_config, 'log_level', "INVALID_LEVEL")  # Invalid: not a valid log level
+    object.__setattr__(logging_config, 'verbose', True)
+    object.__setattr__(logging_config, 'quiet', True)  # Invalid: conflicts with verbose
+    
+    # Combine all invalid configurations into a ServerConfiguration
+    server_config = ServerConfiguration.__new__(ServerConfiguration)
+    object.__setattr__(server_config, 'authentication', auth_config)
+    object.__setattr__(server_config, 'scope', scope_config)
+    object.__setattr__(server_config, 'output', output_config)
+    object.__setattr__(server_config, 'logging', logging_config)
+    object.__setattr__(server_config, 'server_name', "")  # Invalid: empty string
+    object.__setattr__(server_config, 'server_version', "invalid-version")  # Invalid: not semantic versioning
+    
+    return server_config
+
+
+@pytest.fixture
+def get_edge_case_config() -> ServerConfiguration:
+    """
+    Pytest fixture version of get_edge_case_config() function for test compatibility.
+    
+    Returns:
+        ServerConfiguration: A configuration object with edge-case values.
+    """
+    # Call the non-fixture function implementation directly to avoid recursion
+    # Instantiate AuthenticationConfig with edge-case values
+    auth_config = AuthenticationConfig(
+        access_key_id="A" * 256,  # Edge case: maximum allowed length
+        access_secret="x" * 1024,  # Edge case: maximum allowed length
+        username="very.long.email.address.with.many.parts@very.long.domain.name.institution.edu",
+        api_base_url=DEFAULT_API_BASE_URL
+    )
+    
+    # Instantiate ScopeConfig with special characters in notebook ID
+    scope_config = ScopeConfig(
+        notebook_id="notebook_with_special-chars_123",
+        notebook_name=None,
+        folder_path=None
+    )
+    
+    # Instantiate OutputConfig with all options enabled
+    output_config = OutputConfig(
+        json_ld_enabled=True,
+        structured_output=True
+    )
+    
+    # Instantiate LoggingConfig with unusual file path and debug level
+    logging_config = LoggingConfig(
+        log_file="logs/with spaces and unicode 测试.log",
+        log_level="DEBUG",
+        verbose=False,
+        quiet=False
+    )
+    
+    # Combine all edge-case configurations into a complete ServerConfiguration
+    return ServerConfiguration(
+        authentication=auth_config,
+        scope=scope_config,
+        output=output_config,
+        logging=logging_config,
+        server_name="labarchives-mcp-server-with-very-long-name-for-testing",
+        server_version="999.999.999-beta.1+build.123"
+    )
+
+
 
 
 
