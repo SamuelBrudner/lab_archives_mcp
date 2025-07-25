@@ -810,7 +810,7 @@ class LabArchivesAPI:
 # for common operations. They are used by the CLI and MCP server components.
 
 
-def get_authenticated_client(access_key_id: str, access_secret: str, 
+async def get_authenticated_client(access_key_id: str, access_password: str, 
                            region: Optional[str] = None, 
                            username: Optional[str] = None) -> LabArchivesAPI:
     """
@@ -818,7 +818,7 @@ def get_authenticated_client(access_key_id: str, access_secret: str,
     
     Args:
         access_key_id: API access key ID or permanent API key
-        access_secret: API access secret or temporary token
+        access_password: API access password or temporary token
         region: LabArchives region (US, AU, UK)
         username: Username (required for token-based auth)
     
@@ -828,13 +828,13 @@ def get_authenticated_client(access_key_id: str, access_secret: str,
     # Placeholder implementation - needs to be fully implemented
     api_client = LabArchivesAPI(
         access_key_id=access_key_id,
-        access_secret=access_secret,
+        access_secret=access_password,
         region=region or "US"
     )
     return api_client
 
 
-def list_user_notebooks(api_client: LabArchivesAPI) -> List[Dict[str, Any]]:
+async def list_user_notebooks(api_client: LabArchivesAPI) -> List[Dict[str, Any]]:
     """
     List all notebooks accessible to the authenticated user.
     
@@ -852,7 +852,7 @@ def list_user_notebooks(api_client: LabArchivesAPI) -> List[Dict[str, Any]]:
         return []
 
 
-def list_notebook_pages(api_client: LabArchivesAPI, notebook_id: str) -> List[Dict[str, Any]]:
+async def list_notebook_pages(api_client: LabArchivesAPI, notebook_id: str) -> List[Dict[str, Any]]:
     """
     List all pages in the specified notebook.
     
@@ -871,7 +871,7 @@ def list_notebook_pages(api_client: LabArchivesAPI, notebook_id: str) -> List[Di
         return []
 
 
-def list_page_entries(api_client: LabArchivesAPI, page_id: str) -> List[Dict[str, Any]]:
+async def list_page_entries(api_client: LabArchivesAPI, page_id: str) -> List[Dict[str, Any]]:
     """
     List all entries in the specified page.
     
@@ -890,7 +890,7 @@ def list_page_entries(api_client: LabArchivesAPI, page_id: str) -> List[Dict[str
         return []
 
 
-def get_notebook_metadata(api_client: LabArchivesAPI, notebook_id: str) -> Dict[str, Any]:
+async def get_notebook_metadata(api_client: LabArchivesAPI, notebook_id: str) -> Dict[str, Any]:
     """
     Get metadata for the specified notebook.
     
@@ -909,7 +909,7 @@ def get_notebook_metadata(api_client: LabArchivesAPI, notebook_id: str) -> Dict[
         return {}
 
 
-def get_page_metadata(api_client: LabArchivesAPI, page_id: str) -> Dict[str, Any]:
+async def get_page_metadata(api_client: LabArchivesAPI, page_id: str) -> Dict[str, Any]:
     """
     Get metadata for the specified page.
     
@@ -928,7 +928,7 @@ def get_page_metadata(api_client: LabArchivesAPI, page_id: str) -> Dict[str, Any
         return {}
 
 
-def get_entry_content(api_client: LabArchivesAPI, entry_id: str) -> Dict[str, Any]:
+async def get_entry_content(api_client: LabArchivesAPI, entry_id: str) -> Dict[str, Any]:
     """
     Get content for the specified entry.
     
