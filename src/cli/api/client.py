@@ -251,7 +251,6 @@ class LabArchivesAPIClient:
         if not self.uid:
             raise APIAuthenticationError(
                 message="User ID not available - authentication required",
-                code=401,
                 context={"operation": "build_authenticated_params"}
             )
         
@@ -325,11 +324,11 @@ class LabArchivesAPIClient:
                 })
                 raise APIAuthenticationError(
                     message="Authentication failed - invalid credentials",
-                    code=response.status_code,
                     context={
                         "endpoint": endpoint,
                         "method": method,
-                        "response_headers": dict(response.headers)
+                        "response_headers": dict(response.headers),
+                        "status_code": response.status_code
                     }
                 )
             
@@ -534,7 +533,6 @@ class LabArchivesAPIClient:
             })
             raise APIAuthenticationError(
                 message=f"Authentication failed: {str(e)}",
-                code=401,
                 context={"error": str(e), "error_type": type(e).__name__}
             )
     
@@ -559,7 +557,6 @@ class LabArchivesAPIClient:
             self.logger.error("List notebooks called without authentication")
             raise APIAuthenticationError(
                 message="Authentication required - call authenticate() first",
-                code=401,
                 context={"operation": "list_notebooks"}
             )
         
@@ -635,7 +632,6 @@ class LabArchivesAPIClient:
             self.logger.error("List pages called without authentication")
             raise APIAuthenticationError(
                 message="Authentication required - call authenticate() first",
-                code=401,
                 context={"operation": "list_pages", "notebook_id": notebook_id}
             )
         
@@ -717,7 +713,6 @@ class LabArchivesAPIClient:
             self.logger.error("List entries called without authentication")
             raise APIAuthenticationError(
                 message="Authentication required - call authenticate() first",
-                code=401,
                 context={"operation": "list_entries", "page_id": page_id}
             )
         
@@ -799,7 +794,6 @@ class LabArchivesAPIClient:
             self.logger.error("Get entry content called without authentication")
             raise APIAuthenticationError(
                 message="Authentication required - call authenticate() first",
-                code=401,
                 context={"operation": "get_entry_content", "entry_id": entry_id}
             )
         
