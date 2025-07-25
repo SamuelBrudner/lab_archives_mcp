@@ -266,3 +266,52 @@ class MCPError(LabArchivesMCPException):
             str(exception) -> "MCP resource not found (Code: -32602)"
         """
         return f"{self.message} (Code: {self.code})"
+
+
+class ConfigurationError(LabArchivesMCPException):
+    """
+    Exception raised for configuration-related errors.
+    
+    This exception is raised when there are issues with loading, parsing,
+    or validating configuration parameters from CLI arguments, environment
+    variables, or configuration files.
+    
+    Examples of configuration errors include:
+    - Invalid configuration file format
+    - Missing required configuration parameters
+    - Invalid parameter values or ranges
+    - Configuration validation failures
+    """
+    pass
+
+
+class AuthenticationError(LabArchivesMCPException):
+    """
+    Exception raised for authentication-related errors.
+    
+    This exception is raised when authentication fails due to invalid
+    credentials, expired tokens, network issues, or server errors.
+    
+    Examples of authentication errors include:
+    - Invalid API key or access token
+    - Expired authentication credentials
+    - Authentication server unavailable
+    - Invalid user credentials
+    """
+    pass
+
+
+class StartupError(LabArchivesMCPException):
+    """
+    Exception raised for server startup-related errors.
+    
+    This exception is raised when the MCP server fails to start due to
+    initialization errors, resource conflicts, or other startup issues.
+    
+    Examples of startup errors include:
+    - Port already in use
+    - Failed to initialize required components
+    - Invalid startup configuration
+    - Resource initialization failures
+    """
+    pass
