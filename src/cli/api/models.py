@@ -20,6 +20,35 @@ from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field, EmailStr, constr, conint  # pydantic>=2.11.7
 
 
+class User(BaseModel):
+    """
+    Represents a LabArchives user with basic profile information.
+    
+    This model captures individual user identity and profile data
+    obtained from LabArchives authentication and user management APIs.
+    
+    Attributes:
+        uid: Unique user identifier from LabArchives
+        name: User's full name
+        email: User's email address
+    """
+    
+    uid: constr(min_length=1, max_length=255) = Field(
+        description="Unique user identifier from LabArchives",
+        example="user_987654"
+    )
+    
+    name: constr(min_length=1, max_length=255) = Field(
+        description="User's full name",
+        example="Dr. Sarah Johnson"
+    )
+    
+    email: EmailStr = Field(
+        description="User's email address",
+        example="sarah.johnson@university.edu"
+    )
+
+
 class NotebookMetadata(BaseModel):
     """
     Represents a LabArchives notebook with metadata and summary information.
@@ -276,37 +305,30 @@ class EntryContent(BaseModel):
 
 class UserContext(BaseModel):
     """
-    Represents authenticated LabArchives user context and permissions.
+    Represents authenticated LabArchives user context and authentication status.
     
-    This model captures user identity information obtained from LabArchives
-    authentication, including user ID, profile information, and assigned roles.
-    Used for session management and access control validation.
+    This model captures the complete authentication response from LabArchives,
+    including user identity information, authentication status, and any
+    status messages. Used for session management and access control validation.
     
     Attributes:
-        uid: Unique user identifier from LabArchives
-        name: User's full name
-        email: User's email address
-        roles: List of assigned user roles and permissions
+        user: User identity and profile information
+        status: Authentication status (success, failure, etc.)
+        message: Status message or additional information
     """
     
-    uid: constr(min_length=1, max_length=255) = Field(
-        description="Unique user identifier from LabArchives",
-        example="user_987654"
+    user: User = Field(
+        description="User identity and profile information"
     )
     
-    name: constr(min_length=1, max_length=255) = Field(
-        description="User's full name",
-        example="Dr. Sarah Johnson"
+    status: constr(min_length=1, max_length=100) = Field(
+        description="Authentication status",
+        example="success"
     )
     
-    email: EmailStr = Field(
-        description="User's email address",
-        example="sarah.johnson@university.edu"
-    )
-    
-    roles: List[constr(min_length=1, max_length=100)] = Field(
-        description="List of assigned user roles and permissions",
-        example=["researcher", "notebook_owner", "collaborator"]
+    message: constr(min_length=1, max_length=500) = Field(
+        description="Status message or additional information",
+        example="Authentication successful"
     )
 
     class Config:
