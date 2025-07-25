@@ -61,6 +61,70 @@ from src.cli.version import __version__
 # Server logger name for consistent logging identification
 SERVER_LOGGER_NAME = "mcp.server"
 
+
+# =============================================================================
+# MCP Server Class
+# =============================================================================
+
+class LabArchivesMCPServer:
+    """
+    Main MCP Server class that orchestrates the LabArchives MCP Server functionality.
+    
+    This class serves as the main server implementation, coordinating between
+    the authentication manager, resource manager, and MCP protocol handler
+    to provide a complete MCP server solution.
+    
+    Attributes:
+        config: Server configuration object
+        auth_manager: Authentication manager instance
+        resource_manager: Resource manager instance
+        protocol_handler: MCP protocol handler instance
+    """
+    
+    def __init__(self, config: ServerConfiguration, auth_manager: AuthenticationManager, 
+                 resource_manager, protocol_handler: MCPProtocolHandler):
+        """
+        Initialize the MCP server with required components.
+        
+        Args:
+            config: Server configuration
+            auth_manager: Authentication manager
+            resource_manager: Resource manager
+            protocol_handler: MCP protocol handler
+        """
+        self.config = config
+        self.auth_manager = auth_manager
+        self.resource_manager = resource_manager
+        self.protocol_handler = protocol_handler
+        self.logger = logging.getLogger(SERVER_LOGGER_NAME)
+    
+    async def run(self) -> None:
+        """
+        Run the MCP server main loop.
+        
+        This method starts the MCP protocol session and handles incoming
+        requests until the server is shut down.
+        """
+        self.logger.info("Starting LabArchives MCP Server")
+        try:
+            # Placeholder implementation - full implementation needed
+            await self.protocol_handler.run()
+        except Exception as e:
+            self.logger.error(f"Server error: {e}")
+            raise
+        finally:
+            self.logger.info("LabArchives MCP Server shutdown complete")
+    
+    def shutdown(self) -> None:
+        """
+        Shutdown the MCP server gracefully.
+        
+        This method handles cleanup tasks and ensures proper resource deallocation.
+        """
+        self.logger.info("Shutting down LabArchives MCP Server")
+        # Placeholder implementation - cleanup logic needed
+
+
 # =============================================================================
 # Signal Handling Functions
 # =============================================================================
