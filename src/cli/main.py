@@ -54,6 +54,9 @@ from src.cli.exceptions import (
 # Internal imports - Version information for display and logging
 from src.cli.version import __version__
 
+# Make version available as MCP_SERVER_VERSION for test compatibility
+MCP_SERVER_VERSION = __version__
+
 # =============================================================================
 # Global Variables
 # =============================================================================
@@ -171,8 +174,8 @@ def main() -> None:
     6. Initialize AuthenticationManager with loaded configuration
     7. Authenticate with LabArchives API using AuthenticationManager
     8. Initialize ResourceManager with authenticated session context
-    9. Launch MCP server with resource handlers
-    10. Register signal handlers for graceful shutdown
+    9. Register signal handlers for graceful shutdown
+    10. Launch MCP server with resource handlers
     11. Start the MCP server event loop using asyncio
     12. Handle all errors with appropriate logging and exit codes
     
@@ -202,6 +205,7 @@ def main() -> None:
     
     # Initialize exit code for error handling
     exit_code = 0
+    args = None  # Initialize args to avoid UnboundLocalError
     
     try:
         # Step 1: Parse CLI arguments using parse_and_dispatch_cli() from cli_parser
@@ -235,7 +239,8 @@ def main() -> None:
                     'event': 'args_parse_error',
                     'exit_code': e.code
                 })
-                sys.exit(e.code)
+                exit_code = e.code
+                return  # Exit with the specified code via finally block
                 
         except Exception as e:
             logger.error(f"Unexpected error parsing CLI arguments: {str(e)}", extra={
@@ -244,20 +249,22 @@ def main() -> None:
                 'error': str(e),
                 'error_type': type(e).__name__
             })
-            sys.exit(1)
+            exit_code = 1
+            return  # Exit with error code via finally block
         
         # Step 2: Handle special cases (already handled by parse_and_dispatch_cli)
         # --help and --version are handled by argparse and cause SystemExit
         
-        # Check if authenticate command - handle separately
-        if hasattr(args, 'command') and args.command == 'authenticate':
+        # Check if authenticate command - handle separately (only if args was parsed successfully)
+        if args is not None and hasattr(args, 'command') and args.command == 'authenticate':
             from src.cli.commands.authenticate import authenticate_command
             try:
                 exit_code = authenticate_command(args)
-                sys.exit(exit_code)
+                return  # Exit with the returned code via finally block
             except Exception as e:
                 print(f"Authentication check failed: {str(e)}", file=sys.stderr)
-                sys.exit(2)
+                exit_code = 2
+                return  # Exit with error code via finally block
         
         # Step 3: Load and validate configuration using load_configuration() from config
         logger.info("Loading server configuration", extra={
@@ -267,12 +274,12 @@ def main() -> None:
         
         try:
             # Convert argparse Namespace to dictionary for configuration loading
-            cli_args_dict = vars(args)
+            cli_args_dict = vars(args) if args is not None else {}
             
             # Load configuration from all sources (CLI, env, file, defaults)
             config = load_configuration(
                 cli_args=cli_args_dict,
-                config_file_path=getattr(args, 'config_file', None)
+                config_file_path=getattr(args, 'config_file', None) if args is not None else None
             )
             
             logger.info("Configuration loaded successfully", extra={
@@ -294,7 +301,7 @@ def main() -> None:
                 'error': str(e),
                 'error_type': type(e).__name__
             })
-            raise ConfigurationError(f"Failed to load configuration: {str(e)}")
+            raise ConfigurationError(str(e))
         
         # Step 4: Initialize logging using setup_logging() from logging_setup
         logger.info("Initializing logging system", extra={
@@ -399,7 +406,7 @@ def main() -> None:
                 'error': str(e),
                 'error_type': type(e).__name__
             })
-            raise AuthenticationError(f"Failed to authenticate with LabArchives API: {str(e)}")
+            raise AuthenticationError(str(e))
         
         # Step 8: Initialize ResourceManager with authenticated session context
         logger.info("Initializing resource manager", extra={
@@ -436,36 +443,9 @@ def main() -> None:
                 'error': str(e),
                 'error_type': type(e).__name__
             })
-            raise StartupError(f"Failed to initialize resource manager: {str(e)}")
+            raise StartupError(str(e))
         
-        # Step 9: Launch MCP server with resource handlers
-        logger.info("Initializing MCP server", extra={
-            'operation': 'main',
-            'event': 'mcp_server_init'
-        })
-        
-        try:
-            # Launch the MCP server
-            exit_code = mcp_server_main()
-            
-            logger.info("MCP server completed", extra={
-                'operation': 'main',
-                'event': 'mcp_server_completed',
-                'exit_code': exit_code
-            })
-            
-            return exit_code
-            
-        except Exception as e:
-            logger.error(f"Failed to run MCP server: {str(e)}", extra={
-                'operation': 'main',
-                'event': 'mcp_server_error',
-                'error': str(e),
-                'error_type': type(e).__name__
-            })
-            raise StartupError(f"Failed to run MCP server: {str(e)}")
-        
-        # Step 10: Register signal handlers for graceful shutdown
+        # Step 9: Register signal handlers for graceful shutdown
         logger.info("Registering signal handlers for graceful shutdown", extra={
             'operation': 'main',
             'event': 'signal_handlers_init'
@@ -492,60 +472,37 @@ def main() -> None:
             # Non-fatal error - continue without signal handlers
             logger.warning("Continuing without signal handlers - manual shutdown required")
         
-        # Step 11: Start the MCP server event loop using asyncio
-        logger.info("Starting MCP server event loop", extra={
+        # Step 10: Launch MCP server with resource handlers
+        logger.info("Initializing MCP server", extra={
             'operation': 'main',
-            'event': 'server_start'
+            'event': 'mcp_server_init'
         })
         
         try:
-            # Log server ready status
-            logger.info("LabArchives MCP Server is ready and listening for connections", extra={
+            # Launch the MCP server
+            exit_code = mcp_server_main()
+            
+            logger.info("MCP server completed", extra={
                 'operation': 'main',
-                'event': 'server_ready',
-                'server_name': config.server_name,
-                'server_version': config.server_version,
-                'user_id': auth_session.user_id
+                'event': 'mcp_server_completed',
+                'exit_code': exit_code
             })
             
-            # Log to audit logger
-            audit_logger.info("MCP server started successfully", extra={
-                'event': 'server_start',
-                'server_name': config.server_name,
-                'server_version': config.server_version,
-                'user_id': auth_session.user_id
-            })
+            # The mcp_server_main() function is the complete server implementation
+            # No additional asyncio.run call needed - it handles its own event loop
             
-            # Start the server event loop
-            # This is a blocking call that runs until the server is stopped
-            asyncio.run(server_instance.run())
-            
-            # If we reach here, the server stopped normally
-            logger.info("MCP server stopped normally", extra={
-                'operation': 'main',
-                'event': 'server_stopped'
-            })
+        except KeyboardInterrupt:
+            # Let KeyboardInterrupt propagate to outer handler
+            raise
             
         except Exception as e:
-            logger.error(f"MCP server runtime error: {str(e)}", extra={
+            logger.error(f"Failed to run MCP server: {str(e)}", extra={
                 'operation': 'main',
-                'event': 'server_runtime_error',
+                'event': 'mcp_server_error',
                 'error': str(e),
                 'error_type': type(e).__name__
             })
-            raise StartupError(f"MCP server runtime error: {str(e)}")
-        
-        # Step 12: Normal shutdown (if we reach here)
-        logger.info("LabArchives MCP Server shutdown completed successfully", extra={
-            'operation': 'main',
-            'event': 'shutdown_completed'
-        })
-        
-        # Log to audit logger
-        audit_logger.info("Server shutdown completed", extra={
-            'event': 'server_shutdown',
-            'reason': 'normal_termination'
-        })
+            raise StartupError(f"Failed to run MCP server: {str(e)}")
         
     except ConfigurationError as e:
         # Handle configuration-related errors
