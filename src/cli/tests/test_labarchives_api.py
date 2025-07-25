@@ -148,7 +148,6 @@ class TestAuthenticationFlow:
             mock_api_instance = Mock()
             mock_api_instance.authenticate.side_effect = APIAuthenticationError(
                 message="Invalid credentials",
-                code=401,
                 context={"endpoint": "/api/user_info", "timestamp": "2024-01-01T12:00:00Z"}
             )
             mock_api_class.return_value = mock_api_instance
@@ -512,7 +511,6 @@ class TestErrorHandling:
         mock_client.client = Mock()
         mock_client.client.list_notebooks.side_effect = APIResponseParseError(
             message="Invalid JSON response: missing required field 'notebooks'",
-            code=422,
             context={"validation_errors": ["notebooks required"], "response_size": 1024}
         )
         
@@ -544,7 +542,6 @@ class TestErrorHandling:
         mock_client.client = Mock()
         mock_client.client.list_notebooks.side_effect = APIRateLimitError(
             message="Rate limit exceeded: 100 requests per hour limit reached",
-            code=429,
             context={"retry_after": 3600, "quota_reset": "2024-01-01T13:00:00Z"}
         )
         
@@ -578,7 +575,6 @@ class TestErrorHandling:
             mock_api_instance = Mock()
             mock_api_instance.authenticate.side_effect = APIPermissionError(
                 message="Access denied: insufficient permissions for operation",
-                code=403,
                 context={"resource_type": "authentication", "user_scope": "limited_access"}
             )
             mock_api_class.return_value = mock_api_instance

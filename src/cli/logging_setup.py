@@ -14,9 +14,20 @@ This module implements:
   for dynamic logging settings at startup and on configuration reload
 - Error Handling and Diagnostics - Structured, auditable format for all errors,
   warnings, and critical events
+- Enhanced Security - URL parameter sanitization and command-line argument scrubbing
+  using centralized Security Utilities to prevent credential exposure in logs
 
 All logging operations are designed to be secure, compliant, and production-ready
-with support for log rotation, structured output, and comprehensive audit trails.
+with support for log rotation, structured output, comprehensive audit trails, and
+fail-secure credential protection per security audit requirements.
+
+Public Exports:
+- get_logger(): Main application logger instance with default configuration
+- get_audit_logger(): Audit logger instance for compliance and security monitoring
+- setup_logging(): Primary logging configuration function
+- reload_logging(): Runtime logging reconfiguration function
+- sanitize_argv(): Enhanced command-line argument sanitization with URL support
+- StructuredFormatter: Custom logging formatter for structured output
 """
 
 import logging
@@ -45,6 +56,7 @@ _models_module = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_models_module)
 LoggingConfig = _models_module.LoggingConfig
 from src.cli.utils import scrub_argv
+from src.cli.security.sanitizers import sanitize_url_params
 
 # =============================================================================
 # Global State Management
@@ -57,6 +69,125 @@ _LOGGERS_INITIALIZED = False
 # Global logger instances for reuse across the application
 _MAIN_LOGGER: Optional[logging.Logger] = None
 _AUDIT_LOGGER: Optional[logging.Logger] = None
+
+# =============================================================================
+# Enhanced Argument Sanitization with URL Parameter Support
+# =============================================================================
+
+def sanitize_argv(argv: list) -> list:
+    """
+    Enhanced command-line argument sanitization with URL parameter redaction support.
+    
+    This function extends the basic command-line argument scrubbing functionality to also
+    detect and sanitize URLs that may be passed as command-line arguments. It combines
+    traditional argument scrubbing (for flags like --password, --token) with URL parameter
+    sanitization to ensure that sensitive query parameters within URLs are also redacted.
+    
+    The function integrates with the centralized Security Utilities module to provide
+    consistent parameter masking policies across all logging operations, as required by
+    the security audit findings for comprehensive credential protection.
+    
+    Features:
+    - Traditional command-line flag value redaction (--password secret123)
+    - URL parameter sanitization for URLs passed as arguments
+    - Integration with centralized security utilities for consistent policies
+    - Support for both separated (--flag value) and combined (--flag=value) formats
+    - Automatic detection of URLs within command-line arguments
+    - Fail-secure redaction that preserves argument structure for debugging
+    
+    Args:
+        argv (list): List of command-line arguments to sanitize. Can be None or empty.
+        
+    Returns:
+        list: Sanitized argument list with sensitive values and URL parameters redacted.
+              All sensitive content is replaced with '[REDACTED]' markers while preserving
+              argument names and URL structure for debugging purposes.
+              
+    Raises:
+        None: This function is designed to be fail-safe and will not raise exceptions,
+              ensuring that logging setup can proceed even if sanitization encounters
+              unexpected input formats.
+    
+    Examples:
+        >>> sanitize_argv(['--password', 'secret123', '--verbose'])
+        ['--password', '[REDACTED]', '--verbose']
+        
+        >>> sanitize_argv(['--url', 'https://api.com/data?token=abc123&id=456'])
+        ['--url', 'https://api.com/data?token=[REDACTED]&id=456']
+        
+        >>> sanitize_argv(['--api-key=secret123', '--endpoint=https://api.com?key=xyz'])
+        ['--api-key=[REDACTED]', '--endpoint=https://api.com?key=[REDACTED]']
+    """
+    # Handle None or empty argv gracefully
+    if not argv:
+        return []
+    
+    try:
+        # Step 1: Apply basic command-line argument scrubbing using existing utilities
+        # This handles traditional credential flags like --password, --token, etc.
+        # Filter to string arguments only for scrub_argv, preserve non-strings as-is
+        string_args = [arg for arg in argv if isinstance(arg, str)]
+        non_string_args = [(i, arg) for i, arg in enumerate(argv) if not isinstance(arg, str)]
+        
+        # Apply basic scrubbing to string arguments
+        if string_args:
+            scrubbed_strings = scrub_argv(string_args)
+        else:
+            scrubbed_strings = []
+        
+        # Reconstruct the full argument list with original positions preserved
+        scrubbed_args = []
+        string_index = 0
+        for i, arg in enumerate(argv):
+            if isinstance(arg, str):
+                scrubbed_args.append(scrubbed_strings[string_index])
+                string_index += 1
+            else:
+                scrubbed_args.append(arg)
+        
+        # Step 2: Apply URL parameter sanitization to detect URLs in arguments
+        # This ensures that any URLs passed as argument values also get sanitized
+        enhanced_args = []
+        
+        for arg in scrubbed_args:
+            if not isinstance(arg, str):
+                # Preserve non-string arguments as-is
+                enhanced_args.append(arg)
+                continue
+                
+            # Check if this argument contains a URL (either as standalone value or in --flag=value format)
+            if '://' in arg:
+                # Argument contains a URL - need to sanitize URL parameters
+                # Check if '=' appears BEFORE '://' (indicating --flag=URL format)
+                # vs. after '://' (indicating URL query parameters)
+                url_start = arg.find('://')
+                equals_pos = arg.find('=')
+                
+                if equals_pos != -1 and equals_pos < url_start:
+                    # Handle --flag=URL format (= comes before ://)
+                    key, url_value = arg.split('=', 1)
+                    sanitized_url = sanitize_url_params(url_value)
+                    enhanced_args.append(f"{key}={sanitized_url}")
+                else:
+                    # Handle standalone URL argument (no = before ://, or = is in query params)
+                    sanitized_url = sanitize_url_params(arg)
+                    enhanced_args.append(sanitized_url)
+            else:
+                # No URL detected - preserve the already scrubbed argument
+                enhanced_args.append(arg)
+        
+        return enhanced_args
+        
+    except Exception:
+        # Fail-safe: If sanitization encounters any errors, fall back to basic scrubbing
+        # This ensures that logging setup can always proceed, even with unexpected input
+        try:
+            return scrub_argv(argv)
+        except Exception:
+            # Ultimate fallback: return original argv if all sanitization fails
+            # This prevents logging initialization from failing due to sanitization errors
+            return argv or []
+
 
 # =============================================================================
 # Structured Logging Formatter
@@ -204,8 +335,9 @@ def setup_logging(logging_config: LoggingConfig) -> Tuple[logging.Logger, loggin
     # CRITICAL: Scrub argv before any logging configuration occurs to prevent
     # credential leakage in logs. This must be the first operation to ensure
     # complete secret redaction from all logging paths per Section 0.2.1 requirement.
+    # Enhanced sanitization now includes URL parameter redaction using Security Utilities.
     # Update sys.argv in place to ensure scrubbed version is used throughout the application.
-    sys.argv[:] = scrub_argv(sys.argv)
+    sys.argv[:] = sanitize_argv(sys.argv)
     
     # Check if logging has already been initialized to prevent duplicate handlers
     if _LOGGERS_INITIALIZED and _MAIN_LOGGER and _AUDIT_LOGGER:

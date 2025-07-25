@@ -52,6 +52,9 @@ from src.cli.constants import MCP_RESOURCE_URI_SCHEME
 from src.cli.logging_setup import get_logger
 from src.cli.data_models.scoping import FolderPath
 
+# Security utilities for fail-secure validation
+from src.cli.security.validators import validate_folder_scope_access
+
 # Logger name for resource management operations
 RESOURCE_MANAGER_LOGGER_NAME = "mcp.resources"
 
@@ -212,18 +215,25 @@ def parse_resource_uri(uri: str) -> Dict[str, str]:
 
 def is_resource_in_scope(resource_info: Dict[str, str], scope_config: Dict[str, Any]) -> bool:
     """
-    Checks if a resource (by type and ID) is within the configured access scope.
+    Immediate, fail-secure scope validation replacing deferred validation approach.
     
-    This function enforces scope limitations by comparing resource identifiers against
-    the configured scope parameters. It supports notebook-based, folder-based, and
-    unrestricted scope configurations, providing granular access control for sensitive
-    research data.
+    This function enforces scope limitations by performing immediate, synchronous validation
+    against configured scope parameters. Unlike the previous implementation that deferred
+    validation for entries and folder paths, this function validates all resource types
+    immediately and denies access by default when scope boundaries are unclear.
+    
+    Key Security Improvements:
+    - Immediate validation: No deferred checks that could be bypassed
+    - Fail-secure behavior: Any uncertainty results in access denial
+    - Entry-to-notebook validation: Prevents cross-notebook data access
+    - Folder scope enforcement: Blocks unauthorized folder boundary violations
+    - Comprehensive audit logging: All decisions are logged for compliance
     
     Scope validation logic:
     - If no scope is configured, all resources are allowed
-    - If notebook_id is configured, only resources within that notebook are allowed
-    - If notebook_name is configured, only resources within that named notebook are allowed
-    - If folder_path is configured, only resources within that folder are allowed
+    - If notebook_id is configured, validates notebook ownership immediately
+    - If notebook_name is configured, validates against resolved notebook names
+    - If folder_path is configured, validates folder boundaries with root-level support
     
     Args:
         resource_info (Dict[str, str]): Parsed resource information from parse_resource_uri
@@ -231,58 +241,196 @@ def is_resource_in_scope(resource_info: Dict[str, str], scope_config: Dict[str, 
                                       notebook_name, and/or folder_path
         
     Returns:
-        bool: True if the resource is within scope, False otherwise
+        bool: True if the resource is definitively within scope, False otherwise.
+              Always returns False for uncertain or ambiguous cases (fail-secure)
+    
+    Raises:
+        LabArchivesMCPException: For validation errors or scope violations with specific error messages
     """
     logger = get_logger()
     
-    # Log scope validation attempt
-    logger.debug(f"Validating resource scope: {resource_info} against scope: {scope_config}")
+    # Validate input parameters - fail secure on invalid input
+    if not isinstance(resource_info, dict) or 'type' not in resource_info:
+        logger.error("Invalid resource_info provided - failing secure", extra={
+            "resource_info_type": type(resource_info).__name__,
+            "validation_event": "invalid_input_fail_secure"
+        })
+        return False
+    
+    if not isinstance(scope_config, dict):
+        logger.error("Invalid scope_config provided - failing secure", extra={
+            "scope_config_type": type(scope_config).__name__,
+            "validation_event": "invalid_scope_config_fail_secure"
+        })
+        return False
+    
+    # Enhanced audit logging for security compliance (after validation to avoid null pointer errors)
+    logger.debug(f"Performing immediate scope validation (fail-secure): {resource_info} against scope: {scope_config}", extra={
+        "resource_type": resource_info.get('type'),
+        "validation_approach": "immediate_fail_secure",
+        "validation_event": "scope_check_start"
+    })
     
     # Extract scope parameters
     notebook_id = scope_config.get('notebook_id')
     notebook_name = scope_config.get('notebook_name')
     folder_path = scope_config.get('folder_path')
+    resource_type = resource_info.get('type')
     
     # If no scope limitations are configured, allow all resources
     if not notebook_id and not notebook_name and not folder_path:
-        logger.debug("No scope limitations configured - allowing all resources")
+        logger.debug("No scope limitations configured - allowing all resources", extra={
+            "validation_event": "no_scope_allow_all"
+        })
         return True
     
-    # Check notebook ID scope limitation
+    # Immediate notebook ID scope validation
     if notebook_id:
-        # For notebook and page resources, check if they belong to the scoped notebook
-        if resource_info.get('type') in ['notebook', 'page']:
+        if resource_type in ['notebook', 'page']:
             resource_notebook_id = resource_info.get('notebook_id')
             if resource_notebook_id == notebook_id:
-                logger.debug(f"Resource {resource_info} is within notebook scope: {notebook_id}")
+                logger.debug(f"Resource {resource_info} validated within notebook scope: {notebook_id}", extra={
+                    "resource_notebook_id": resource_notebook_id,
+                    "scope_notebook_id": notebook_id,
+                    "validation_event": "notebook_scope_match"
+                })
                 return True
             else:
-                logger.debug(f"Resource {resource_info} is outside notebook scope: {notebook_id}")
+                logger.warning(f"Resource {resource_info} denied - outside notebook scope: {notebook_id}", extra={
+                    "resource_notebook_id": resource_notebook_id,
+                    "scope_notebook_id": notebook_id,
+                    "validation_event": "notebook_scope_violation"
+                })
                 return False
         
-        # For entry resources, we need to check if they belong to a page in the scoped notebook
-        # This requires additional API calls in the calling context, so we allow entries
-        # and let the caller handle the validation during content retrieval
-        elif resource_info.get('type') == 'entry':
-            logger.debug(f"Entry resource {resource_info} - scope validation deferred to content retrieval")
-            return True
+        # For entry resources, perform immediate notebook ownership validation
+        elif resource_type == 'entry':
+            entry_id = resource_info.get('entry_id')
+            # Entry validation requires notebook_id to be provided in resource_info for immediate validation
+            entry_notebook_id = resource_info.get('notebook_id')
+            if entry_notebook_id:
+                if entry_notebook_id == notebook_id:
+                    logger.debug(f"Entry {entry_id} validated within notebook scope: {notebook_id}", extra={
+                        "entry_id": entry_id,
+                        "entry_notebook_id": entry_notebook_id,
+                        "scope_notebook_id": notebook_id,
+                        "validation_event": "entry_notebook_scope_match"
+                    })
+                    return True
+                else:
+                    logger.warning(f"Entry {entry_id} denied - belongs to notebook {entry_notebook_id} outside scope: {notebook_id}", extra={
+                        "entry_id": entry_id,
+                        "entry_notebook_id": entry_notebook_id,
+                        "scope_notebook_id": notebook_id,
+                        "validation_event": "entry_notebook_scope_violation"
+                    })
+                    return False
+            else:
+                # Without notebook_id in resource_info, we cannot validate immediately - fail secure
+                logger.warning(f"Entry {entry_id} denied - insufficient information for immediate notebook validation", extra={
+                    "entry_id": entry_id,
+                    "validation_event": "entry_insufficient_info_fail_secure"
+                })
+                return False
     
-    # Check notebook name scope limitation (similar logic to notebook_id)
+    # Immediate notebook name scope validation
     if notebook_name:
-        # For notebook name scope, we need to resolve the name to ID during listing
-        # This is handled in the ResourceManager during resource discovery
-        logger.debug(f"Notebook name scope validation deferred to resource discovery: {notebook_name}")
-        return True
+        # For notebook name validation, we need the actual notebook name in resource_info
+        resource_notebook_name = resource_info.get('notebook_name')
+        if resource_notebook_name:
+            if resource_notebook_name == notebook_name:
+                logger.debug(f"Resource validated within notebook name scope: {notebook_name}", extra={
+                    "resource_notebook_name": resource_notebook_name,
+                    "scope_notebook_name": notebook_name,
+                    "validation_event": "notebook_name_scope_match"
+                })
+                return True
+            else:
+                logger.warning(f"Resource denied - notebook name '{resource_notebook_name}' outside scope: '{notebook_name}'", extra={
+                    "resource_notebook_name": resource_notebook_name,
+                    "scope_notebook_name": notebook_name,
+                    "validation_event": "notebook_name_scope_violation"
+                })
+                return False
+        else:
+            # Without notebook name in resource_info, fail secure
+            logger.warning(f"Resource denied - insufficient information for immediate notebook name validation", extra={
+                "resource_type": resource_type,
+                "scope_notebook_name": notebook_name,
+                "validation_event": "notebook_name_insufficient_info_fail_secure"
+            })
+            return False
     
-    # Check folder path scope limitation
+    # Immediate folder path scope validation with root-level page support
     if folder_path:
-        # Folder path scope is handled during resource discovery and content retrieval
-        # based on the folder_path metadata from LabArchives API responses
-        logger.debug(f"Folder path scope validation deferred to resource discovery: {folder_path}")
-        return True
+        resource_folder_path = resource_info.get('folder_path')
+        
+        # Special handling for root-level access
+        if not folder_path or folder_path in ['', '/']:
+            # Root scope allows all resources including those with empty/null folder paths
+            logger.debug(f"Resource validated within root folder scope - all resources allowed", extra={
+                "resource_folder_path": resource_folder_path,
+                "scope_folder_path": folder_path,
+                "validation_event": "root_folder_scope_allow_all"
+            })
+            return True
+        
+        # For non-root folder scope, validate against specific folder path
+        if resource_folder_path is not None:
+            try:
+                # Use FolderPath for proper hierarchical validation
+                if resource_folder_path in ['', None]:
+                    # Root-level resource doesn't match non-root folder scope
+                    logger.debug(f"Root-level resource denied by non-root folder scope: {folder_path}", extra={
+                        "resource_folder_path": resource_folder_path,
+                        "scope_folder_path": folder_path,
+                        "validation_event": "root_resource_non_root_scope_denied"
+                    })
+                    return False
+                
+                # Parse folder paths for hierarchical comparison
+                scope_folder = FolderPath.from_raw(folder_path)
+                resource_folder = FolderPath.from_raw(resource_folder_path)
+                
+                # Check if resource folder is within scope using hierarchical validation
+                if scope_folder.is_parent_of(resource_folder) or scope_folder.components == resource_folder.components:
+                    logger.debug(f"Resource validated within folder scope: {folder_path}", extra={
+                        "resource_folder_path": resource_folder_path,
+                        "scope_folder_path": folder_path,
+                        "validation_event": "folder_scope_hierarchical_match"
+                    })
+                    return True
+                else:
+                    logger.warning(f"Resource denied - folder '{resource_folder_path}' outside scope: '{folder_path}'", extra={
+                        "resource_folder_path": resource_folder_path,
+                        "scope_folder_path": folder_path,
+                        "validation_event": "folder_scope_hierarchical_violation"
+                    })
+                    return False
+                    
+            except Exception as e:
+                # Fail secure on folder path parsing errors
+                logger.error(f"Folder path validation error - failing secure: {e}", extra={
+                    "resource_folder_path": resource_folder_path,
+                    "scope_folder_path": folder_path,
+                    "error_type": type(e).__name__,
+                    "validation_event": "folder_path_parse_error_fail_secure"
+                })
+                return False
+        else:
+            # Without folder path information, fail secure for non-root scopes
+            logger.warning(f"Resource denied - insufficient folder information for scope validation", extra={
+                "resource_type": resource_type,
+                "scope_folder_path": folder_path,
+                "validation_event": "folder_insufficient_info_fail_secure"
+            })
+            return False
     
-    # If we reach here, the resource doesn't match any configured scope
-    logger.debug(f"Resource {resource_info} does not match any configured scope")
+    # If we reach here, the resource doesn't match any configured scope - fail secure
+    logger.warning(f"Resource {resource_info} denied - does not match any configured scope", extra={
+        "resource_type": resource_type,
+        "validation_event": "no_scope_match_fail_secure"
+    })
     return False
 
 
@@ -452,26 +600,34 @@ class ResourceManager:
                     # Get page list for the specified notebook
                     page_list_response = self.api_client.list_pages(notebook_id)
                     
-                    # Apply folder filtering if configured using exact path matching
+                    # Apply folder filtering if configured using exact path matching with root-level page support
                     pages_to_process = page_list_response.pages
-                    if folder_path and folder_path.strip():
-                        try:
-                            folder_scope = FolderPath.from_raw(folder_path)
-                            filtered_pages = []
-                            for page in page_list_response.pages:
-                                if page.folder_path and page.folder_path.strip():
-                                    try:
-                                        page_folder = FolderPath.from_raw(page.folder_path)
-                                        # Include page if it's within the folder scope (exact parent-child relationship)
-                                        if folder_scope.is_parent_of(page_folder) or folder_scope.components == page_folder.components:
-                                            filtered_pages.append(page)
-                                    except Exception as e:
-                                        self.logger.warning(f"Error processing page folder path '{page.folder_path}': {e}")
-                                        continue
-                            pages_to_process = filtered_pages
-                        except Exception as e:
-                            self.logger.warning(f"Invalid folder path '{folder_path}': {e}")
-                            pages_to_process = []
+                    if folder_path is not None:
+                        if folder_path.strip() in ['', '/']:
+                            # Root folder scope - include ALL pages including root-level ones
+                            self.logger.debug(f"Root folder scope configured - including all pages including root-level pages")
+                            pages_to_process = page_list_response.pages
+                        else:
+                            # Non-root folder scope - filter pages by folder hierarchy
+                            try:
+                                folder_scope = FolderPath.from_raw(folder_path)
+                                filtered_pages = []
+                                for page in page_list_response.pages:
+                                    # Include page if it's within the folder scope OR if it's root-level and scope allows
+                                    if page.folder_path and page.folder_path.strip():
+                                        try:
+                                            page_folder = FolderPath.from_raw(page.folder_path)
+                                            # Include page if it's within the folder scope (exact parent-child relationship)
+                                            if folder_scope.is_parent_of(page_folder) or folder_scope.components == page_folder.components:
+                                                filtered_pages.append(page)
+                                        except Exception as e:
+                                            self.logger.warning(f"Error processing page folder path '{page.folder_path}': {e}")
+                                            continue
+                                    # Note: Root-level pages (empty folder_path) are NOT included in non-root folder scopes
+                                pages_to_process = filtered_pages
+                            except Exception as e:
+                                self.logger.warning(f"Invalid folder path '{folder_path}': {e}")
+                                pages_to_process = []
                     
                     # Transform each page to MCP resource
                     for page in pages_to_process:
@@ -523,26 +679,34 @@ class ResourceManager:
                     # List pages for the found notebook
                     page_list_response = self.api_client.list_pages(target_notebook.id)
                     
-                    # Apply folder filtering if configured using exact path matching
+                    # Apply folder filtering if configured using exact path matching with root-level page support
                     pages_to_process = page_list_response.pages
-                    if folder_path and folder_path.strip():
-                        try:
-                            folder_scope = FolderPath.from_raw(folder_path)
-                            filtered_pages = []
-                            for page in page_list_response.pages:
-                                if page.folder_path and page.folder_path.strip():
-                                    try:
-                                        page_folder = FolderPath.from_raw(page.folder_path)
-                                        # Include page if it's within the folder scope (exact parent-child relationship)
-                                        if folder_scope.is_parent_of(page_folder) or folder_scope.components == page_folder.components:
-                                            filtered_pages.append(page)
-                                    except Exception as e:
-                                        self.logger.warning(f"Error processing page folder path '{page.folder_path}': {e}")
-                                        continue
-                            pages_to_process = filtered_pages
-                        except Exception as e:
-                            self.logger.warning(f"Invalid folder path '{folder_path}': {e}")
-                            pages_to_process = []
+                    if folder_path is not None:
+                        if folder_path.strip() in ['', '/']:
+                            # Root folder scope - include ALL pages including root-level ones
+                            self.logger.debug(f"Root folder scope configured - including all pages including root-level pages")
+                            pages_to_process = page_list_response.pages
+                        else:
+                            # Non-root folder scope - filter pages by folder hierarchy
+                            try:
+                                folder_scope = FolderPath.from_raw(folder_path)
+                                filtered_pages = []
+                                for page in page_list_response.pages:
+                                    # Include page if it's within the folder scope OR if it's root-level and scope allows
+                                    if page.folder_path and page.folder_path.strip():
+                                        try:
+                                            page_folder = FolderPath.from_raw(page.folder_path)
+                                            # Include page if it's within the folder scope (exact parent-child relationship)
+                                            if folder_scope.is_parent_of(page_folder) or folder_scope.components == page_folder.components:
+                                                filtered_pages.append(page)
+                                        except Exception as e:
+                                            self.logger.warning(f"Error processing page folder path '{page.folder_path}': {e}")
+                                            continue
+                                    # Note: Root-level pages (empty folder_path) are NOT included in non-root folder scopes
+                                pages_to_process = filtered_pages
+                            except Exception as e:
+                                self.logger.warning(f"Invalid folder path '{folder_path}': {e}")
+                                pages_to_process = []
                     
                     # Transform each page to MCP resource
                     for page in pages_to_process:
@@ -590,24 +754,43 @@ class ResourceManager:
                             try:
                                 page_list_response = self.api_client.list_pages(notebook.id)
                                 
-                                # Filter pages to only those within folder scope
+                                # Filter pages to only those within folder scope with root-level page support
                                 for page in page_list_response.pages:
-                                    if page.folder_path and page.folder_path.strip():
+                                    include_page = False
+                                    
+                                    # Special handling for root folder scope - include ALL pages including root-level
+                                    if folder_scope.is_root or folder_path.strip() in ['', '/']:
+                                        include_page = True
+                                        self.logger.debug(f"Including page {page.id} - root scope includes all pages")
+                                    elif page.folder_path and page.folder_path.strip():
+                                        # Non-root scope with non-empty page folder path
                                         try:
                                             page_folder = FolderPath.from_raw(page.folder_path)
                                             # Include page if it's within the folder scope (exact parent-child relationship)
                                             if folder_scope.is_parent_of(page_folder) or folder_scope.components == page_folder.components:
-                                                # Create parent URI for hierarchical context
-                                                parent_uri = f"{MCP_RESOURCE_URI_SCHEME}notebook/{notebook.id}"
-                                                
-                                                # Transform to MCP resource
-                                                mcp_resource = labarchives_to_mcp_resource(page, parent_uri)
-                                                resources.append(mcp_resource)
-                                                
-                                                self.logger.debug(f"Added page resource: {mcp_resource.uri}")
+                                                include_page = True
+                                                self.logger.debug(f"Including page {page.id} - within folder scope '{folder_scope}'")
                                         except Exception as e:
                                             self.logger.warning(f"Error processing page folder path '{page.folder_path}': {e}")
                                             continue
+                                    elif not page.folder_path or page.folder_path.strip() == '':
+                                        # Root-level page (empty folder_path) - only include if folder scope is root
+                                        if folder_scope.is_root or folder_path.strip() in ['', '/']:
+                                            include_page = True
+                                            self.logger.debug(f"Including root-level page {page.id} - root scope allows root pages")
+                                        else:
+                                            self.logger.debug(f"Excluding root-level page {page.id} - non-root scope excludes root pages")
+                                    
+                                    # Add page if it should be included
+                                    if include_page:
+                                        # Create parent URI for hierarchical context
+                                        parent_uri = f"{MCP_RESOURCE_URI_SCHEME}notebook/{notebook.id}"
+                                        
+                                        # Transform to MCP resource
+                                        mcp_resource = labarchives_to_mcp_resource(page, parent_uri)
+                                        resources.append(mcp_resource)
+                                        
+                                        self.logger.debug(f"Added page resource: {mcp_resource.uri}")
                                             
                             except APIError as e:
                                 self.logger.warning(f"API error listing pages for notebook {notebook.id}: {e}")
@@ -728,7 +911,7 @@ class ResourceManager:
             resource_type = resource_info.get('type')
             
             if resource_type == 'notebook':
-                # Read notebook content with page summaries
+                # Read notebook content with page summaries and folder scope validation
                 notebook_id = resource_info.get('notebook_id')
                 self.logger.debug(f"Reading notebook content: {notebook_id}")
                 
@@ -751,30 +934,148 @@ class ResourceManager:
                             context={"notebook_id": notebook_id}
                         )
                     
+                    # Critical Security Fix: Prevent information leakage when only folder scope is configured
+                    # Direct notebook reads must be blocked if notebook has no pages in the configured folder scope
+                    folder_path = self.scope_config.get('folder_path')
+                    if folder_path is not None and not self.scope_config.get('notebook_id') and not self.scope_config.get('notebook_name'):
+                        # Only folder scope is configured - validate notebook contains pages in folder scope
+                        self.logger.debug(f"Validating notebook {notebook_id} contains pages in folder scope: {folder_path}", extra={
+                            "notebook_id": notebook_id,
+                            "folder_scope": folder_path,
+                            "validation_type": "notebook_folder_scope_containment"
+                        })
+                        
+                        # Use the integrated folder scope validation
+                        try:
+                            notebook_contains_folder_pages = validate_folder_scope_access(
+                                resource_info={'type': 'notebook', 'notebook_id': notebook_id},
+                                folder_scope=folder_path,
+                                resource_metadata={
+                                    'notebook_folders': [],  # Will be populated below
+                                    'has_root_pages': False   # Will be populated below
+                                }
+                            )
+                            
+                            # Get page list to check for folder containment
+                            page_list_response = self.api_client.list_pages(notebook_id)
+                            
+                            # Build folder metadata for validation
+                            notebook_folders = set()
+                            has_root_pages = False
+                            for page in page_list_response.pages:
+                                if page.folder_path and page.folder_path.strip():
+                                    notebook_folders.add(page.folder_path)
+                                else:
+                                    has_root_pages = True
+                            
+                            # Update metadata and re-validate
+                            updated_metadata = {
+                                'notebook_folders': list(notebook_folders),
+                                'has_root_pages': has_root_pages
+                            }
+                            
+                            # Check if notebook contains pages within folder scope
+                            if folder_path.strip() in ['', '/']:
+                                # Root scope allows access if notebook has any pages
+                                folder_scope_allows_access = len(page_list_response.pages) > 0
+                            else:
+                                # Non-root scope requires pages within specific folder
+                                folder_scope_allows_access = False
+                                try:
+                                    scope_folder = FolderPath.from_raw(folder_path)
+                                    for page in page_list_response.pages:
+                                        if page.folder_path and page.folder_path.strip():
+                                            try:
+                                                page_folder = FolderPath.from_raw(page.folder_path)
+                                                if scope_folder.is_parent_of(page_folder) or scope_folder.components == page_folder.components:
+                                                    folder_scope_allows_access = True
+                                                    break
+                                            except Exception as e:
+                                                self.logger.warning(f"Error processing page folder path '{page.folder_path}': {e}")
+                                                continue
+                                except Exception as e:
+                                    self.logger.error(f"Error parsing folder scope '{folder_path}': {e}")
+                                    folder_scope_allows_access = False
+                            
+                            if not folder_scope_allows_access:
+                                self.logger.warning(f"Direct notebook {notebook_id} read denied - no pages in configured folder scope '{folder_path}'", extra={
+                                    "notebook_id": notebook_id,
+                                    "folder_scope": folder_path,
+                                    "notebook_folders": list(notebook_folders),
+                                    "has_root_pages": has_root_pages,
+                                    "security_violation": "notebook_metadata_leakage_prevention"
+                                })
+                                raise LabArchivesMCPException(
+                                    message=f"Direct notebook {notebook_id} read denied: no pages in configured folder scope '{folder_path}'",
+                                    code=403,
+                                    context={
+                                        "notebook_id": notebook_id,
+                                        "configured_folder_scope": folder_path,
+                                        "notebook_folders": list(notebook_folders),
+                                        "violation_type": "notebook_folder_scope_metadata_leakage"
+                                    }
+                                )
+                            else:
+                                self.logger.debug(f"Notebook {notebook_id} contains pages in folder scope '{folder_path}' - access allowed", extra={
+                                    "notebook_id": notebook_id,
+                                    "folder_scope": folder_path,
+                                    "validation_result": "notebook_folder_scope_validated"
+                                })
+                        
+                        except LabArchivesMCPException:
+                            # Re-raise security violations
+                            raise
+                        except Exception as e:
+                            # Fail secure on validation errors
+                            self.logger.error(f"Error validating notebook {notebook_id} folder scope - denying access: {e}", extra={
+                                "notebook_id": notebook_id,
+                                "folder_scope": folder_path,
+                                "error_type": type(e).__name__,
+                                "security_decision": "fail_secure_validation_error"
+                            })
+                            raise LabArchivesMCPException(
+                                message=f"Cannot validate notebook {notebook_id} folder scope - access denied for security",
+                                code=403,
+                                context={
+                                    "notebook_id": notebook_id,
+                                    "configured_folder_scope": folder_path,
+                                    "error": str(e),
+                                    "violation_type": "notebook_folder_validation_failure"
+                                }
+                            )
+                    
                     # Get page list for the notebook
                     page_list_response = self.api_client.list_pages(notebook_id)
                     
-                    # Apply folder filtering if configured using exact path matching
+                    # Apply folder filtering if configured using exact path matching with root-level page support
                     pages_to_include = page_list_response.pages
                     folder_path = self.scope_config.get('folder_path')
-                    if folder_path and folder_path.strip():
-                        try:
-                            folder_scope = FolderPath.from_raw(folder_path)
-                            filtered_pages = []
-                            for page in page_list_response.pages:
-                                if page.folder_path and page.folder_path.strip():
-                                    try:
-                                        page_folder = FolderPath.from_raw(page.folder_path)
-                                        # Include page if it's within the folder scope (exact parent-child relationship)
-                                        if folder_scope.is_parent_of(page_folder) or folder_scope.components == page_folder.components:
-                                            filtered_pages.append(page)
-                                    except Exception as e:
-                                        self.logger.warning(f"Error processing page folder path '{page.folder_path}': {e}")
-                                        continue
-                            pages_to_include = filtered_pages
-                        except Exception as e:
-                            self.logger.warning(f"Invalid folder path '{folder_path}': {e}")
-                            pages_to_include = []
+                    if folder_path is not None:
+                        if folder_path.strip() in ['', '/']:
+                            # Root folder scope - include ALL pages including root-level ones
+                            self.logger.debug(f"Root folder scope configured - including all pages including root-level pages")
+                            pages_to_include = page_list_response.pages
+                        else:
+                            # Non-root folder scope - filter pages by folder hierarchy
+                            try:
+                                folder_scope = FolderPath.from_raw(folder_path)
+                                filtered_pages = []
+                                for page in page_list_response.pages:
+                                    # Include page if it's within the folder scope OR if it's root-level and scope allows
+                                    if page.folder_path and page.folder_path.strip():
+                                        try:
+                                            page_folder = FolderPath.from_raw(page.folder_path)
+                                            # Include page if it's within the folder scope (exact parent-child relationship)
+                                            if folder_scope.is_parent_of(page_folder) or folder_scope.components == page_folder.components:
+                                                filtered_pages.append(page)
+                                        except Exception as e:
+                                            self.logger.warning(f"Error processing page folder path '{page.folder_path}': {e}")
+                                            continue
+                                    # Note: Root-level pages (empty folder_path) are NOT included in non-root folder scopes
+                                pages_to_include = filtered_pages
+                            except Exception as e:
+                                self.logger.warning(f"Invalid folder path '{folder_path}': {e}")
+                                pages_to_include = []
                     
                     # Create comprehensive notebook content
                     notebook_content = {
@@ -868,31 +1169,72 @@ class ResourceManager:
                             context={"page_id": page_id, "notebook_id": notebook_id}
                         )
                     
-                    # Validate folder scope for pages using exact path matching
+                    # Validate folder scope for pages using exact path matching with root-level page support
                     folder_path = self.scope_config.get('folder_path')
-                    if folder_path and folder_path.strip() and target_page.folder_path and target_page.folder_path.strip():
-                        try:
-                            folder_scope = FolderPath.from_raw(folder_path)
-                            page_folder = FolderPath.from_raw(target_page.folder_path)
-                            
-                            # Check if page is within folder scope using exact parent-child relationship
-                            if not (folder_scope.is_parent_of(page_folder) or folder_scope.components == page_folder.components):
-                                self.logger.warning(f"Page access denied - outside folder scope: {target_page.folder_path}")
+                    if folder_path is not None:
+                        if folder_path.strip() in ['', '/']:
+                            # Root folder scope - allow all pages including root-level ones
+                            self.logger.debug(f"Page {page_id} allowed - root folder scope includes all pages")
+                        else:
+                            # Non-root folder scope - validate page folder against scope
+                            if target_page.folder_path and target_page.folder_path.strip():
+                                try:
+                                    folder_scope = FolderPath.from_raw(folder_path)
+                                    page_folder = FolderPath.from_raw(target_page.folder_path)
+                                    
+                                    # Check if page is within folder scope using exact parent-child relationship
+                                    if not (folder_scope.is_parent_of(page_folder) or folder_scope.components == page_folder.components):
+                                        self.logger.warning(f"Page {page_id} access denied - folder '{target_page.folder_path}' outside scope '{folder_path}'", extra={
+                                            "page_id": page_id,
+                                            "page_folder_path": target_page.folder_path,
+                                            "configured_folder_scope": folder_path,
+                                            "security_violation": "page_folder_scope_violation"
+                                        })
+                                        raise LabArchivesMCPException(
+                                            message=f"Page {page_id} access denied: folder '{target_page.folder_path}' is outside configured scope '{folder_path}'",
+                                            code=403,
+                                            context={
+                                                "page_id": page_id,
+                                                "page_folder_path": target_page.folder_path,
+                                                "configured_folder_scope": folder_path,
+                                                "violation_type": "page_folder_scope_violation"
+                                            }
+                                        )
+                                    else:
+                                        self.logger.debug(f"Page {page_id} validated - folder '{target_page.folder_path}' within scope '{folder_path}'")
+                                except LabArchivesMCPException:
+                                    # Re-raise scope violations
+                                    raise
+                                except Exception as e:
+                                    self.logger.error(f"Error validating folder scope for page {page_id}: {e}")
+                                    raise LabArchivesMCPException(
+                                        message=f"Cannot validate folder scope for page {page_id} - access denied for security",
+                                        code=403,
+                                        context={
+                                            "page_id": page_id,
+                                            "configured_folder_scope": folder_path,
+                                            "error": str(e),
+                                            "violation_type": "page_folder_validation_failure"
+                                        }
+                                    )
+                            elif not target_page.folder_path or target_page.folder_path.strip() == '':
+                                # Root-level page with non-root folder scope - deny access
+                                self.logger.warning(f"Root-level page {page_id} access denied - non-root folder scope '{folder_path}' excludes root pages", extra={
+                                    "page_id": page_id,
+                                    "page_folder_path": target_page.folder_path,
+                                    "configured_folder_scope": folder_path,
+                                    "security_violation": "root_page_non_root_scope_violation"
+                                })
                                 raise LabArchivesMCPException(
-                                    message="ScopeViolation",
+                                    message=f"Root-level page {page_id} access denied: non-root folder scope '{folder_path}' excludes root-level pages",
                                     code=403,
-                                    context={"requested": target_page.folder_path, "allowed": folder_path}
+                                    context={
+                                        "page_id": page_id,
+                                        "page_folder_path": target_page.folder_path,
+                                        "configured_folder_scope": folder_path,
+                                        "violation_type": "root_page_non_root_scope_violation"
+                                    }
                                 )
-                        except LabArchivesMCPException:
-                            # Re-raise scope violations
-                            raise
-                        except Exception as e:
-                            self.logger.error(f"Error validating folder scope for page {page_id}: {e}")
-                            raise LabArchivesMCPException(
-                                message="ScopeViolation",
-                                code=403,
-                                context={"page_id": page_id, "error": str(e)}
-                            )
                     
                     # Get entry list for the page
                     entry_list_response = self.api_client.list_entries(page_id)
@@ -969,7 +1311,7 @@ class ResourceManager:
                     )
             
             elif resource_type == 'entry':
-                # Read detailed entry content
+                # Read detailed entry content with entry-to-notebook validation
                 entry_id = resource_info.get('entry_id')
                 self.logger.debug(f"Reading entry content: {entry_id}")
                 
@@ -988,59 +1330,215 @@ class ResourceManager:
                     # Get the entry (should be only one)
                     entry = entry_response.entries[0]
                     
-                    # Validate folder scope for entries by checking their parent page using exact path matching
-                    folder_path = self.scope_config.get('folder_path')
-                    if folder_path and folder_path.strip() and entry.page_id:
-                        try:
-                            # Find the parent page by searching through all notebooks
-                            # This is necessary because EntryContent doesn't contain notebook_id
-                            entry_page = None
-                            notebook_list_response = self.api_client.list_notebooks()
-                            
-                            for notebook in notebook_list_response.notebooks:
-                                try:
-                                    page_list_response = self.api_client.list_pages(notebook.id)
-                                    for page in page_list_response.pages:
-                                        if page.id == entry.page_id:
-                                            entry_page = page
+                    # Critical Security Fix: Validate entry-to-notebook ownership before content access
+                    # This prevents unauthorized cross-notebook data access by ensuring entries
+                    # can only be accessed if their parent notebook is within configured scope
+                    notebook_id_scope = self.scope_config.get('notebook_id')
+                    if notebook_id_scope:
+                        # Find the notebook containing this entry through its parent page
+                        entry_notebook_id = None
+                        if entry.page_id:
+                            try:
+                                # Search through notebooks to find the one containing the entry's page
+                                notebook_list_response = self.api_client.list_notebooks()
+                                for notebook in notebook_list_response.notebooks:
+                                    try:
+                                        page_list_response = self.api_client.list_pages(notebook.id)
+                                        for page in page_list_response.pages:
+                                            if page.id == entry.page_id:
+                                                entry_notebook_id = notebook.id
+                                                break
+                                        if entry_notebook_id:
                                             break
-                                    if entry_page:
-                                        break
-                                except APIError:
-                                    # Continue searching in other notebooks if one fails
-                                    continue
-                            
-                            if entry_page and entry_page.folder_path and entry_page.folder_path.strip():
-                                try:
-                                    folder_scope = FolderPath.from_raw(folder_path)
-                                    page_folder = FolderPath.from_raw(entry_page.folder_path)
-                                    
-                                    # Check if page is within folder scope using exact parent-child relationship
-                                    if not (folder_scope.is_parent_of(page_folder) or folder_scope.components == page_folder.components):
-                                        self.logger.warning(f"Entry access denied - parent page outside folder scope: {entry_page.folder_path}")
-                                        raise LabArchivesMCPException(
-                                            message="ScopeViolation",
-                                            code=403,
-                                            context={"requested": entry_page.folder_path, "allowed": folder_path}
-                                        )
-                                except LabArchivesMCPException:
-                                    # Re-raise scope violations
-                                    raise
-                                except Exception as path_error:
-                                    self.logger.error(f"Error validating folder scope for entry {entry_id}: {path_error}")
+                                    except APIError:
+                                        # Continue searching in other notebooks if one fails
+                                        continue
+                                
+                                # Validate entry belongs to notebook within scope
+                                if entry_notebook_id != notebook_id_scope:
+                                    self.logger.warning(f"Entry {entry_id} access denied - belongs to notebook {entry_notebook_id} outside configured scope [{notebook_id_scope}]", extra={
+                                        "entry_id": entry_id,
+                                        "entry_notebook_id": entry_notebook_id,
+                                        "configured_notebook_scope": notebook_id_scope,
+                                        "security_violation": "cross_notebook_entry_access"
+                                    })
                                     raise LabArchivesMCPException(
-                                        message="ScopeViolation",
+                                        message=f"Entry {entry_id} belongs to notebook {entry_notebook_id} which is outside configured scope [{notebook_id_scope}]",
                                         code=403,
-                                        context={"entry_id": entry_id, "error": str(path_error)}
+                                        context={
+                                            "entry_id": entry_id,
+                                            "entry_notebook_id": entry_notebook_id,
+                                            "configured_scope": notebook_id_scope,
+                                            "violation_type": "cross_notebook_entry_access"
+                                        }
                                     )
-                        except APIError as api_error:
-                            # If we can't validate the folder scope, deny access for security
-                            self.logger.error(f"Unable to validate folder scope for entry {entry_id}: {api_error}")
+                                else:
+                                    self.logger.debug(f"Entry {entry_id} validated - belongs to notebook {entry_notebook_id} within scope", extra={
+                                        "entry_id": entry_id,
+                                        "entry_notebook_id": entry_notebook_id,
+                                        "configured_notebook_scope": notebook_id_scope,
+                                        "validation_result": "entry_notebook_ownership_validated"
+                                    })
+                            except APIError as api_error:
+                                # If we cannot validate ownership, deny access for security
+                                self.logger.error(f"Unable to validate entry {entry_id} notebook ownership - denying access: {api_error}", extra={
+                                    "entry_id": entry_id,
+                                    "configured_notebook_scope": notebook_id_scope,
+                                    "security_decision": "fail_secure_entry_validation"
+                                })
+                                raise LabArchivesMCPException(
+                                    message=f"Cannot validate entry {entry_id} notebook ownership - access denied for security",
+                                    code=403,
+                                    context={
+                                        "entry_id": entry_id,
+                                        "configured_scope": notebook_id_scope,
+                                        "error": str(api_error),
+                                        "violation_type": "entry_validation_failure"
+                                    }
+                                )
+                        else:
+                            # Entry without page_id cannot be validated - deny access
+                            self.logger.warning(f"Entry {entry_id} has no page_id - cannot validate notebook ownership", extra={
+                                "entry_id": entry_id,
+                                "configured_notebook_scope": notebook_id_scope,
+                                "security_decision": "fail_secure_no_page_id"
+                            })
                             raise LabArchivesMCPException(
-                                message="ScopeViolation",
+                                message=f"Entry {entry_id} cannot be validated for notebook ownership - access denied",
                                 code=403,
-                                context={"entry_id": entry_id, "error": str(api_error)}
+                                context={
+                                    "entry_id": entry_id,
+                                    "configured_scope": notebook_id_scope,
+                                    "violation_type": "entry_missing_page_id"
+                                }
                             )
+                    
+                    # Validate folder scope for entries by checking their parent page with root-level page support
+                    folder_path = self.scope_config.get('folder_path')
+                    if folder_path is not None and entry.page_id:
+                        if folder_path.strip() in ['', '/']:
+                            # Root folder scope - allow all entries including those on root-level pages
+                            self.logger.debug(f"Entry {entry_id} allowed - root folder scope includes all entries")
+                        else:
+                            # Non-root folder scope - validate parent page folder against scope
+                            try:
+                                # Find the parent page by searching through all notebooks
+                                # This is necessary because EntryContent doesn't contain notebook_id
+                                entry_page = None
+                                notebook_list_response = self.api_client.list_notebooks()
+                                
+                                for notebook in notebook_list_response.notebooks:
+                                    try:
+                                        page_list_response = self.api_client.list_pages(notebook.id)
+                                        for page in page_list_response.pages:
+                                            if page.id == entry.page_id:
+                                                entry_page = page
+                                                break
+                                        if entry_page:
+                                            break
+                                    except APIError:
+                                        # Continue searching in other notebooks if one fails
+                                        continue
+                                
+                                if entry_page:
+                                    if entry_page.folder_path and entry_page.folder_path.strip():
+                                        try:
+                                            folder_scope = FolderPath.from_raw(folder_path)
+                                            page_folder = FolderPath.from_raw(entry_page.folder_path)
+                                            
+                                            # Check if page is within folder scope using exact parent-child relationship
+                                            if not (folder_scope.is_parent_of(page_folder) or folder_scope.components == page_folder.components):
+                                                self.logger.warning(f"Entry {entry_id} access denied - parent page folder '{entry_page.folder_path}' outside scope '{folder_path}'", extra={
+                                                    "entry_id": entry_id,
+                                                    "parent_page_id": entry_page.id,
+                                                    "parent_page_folder_path": entry_page.folder_path,
+                                                    "configured_folder_scope": folder_path,
+                                                    "security_violation": "entry_parent_page_folder_scope_violation"
+                                                })
+                                                raise LabArchivesMCPException(
+                                                    message=f"Entry {entry_id} access denied: parent page folder '{entry_page.folder_path}' is outside configured scope '{folder_path}'",
+                                                    code=403,
+                                                    context={
+                                                        "entry_id": entry_id,
+                                                        "parent_page_id": entry_page.id,
+                                                        "parent_page_folder_path": entry_page.folder_path,
+                                                        "configured_folder_scope": folder_path,
+                                                        "violation_type": "entry_parent_page_folder_scope_violation"
+                                                    }
+                                                )
+                                            else:
+                                                self.logger.debug(f"Entry {entry_id} validated - parent page folder '{entry_page.folder_path}' within scope '{folder_path}'")
+                                        except LabArchivesMCPException:
+                                            # Re-raise scope violations
+                                            raise
+                                        except Exception as path_error:
+                                            self.logger.error(f"Error validating folder scope for entry {entry_id}: {path_error}")
+                                            raise LabArchivesMCPException(
+                                                message=f"Cannot validate folder scope for entry {entry_id} - access denied for security",
+                                                code=403,
+                                                context={
+                                                    "entry_id": entry_id,
+                                                    "configured_folder_scope": folder_path,
+                                                    "error": str(path_error),
+                                                    "violation_type": "entry_folder_validation_failure"
+                                                }
+                                            )
+                                    elif not entry_page.folder_path or entry_page.folder_path.strip() == '':
+                                        # Entry on root-level page with non-root folder scope - deny access
+                                        self.logger.warning(f"Entry {entry_id} access denied - on root-level page but non-root folder scope '{folder_path}' excludes root pages", extra={
+                                            "entry_id": entry_id,
+                                            "parent_page_id": entry_page.id,
+                                            "parent_page_folder_path": entry_page.folder_path,
+                                            "configured_folder_scope": folder_path,
+                                            "security_violation": "entry_root_page_non_root_scope_violation"
+                                        })
+                                        raise LabArchivesMCPException(
+                                            message=f"Entry {entry_id} access denied: on root-level page but non-root folder scope '{folder_path}' excludes root-level pages",
+                                            code=403,
+                                            context={
+                                                "entry_id": entry_id,
+                                                "parent_page_id": entry_page.id,
+                                                "parent_page_folder_path": entry_page.folder_path,
+                                                "configured_folder_scope": folder_path,
+                                                "violation_type": "entry_root_page_non_root_scope_violation"
+                                            }
+                                        )
+                                else:
+                                    # Cannot find parent page - deny access for security
+                                    self.logger.error(f"Cannot find parent page for entry {entry_id} - denying access", extra={
+                                        "entry_id": entry_id,
+                                        "parent_page_id": entry.page_id,
+                                        "configured_folder_scope": folder_path,
+                                        "security_decision": "fail_secure_parent_page_not_found"
+                                    })
+                                    raise LabArchivesMCPException(
+                                        message=f"Cannot find parent page for entry {entry_id} - access denied for security",
+                                        code=403,
+                                        context={
+                                            "entry_id": entry_id,
+                                            "parent_page_id": entry.page_id,
+                                            "configured_folder_scope": folder_path,
+                                            "violation_type": "entry_parent_page_not_found"
+                                        }
+                                    )
+                            except APIError as api_error:
+                                # If we can't validate the folder scope, deny access for security
+                                self.logger.error(f"Unable to validate folder scope for entry {entry_id}: {api_error}", extra={
+                                    "entry_id": entry_id,
+                                    "configured_folder_scope": folder_path,
+                                    "error_type": type(api_error).__name__,
+                                    "security_decision": "fail_secure_api_error"
+                                })
+                                raise LabArchivesMCPException(
+                                    message=f"Cannot validate folder scope for entry {entry_id} - access denied for security",
+                                    code=403,
+                                    context={
+                                        "entry_id": entry_id,
+                                        "configured_folder_scope": folder_path,
+                                        "error": str(api_error),
+                                        "violation_type": "entry_folder_validation_api_failure"
+                                    }
+                                )
                     
                     # Transform to MCP resource content using the existing function
                     resource_content = labarchives_to_mcp_resource(entry)

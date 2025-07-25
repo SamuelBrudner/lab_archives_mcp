@@ -6,284 +6,257 @@
 
 ### 0.1.1 Core Objective
 
-Based on the provided requirements, the Blitzy platform understands that the objective is to:
+Based on the provided requirements, the Blitzy platform understands that the objective is to **address critical security vulnerabilities, parameter mismatches, and functional defects** identified in the LabArchives MCP Server audit. The audit revealed 5 previously reported issues that remain unfixed and several new defects that compromise security, functionality, and usability of the system.
 
-1. **Enforce strict folder-scoped access control** throughout the LabArchives MCP Server to ensure that once a folder scope is configured, ALL resource operations (listing and reading) respect that boundary without exceptions or leaks
-2. **Eliminate substring-based path matching vulnerabilities** that currently allow false positives (e.g., "Chem" matching "Chemistry") by implementing exact hierarchical path comparison
-3. **Guarantee complete secret redaction from all logging paths** to ensure compliance with security auditing requirements by preventing any literal secret/token strings from appearing in logs
-4. **Harmonize CLI flag naming conventions** to eliminate the current inconsistency between documentation (--access-key) and implementation (--access-key-id)
-
-These requirements translate to a fundamental shift from partial enforcement to complete, audit-compliant access control that blocks strict data-access compliance.
+The requirements translate into the following technical implementation strategy:
+1. **Fix authentication parameter mismatch** to prevent runtime errors during API client instantiation
+2. **Enforce proper scope validation** to prevent unauthorized access to notebooks, pages, and entries outside configured boundaries
+3. **Add missing CLI aliases** to improve developer experience and maintain consistency
+4. **Fix folder path filtering logic** to include root-level pages in listings
+5. **Implement comprehensive security improvements** including session refresh, sensitive data protection in logs, and proper error handling
 
 ### 0.1.2 Special Instructions and Constraints
 
-**CRITICAL DIRECTIVES CAPTURED:**
-- **G-1 Success Metric**: "Attempting to list or read a page/entry outside the folder returns MCP error 403 ScopeViolation" - This is the definitive acceptance criterion
-- **G-2 Success Metric**: "Folder 'Chem' must not match 'Chemistry'" - Exact path matching is mandatory, no substring shortcuts
-- **G-3 Success Metric**: "Grep of logs shows no literal secret/token strings in any code path" - Zero tolerance for credential leakage
-- **G-4 Success Metric**: "labarchives-mcp -k … -p … behaves exactly as docs show" - CLI must work with shortened flags
+**CRITICAL DIRECTIVES FROM AUDIT:**
+- All fixes must maintain backward compatibility with existing CLI interfaces
+- Security fixes take highest priority due to potential data exposure risks
+- Scope enforcement must be fail-secure (deny by default) rather than fail-open
+- Logging improvements must not impact performance or create new security risks
+- Error messages should be informative without exposing sensitive implementation details
 
-**METHODOLOGY REQUIREMENTS:**
-- Maintain backward compatibility: Existing --access-key-id flag must continue working
-- Zero behavior change for existing users when adding --access-key alias
-- Secrets must be scrubbed before ANY logging occurs, not just in specific handlers
-
-**USER-PROVIDED EXAMPLES:**
-- User Example Command: `labarchives-mcp start -k $KEY -p $PW --notebook-name "Research" --folder-path "Projects/AI"`
-- User Example Expected Behavior: "resources/list shows only pages whose folder_path starts with Projects/AI/…"
-- User Example Error Response: `{ "jsonrpc": "2.0", "id": 12, "error": { "code": 403, "message": "ScopeViolation" } }`
+**User Example from Audit:** "If `folder_path` is `""` or `/`, the code treats it as 'root scope'... Pages at a notebook's top level (with no folder) are omitted from results"
 
 ### 0.1.3 Technical Interpretation
 
-These requirements translate to the following technical implementation strategy:
-
-1. **To achieve exact folder path matching**, we will introduce a FolderPath value object in models/scoping.py that normalizes paths to component tuples and implements precise parent-child relationships
-2. **To enforce folder scope across all operations**, we will refactor ResourceManager to use FolderPath comparisons in both list_resources() and read_resource() methods, splitting the listing logic into two phases for proper filtering
-3. **To guarantee secret redaction**, we will wrap the top-level logger initialization to intercept and sanitize argv before any logging occurs, ensuring secrets never enter the logging pipeline
-4. **To harmonize CLI flags**, we will add argument aliases using argparse's argument groups, allowing both --access-key and --access-key-id to work identically
+These requirements translate to the following technical objectives:
+- **Authentication Fix**: Modify `AuthenticationManager` to pass correct parameter name (`access_password` instead of `access_secret`) when instantiating `LabArchivesAPI`
+- **Scope Enforcement**: Replace deferred validation in `is_resource_in_scope` with immediate, strict validation that blocks access to out-of-scope resources
+- **CLI Enhancement**: Add `-u` short alias for `--username` in the argument parser
+- **Folder Logic Fix**: Update page filtering to explicitly include root-level pages when folder_path is empty
+- **Security Hardening**: Implement URL parameter sanitization in debug logs, add session refresh mechanism, improve error specificity
 
 ## 0.2 TECHNICAL SCOPE
 
 ### 0.2.1 Primary Objectives with Implementation Approach
 
-**Achieve strict folder-scoped access control** by modifying ResourceManager to:
-- Replace all substring-based folder path checks with FolderPath.is_parent_of() comparisons
-- Implement two-phase listing: first filter notebooks to those containing in-scope pages, then filter pages by exact path
-- Block read_resource() calls for pages/entries outside the configured folder scope with proper 403 errors
+1. **Fix Authentication Parameter Mismatch**
+   - Achieve consistent parameter naming by modifying `AuthenticationManager.__init__` to pass `access_password` instead of `access_secret` to `LabArchivesAPI`
+   - Rationale: Prevents runtime `TypeError` when starting server with permanent API credentials
+   - Critical success factor: Server must start successfully with both API key and token authentication
 
-**Eliminate path matching vulnerabilities** by creating FolderPath value object to:
-- Parse folder paths into normalized component tuples (e.g., "Projects/AI/" → ("Projects", "AI"))
-- Implement is_parent_of() method using tuple prefix matching instead of string operations
-- Handle edge cases like trailing slashes, empty components, and root paths consistently
+2. **Enforce Notebook Scope for Entry Access**
+   - Achieve secure entry access by modifying `is_resource_in_scope` to validate entry ownership against notebook scope
+   - Implement entry-to-notebook validation in `ResourceManager.read_resource` before content retrieval
+   - Rationale: Prevents unauthorized cross-notebook data access
+   - Critical success factor: Entries outside scope notebook must be blocked with proper error
 
-**Guarantee complete secret redaction** by modifying logging initialization to:
-- Intercept sys.argv at the earliest possible point in application startup
-- Apply sanitize_argv() transformation before any logger is configured
-- Extend redaction patterns to cover all variants of credential-passing flags
+3. **Prevent Folder-Only Scope Information Leakage**
+   - Achieve secure folder scoping by modifying `is_resource_in_scope` to deny notebook reads when only folder scope is set
+   - Add validation in `ResourceManager.read_resource` to check notebook contains pages in folder
+   - Rationale: Prevents exposure of notebook metadata outside folder boundaries
+   - Critical success factor: Direct notebook reads must fail when notebook has no pages in scope folder
 
-**Harmonize CLI interface** by updating cli_parser.py to:
-- Add --access-key as an alias for --access-key-id using argparse dest parameter
-- Update all help text and documentation to show the shorter form
-- Ensure both flags map to the same configuration value
+4. **Add CLI Username Alias**
+   - Achieve consistent CLI experience by adding `-u` alias to `--username` argument in `cli_parser.py`
+   - Rationale: Provides expected short-form option for common parameter
+   - Critical success factor: Both `-u` and `--username` must work identically
+
+5. **Include Root-Level Pages in Empty Folder Scope**
+   - Achieve complete page listings by modifying folder filtering logic to explicitly handle empty `folder_path`
+   - Update `ResourceManager.list_resources` to include pages with null/empty folder_path when scope is root
+   - Rationale: Ensures all pages are discoverable when folder scope is root
+   - Critical success factor: Root folder scope must list ALL pages including those without folders
 
 ### 0.2.2 Component Impact Analysis
 
 **Direct modifications required:**
+- `src/cli/auth_manager.py`: 
+  - Modify `AuthenticationManager.__init__` line 458 to use `access_password` parameter
+  - Extend `authenticate()` method to store token expiration for refresh capability
+  
+- `src/cli/resource_manager.py`:
+  - Rewrite `is_resource_in_scope` function to perform immediate validation instead of deferring
+  - Modify `read_resource` method to validate entry notebook ownership
+  - Update `list_resources` method page filtering to include root-level pages
 
-- **models/scoping.py** (NEW): Create FolderPath value object with path normalization and comparison logic
-- **resource_manager.py**: Modify _notebook_contains_folder(), list_resources(), and read_resource() to use FolderPath comparisons
-- **cli_parser.py**: Extend argument definitions to support --access-key/-k aliases for all subcommands
-- **logging_setup.py**: Modify setup_logging() to call scrub_argv() before configuring any handlers
-- **utils.py**: Create new scrub_argv() function (distinct from sanitize_argv) for logging integration
+- `src/cli/cli_parser.py`:
+  - Add `-u` alias to username argument definition (line 212)
+
+- `src/cli/api/client.py`:
+  - Add URL parameter sanitization in debug logging statements
+  - Implement method to mask sensitive query parameters
 
 **Indirect impacts and dependencies:**
-
-- **All CLI commands**: Will inherit the new --access-key alias support automatically
-- **Audit logs**: Will no longer contain any credential values due to early scrubbing
-- **MCP error responses**: Will properly return 403 ScopeViolation for out-of-scope access attempts
+- `src/cli/mcp_server.py`: Update to handle session refresh on 401 errors
+- `src/cli/logging_setup.py`: Enhance argument scrubbing to cover URL parameters
+- `src/cli/exceptions.py`: Add specific exception types for scope violations
 
 **New components introduction:**
-
-- **FolderPath**: Immutable value object for exact path comparison operations
-- **scrub_argv**: Specialized function for logger-level secret redaction
+- `src/cli/security/`: Create module for centralized security utilities
+  - `sanitizers.py`: URL and parameter sanitization functions
+  - `validators.py`: Scope validation helpers
 
 ### 0.2.3 File and Path Mapping
 
 | Target File/Module | Source Reference | Context Dependencies | Modification Type |
 |-------------------|------------------|---------------------|-------------------|
-| src/cli/models/scoping.py | NEW FILE | models.py, exceptions.py | Create new module |
-| src/cli/resource_manager.py | Lines 355-394, 426-553, 765-903 | FolderPath, exceptions | Refactor scope logic |
-| src/cli/cli_parser.py | Lines 196-200, 270-274 | argparse patterns | Add argument aliases |
-| src/cli/logging_setup.py | Lines 158-200 | utils.scrub_argv | Inject secret scrubbing |
-| src/cli/utils.py | Lines 861-907 | logging context | Create scrub_argv |
-| README.md | CLI usage examples | None | Update documentation |
-| tests/test_scoping.py | NEW FILE | FolderPath, pytest | Create test suite |
-| tests/test_resource_manager.py | Existing tests | Updated ResourceManager | Extend test coverage |
+| src/cli/auth_manager.py | Line 458: `access_secret` parameter | src/cli/labarchives_api.py (expects `access_password`) | Parameter rename |
+| src/cli/resource_manager.py | Lines 266-268, 271-275, 278-282: Deferred validation | src/cli/models.py (scope config), src/cli/api/client.py | Logic rewrite |
+| src/cli/resource_manager.py | Lines 595-599: Folder filtering | src/cli/data_models/scoping.py (FolderPath) | Condition update |
+| src/cli/cli_parser.py | Lines 211-217: Username argument | argparse module | Alias addition |
+| src/cli/api/client.py | Debug logging statements | src/cli/logging_setup.py | Security enhancement |
+| src/cli/mcp_server.py | Main server loop | src/cli/auth_manager.py (session management) | Error handling |
 
 ## 0.3 IMPLEMENTATION DESIGN
 
 ### 0.3.1 Technical Approach
 
-**First, establish the FolderPath foundation** by creating models/scoping.py with:
-- `@dataclass(frozen=True, slots=True)` for immutability and performance
-- `from_raw()` class method to parse string paths into normalized tuples
-- `is_parent_of()` method implementing exact tuple prefix matching
-- Comprehensive handling of edge cases (empty paths, trailing slashes, dots)
+First, establish secure parameter consistency by modifying `AuthenticationManager` to use correct parameter names when instantiating API clients.
 
-**Next, integrate FolderPath into ResourceManager** by:
-- Importing FolderPath and replacing all `folder_path.startswith()` checks
-- Modifying `_notebook_contains_folder()` to use `FolderPath.from_raw()` and `is_parent_of()`
-- Updating `list_resources()` to filter pages using FolderPath comparisons in the folder_path branches
-- Extending `read_resource()` to validate folder scope for both pages and entries, returning 403 on violations
+Next, integrate comprehensive scope validation by rewriting `is_resource_in_scope` to perform immediate validation rather than deferring checks. This ensures fail-secure behavior where any uncertainty results in access denial.
 
-**Then, implement comprehensive secret scrubbing** by:
-- Creating `scrub_argv(argv)` in utils.py that returns a sanitized copy of argv
-- Modifying `setup_logging()` to call `scrub_argv(sys.argv)` before creating any handlers
-- Ensuring the scrubbed argv is used for all subsequent logging operations
-- Adding unit tests to verify secrets don't appear in log files
+Then, enhance error handling specificity by implementing distinct error codes and messages for different scope violation scenarios, replacing generic "ScopeViolation" with descriptive messages like "Entry belongs to notebook X which is outside configured scope Y".
 
-**Finally, ensure CLI harmony** by:
-- Adding `'-k', '--access-key', dest='access_key_id'` to all subcommand parsers
-- Keeping existing `'--access-key-id'` for backward compatibility
-- Updating help text to show `-k/--access-key` as the primary option
-- Modifying README.md and all documentation to use the harmonized flags
+Finally, ensure security-by-default in logging by implementing URL parameter sanitization that automatically detects and masks sensitive values in debug output.
 
 ### 0.3.2 User-Provided Examples Integration
 
-The user's example of running:
-```bash
-labarchives-mcp start -k $KEY -p $PW --notebook-name "Research" --folder-path "Projects/AI"
-```
-
-Will be implemented in cli_parser.py by ensuring `-k` maps to the same destination as `--access-key-id`, making both commands functionally identical:
+The user's example of empty folder path excluding root-level pages will be addressed by implementing special-case handling:
 ```python
-parser.add_argument('-k', '--access-key', '--access-key-id', 
-                   dest='access_key_id', 
-                   help='LabArchives API access key')
-```
-
-The user's example of scope enforcement will be implemented in ResourceManager.read_resource() as:
-```python
-if not folder_scope.is_parent_of(page_folder):
-    raise LabArchivesMCPException(
-        message="ScopeViolation",
-        code=403,
-        context={"requested": page_folder, "allowed": folder_scope}
-    )
+if not folder_path or folder_path in ['', '/']:
+    # Include ALL pages, including those with null/empty folder_path
+    include_page = True
+else:
+    # Normal folder filtering logic
+    include_page = page_in_folder_scope(page, folder_path)
 ```
 
 ### 0.3.3 Critical Implementation Details
 
-**FolderPath Design Pattern:**
-- Immutable value object pattern for thread safety
-- Tuple-based internal representation for exact matching
-- Factory method pattern for construction from strings
-- No external dependencies (pure Python implementation)
+**Scope Validation Pattern**: Implement a validation chain that checks scope at multiple levels:
+1. URI parsing validates resource type and IDs
+2. Scope check validates against configuration
+3. Content retrieval re-validates after fetching parent relationships
 
-**Two-Phase Listing Algorithm:**
-1. Notebook Discovery Phase: List all notebooks, then filter to only those containing pages within folder_scope
-2. Page Listing Phase: For each included notebook, list pages and filter by exact folder path match
+**Security Sanitization Pattern**: Create reusable sanitizer that:
+1. Parses URLs to extract query parameters
+2. Identifies sensitive parameters (token, password, secret)
+3. Replaces values with `[REDACTED]` in log output
+4. Preserves parameter names for debugging
 
-**Secret Scrubbing Integration:**
-- Must occur BEFORE any logger is configured
-- Must handle both positional and flag-based secret passing
-- Must preserve original argv structure for correct parsing
-- Must be transparent to the rest of the application
-
-**Error Response Structure:**
-- Use standard JSON-RPC error format
-- Return code 403 for all scope violations
-- Include minimal context to avoid information leakage
-- Log detailed context for audit purposes only
+**Session Management Pattern**: Implement proactive session refresh:
+1. Store session expiration time during authentication
+2. Check expiration before API calls
+3. Automatically re-authenticate if expired
+4. Retry failed request with new session
 
 ### 0.3.4 Dependency Analysis
 
-**Required dependencies for implementation:**
-- Python 3.11+ (for dataclasses with slots support)
-- No new external dependencies required
-- Existing pytest framework for test coverage
-
-**Version constraints and compatibility:**
-- Must maintain compatibility with existing argparse usage
-- Must preserve existing MCP protocol error codes
-- Must not break existing credential validation flows
-
-**Justification for design choices:**
-- FolderPath as value object: Ensures immutability and exact comparison semantics
-- Two-phase listing: Maintains efficiency while ensuring complete filtering
-- Early argv scrubbing: Only way to guarantee secrets never enter logs
-- Argument aliases: Standard argparse pattern for backward compatibility
+- **urllib.parse**: Required for URL parameter extraction and sanitization
+- **datetime**: Enhanced usage for session expiration tracking
+- **No new external dependencies**: All fixes use existing libraries
 
 ## 0.4 SCOPE BOUNDARIES
 
 ### 0.4.1 Explicitly In Scope
 
-**ALL affected files/modules:**
-- src/cli/models/scoping.py (NEW)
-- src/cli/resource_manager.py 
-- src/cli/cli_parser.py
-- src/cli/logging_setup.py
-- src/cli/utils.py
-- README.md
-- CHANGELOG.md
+**Affected files/modules:**
+- src/cli/auth_manager.py (parameter fix, session management)
+- src/cli/resource_manager.py (scope validation, folder filtering)
+- src/cli/cli_parser.py (CLI alias)
+- src/cli/api/client.py (logging sanitization)
+- src/cli/mcp_server.py (session refresh handling)
+- src/cli/logging_setup.py (enhanced scrubbing)
 
-**ALL configuration changes required:**
-- No configuration schema changes needed
-- Existing folder_path configuration remains unchanged
+**Configuration changes required:**
+- None - fixes work with existing configuration structure
 
-**ALL test modifications needed:**
-- tests/test_scoping.py (NEW) - FolderPath unit tests
-- tests/test_resource_manager.py - Extended integration tests
-- tests/test_cli_parser.py - Alias parsing tests
-- tests/test_logging.py - Secret scrubbing tests
+**Test modifications needed:**
+- Update test_auth_manager.py to use `access_password`
+- Add tests for scope validation edge cases
+- Add tests for root-level page inclusion
+- Add tests for URL parameter sanitization
 
-**ALL documentation updates required:**
-- README.md - Update CLI examples to use -k instead of --access-key-id
-- CHANGELOG.md - Document v0.2.0 changes
-- CLI help text - Harmonize all flag documentation
+**Documentation updates required:**
+- Update API client initialization examples
+- Document enhanced scope enforcement behavior
+- Add security best practices for logging
 
 ### 0.4.2 Explicitly Out of Scope
 
-- Adding new MCP tools or "mode" presets
-- Performance optimization beyond the scope filtering logic
-- Changing the folder_path configuration schema
-- Modifying authentication mechanisms
-- Altering the MCP protocol implementation
-- Database or storage layer changes
-- Infrastructure or deployment modifications
+- Architectural changes to authentication flow
+- New authentication methods beyond existing API key/token
+- Changes to MCP protocol implementation
+- Performance optimizations unrelated to security fixes
+- UI/UX changes beyond the `-u` alias addition
+- Database or storage layer modifications
 
 ## 0.5 VALIDATION CHECKLIST
 
 ### 0.5.1 Implementation Verification Points
 
-- [ ] FolderPath correctly identifies "Chem" as NOT a parent of "Chemistry" 
-- [ ] FolderPath correctly identifies "Projects/AI" as a parent of "Projects/AI/ML"
-- [ ] ResourceManager.list_resources() returns empty list when no resources match folder scope
-- [ ] ResourceManager.read_resource() returns 403 for out-of-scope page access
-- [ ] ResourceManager.read_resource() returns 403 for out-of-scope entry access
-- [ ] CLI accepts both -k and --access-key-id with identical behavior
-- [ ] Grep for actual secret values in logs returns zero matches
-- [ ] All existing tests continue to pass
+1. **Authentication Parameter Fix**
+   - ✓ Server starts successfully with API key credentials
+   - ✓ No `TypeError` on `access_secret` parameter
+   - ✓ Both API key and token auth modes work
+
+2. **Entry Scope Enforcement**
+   - ✓ Entry from different notebook returns 403 error
+   - ✓ Entry from same notebook returns content
+   - ✓ Error message specifies scope violation reason
+
+3. **Folder Scope Enforcement**
+   - ✓ Direct notebook read fails when notebook has no pages in folder
+   - ✓ Notebook with pages in folder allows page access only
+   - ✓ No notebook metadata leakage
+
+4. **CLI Alias**
+   - ✓ `-u username` works identically to `--username username`
+   - ✓ Help text shows both options
+   - ✓ Argument parsing handles both forms
+
+5. **Root Page Inclusion**
+   - ✓ Empty folder_path lists all pages including root
+   - ✓ Root pages appear in listing output
+   - ✓ Folder filtering still works for non-root folders
+
+6. **Security Logging**
+   - ✓ Debug logs show `token=[REDACTED]` not actual token
+   - ✓ URL parameters are sanitized before logging
+   - ✓ Performance impact is negligible
 
 ### 0.5.2 Observable Changes
 
-- Running with `--folder-path X` now strictly limits ALL operations to that folder
-- Attempting to read any page/entry outside the folder returns consistent 403 errors
-- Log files no longer contain credential values even during startup
-- CLI help text shows `-k/--access-key` as the primary option
-
-### 0.5.3 Integration Points
-
-- MCP protocol handler correctly receives and forwards 403 errors
-- Audit logs capture scope violation attempts with full context
-- Error messages clearly indicate "ScopeViolation" as the reason
+- Error messages change from "ScopeViolation" to specific descriptions
+- Debug logs no longer contain sensitive tokens or passwords  
+- CLI accepts `-u` in addition to `--username`
+- Root-level pages appear in folder listings when folder_path is empty
+- Server successfully starts with permanent API credentials
 
 ## 0.6 EXECUTION PARAMETERS
 
 ### 0.6.1 Special Execution Instructions
 
-**Process-specific requirements:**
-- This is a REFACTOR only - no new features or modes
-- Maintain 100% backward compatibility for existing CLI users
-- Target test coverage must reach ≥ 92% (up from current ~89%)
-- All changes must be included in a single PR titled "Folder scope enforcement & CLI/log refactor"
+- **Testing Priority**: Security fixes (scope enforcement, logging) must be tested before functionality fixes
+- **Deployment Sequence**: Deploy authentication parameter fix first to unblock server startup
+- **Rollback Plan**: Each fix should be independently revertible without affecting others
 
 ### 0.6.2 Constraints and Boundaries
 
-**Technical constraints:**
-- Must use only Python standard library for FolderPath implementation
-- Cannot modify the MCP protocol message format
-- Must preserve existing error code semantics (403 = forbidden)
+**Technical Constraints:**
+- Must maintain Python 3.11+ compatibility
+- Cannot modify external LabArchives API behavior
+- Must preserve existing CLI argument structure (only adding, not changing)
 
-**Process constraints:**
-- Do not add any performance optimizations beyond fixing the scope logic
-- Do not refactor any code outside the listed files
-- Do not add new configuration options or environment variables
+**Process Constraints:**
+- Security fixes must undergo security review before merge
+- Performance impact must be measured for scope validation changes
+- Backward compatibility must be validated with existing deployments
 
-**Output constraints:**
-- Merged PR with all tests passing
-- Tag v0.2.0 with updated CHANGELOG.md
-- Green CI pipeline on GitHub Actions
+**Output Constraints:**
+- Log format must remain compatible with existing log parsers
+- Error response format must maintain MCP protocol compliance
+- CLI output format must remain stable for scripting compatibility
 
 # 1. INTRODUCTION
 
@@ -291,248 +264,278 @@ if not folder_scope.is_parent_of(page_folder):
 
 ### 1.1.1 Project Overview
 
-The LabArchives MCP Server represents a groundbreaking open-source integration solution that bridges electronic lab notebook (ELN) data with artificial intelligence applications. This innovative system leverages Anthropic's Model Context Protocol (MCP), an open standard introduced in November 2024, to provide universal, standardized connectivity between AI systems and data sources.
-
-Built as a production-ready command-line integration tool, the LabArchives MCP Server addresses the critical gap between research data management and AI-powered analysis. The system implements a comprehensive client-server architecture that enables secure, read-only access to LabArchives data while maintaining strict compliance with enterprise security standards including SOC2, ISO 27001, HIPAA, and GDPR requirements. <span style="background-color: rgba(91, 57, 243, 0.2)">The v0.2.0 refactor introduces strict folder-scoped access control with exact hierarchical path matching, eliminating any possibility of out-of-scope data leakage, while all secrets are now fully redacted from every logging path prior to logger initialization, guaranteeing audit-compliant operation.</span> <span style="background-color: rgba(91, 57, 243, 0.2)">Additionally, the CLI has been harmonized to accept the shorter "-k / --access-key" flag while retaining "--access-key-id" for backward compatibility.</span>
+The LabArchives MCP Server is an open-source command-line tool that leverages Anthropic's Model Context Protocol (MCP), an open standard introduced in November 2024 that provides a universal protocol for connecting AI systems with data sources. This innovative solution addresses the fundamental "N×M integration problem" where the complexity of creating custom integrations between AI applications (N) and data sources (M) becomes unmanageable at scale. The server enables Large Language Models to securely access LabArchives electronic lab notebook data through standardized interfaces, positioning itself as a first-to-market solution for LabArchives-MCP integration.
 
 ### 1.1.2 Core Business Problem
 
-Research organizations face significant operational inefficiencies when attempting to leverage artificial intelligence for data analysis and insights. The current landscape presents several critical challenges:
+Research organizations face significant challenges leveraging laboratory data for AI workflows. Even sophisticated AI models are constrained by isolation from data—trapped behind information silos and legacy systems, with every new data source requiring custom implementation. The current landscape presents three critical issues:
 
-- **Manual Data Transfer**: Researchers must manually extract data from LabArchives and input it into AI tools, creating time-consuming bottlenecks in the research workflow
-- **Lack of Standardized Integration**: No secure, standardized methods exist for connecting electronic lab notebooks with AI applications
-- **Security and Compliance Concerns**: Sharing sensitive research data with AI tools raises significant security and regulatory compliance issues
-- **Time-Intensive Processes**: AI-assisted research requires extensive manual preparation, reducing productivity and delaying scientific discoveries
-
-The LabArchives MCP Server eliminates these barriers by providing a secure, standardized, and automated bridge between LabArchives data and AI applications, enabling researchers to focus on analysis rather than data preparation.
+| Problem Area | Description | Impact |
+|--------------|-------------|---------|
+| Data Isolation | AI models cannot access lab notebook content without manual extraction | Reduced research efficiency and insights |
+| Integration Complexity | Custom solutions required for each data source with high development overhead | Increased costs and development time |
+| Security Concerns | Uncontrolled data access to AI systems with limited audit capabilities | Compliance risks and data governance issues |
 
 ### 1.1.3 Key Stakeholders and Users
 
-The system serves a diverse ecosystem of stakeholders across the research and technology landscape:
+The LabArchives MCP Server serves a diverse ecosystem of research professionals and organizational stakeholders:
 
-| Stakeholder Category | Primary Users | Secondary Users |
-|---------------------|---------------|----------------|
-| **Research Personnel** | Research scientists, lab technicians, data analysts | Graduate students, postdoctoral researchers |
-| **Institutional Users** | Universities, pharmaceutical companies, biotech firms | Government research agencies, medical institutions |
-| **Technical Teams** | Lab IT administrators, DevOps engineers | Security teams, compliance officers |
-| **AI/ML Engineers** | Claude Desktop users, MCP client developers | Machine learning researchers, data scientists |
+**Primary Users:**
+- Research scientists conducting AI-assisted data analysis
+- Principal investigators managing laboratory workflows
+- Graduate students and postdoctoral researchers performing data-driven research
+- Laboratory teams requiring streamlined data access
 
-### 1.1.4 Expected Business Impact
+**Secondary Stakeholders:**
+- IT administrators responsible for system deployment and maintenance
+- Compliance officers ensuring adherence to research data governance
+- Software developers integrating AI capabilities into research workflows
 
-The LabArchives MCP Server delivers transformative value across multiple dimensions:
+**Organizational Beneficiaries:**
+- Academic institutions with LabArchives deployments
+- Research organizations seeking AI-enhanced laboratory capabilities
+- Laboratory teams requiring improved data accessibility and analysis workflows
 
-**Operational Efficiency**:
-- **60-80% reduction** in time required for AI-assisted data analysis
-- <span style="background-color: rgba(91, 57, 243, 0.2)">**100% in-scope data coverage** with zero out-of-scope access leakage (strict folder scope enforcement)</span>
-- Elimination of manual data transfer processes
-- Streamlined research workflows with immediate AI accessibility
+### 1.1.4 Expected Business Impact and Value Proposition
 
-**Strategic Advantage**:
-- **First-to-market** MCP integration for electronic lab notebooks
-- Enhanced research productivity through AI-powered insights
-- Competitive positioning in AI-enhanced research environments
-- Future-ready infrastructure for evolving AI capabilities
-- <span style="background-color: rgba(91, 57, 243, 0.2)">Unified CLI flag naming (-k / --access-key) improves usability while preserving backward compatibility</span>
+The LabArchives MCP Server delivers transformative value to research organizations through measurable efficiency gains and enhanced research capabilities:
 
-**Risk Mitigation**:
-- Maintained security and compliance standards
-- Reduced data exposure through controlled access protocols
-- Comprehensive audit trails for regulatory compliance
-- Zero-persistence architecture minimizing data security risks
-- <span style="background-color: rgba(91, 57, 243, 0.2)">Zero credential leakage to logs through complete secret redaction prior to any logging</span>
+- **Productivity Enhancement:** Estimated 60-80% reduction in time required for AI-assisted data analysis
+- **Research Quality Improvement:** Enhanced research reproducibility through comprehensive data context and structured access
+- **Compliance Strengthening:** Improved regulatory compliance through detailed audit trails and access controls
+- **Strategic Positioning:** Positions organizations at the forefront of AI-enhanced research workflows
+- **Foundation for Innovation:** Creates a robust foundation for advanced AI agent capabilities in laboratory environments
 
 ## 1.2 SYSTEM OVERVIEW
 
 ### 1.2.1 Project Context
 
-The LabArchives MCP Server emerges from the convergence of two critical technological trends: the increasing adoption of artificial intelligence in research environments and the growing need for standardized data integration protocols. LabArchives, as a leading electronic lab notebook platform used globally across research institutions, contains vast amounts of structured research data that can significantly benefit from AI analysis.
+#### 1.2.1.1 Business Context and Market Positioning
 
-The introduction of Anthropic's Model Context Protocol in November 2024 created an unprecedented opportunity to standardize AI-data connectivity. This integration positions research organizations at the forefront of AI-enhanced research capabilities while maintaining the security and compliance standards essential for sensitive research data.
+The Model Context Protocol represents a significant advancement in AI-data integration standards. In March 2025, OpenAI officially adopted MCP, joining organizations like Block, Replit, and Sourcegraph, highlighting its potential as a universal open standard for AI-data connectivity. This widespread adoption validates the strategic importance of MCP-compatible solutions in the enterprise AI ecosystem.
 
-**Current System Limitations Addressed**:
-- Fragmented data access requiring manual intervention
-- Lack of standardized protocols for AI-data integration
-- Security vulnerabilities in ad-hoc data sharing methods
-- Inefficient workflows hindering research productivity
+The LabArchives MCP Server capitalizes on this emerging standard by providing the first comprehensive integration between LabArchives and MCP-compatible AI systems. All Claude.ai plans support MCP servers, with Claude for Work customers able to test MCP servers locally, creating immediate market opportunities for research organizations.
 
-**Integration with Enterprise Landscape**:
-- Seamless integration with existing LabArchives deployments
-- Compatibility with Claude Desktop and other MCP-compliant clients
-- Support for regional API endpoints (US, Australia, UK)
-- Alignment with enterprise security and compliance frameworks
+#### 1.2.1.2 Current System Limitations
+
+Traditional approaches to AI-laboratory data integration suffer from several fundamental limitations:
+
+- **Manual Data Extraction:** Researchers must manually export and format laboratory data for AI analysis
+- **Point-to-Point Integrations:** Each AI application requires custom integration development
+- **Limited Scalability:** Custom solutions cannot efficiently scale across multiple data sources
+- **Security Vulnerabilities:** Ad-hoc integrations often lack proper authentication and audit controls
+- **Maintenance Overhead:** Custom integrations require ongoing maintenance and updates
+
+#### 1.2.1.3 Integration with Existing Enterprise Landscape
+
+The LabArchives MCP Server seamlessly integrates with existing research infrastructure:
+
+- **LabArchives Integration:** Full compatibility with all LabArchives regions (US, AU, UK)
+- **AI Platform Compatibility:** Native support for Claude Desktop and future MCP-compatible AI applications
+- **Enterprise Infrastructure:** Docker and Kubernetes deployment support for enterprise environments
+- **Security Compliance:** Maintains SOC2, ISO 27001, HIPAA, and GDPR compliance standards
 
 ### 1.2.2 High-Level Description
 
-The LabArchives MCP Server implements a sophisticated client-server architecture that provides secure, read-only access to LabArchives data through the Model Context Protocol. The system operates as a specialized bridge, transforming LabArchives content into AI-optimized formats while maintaining strict security and compliance controls.
+#### 1.2.2.1 Primary System Capabilities
 
-**Primary System Capabilities**:
+The LabArchives MCP Server provides three core capabilities that enable secure, efficient AI-data integration:
 
-| Capability | Description | Implementation |
-|-----------|-------------|---------------|
-| **MCP Protocol Compliance** | Full implementation of Model Context Protocol specification (2024-11-05) | JSON-RPC 2.0 communication with standardized resource discovery |
-| **Authentication Management** | Dual-mode authentication supporting permanent API keys and temporary SSO tokens<span style="background-color: rgba(91, 57, 243, 0.2)">, with complete secret redaction in all log paths</span> | HMAC-SHA256 encryption with 3600-second session lifetime |
-| **Resource Discovery** | Hierarchical enumeration of notebooks, pages, and entries with <span style="background-color: rgba(91, 57, 243, 0.2)">exact folder-scope enforcement using FolderPath comparisons</span> | Structured navigation with configurable scope limitations |
-| **Content Transformation** | AI-optimized JSON/JSON-LD output | Real-time data processing with zero-persistence architecture |
-| **<span style="background-color: rgba(91, 57, 243, 0.2)">Strict Folder-Scoped Access Control</span>** | <span style="background-color: rgba(91, 57, 243, 0.2)">Exact hierarchical path matching prevents any resource access outside the configured folder scope; returns 403 ScopeViolation on violation</span> | <span style="background-color: rgba(91, 57, 243, 0.2)">FolderPath value object + two-phase ResourceManager filtering</span> |
-| **<span style="background-color: rgba(91, 57, 243, 0.2)">Credential Redaction & Audit-Proof Logging</span>** | <span style="background-color: rgba(91, 57, 243, 0.2)">Secrets are scrubbed from argv before logger creation, ensuring zero credential exposure</span> | <span style="background-color: rgba(91, 57, 243, 0.2)">Early argv sanitisation via utils.scrub_argv()</span> |
+1. **Resource Discovery:** Hierarchical enumeration of notebooks, pages, and entries within configured scope, enabling AI systems to understand laboratory data structure
+2. **Content Retrieval:** Structured JSON output optimized for AI consumption with metadata preservation, ensuring comprehensive data context
+3. **Secure Access Management:** Authentication, audit logging, and configurable scope limitations that maintain data security and compliance, <span style="background-color: rgba(91, 57, 243, 0.2)">including automatic session refresh on token expiry and sensitive URL-parameter sanitization in all logs</span>
 
-**Major System Components**:
+#### 1.2.2.2 Major System Components
 
 ```mermaid
 graph TB
-    subgraph "LabArchives MCP Server"
-        MCP[MCP Protocol Handler]
-        AUTH[Authentication Manager]
-        RESOURCE[Resource Manager]
-        API[LabArchives API Client]
-        AUDIT[Audit System]
-        CLI[CLI Interface]
+    A[MCP Protocol Handler] --> B[Authentication Manager]
+    A --> C[Resource Management Engine]
+    B --> D[LabArchives API Client]
+    B --> H[Security Utilities Module]
+    C --> D
+    C --> E[Scope Enforcement Service]
+    C --> H
+    D --> F[LabArchives Platform]
+    E --> G[Audit Logging System]
+    
+    subgraph "Core Components"
+        A
+        B
+        C
+        E
+        H
     end
     
-    subgraph "External Systems"
-        CLAUDE[Claude Desktop]
-        LABARCH[LabArchives Platform]
-        LOG[Audit Logs]
+    subgraph "External Interfaces"
+        D
+        F
+        G
     end
-    
-    CLAUDE <--> MCP
-    MCP <--> AUTH
-    MCP <--> RESOURCE
-    RESOURCE <--> API
-    API <--> LABARCH
-    AUTH --> AUDIT
-    RESOURCE --> AUDIT
-    AUDIT --> LOG
-    CLI --> AUTH
-    CLI --> RESOURCE
 ```
 
-**Core Technical Approach**:
-- **Architecture Pattern**: Client-server model following MCP specifications with on-demand data retrieval
-- **Runtime Environment**: Python 3.11+ for cross-platform compatibility and modern language features
-- **Protocol Implementation**: FastMCP framework ensuring full MCP compliance
-- **Security Model**: Zero-persistence architecture with encrypted transport and comprehensive access controls
-- **Deployment Strategy**: Docker containerization with Kubernetes orchestration for scalable, cloud-ready infrastructure
+The system architecture comprises <span style="background-color: rgba(91, 57, 243, 0.2)">six</span> major components:
+
+- **MCP Protocol Handler:** Manages JSON-RPC 2.0 communication with MCP-compatible AI clients
+- **Authentication Manager:** Handles credential management and session security
+- **Resource Management Engine:** Orchestrates data discovery and content retrieval operations
+- **LabArchives API Client:** Provides standardized interface to LabArchives REST API
+- **Scope Enforcement Service:** Implements access control and data filtering policies
+- <span style="background-color: rgba(91, 57, 243, 0.2)">**Security Utilities Module:** Centralized security utilities for sanitization and validation operations</span>
+
+#### 1.2.2.3 Core Technical Approach
+
+The LabArchives MCP Server employs a client-server architecture following MCP specifications with several key design principles:
+
+- **Stateless Architecture:** Request-response model with no persistent storage requirements
+- **On-Demand Retrieval:** Dynamic data access without caching or synchronization overhead
+- **Cross-Platform Compatibility:** Support for Windows, macOS, and Linux environments
+- **Standards Compliance:** Full adherence to MCP protocol specifications and JSON-RPC 2.0
+- **Security-First Design:** Comprehensive authentication, authorization, and audit capabilities
+
+<span style="background-color: rgba(91, 57, 243, 0.2)">Scope validation is performed immediately upon access requests and operates in a fail-secure (deny-by-default) manner to ensure unauthorized access is prevented.</span>
 
 ### 1.2.3 Success Criteria
 
-**Measurable Objectives**:
+#### 1.2.3.1 Measurable Objectives
 
-| Metric | Target | Current Status |
-|--------|--------|---------------|
-| **Response Time** | <2 seconds P95 latency | Optimized for real-time interaction |
-| **Memory Usage** | <100MB runtime footprint | Lightweight architecture implemented |
-| **Availability** | 99.9% uptime SLA | High-availability design patterns |
-| **Test Coverage** | 85% minimum (targeting 90%) | Comprehensive test suite in place |
+The LabArchives MCP Server defines success through specific performance and reliability metrics:
 
-**Critical Success Factors**:
-- Seamless integration with Claude Desktop and other MCP clients
-- Secure authentication without credential exposure or persistence
-- Comprehensive audit trail for all data access operations
-- Cross-platform compatibility across Windows, macOS, and Linux environments
-- Full compliance with MCP protocol specifications
+| Metric Category | Target | Measurement Method |
+|-----------------|--------|-------------------|
+| Resource Listing Response Time | < 2 seconds | API response time monitoring |
+| Page Content Fetch Time | < 5 seconds | End-to-end retrieval timing |
+| System Uptime | > 99% during active sessions | Availability monitoring |
 
-**Key Performance Indicators**:
-- **Operational Efficiency**: 60-80% reduction in time to AI analysis
-- **Security Posture**: Zero critical security vulnerabilities maintained
-- **Protocol Compliance**: 100% MCP protocol adherence
-- **Deployment Success**: First successful production deployment within 1 week of installation
+#### 1.2.3.2 Critical Success Factors
+
+Success depends on achieving several critical technical and operational milestones:
+
+- **Protocol Compliance:** Full MCP protocol compliance ensuring compatibility with all MCP-enabled AI systems
+- **Reliability:** Robust error handling and graceful degradation under various failure scenarios
+- **Auditability:** Comprehensive logging for compliance and governance requirements
+- **Usability:** Intuitive CLI interface requiring minimal configuration and setup
+- **Security:** Secure credential management and access control mechanisms
+
+#### 1.2.3.3 Key Performance Indicators (KPIs)
+
+Long-term success will be measured through operational and adoption metrics:
+
+- **Deployment Success Rate:** Number of successful system deployments across research organizations
+- **User Retention:** Sustained usage rates among research teams
+- **Performance Consistency:** Average response times and error rates for API interactions
+- **Research Impact:** Measurable reduction in time-to-insight for research tasks
+- **Ecosystem Growth:** Integration with additional MCP-compatible AI platforms
 
 ## 1.3 SCOPE
 
 ### 1.3.1 In-Scope Elements
 
-**Core Features and Functionalities**:
+#### 1.3.1.1 Core Features and Functionalities
 
-The LabArchives MCP Server includes comprehensive features designed to provide secure, efficient access to LabArchives data:
+The LabArchives MCP Server includes the following must-have capabilities:
 
-| Feature | Description | Implementation Status |
-|---------|-------------|---------------------|
-| **MCP Protocol Compliance** | Full implementation of Model Context Protocol specification | 100% Complete |
-| **LabArchives API Integration** | Secure REST API connectivity with regional endpoint support | 100% Complete |
-| **Resource Discovery** | Hierarchical enumeration of notebooks, pages, and entries | 100% Complete |
-| **Content Retrieval** | Structured JSON/JSON-LD output optimized for AI consumption | 100% Complete |
-| **<span style="background-color: rgba(91, 57, 243, 0.2)">Strict Folder-Scoped Access Control</span>** | <span style="background-color: rgba(91, 57, 243, 0.2)">Enforces exact hierarchical path matching with 403 ScopeViolation on breach</span> | <span style="background-color: rgba(91, 57, 243, 0.2)">Target v0.2.0</span> |
-| **<span style="background-color: rgba(91, 57, 243, 0.2)">Complete Secret Redaction in Logs</span>** | <span style="background-color: rgba(91, 57, 243, 0.2)">Scrubs secrets before any logging to ensure audit compliance</span> | <span style="background-color: rgba(91, 57, 243, 0.2)">Target v0.2.0</span> |
-| **<span style="background-color: rgba(91, 57, 243, 0.2)">CLI Flag Harmonisation</span>** | <span style="background-color: rgba(91, 57, 243, 0.2)">Adds -k / --access-key alias to existing --access-key-id without behaviour change</span> | <span style="background-color: rgba(91, 57, 243, 0.2)">Target v0.2.0</span> |
+| Feature Category | Capabilities |
+|------------------|-------------|
+| MCP Protocol Implementation | Resources/list and resources/read operations |
+| LabArchives Integration | Read-only access to all LabArchives regions |
+| Authentication Support | API keys and temporary token management |
+| Data Retrieval | Hierarchical data access with structure preservation |
 
-**Primary User Workflows**:
-- Authenticated connection establishment to LabArchives
-- Hierarchical browsing of notebook structure (notebooks → pages → entries)
-- Real-time content retrieval with AI-optimized formatting
-- Comprehensive audit logging for all access operations
-- CLI-based configuration and management
+**Primary User Workflows:**
+- Research scientists configuring MCP server for AI-assisted data analysis
+- Principal investigators setting up laboratory-wide data access policies
+- Graduate students retrieving experimental data for computational analysis
+- Laboratory teams integrating AI capabilities into existing research workflows
 
-**Essential Integrations**:
-- LabArchives REST API v1 with regional support (US, Australia, UK)
-- Claude Desktop and other MCP-compliant clients
-- Enterprise authentication systems supporting API keys and SSO tokens
-- Audit logging systems for compliance and security monitoring
+**Essential Technical Features:**
+- Configurable scope limitation at notebook and folder levels
+- Comprehensive audit logging for compliance and governance
+- CLI interface with extensive configuration options
+- JSON and JSON-LD structured output formats optimized for AI consumption
+- Docker containerization support for deployment flexibility
 
-**Key Technical Requirements**:
-- Python 3.11+ runtime environment support
-- Docker containerization for consistent deployment
-- Kubernetes orchestration for scalable infrastructure
-- SOC2, ISO 27001, HIPAA, and GDPR compliance maintenance
-- <span style="background-color: rgba(91, 57, 243, 0.2)">Early argv scrubbing via utils.scrub_argv() guarantees zero credential exposure in logs</span>
+#### 1.3.1.2 Implementation Boundaries
 
-**Implementation Boundaries**:
+The system scope encompasses specific technical and operational boundaries:
 
-| Boundary Type | Coverage | Specifications |
-|---------------|----------|---------------|
-| **System Boundaries** | Read-only access to LabArchives data | MCP protocol endpoints only |
-| **User Groups** | Research scientists, lab administrators, AI/ML engineers | Authenticated LabArchives users |
-| **Geographic Coverage** | Global deployment with regional API support | US, Australia, UK regions |
-| **Data Domains** | All LabArchives content types | Notebooks, pages, entries, metadata |
+**System Boundaries:**
+- Local deployment model designed for individual user installations
+- Command-line interface configuration and management
+- Read-only data access with no modification capabilities
+- Text entries, metadata, and attachment references (not binary content)
+
+**Geographic and Market Coverage:**
+- Support for all global LabArchives deployments (US, AU, UK regions)
+- Cross-platform compatibility (Windows, macOS, Linux)
+- Standard MCP transport mechanisms (stdio, WebSocket)
+
+**Data Domains Included:**
+- Laboratory notebook entries and experimental data
+- Metadata and structural information
+- User permissions and access control data
+- Audit trail and access logging information
 
 ### 1.3.2 Out-of-Scope Elements
 
-**Explicitly Excluded Features**:
-- **Write-back capabilities** to LabArchives (read-only access only)
-- **Version history retrieval** (current version access only)
-- **Binary file content streaming** (metadata and text content only)
-- **Real-time data synchronization** (on-demand retrieval model)
-- **GUI interface** (CLI-based interaction only)
-- **Multi-user session support** (single-user authentication model)
+#### 1.3.2.1 Explicitly Excluded Features and Capabilities
 
-**Future Phase Considerations**:
-- **Safe write mode** with user confirmation and validation
-- **Historical version access** for research audit trails
-- **Enhanced search capabilities** across notebook contents
-- **Performance optimization** with intelligent caching mechanisms
-- **Advanced filtering options** for targeted data retrieval
-- **Multi-notebook aggregation** for cross-project analysis
+The following capabilities are explicitly excluded from the current implementation:
 
-**Integration Points Not Covered**:
-- Direct database access to LabArchives infrastructure
-- Third-party ELN platforms beyond LabArchives
-- Alternative authentication providers outside LabArchives SSO
-- Custom data transformation pipelines
-- Real-time notification systems
+**Data Modification Operations:**
+- Write operations (create, modify, delete) to LabArchives content
+- Real-time data synchronization between systems
+- Data migration or bulk transfer capabilities
+- Version history modification or management
 
-**Unsupported Use Cases**:
-- **Bulk data export** operations requiring batch processing
-- **Automated data modification** without user intervention
-- **Multi-tenant deployments** with shared infrastructure
-- **Direct database queries** bypassing LabArchives API
-- **Offline operation** without internet connectivity
+**Enterprise-Scale Features:**
+- Multi-tenant deployment architecture
+- Centralized user management and authentication
+- Advanced role-based access controls beyond LabArchives permissions
+- Enterprise-scale monitoring and alerting systems
 
-## 1.4 References
+**Advanced Integration Capabilities:**
+- Binary file content processing and analysis
+- Integration with non-LabArchives laboratory information systems
+- Real-time data streaming or event processing
+- High-frequency automated data extraction workflows
 
-#### Source Files Examined
-- `blitzy/documentation/Input Prompt.md` - Complete Product Requirements Document providing business context and technical specifications
-- `blitzy/documentation/Technical Specifications.md` - Comprehensive technical design including architecture patterns and implementation details
-- `blitzy/documentation/Project Guide.md` - Project status and completion metrics indicating 90% overall completion
-- `README.md` - User-facing documentation and quick start guide with installation instructions
-- `.github/workflows/ci.yml` - CI/CD pipeline configuration demonstrating testing and deployment processes
+#### 1.3.2.2 Future Phase Considerations
 
-#### Repository Structure Analyzed
-- `blitzy/` - Documentation repository containing comprehensive project specifications
-- `blitzy/documentation/` - Core specification documents including PRD and technical design
-- `src/` - Source code root with complete implementation
-- `src/cli/` - CLI implementation with 27 first-order children providing user interface
-- `infrastructure/` - Deployment and Infrastructure as Code assets for cloud deployment
-- `.github/` - GitHub configuration and workflows for automated testing and deployment
+The project roadmap identifies several capabilities for future development phases:
+
+**Phase 2 Enhancements:**
+- Safe write-back capabilities with version control
+- Enhanced version history access and management
+- Advanced search capabilities across multiple notebooks
+- Improved performance optimization for large datasets
+
+**Phase 3 Enterprise Features:**
+- Multi-notebook data aggregation and analysis
+- Integration with enterprise laboratory management tools
+- Advanced compliance and governance features
+- Real-time collaboration and sharing capabilities
+
+#### 1.3.2.3 Unsupported Use Cases
+
+The following use cases are not supported by the current system design:
+
+- **High-Frequency Operations:** Automated data extraction requiring high-frequency API calls
+- **Real-Time Processing:** Applications requiring real-time data streaming or event processing
+- **Large-Scale Migration:** Bulk data migration or synchronization between systems
+- **Multi-User Concurrency:** Multiple users performing simultaneous write operations
+- **Binary Content Analysis:** Processing or analysis of binary file attachments
+
+#### References
+
+- `README.md` - High-level project overview, features, installation, and usage documentation
+- `blitzy/documentation/Input Prompt.md` - Product Requirements Document with MVP specifications
+- `blitzy/documentation/Technical Specifications.md` - Consolidated v0.2.0 technical design reference
+- `blitzy/documentation/Technical Specifications_916f36fe-6c43-4713-80b6-8444416b5a59.md` - Definitive technical specification with business justification and stakeholder analysis
+- `blitzy/` - Documentation consolidation folder containing comprehensive project documentation
+- `blitzy/documentation/` - Core documentation files including technical specifications and requirements
+- `.github/` - GitHub configuration and workflows for project governance
+- `infrastructure/` - Deployment and orchestration assets for enterprise environments
 
 # 2. PRODUCT REQUIREMENTS
 
@@ -540,397 +543,358 @@ The LabArchives MCP Server includes comprehensive features designed to provide s
 
 ### 2.1.1 F-001: MCP Protocol Implementation
 
-| **Attribute** | **Value** |
-|---------------|-----------|
-| **Feature ID** | F-001 |
+#### 2.1.1.1 Feature Metadata
+| Attribute | Value |
+|-----------|-------|
+| **Unique ID** | F-001 |
 | **Feature Name** | MCP Protocol Implementation |
 | **Feature Category** | Core Infrastructure |
 | **Priority Level** | Critical |
-| **Status** | Proposed |
+| **Status** | Completed |
 
-#### 2.1.1.1 Description
+#### 2.1.1.2 Description
 
-**Overview:**
-Implements the Model Context Protocol (MCP) as an open standard for connecting AI systems with data sources. The server exposes LabArchives data as MCP resources that can be consumed by MCP-compatible clients like Claude Desktop through JSON-RPC 2.0 transport, establishing the foundational communication layer for AI-enhanced research workflows.
+**Overview**: Implements the Model Context Protocol (MCP) as an open standard for connecting AI systems with data sources, providing a universal protocol for AI-to-data integration. The server exposes LabArchives data as MCP resources that can be consumed by MCP-compatible clients like Claude Desktop, positioning the solution within the rapidly expanding MCP ecosystem that includes OpenAI, Block, Replit, and Sourcegraph.
 
-**Business Value:**
-Enables seamless integration between AI applications and LabArchives data without custom implementations, positioning the organization within the rapidly expanding MCP ecosystem supported by Anthropic, OpenAI, and Google DeepMind. This creates a future-ready infrastructure that supports the 60-80% reduction in time required for AI-assisted data analysis.
+**Business Value**: Enables seamless integration between AI applications and LabArchives data without custom implementations, addressing the fundamental "N×M integration problem" where complexity scales exponentially with the number of AI applications and data sources. This strategic positioning leverages the March 2025 OpenAI adoption of MCP and creates immediate market opportunities for research organizations.
 
-**User Benefits:**
-- Direct access to LabArchives notebook content through AI assistants
-- Elimination of manual data transfer processes
-- Standardized integration compatible with any MCP client
-- Real-time AI interaction with research data
+**User Benefits**: Research scientists can access their LabArchives notebook content directly through AI assistants, eliminating manual data extraction and enabling AI-enhanced research workflows. This capability delivers an estimated 60-80% reduction in time required for AI-assisted data analysis while maintaining compliance with research data governance requirements.
 
-**Technical Context:**
-Utilizes the official Python MCP SDK and FastMCP framework to ensure full protocol compliance with the 2024-11-05 specification, implementing resource listing and reading capabilities with JSON-RPC transport and comprehensive capability negotiation.
+**Technical Context**: Utilizes MCP as an open protocol that enables seamless integration between LLM applications and external data sources, providing a standardized JSON-RPC 2.0 communication layer that ensures compatibility across all MCP-enabled AI systems.
 
-#### 2.1.1.2 Dependencies
-
-| **Dependency Type** | **Details** |
-|---------------------|-------------|
-| **Prerequisite Features** | None (foundational feature) |
-| **System Dependencies** | Python MCP SDK (mcp>=1.0.0), FastMCP framework (fastmcp>=1.0.0), JSON-RPC transport layer |
-| **External Dependencies** | MCP specification compliance (2024-11-05), Claude Desktop compatibility |
-| **Integration Requirements** | JSON-RPC 2.0 message handling, capability negotiation, resource URI scheme |
+#### 2.1.1.3 Dependencies
+- **Prerequisite Features**: None (foundational feature)
+- **System Dependencies**: Python MCP SDK, FastMCP Framework, JSON-RPC transport layer
+- **External Dependencies**: MCP specification compliance, Claude Desktop compatibility
+- **Integration Requirements**: LabArchives API integration, secure credential management
 
 ---
 
 ### 2.1.2 F-002: LabArchives API Integration
 
-| **Attribute** | **Value** |
-|---------------|-----------|
-| **Feature ID** | F-002 |
+#### 2.1.2.1 Feature Metadata
+| Attribute | Value |
+|-----------|-------|
+| **Unique ID** | F-002 |
 | **Feature Name** | LabArchives API Integration |
 | **Feature Category** | Data Access |
 | **Priority Level** | Critical |
-| **Status** | Proposed |
+| **Status** | Completed |
 
-#### 2.1.2.1 Description
+#### 2.1.2.2 Description
 
-**Overview:**
-Provides secure, authenticated access to LabArchives electronic lab notebook data through their REST API, supporting both permanent API keys and temporary user tokens with regional endpoint support across US, Australia, and UK deployments.
+**Overview**: Provides secure, authenticated access to LabArchives electronic lab notebook data through their REST API, supporting both permanent API keys and temporary user tokens across all global LabArchives deployments (US, AU, UK regions).
 
-**Business Value:**
-Leverages existing institutional investments in LabArchives infrastructure, enabling immediate access to valuable research data without migration or system changes. Supports the global research community through regional API optimization while maintaining enterprise security standards.
+**Business Value**: Enables direct access to valuable research data stored in LabArchives, leveraging existing institutional investments in electronic lab notebook infrastructure while maintaining SOC2, ISO 27001, HIPAA, and GDPR compliance standards.
 
-**User Benefits:**
-- Seamless access to existing LabArchives content
-- Support for SSO users via temporary tokens
-- Regional API endpoint optimization for improved performance
-- Secure authentication without credential exposure
+**User Benefits**: Researchers can access their existing LabArchives content without data migration or system changes, maintaining familiar workflows while adding AI capabilities. This approach preserves the substantial organizational investment in laboratory data management systems.
 
-**Technical Context:**
-Implements HMAC-SHA256 authentication with dual-mode support for permanent access keys and temporary SSO tokens, includes retry logic with exponential backoff, and supports XML/JSON response parsing with comprehensive error handling.
+**Technical Context**: Integrates with LabArchives API using access key ID and password authentication, supporting both permanent credentials and temporary app authentication tokens for SSO users, with comprehensive error handling and graceful degradation under various failure scenarios.
 
-#### 2.1.2.2 Dependencies
-
-| **Dependency Type** | **Details** |
-|---------------------|-------------|
-| **Prerequisite Features** | None (foundational feature) |
-| **System Dependencies** | HTTP requests library (requests>=2.31.0), XML/JSON parsing, HMAC-SHA256 signing |
-| **External Dependencies** | LabArchives REST API availability, valid authentication credentials |
-| **Integration Requirements** | Regional endpoints (US/AU/UK), secure credential storage, session management |
+#### 2.1.2.3 Dependencies
+- **Prerequisite Features**: None (foundational feature)
+- **System Dependencies**: HTTP requests library, XML/JSON parsing capabilities
+- **External Dependencies**: LabArchives API availability, valid authentication credentials
+- **Integration Requirements**: Secure credential storage, error handling for API failures
 
 ---
 
 ### 2.1.3 F-003: Resource Discovery and Listing
 
-| **Attribute** | **Value** |
-|---------------|-----------|
-| **Feature ID** | F-003 |
+#### 2.1.3.1 Feature Metadata
+| Attribute | Value |
+|-----------|-------|
+| **Unique ID** | F-003 |
 | **Feature Name** | Resource Discovery and Listing |
 | **Feature Category** | Data Management |
 | **Priority Level** | High |
-| **Status** | Proposed |
+| **Status** | Completed |
 
-#### 2.1.3.1 Description
+#### 2.1.3.2 Description
 
-**Overview:**
-Implements MCP `resources/list` functionality to enumerate available notebooks, pages, and entries within configured scope, providing hierarchical navigation of LabArchives data structures with intelligent filtering and organization.
+**Overview**: Implements MCP resource listing capabilities to enumerate available notebooks, pages, and entries within configured scope, providing hierarchical navigation of LabArchives data structures that preserves the original laboratory organization and metadata context.
 
-**Business Value:**
-Improves data accessibility by enabling users to browse and discover research content through AI interfaces, reducing time to locate specific experiments or datasets while maintaining security boundaries through scope-based access controls.
+**Business Value**: Enables users to discover and navigate their research data through AI interfaces, improving data accessibility and utilization while maintaining the structured approach that researchers depend on for experimental organization.
 
-**User Benefits:**
-- Hierarchical browsing of notebook structures
-- Filtered views based on permissions and scope
-- Intuitive resource discovery through AI applications
-- Efficient navigation of large research datasets
+**User Benefits**: Researchers can browse their notebook structure through AI applications, making it easy to locate specific experiments or data sets within their established laboratory workflows and organizational systems.
 
-**Technical Context:**
-Generates unique resource URIs using the `labarchives://` scheme, supports nested hierarchy representation, and enforces scope-based filtering at the listing level with performance optimization for large datasets.
+**Technical Context**: Implements MCP `resources/list` functionality with support for hierarchical data presentation, scope-based filtering, and URI scheme design that maintains consistency with MCP protocol specifications.
 
-#### 2.1.3.2 Dependencies
-
-| **Dependency Type** | **Details** |
-|---------------------|-------------|
-| **Prerequisite Features** | F-001 (MCP Protocol), F-002 (LabArchives API) |
-| **System Dependencies** | URI generation and parsing, JSON serialization |
-| **External Dependencies** | LabArchives permission model |
-| **Integration Requirements** | Resource URI scheme validation, hierarchical data structure support |
+#### 2.1.3.3 Dependencies
+- **Prerequisite Features**: F-001 (MCP Protocol), F-002 (LabArchives API)
+- **System Dependencies**: JSON serialization, URI scheme handling
+- **External Dependencies**: LabArchives notebook permissions
+- **Integration Requirements**: Scope configuration, permission validation
 
 ---
 
 ### 2.1.4 F-004: Content Retrieval and Contextualization
 
-| **Attribute** | **Value** |
-|---------------|-----------|
-| **Feature ID** | F-004 |
+#### 2.1.4.1 Feature Metadata
+| Attribute | Value |
+|-----------|-------|
+| **Unique ID** | F-004 |
 | **Feature Name** | Content Retrieval and Contextualization |
 | **Feature Category** | Data Management |
 | **Priority Level** | High |
-| **Status** | Proposed |
+| **Status** | Completed |
 
-#### 2.1.4.1 Description
+#### 2.1.4.2 Description
 
-**Overview:**
-Implements MCP `resources/read` functionality to fetch detailed content from specific notebook pages and entries, preserving metadata and hierarchical context for AI consumption with optional JSON-LD semantic enrichment.
+**Overview**: Implements MCP resource reading capabilities to fetch detailed content from specific notebook pages and entries, preserving metadata and hierarchical context for AI consumption while supporting both JSON and JSON-LD structured output formats optimized for AI analysis.
 
-**Business Value:**
-Provides AI applications with rich, contextual research data that maintains original structure and metadata, enabling more accurate and relevant AI-powered analysis while supporting semantic web technologies for enhanced interoperability.
+**Business Value**: Provides AI applications with rich, contextual research data that maintains the original structure and metadata from LabArchives, enabling more accurate and relevant responses to research questions while supporting enhanced research reproducibility.
 
-**User Benefits:**
-- Complete experimental data with proper context
-- Preserved metadata including timestamps and authorship
-- Optional JSON-LD semantic enrichment
-- AI-optimized content formatting
+**User Benefits**: AI assistants can access complete experimental data with proper context, enabling more accurate and relevant responses to research questions while maintaining the structured approach that ensures research quality and reproducibility.
 
-**Technical Context:**
-Transforms LabArchives API responses into structured JSON with optional JSON-LD context, preserves hierarchical relationships, and handles various entry types (text, attachments, metadata) with zero-persistence architecture.
+**Technical Context**: Implements MCP `resources/read` functionality with structured JSON output optimized for LLM processing, including optional JSON-LD semantic context support for advanced AI applications.
 
-#### 2.1.4.2 Dependencies
-
-| **Dependency Type** | **Details** |
-|---------------------|-------------|
-| **Prerequisite Features** | F-001 (MCP Protocol), F-002 (LabArchives API) |
-| **System Dependencies** | JSON-LD support, data transformation utilities |
-| **External Dependencies** | LabArchives content permissions |
-| **Integration Requirements** | Content serialization, metadata preservation, JSON-LD context |
+#### 2.1.4.3 Dependencies
+- **Prerequisite Features**: F-001 (MCP Protocol), F-002 (LabArchives API)
+- **System Dependencies**: JSON-LD support (optional), data serialization
+- **External Dependencies**: LabArchives content permissions
+- **Integration Requirements**: Metadata preservation, content formatting
 
 ---
 
 ### 2.1.5 F-005: Authentication and Security Management
 
-| **Attribute** | **Value** |
-|---------------|-----------|
-| **Feature ID** | F-005 |
+#### 2.1.5.1 Feature Metadata
+| Attribute | Value |
+|-----------|-------|
+| **Unique ID** | F-005 |
 | **Feature Name** | Authentication and Security Management |
 | **Feature Category** | Security |
 | **Priority Level** | Critical |
-| **Status** | Proposed |
+| **Status** | Completed |
 
-#### 2.1.5.1 Description
+#### 2.1.5.2 Description
 
-**Overview:**
-Implements secure authentication mechanisms for LabArchives API access, supporting both permanent API keys and temporary user tokens with comprehensive security controls, session management, and compliance with enterprise security standards.
+**Overview**: Implements secure authentication mechanisms for LabArchives API access, supporting both permanent API keys and temporary user tokens with comprehensive security controls that maintain compliance with institutional security requirements.
 
-**Business Value:**
-Ensures secure access to sensitive research data while maintaining compliance with institutional security requirements and regulatory standards including SOC2, ISO 27001, HIPAA, and GDPR, protecting valuable intellectual property and research investments.
+**Business Value**: Ensures secure access to sensitive research data while maintaining compliance with institutional security requirements, supporting the comprehensive audit trails and access controls required for research data governance.
 
-**User Benefits:**
-- Secure credential handling without exposure
-- Support for SSO authentication workflows
-- Automatic session renewal and token refresh
-- Comprehensive audit trail for security monitoring
+**User Benefits**: Researchers can securely connect their LabArchives accounts without compromising credentials or data security, maintaining the trust and confidence required for sensitive research data handling.
 
-**Technical Context:**
-Manages 3600-second session lifetimes with automatic renewal, implements credential sanitization for logging, supports dual-mode authentication with secure storage, and includes comprehensive security controls for compliance.
+**Technical Context**: Supports SSO users through app authentication tokens obtained from LabArchives user profile settings, with secure credential handling, session management, and comprehensive validation mechanisms.
 
-#### 2.1.5.2 Dependencies
-
-| **Dependency Type** | **Details** |
-|---------------------|-------------|
-| **Prerequisite Features** | F-002 (LabArchives API) |
-| **System Dependencies** | Environment variable handling, secure credential storage, session management |
-| **External Dependencies** | LabArchives authentication services |
-| **Integration Requirements** | Token validation, session lifecycle management, credential encryption |
+#### 2.1.5.3 Dependencies
+- **Prerequisite Features**: F-002 (LabArchives API)
+- **System Dependencies**: Environment variable handling, secure storage
+- **External Dependencies**: LabArchives authentication services
+- **Integration Requirements**: Credential validation, token refresh handling
 
 ---
 
-### 2.1.6 F-006: CLI Interface and Configuration (updated)
+### 2.1.6 F-006: CLI Interface and Configuration
 
-| **Attribute** | **Value** |
-|---------------|-----------|
-| **Feature ID** | F-006 |
+#### 2.1.6.1 Feature Metadata
+| Attribute | Value |
+|-----------|-------|
+| **Unique ID** | F-006 |
 | **Feature Name** | CLI Interface and Configuration |
 | **Feature Category** | User Interface |
 | **Priority Level** | High |
-| **Status** | Proposed |
+| **Status** | Completed |
 
-#### 2.1.6.1 Description
+#### 2.1.6.2 Description
 
-**Overview:**
-Provides a comprehensive command-line interface for server configuration, credential management, and operational control, supporting multiple configuration sources with clear precedence and extensive help documentation. <span style="background-color: rgba(91, 57, 243, 0.2)">The CLI now accepts the alias -k/--access-key in addition to the existing --access-key-id flag for enhanced usability and consistency.</span>
+**Overview**: Provides a comprehensive command-line interface for server configuration, credential management, and operational control, enabling easy deployment and management across Windows, macOS, and Linux environments with extensive configuration options.
 
-**Business Value:**
-Simplifies deployment and configuration for technical users, reducing setup complexity and enabling rapid deployment across different environments while maintaining consistency and reliability in enterprise environments.
+**Business Value**: Simplifies deployment and configuration for technical users, reducing setup time and complexity while providing the flexibility required for diverse research environments and deployment scenarios.
 
-**User Benefits:**
-- Intuitive command-line arguments and options
-- Environment variable support for automation
-- Configuration file support for complex setups
-- Comprehensive help and documentation
+**User Benefits**: Researchers and IT administrators can easily configure and deploy the server with familiar command-line tools, reducing barriers to adoption and enabling integration with existing research infrastructure.
 
-**Technical Context:**
-Implements argparse-based CLI with subcommands (start, authenticate, config), supports configuration precedence (CLI > env > file > defaults), and includes comprehensive validation and error handling. <span style="background-color: rgba(91, 57, 243, 0.2)">Both -k/--access-key and --access-key-id flags map to the same configuration value, providing backwards compatibility while establishing -k as the primary option.</span>
+**Technical Context**: Implements comprehensive CLI with argument parsing, environment variable support, configuration validation, and extensive help documentation that supports both individual user installations and enterprise deployment scenarios.
 
-#### 2.1.6.2 Dependencies
-
-| **Dependency Type** | **Details** |
-|---------------------|-------------|
-| **Prerequisite Features** | F-005 (Authentication) |
-| **System Dependencies** | Python argparse, environment variable access, JSON file parsing |
-| **External Dependencies** | None |
-| **Integration Requirements** | Configuration validation, help system, error messaging |
+#### 2.1.6.3 Dependencies
+- **Prerequisite Features**: F-005 (Authentication)
+- **System Dependencies**: Python argparse, environment variable access
+- **External Dependencies**: None
+- **Integration Requirements**: Configuration validation, help documentation
 
 ---
 
-### 2.1.7 F-007: Scope Limitation and Access Control (updated)
+### 2.1.7 F-007: Scope Limitation and Access Control
 
-| **Attribute** | **Value** |
-|---------------|-----------|
-| **Feature ID** | F-007 |
+#### 2.1.7.1 Feature Metadata
+| Attribute | Value |
+|-----------|-------|
+| **Unique ID** | F-007 |
 | **Feature Name** | Scope Limitation and Access Control |
 | **Feature Category** | Security |
 | **Priority Level** | High |
-| **Status** | Proposed |
+| **Status** | Completed |
 
-#### 2.1.7.1 Description
+#### 2.1.7.2 Description
 
-**Overview:**
-Implements configurable scope limitations to restrict data exposure to specific notebooks or folders, providing granular access control for sensitive research data with multiple scope types and enforcement mechanisms. <span style="background-color: rgba(91, 57, 243, 0.2)">Enforcement relies on a new FolderPath value object that performs exact hierarchical comparisons using normalized tuple-based path representation, eliminating substring matching vulnerabilities.</span>
+**Overview**: Implements configurable scope limitations to restrict data exposure to specific notebooks or folders, providing granular access control for sensitive research data while maintaining the performance and functionality required for effective AI-assisted research workflows.
 
-**Business Value:**
-Enables controlled data sharing with AI applications, minimizing risk of unauthorized data exposure while maintaining functionality for approved content, supporting institutional policies for data governance and security.
+**Business Value**: Enables controlled data sharing with AI applications, reducing risk of unauthorized data exposure while maintaining functionality, supporting the compliance and governance requirements critical for research organizations.
 
-**User Benefits:**
-- Limit AI access to specific projects
-- Granular control over data exposure
-- Clear scope enforcement and reporting
-- Flexible scope configuration options
+**User Benefits**: Researchers can limit AI access to specific projects or experiments, maintaining data privacy and security while enabling AI-enhanced capabilities where appropriate and beneficial.
 
-**Technical Context:**
-Supports multiple scope types (notebook_id, notebook_name, folder_path), enforces scope at both listing and reading levels, and validates all resource access against configured boundaries with comprehensive logging. <span style="background-color: rgba(91, 57, 243, 0.2)">The FolderPath value object implements immutable, thread-safe exact hierarchical comparisons with no substring matching, and all out-of-scope list/read operations return MCP error 403 "ScopeViolation" for consistent security enforcement.</span>
+**Technical Context**: Implements scope enforcement at the resource listing and reading levels with configuration-based controls that integrate seamlessly with LabArchives permission models and organizational security policies.
 
-#### 2.1.7.2 Dependencies
-
-| **Dependency Type** | **Details** |
-|---------------------|-------------|
-| **Prerequisite Features** | F-003 (Resource Discovery), F-004 (Content Retrieval) |
-| **System Dependencies** | Scope validation logic, URI parsing and matching |
-| **External Dependencies** | LabArchives permission model |
-| **Integration Requirements** | Permission validation, scope configuration, access enforcement |
+#### 2.1.7.3 Dependencies
+- **Prerequisite Features**: F-003 (Resource Discovery), F-004 (Content Retrieval)
+- **System Dependencies**: Configuration management, access validation
+- **External Dependencies**: LabArchives permission model
+- **Integration Requirements**: Scope validation, error handling
 
 ---
 
-### 2.1.8 F-008: Comprehensive Audit Logging (updated)
+### 2.1.8 F-008: Comprehensive Audit Logging
 
-| **Attribute** | **Value** |
-|---------------|-----------|
-| **Feature ID** | F-008 |
+#### 2.1.8.1 Feature Metadata
+| Attribute | Value |
+|-----------|-------|
+| **Unique ID** | F-008 |
 | **Feature Name** | Comprehensive Audit Logging |
 | **Feature Category** | Compliance |
 | **Priority Level** | High |
-| **Status** | Proposed |
+| **Status** | Completed |
 
-#### 2.1.8.1 Description
+#### 2.1.8.2 Description
 
-**Overview:**
-Implements comprehensive logging of all data access operations, API calls, and system events to support audit requirements and compliance needs with structured logging formats and configurable retention policies.
+**Overview**: Implements comprehensive logging of all data access operations, API calls, and system events to support audit requirements and compliance needs, with structured logging that supports both operational monitoring and regulatory compliance requirements.
 
-**Business Value:**
-Provides complete traceability and accountability for data access, supporting regulatory compliance (SOC2, ISO 27001, HIPAA, GDPR) and security monitoring while enabling performance optimization and troubleshooting.
+**Business Value**: Provides traceability and accountability for data access, supporting regulatory compliance and security monitoring requirements while enabling organizations to maintain comprehensive governance over research data usage.
 
-**User Benefits:**
-- Complete audit trail of all data access
-- Configurable logging verbosity
-- Structured logs for analysis and compliance
-- Performance monitoring and optimization
+**User Benefits**: Researchers and administrators can track data usage and access patterns for compliance and security purposes, providing the transparency and accountability required for sensitive research data management.
 
-**Technical Context:**
-Implements dual logging streams (operational and audit), uses rotating file handlers with configurable size limits, supports JSON-formatted audit records, and includes comprehensive security controls for log integrity. <span style="background-color: rgba(91, 57, 243, 0.2)">All logging is preceded by argv scrubbing to guarantee that no literal secret or token strings ever reach any logger, ensuring complete credential protection in audit trails.</span>
+**Technical Context**: Implements structured logging with configurable verbosity levels, secure log management, and comprehensive event tracking that supports both operational monitoring and compliance reporting requirements.
 
-#### 2.1.8.2 Dependencies
-
-| **Dependency Type** | **Details** |
-|---------------------|-------------|
-| **Prerequisite Features** | All features (cross-cutting concern) |
-| **System Dependencies** | Python logging framework, file I/O, JSON serialization |
-| **External Dependencies** | None |
-| **Integration Requirements** | Log rotation, structured formatting, secure storage |
-
----
+#### 2.1.8.3 Dependencies
+- **Prerequisite Features**: All core features (cross-cutting concern)
+- **System Dependencies**: Python logging framework, file I/O
+- **External Dependencies**: None
+- **Integration Requirements**: Log rotation, secure storage
 
 ## 2.2 FUNCTIONAL REQUIREMENTS TABLE
 
-### 2.2.1 F-001: MCP Protocol Implementation Requirements
+### 2.2.1 F-001: MCP Protocol Implementation
 
-| **Requirement ID** | **Description** | **Acceptance Criteria** | **Priority** |
-|-------------------|-----------------|-------------------------|--------------|
-| F-001-RQ-001 | JSON-RPC 2.0 Transport Implementation | Server accepts and responds to JSON-RPC 2.0 messages per MCP spec | Must-Have |
-| F-001-RQ-002 | MCP Capability Negotiation | Server advertises resources capability and handles client negotiation | Must-Have |
-| F-001-RQ-003 | Resource URI Scheme Support | Generates valid labarchives:// URIs for all resources | Must-Have |
-| F-001-RQ-004 | Error Handling Compliance | Returns standard MCP error codes and formats | Must-Have |
+| Requirement ID | Description | Acceptance Criteria | Priority | Complexity |
+|----------------|-------------|---------------------|----------|------------|
+| F-001-RQ-001 | MCP Server Initialization | Server successfully initializes and advertises MCP capabilities | Must-Have | Medium |
+| F-001-RQ-002 | Protocol Handshake | Completes MCP handshake with client applications | Must-Have | Medium |
+| F-001-RQ-003 | JSON-RPC Transport | Implements JSON-RPC 2.0 communication protocol | Must-Have | High |
+| F-001-RQ-004 | Capability Negotiation | Advertises resource capabilities to MCP clients | Must-Have | Low |
 
-### 2.2.2 F-002: LabArchives API Integration Requirements
+#### 2.2.1.1 Technical Specifications
+- **Input Parameters**: Server configuration, client connection requests, JSON-RPC messages
+- **Output/Response**: MCP server instance, handshake responses, structured JSON responses, capability list
+- **Performance Criteria**: < 2 seconds startup, < 1 second handshake, < 500ms per message, < 100ms capability response
+- **Data Requirements**: Server metadata, protocol version, message validation, feature inventory
 
-| **Requirement ID** | **Description** | **Acceptance Criteria** | **Priority** |
-|-------------------|-----------------|-------------------------|--------------|
-| F-002-RQ-001 | HMAC-SHA256 Authentication | Authenticates with LabArchives API using HMAC-SHA256 | Must-Have |
-| F-002-RQ-002 | Multi-Region Support | Supports US, AU, UK API endpoints | Must-Have |
-| F-002-RQ-003 | Token Management | Handles both permanent keys and temporary SSO tokens | Must-Have |
-| F-002-RQ-004 | Retry Logic Implementation | Implements exponential backoff for API failures | Should-Have |
+#### 2.2.1.2 Validation Rules
+- **Business Rules**: Single server instance per configuration, compatible protocol versions only, valid JSON-RPC format
+- **Data Validation**: Valid configuration parameters, protocol version validation, message structure validation
+- **Security Requirements**: Secure initialization, authenticated connections, secure message handling
+- **Compliance Requirements**: MCP specification compliance, JSON-RPC 2.0 compliance
 
-### 2.2.3 F-003: Resource Discovery and Listing Requirements
+### 2.2.2 F-002: LabArchives API Integration
 
-| **Requirement ID** | **Description** | **Acceptance Criteria** | **Priority** |
-|-------------------|-----------------|-------------------------|--------------|
-| F-003-RQ-001 | Hierarchical Resource Listing | Lists notebooks, pages, and entries in hierarchical structure | Must-Have |
-| F-003-RQ-002 | Scope-Based Filtering | Filters resources based on configured scope boundaries | Must-Have |
-| F-003-RQ-003 | URI Generation | Generates unique URIs for all discoverable resources | Must-Have |
-| F-003-RQ-004 | Performance Optimization | Handles large datasets efficiently without timeout | Should-Have |
+| Requirement ID | Description | Acceptance Criteria | Priority | Complexity |
+|----------------|-------------|---------------------|----------|------------|
+| F-002-RQ-001 | API Authentication | Successfully authenticate with LabArchives API | Must-Have | Medium |
+| F-002-RQ-002 | Notebook Listing | Retrieve list of accessible notebooks | Must-Have | Low |
+| F-002-RQ-003 | Page Content Retrieval | Fetch page entries and metadata | Must-Have | Medium |
+| F-002-RQ-004 | Error Handling | Handle API failures gracefully | Must-Have | Medium |
 
-### 2.2.4 F-004: Content Retrieval and Contextualization Requirements
+#### 2.2.2.1 Technical Specifications
+- **Input Parameters**: Access key, token/password, user credentials, page ID
+- **Output/Response**: Authentication session, notebook list JSON, page content JSON, error messages
+- **Performance Criteria**: < 3 seconds authentication, < 5 seconds listing, < 10 seconds retrieval
+- **Data Requirements**: Valid credentials, user permissions, page access rights, error context
 
-| **Requirement ID** | **Description** | **Acceptance Criteria** | **Priority** |
-|-------------------|-----------------|-------------------------|--------------|
-| F-004-RQ-001 | Content Transformation | Converts LabArchives data to structured JSON format | Must-Have |
-| F-004-RQ-002 | Metadata Preservation | Maintains original timestamps, authorship, and context | Must-Have |
-| F-004-RQ-003 | JSON-LD Support | Optionally provides JSON-LD semantic enrichment | Could-Have |
-| F-004-RQ-004 | Zero-Persistence Architecture | Retrieves data on-demand without local storage | Must-Have |
+#### 2.2.2.2 Validation Rules
+- **Business Rules**: Valid credentials required, user permission-based access, read-only access only
+- **Data Validation**: Credential format validation, notebook ID validation, content integrity validation
+- **Security Requirements**: Secure credential storage, access control enforcement, no data modification
+- **Compliance Requirements**: Authentication standards, data privacy compliance, research data protection
 
-### 2.2.5 F-005: Authentication and Security Management Requirements
+### 2.2.3 F-003: Resource Discovery and Listing
 
-| **Requirement ID** | **Description** | **Acceptance Criteria** | **Priority** |
-|-------------------|-----------------|-------------------------|--------------|
-| F-005-RQ-001 | Credential Security | Secures storage and handling of authentication credentials | Must-Have |
-| F-005-RQ-002 | Session Management | Manages 3600-second session lifetimes with auto-renewal | Must-Have |
-| F-005-RQ-003 | Compliance Support | Supports SOC2, ISO 27001, HIPAA, GDPR requirements | Must-Have |
-| F-005-RQ-004 | Audit Trail | Maintains comprehensive security audit logs | Must-Have |
+| Requirement ID | Description | Acceptance Criteria | Priority | Complexity |
+|----------------|-------------|---------------------|----------|------------|
+| F-003-RQ-001 | MCP Resource Listing | Implement `resources/list` MCP method | Must-Have | Medium |
+| F-003-RQ-002 | Hierarchical Navigation | Support notebook/page hierarchy | Should-Have | Medium |
+| F-003-RQ-003 | Scope-Based Filtering | Filter resources by configured scope | Must-Have | Low |
+| F-003-RQ-004 | Resource URI Generation | Generate valid MCP resource URIs | Must-Have | Low |
 
-### 2.2.6 F-006: CLI Interface and Configuration Requirements
+#### 2.2.3.1 Technical Specifications
+- **Input Parameters**: MCP list request, hierarchy level, scope configuration, resource identifiers
+- **Output/Response**: Resource array JSON, structured resource list, filtered list, valid URI strings
+- **Performance Criteria**: < 2 seconds response, < 3 seconds hierarchical, < 1 second filtering
+- **Data Requirements**: Resource metadata, hierarchy data, scope parameters, resource IDs
 
-| **Requirement ID** | **Description** | **Acceptance Criteria** | **Priority** |
-|-------------------|-----------------|-------------------------|--------------|
-| F-006-RQ-001 | Command-Line Interface | Provides intuitive CLI with subcommands and options | Must-Have |
-| F-006-RQ-002 | Configuration Precedence | Supports CLI > env > file > defaults precedence | Must-Have |
-| F-006-RQ-003 | Help Documentation | Includes comprehensive help and usage information | Must-Have |
-| F-006-RQ-004 | Flag Harmonization | Accepts both -k/--access-key and --access-key-id aliases | Must-Have |
+#### 2.2.3.2 Validation Rules
+- **Business Rules**: Only accessible resources listed, consistent hierarchy representation
+- **Data Validation**: Resource existence validation, hierarchy structure validation, URI format validation
+- **Security Requirements**: Permission-based listing, secure navigation, access control compliance
+- **Compliance Requirements**: MCP resource specification, data organization standards
 
-### 2.2.7 F-007: Scope Limitation and Access Control Requirements
+### 2.2.4 F-004: Content Retrieval and Contextualization
 
-| **Requirement ID** | **Description** | **Acceptance Criteria** | **Priority** |
-|-------------------|-----------------|-------------------------|--------------|
-| F-007-RQ-001 | Scope Configuration | Supports notebook_id, notebook_name, and folder_path scopes | Must-Have |
-| F-007-RQ-002 | Access Enforcement | Blocks access to resources outside configured scope | Must-Have |
-| F-007-RQ-003 | Exact Path Matching | Uses FolderPath value object for precise hierarchical comparisons | Must-Have |
-| F-007-RQ-004 | Scope Violation Errors | Returns MCP error 403 "ScopeViolation" for out-of-scope access | Must-Have |
+| Requirement ID | Description | Acceptance Criteria | Priority | Complexity |
+|----------------|-------------|---------------------|----------|------------|
+| F-004-RQ-001 | MCP Resource Reading | Implement `resources/read` MCP method | Must-Have | Medium |
+| F-004-RQ-002 | Content Serialization | Convert LabArchives data to JSON | Must-Have | Medium |
+| F-004-RQ-003 | Metadata Preservation | Maintain original metadata context | Should-Have | Low |
+| F-004-RQ-004 | JSON-LD Support | Optional semantic context support | Could-Have | Medium |
 
-### 2.2.8 F-008: Comprehensive Audit Logging Requirements
+#### 2.2.4.1 Technical Specifications
+- **Input Parameters**: Resource URI, LabArchives data, original metadata, JSON-LD flag
+- **Output/Response**: Content JSON, structured JSON, enhanced JSON, semantic JSON
+- **Performance Criteria**: < 5 seconds retrieval, < 1 second serialization, < 500ms metadata processing
+- **Data Requirements**: Resource content, data schema, metadata fields, context schema
 
-| **Requirement ID** | **Description** | **Acceptance Criteria** | **Priority** |
-|-------------------|-----------------|-------------------------|--------------|
-| F-008-RQ-001 | Dual Logging Streams | Maintains separate operational and audit logs | Must-Have |
-| F-008-RQ-002 | Structured Logging | Uses JSON format for audit records and analysis | Must-Have |
-| F-008-RQ-003 | Log Rotation | Implements configurable size limits and rotation | Should-Have |
-| F-008-RQ-004 | Secret Scrubbing | Performs argv scrubbing to prevent credential exposure | Must-Have |
+#### 2.2.4.2 Validation Rules
+- **Business Rules**: Valid resource URIs only, consistent JSON structure, complete metadata inclusion
+- **Data Validation**: URI validation, JSON schema validation, metadata completeness check
+- **Security Requirements**: Authorized access only, data integrity, metadata security
+- **Compliance Requirements**: MCP read specification, serialization standards, JSON-LD specification
 
 ## 2.3 FEATURE RELATIONSHIPS
 
-### 2.3.1 Core Dependencies
+### 2.3.1 Feature Dependencies Map
+
+The features of the LabArchives MCP Server have clear dependencies and integration points that reflect the layered architecture approach:
 
 ```mermaid
-graph TD
-    F001[F-001: MCP Protocol] --> F003[F-003: Resource Discovery]
-    F001 --> F004[F-004: Content Retrieval]
-    F002[F-002: LabArchives API] --> F003
-    F002 --> F004
-    F005[F-005: Authentication] --> F002
-    F005 --> F006[F-006: CLI Interface]
-    F003 --> F007[F-007: Scope Control]
-    F004 --> F007
-    F008[F-008: Audit Logging] --> F001
+graph TB
+    subgraph "Foundation Layer"
+        F001[F-001: MCP Protocol Implementation]
+        F002[F-002: LabArchives API Integration]
+    end
+    
+    subgraph "Core Functionality Layer"
+        F003[F-003: Resource Discovery and Listing]
+        F004[F-004: Content Retrieval and Contextualization]
+    end
+    
+    subgraph "Control Layer"
+        F005[F-005: Authentication & Security Management]
+        F006[F-006: CLI Interface & Configuration]
+        F007[F-007: Scope Limitation & Access Control]
+    end
+    
+    subgraph "Cross-Cutting Layer"
+        F008[F-008: Comprehensive Audit Logging]
+    end
+    
+    F003 --> F001
+    F003 --> F002
+    F004 --> F001
+    F004 --> F002
+    F005 --> F002
+    F006 --> F005
+    F007 --> F003
+    F007 --> F004
+    F007 --> F005
+    F008 --> F001
     F008 --> F002
     F008 --> F003
     F008 --> F004
@@ -941,935 +905,502 @@ graph TD
 
 ### 2.3.2 Integration Points
 
-| **Feature Pair** | **Integration Point** | **Shared Component** |
-|-------------------|-----------------------|---------------------|
-| F-001 & F-003 | MCP resources/list endpoint | JSON-RPC message handling |
-| F-001 & F-004 | MCP resources/read endpoint | JSON-RPC message handling |
-| F-002 & F-005 | API authentication | HMAC-SHA256 credential handling |
-| F-003 & F-007 | Resource filtering | Scope validation logic |
-| F-004 & F-007 | Content access control | Scope enforcement |
-| F-005 & F-008 | Security logging | Credential audit trail |
-| F-006 & F-008 | CLI operation logging | Command execution audit |
+| Integration Point | Features Involved | Shared Components |
+|-------------------|-------------------|-------------------|
+| **MCP Resource Interface** | F-001, F-003, F-004 | JSON-RPC handler, Resource URI scheme, MCP protocol compliance |
+| **LabArchives Data Access** | F-002, F-005, F-007 | Authentication manager, API client, credential handling |
+| **Configuration Management** | F-005, F-006, F-007 | Configuration parser, validation engine, environment variables |
+| **Audit Trail System** | F-008, All Features | Logging framework, event dispatcher, audit log formatting |
 
 ### 2.3.3 Common Services
 
-- **Error Handling Service**: Shared across F-001, F-002, F-007 for consistent error responses
-- **Configuration Service**: Shared across F-005, F-006, F-007 for centralized settings management
-- **URI Generation Service**: Shared across F-001, F-003, F-004 for consistent resource addressing
-- **Validation Service**: Shared across F-006, F-007 for input validation and scope checking
-
-## 2.4 IMPLEMENTATION CONSIDERATIONS
-
-### 2.4.1 Technical Constraints
-
-| **Feature** | **Constraint** | **Impact** | **Mitigation** |
-|-------------|----------------|------------|----------------|
-| F-001 | MCP protocol compliance | Must follow exact specification | Use official SDK and comprehensive testing |
-| F-002 | LabArchives API limitations | Rate limiting and regional differences | Implement retry logic and regional support |
-| F-007 | Exact path matching requirement | No substring matching allowed | FolderPath value object with tuple comparison |
-| F-008 | Complete secret redaction | No credentials in logs | Mandatory argv scrubbing before logging |
-
-### 2.4.2 Performance Requirements
-
-| **Feature** | **Requirement** | **Metric** | **Validation** |
-|-------------|-----------------|------------|----------------|
-| F-003 | Resource listing performance | <2 seconds for 1000 resources | Load testing with mock data |
-| F-004 | Content retrieval latency | <1 second for typical notebook page | Performance benchmarking |
-| F-005 | Authentication response time | <500ms for credential validation | Authentication flow timing |
-| F-008 | Logging performance impact | <10% overhead on operations | Performance profiling |
-
-### 2.4.3 Security Implications
-
-| **Feature** | **Security Consideration** | **Implementation** |
-|-------------|----------------------------|-------------------|
-| F-005 | Credential protection | Encrypted storage and memory clearing |
-| F-007 | Access control enforcement | Mandatory scope validation on all operations |
-| F-008 | Audit trail integrity | Tamper-evident logging with secure storage |
-| F-001 | MCP protocol security | Input validation and sanitization |
-
-### 2.4.4 Scalability Considerations
-
-| **Feature** | **Scalability Factor** | **Design Approach** |
-|-------------|------------------------|-------------------|
-| F-003 | Large notebook collections | Pagination and lazy loading |
-| F-004 | Concurrent content requests | Stateless design with connection pooling |
-| F-007 | Complex scope hierarchies | Efficient tuple-based path matching |
-| F-008 | High-volume logging | Asynchronous logging with batching |
-
-### 2.4.5 Maintenance Requirements
-
-| **Feature** | **Maintenance Aspect** | **Frequency** | **Responsibility** |
-|-------------|------------------------|---------------|-------------------|
-| F-001 | MCP specification updates | As needed | Development team |
-| F-002 | LabArchives API changes | Monthly review | Integration team |
-| F-005 | Security credential rotation | Per institutional policy | Security team |
-| F-008 | Log retention management | Daily/weekly | Operations team |
-
-## 2.2 FUNCTIONAL REQUIREMENTS TABLE
-
-### 2.2.1 F-001: MCP Protocol Implementation
-
-| **Requirement ID** | **Description** | **Acceptance Criteria** | **Priority** | **Complexity** |
-|-------------------|-----------------|------------------------|------------|---------------|
-| **F-001-RQ-001** | Initialize MCP server with protocol capabilities | Server starts and advertises resources capability | Must-Have | Medium |
-| **F-001-RQ-002** | Complete MCP handshake with clients | Successfully negotiates protocol version 2024-11-05 | Must-Have | Medium |
-| **F-001-RQ-003** | Implement JSON-RPC 2.0 transport | Handles all required JSON-RPC message types | Must-Have | High |
-| **F-001-RQ-004** | Advertise server capabilities | Reports resources/list and resources/read support | Must-Have | Low |
-
-#### 2.2.1.1 Technical Specifications
-
-| **Requirement** | **Input Parameters** | **Output/Response** | **Performance Criteria** | **Data Requirements** |
-|----------------|---------------------|-------------------|------------------------|---------------------|
-| **F-001-RQ-001** | Server configuration | MCP server instance | < 2 seconds startup | Server metadata, version info |
-| **F-001-RQ-002** | Client connection request | Handshake response | < 1 second response | Protocol version 2024-11-05 |
-| **F-001-RQ-003** | JSON-RPC messages | Structured responses | < 500ms per message | Valid JSON-RPC 2.0 format |
-| **F-001-RQ-004** | Capability request | Capability list | < 100ms response | Resources capability flag |
-
-#### 2.2.1.2 Validation Rules
-
-| **Requirement** | **Business Rules** | **Data Validation** | **Security Requirements** | **Compliance Requirements** |
-|----------------|-------------------|-------------------|------------------------|-------------------------|
-| **F-001-RQ-001** | Single server instance per config | Valid config parameters | Secure initialization | MCP spec compliance |
-| **F-001-RQ-002** | Compatible protocol versions only | Version string validation | No downgrade attacks | Protocol standards |
-| **F-001-RQ-003** | Valid JSON-RPC format required | Message structure validation | Input sanitization | JSON-RPC 2.0 spec |
-| **F-001-RQ-004** | Accurate capability reporting | Boolean capability flags | No false capabilities | MCP capability spec |
-
----
-
-### 2.2.2 F-002: LabArchives API Integration
-
-| **Requirement ID** | **Description** | **Acceptance Criteria** | **Priority** | **Complexity** |
-|-------------------|-----------------|------------------------|------------|---------------|
-| **F-002-RQ-001** | Authenticate with LabArchives API | Valid session established within 3 seconds | Must-Have | Medium |
-| **F-002-RQ-002** | List accessible notebooks | Returns user's notebooks with metadata | Must-Have | Low |
-| **F-002-RQ-003** | Retrieve page content and entries | Fetches complete page data with hierarchy | Must-Have | Medium |
-| **F-002-RQ-004** | Handle API errors gracefully | No crashes on API failures with retry logic | Must-Have | Medium |
-| **F-002-RQ-005** | Support regional endpoints | Connect to US/AU/UK APIs automatically | Should-Have | Low |
-
-#### 2.2.2.1 Technical Specifications
-
-| **Requirement** | **Input Parameters** | **Output/Response** | **Performance Criteria** | **Data Requirements** |
-|----------------|---------------------|-------------------|------------------------|---------------------|
-| **F-002-RQ-001** | Access key, token/password | Auth session with 3600s lifetime | < 3 seconds authentication | Valid credentials, region |
-| **F-002-RQ-002** | User session | Notebook list with metadata | < 5 seconds for listing | User permissions, scope |
-| **F-002-RQ-003** | Page ID, session | Page content JSON | < 10 seconds for retrieval | Page access rights |
-| **F-002-RQ-004** | API error response | Error message with context | Immediate error handling | Error classification |
-| **F-002-RQ-005** | Region code | Regional API base URL | < 100ms region selection | Valid region identifier |
-
-#### 2.2.2.2 Validation Rules
-
-| **Requirement** | **Business Rules** | **Data Validation** | **Security Requirements** | **Compliance Requirements** |
-|----------------|-------------------|-------------------|------------------------|-------------------------|
-| **F-002-RQ-001** | Valid credentials required | AKID format validation | Secure credential storage | Authentication standards |
-| **F-002-RQ-002** | User permissions enforced | Notebook ID validation | Access control enforcement | Data privacy regulations |
-| **F-002-RQ-003** | Read-only access only | Content integrity checks | No data modifications | Research data protection |
-| **F-002-RQ-004** | Graceful error handling | Error format validation | No credential exposure | Error handling standards |
-| **F-002-RQ-005** | HTTPS endpoints only | URL validation | TLS 1.2+ requirement | Security compliance |
-
----
-
-### 2.2.3 F-003: Resource Discovery and Listing
-
-| **Requirement ID** | **Description** | **Acceptance Criteria** | **Priority** | **Complexity** |
-|-------------------|-----------------|------------------------|------------|---------------|
-| **F-003-RQ-001** | List resources via MCP | Returns resource array with metadata | Must-Have | Medium |
-| **F-003-RQ-002** | Support hierarchical navigation | Notebooks→Pages→Entries structure | Should-Have | Medium |
-| **F-003-RQ-003** | Apply scope filtering | Respects configured access limits | Must-Have | Low |
-| **F-003-RQ-004** | Generate valid resource URIs | Unique labarchives:// URIs | Must-Have | Low |
-
-#### 2.2.3.1 Technical Specifications
-
-| **Requirement** | **Input Parameters** | **Output/Response** | **Performance Criteria** | **Data Requirements** |
-|----------------|---------------------|-------------------|------------------------|---------------------|
-| **F-003-RQ-001** | MCP list request | Resource array with metadata | < 2 seconds for listing | Resource metadata |
-| **F-003-RQ-002** | Hierarchy level | Structured resource list | < 3 seconds for hierarchy | Parent-child relations |
-| **F-003-RQ-003** | Scope configuration | Filtered resource list | < 1 second for filtering | Scope parameters |
-| **F-003-RQ-004** | Resource identifiers | URI strings | < 100ms for generation | Valid resource IDs |
-
-#### 2.2.3.2 Validation Rules
-
-| **Requirement** | **Business Rules** | **Data Validation** | **Security Requirements** | **Compliance Requirements** |
-|----------------|-------------------|-------------------|------------------------|-------------------------|
-| **F-003-RQ-001** | Only accessible resources | Resource existence validation | Permission-based access | MCP resource specification |
-| **F-003-RQ-002** | Consistent hierarchy | Structure validation | Secure hierarchy traversal | Data organization standards |
-| **F-003-RQ-003** | Scope boundary enforcement | Scope validation | No scope bypass | Access control policies |
-| **F-003-RQ-004** | URI uniqueness | Format validation | No URI manipulation | URI scheme standards |
-
----
-
-### 2.2.4 F-004: Content Retrieval and Contextualization
-
-| **Requirement ID** | **Description** | **Acceptance Criteria** | **Priority** | **Complexity** |
-|-------------------|-----------------|------------------------|------------|---------------|
-| **F-004-RQ-001** | Read resources via MCP | Returns structured content JSON | Must-Have | Medium |
-| **F-004-RQ-002** | Convert to structured JSON | Valid JSON with preserved structure | Must-Have | Medium |
-| **F-004-RQ-003** | Preserve metadata context | Complete metadata inclusion | Should-Have | Low |
-| **F-004-RQ-004** | Support JSON-LD context | Optional semantic enrichment | Could-Have | Medium |
-
-#### 2.2.4.1 Technical Specifications
-
-| **Requirement** | **Input Parameters** | **Output/Response** | **Performance Criteria** | **Data Requirements** |
-|----------------|---------------------|-------------------|------------------------|---------------------|
-| **F-004-RQ-001** | Resource URI | Content JSON | < 5 seconds for retrieval | Resource content |
-| **F-004-RQ-002** | LabArchives data | Structured JSON | < 1 second for conversion | Valid data schema |
-| **F-004-RQ-003** | Original metadata | Enhanced JSON | < 500ms for enhancement | Complete metadata |
-| **F-004-RQ-004** | JSON-LD flag | Semantic JSON | < 200ms for enrichment | Context definition |
-
-#### 2.2.4.2 Validation Rules
-
-| **Requirement** | **Business Rules** | **Data Validation** | **Security Requirements** | **Compliance Requirements** |
-|----------------|-------------------|-------------------|------------------------|-------------------------|
-| **F-004-RQ-001** | Valid URIs only | URI format validation | Authorized resource access | MCP read specification |
-| **F-004-RQ-002** | Consistent JSON structure | Schema validation | Data integrity protection | JSON format standards |
-| **F-004-RQ-003** | Complete metadata | Metadata validation | Metadata security | Research data standards |
-| **F-004-RQ-004** | Valid JSON-LD | Context validation | Semantic data security | JSON-LD specification |
-
----
-
-### 2.2.5 F-005: Authentication and Security Management
-
-| **Requirement ID** | **Description** | **Acceptance Criteria** | **Priority** | **Complexity** |
-|-------------------|-----------------|------------------------|------------|---------------|
-| **F-005-RQ-001** | Secure credential handling | No plaintext credential storage | Must-Have | Medium |
-| **F-005-RQ-002** | Validate authentication tokens | Reject invalid or expired tokens | Must-Have | Low |
-| **F-005-RQ-003** | Manage authentication sessions | 3600s session with auto-renewal | Should-Have | Medium |
-| **F-005-RQ-004** | Implement security controls | <span style="background-color: rgba(91, 57, 243, 0.2)">Grep of all log outputs shows zero literal secret/token strings; credentials are scrubbed before any logging occurs.</span> | Must-Have | High |
-
-#### 2.2.5.1 Technical Specifications
-
-| **Requirement** | **Input Parameters** | **Output/Response** | **Performance Criteria** | **Data Requirements** |
-|----------------|---------------------|-------------------|------------------------|---------------------|
-| **F-005-RQ-001** | Raw credentials | Encrypted storage | Immediate processing | Credential data |
-| **F-005-RQ-002** | Token string | Validation status | < 1 second validation | Token metadata |
-| **F-005-RQ-003** | Session state | Session management | < 500ms session ops | Session data |
-| **F-005-RQ-004** | Security policies | Compliance status | Continuous monitoring | Security configuration |
-
-#### 2.2.5.2 Validation Rules
-
-| **Requirement** | **Business Rules** | **Data Validation** | **Security Requirements** | **Compliance Requirements** |
-|----------------|-------------------|-------------------|------------------------|-------------------------|
-| **F-005-RQ-001** | No credential exposure | Encryption validation | Strong encryption required | Security standards |
-| **F-005-RQ-002** | Valid tokens only | Token format validation | Token integrity verification | Authentication standards |
-| **F-005-RQ-003** | Session lifecycle | Expiry validation | Secure session management | Session security standards |
-| **F-005-RQ-004** | Comprehensive sanitization | Sanitization verification | Complete security controls | Compliance requirements |
-
----
-
-### 2.2.6 F-006: CLI Interface and Configuration
-
-| **Requirement ID** | **Description** | **Acceptance Criteria** | **Priority** | **Complexity** |
-|-------------------|-----------------|------------------------|------------|---------------|
-| **F-006-RQ-001** | Parse CLI arguments | <span style="background-color: rgba(91, 57, 243, 0.2)">All command options recognized, including new -k / --access-key alias (with backward-compatible --access-key-id).</span> | Must-Have | Low |
-| **F-006-RQ-002** | Support environment variables | ENV variable override functionality | Must-Have | Low |
-| **F-006-RQ-003** | Validate configuration | Comprehensive config validation | Must-Have | Medium |
-| **F-006-RQ-004** | Provide help documentation | Clear usage and help information | Should-Have | Low |
-
-#### 2.2.6.1 Technical Specifications
-
-| **Requirement** | **Input Parameters** | **Output/Response** | **Performance Criteria** | **Data Requirements** |
-|----------------|---------------------|-------------------|------------------------|---------------------|
-| **F-006-RQ-001** | CLI arguments | Parsed configuration | < 100ms parsing | Argument definitions |
-| **F-006-RQ-002** | Environment variables | Configuration values | < 50ms processing | Variable mappings |
-| **F-006-RQ-003** | Configuration data | Validation results | < 200ms validation | Validation rules |
-| **F-006-RQ-004** | Help requests | Help documentation | < 50ms response | Help content |
-
-#### 2.2.6.2 Validation Rules
-
-| **Requirement** | **Business Rules** | **Data Validation** | **Security Requirements** | **Compliance Requirements** |
-|----------------|-------------------|-------------------|------------------------|-------------------------|
-| **F-006-RQ-001** | Valid argument formats | Format validation | No credential exposure | CLI standards |
-| **F-006-RQ-002** | ENV precedence rules | Variable validation | Secure variable handling | Configuration standards |
-| **F-006-RQ-003** | Complete configuration | Completeness validation | Security validation | Configuration compliance |
-| **F-006-RQ-004** | Accurate documentation | Content validation | No sensitive information | Documentation standards |
-
----
-
-### 2.2.7 F-007: Scope Limitation and Access Control
-
-| **Requirement ID** | **Description** | **Acceptance Criteria** | **Priority** | **Complexity** |
-|-------------------|-----------------|------------------------|------------|---------------|
-| **F-007-RQ-001** | Configure access scope | Scope rules applied correctly | Must-Have | Medium |
-| **F-007-RQ-002** | Enforce scope limitations | <span style="background-color: rgba(91, 57, 243, 0.2)">Attempting to list or read a page/entry outside the configured folder returns MCP error 403 ScopeViolation.</span> | Must-Have | Medium |
-| **F-007-RQ-003** | Validate user permissions | Permission checks for all operations | Must-Have | Low |
-| **F-007-RQ-004** | Report active scope | Clear scope visibility and reporting | Should-Have | Low |
-| **F-007-RQ-005** | <span style="background-color: rgba(91, 57, 243, 0.2)">Exact folder path matching</span> | <span style="background-color: rgba(91, 57, 243, 0.2)">Folder 'Chem' must NOT match 'Chemistry'; matching uses exact hierarchical comparison only.</span> | <span style="background-color: rgba(91, 57, 243, 0.2)">Must-Have</span> | <span style="background-color: rgba(91, 57, 243, 0.2)">Low</span> |
-
-#### 2.2.7.1 Technical Specifications
-
-| **Requirement** | **Input Parameters** | **Output/Response** | **Performance Criteria** | **Data Requirements** |
-|----------------|---------------------|-------------------|------------------------|---------------------|
-| **F-007-RQ-001** | Scope parameters | Scope configuration | < 100ms configuration | Scope definitions |
-| **F-007-RQ-002** | Access requests | Access decisions | < 50ms per check | Access control rules |
-| **F-007-RQ-003** | User context | Permission validation | < 200ms validation | Permission metadata |
-| **F-007-RQ-004** | Scope queries | Scope information | < 50ms reporting | Scope status |
-| **F-007-RQ-005** | <span style="background-color: rgba(91, 57, 243, 0.2)">Folder path strings</span> | <span style="background-color: rgba(91, 57, 243, 0.2)">Exact match result</span> | <span style="background-color: rgba(91, 57, 243, 0.2)">< 10ms comparison</span> | <span style="background-color: rgba(91, 57, 243, 0.2)">Hierarchical path structure</span> |
-
-#### 2.2.7.2 Validation Rules
-
-| **Requirement** | **Business Rules** | **Data Validation** | **Security Requirements** | **Compliance Requirements** |
-|----------------|-------------------|-------------------|------------------------|-------------------------|
-| **F-007-RQ-001** | Valid scope types | Scope validation | Secure scope handling | Access control standards |
-| **F-007-RQ-002** | No scope bypass | Boundary validation | Strict enforcement | Security policies |
-| **F-007-RQ-003** | Accurate permission checks | Permission validation | Permission integrity | Authorization standards |
-| **F-007-RQ-004** | Transparent reporting | Report validation | Scope visibility | Reporting compliance |
-| **F-007-RQ-005** | <span style="background-color: rgba(91, 57, 243, 0.2)">Exact string matching only</span> | <span style="background-color: rgba(91, 57, 243, 0.2)">Path format validation</span> | <span style="background-color: rgba(91, 57, 243, 0.2)">No path traversal attacks</span> | <span style="background-color: rgba(91, 57, 243, 0.2)">Path security standards</span> |
-
----
-
-### 2.2.8 F-008: Comprehensive Audit Logging
-
-| **Requirement ID** | **Description** | **Acceptance Criteria** | **Priority** | **Complexity** |
-|-------------------|-----------------|------------------------|------------|---------------|
-| **F-008-RQ-001** | Log all system events | Complete event capture with metadata | Must-Have | Medium |
-| **F-008-RQ-002** | Track data access operations | Every access operation logged | Must-Have | Low |
-| **F-008-RQ-003** | Manage log file rotation | Automatic rotation and size management | Should-Have | Medium |
-| **F-008-RQ-004** | Generate compliance reports | Audit trail reporting capability | Could-Have | High |
-
-#### 2.2.8.1 Technical Specifications
-
-| **Requirement** | **Input Parameters** | **Output/Response** | **Performance Criteria** | **Data Requirements** |
-|----------------|---------------------|-------------------|------------------------|---------------------|
-| **F-008-RQ-001** | System events | Structured log entries | < 10ms logging overhead | Event metadata |
-| **F-008-RQ-002** | Access operations | Audit log entries | < 5ms per access log | Access details |
-| **F-008-RQ-003** | Log configuration | Rotation management | Background processing | Rotation policies |
-| **F-008-RQ-004** | Report parameters | Compliance reports | < 30 seconds generation | Historical log data |
-
-#### 2.2.8.2 Validation Rules
-
-| **Requirement** | **Business Rules** | **Data Validation** | **Security Requirements** | **Compliance Requirements** |
-|----------------|-------------------|-------------------|------------------------|-------------------------|
-| **F-008-RQ-001** | No event loss | Event completeness | Secure logging | Audit standards |
-| **F-008-RQ-002** | Complete access tracking | Access validation | Log integrity | Compliance tracking |
-| **F-008-RQ-003** | Secure log handling | Log validation | Log file security | Storage compliance |
-| **F-008-RQ-004** | Accurate reporting | Report validation | Report security | Regulatory reporting |
-
-## 2.3 FEATURE RELATIONSHIPS
-
-### 2.3.1 Feature Dependencies Map
-
-```mermaid
-graph TB
-    F001[F-001: MCP Protocol<br/>Implementation] --> F003[F-003: Resource<br/>Discovery]
-    F001 --> F004[F-004: Content<br/>Retrieval]
-    
-    F002[F-002: LabArchives<br/>API Integration] --> F003
-    F002 --> F004
-    F002 --> F005[F-005: Authentication<br/>& Security]
-    
-    F005 --> F006[F-006: CLI<br/>Interface]
-    F005 --> F007[F-007: Scope<br/>Limitation]
-    
-    F003 --> F007
-    F004 --> F007
-    
-    F008[F-008: Audit<br/>Logging] -.-> F001
-    F008 -.-> F002
-    F008 -.-> F003
-    F008 -.-> F004
-    F008 -.-> F005
-    F008 -.-> F006
-    F008 -.-> F007
-    
-    style F001 fill:#e1f5fe,stroke:#0277bd,stroke-width:2px
-    style F002 fill:#e1f5fe,stroke:#0277bd,stroke-width:2px
-    style F005 fill:#fff3e0,stroke:#f57c00,stroke-width:2px
-    style F008 fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
-```
-
-### 2.3.2 Integration Points
-
-| **Integration Point** | **Features Involved** | **Description** | **Shared Components** |
-|----------------------|----------------------|-----------------|---------------------|
-| **MCP Resource Interface** | F-001, F-003, F-004 | MCP protocol implementation for resource operations | MCPProtocolHandler, resource URI scheme, JSON-RPC handler |
-| **LabArchives Data Access** | F-002, F-005, F-007 | Secure access to LabArchives API with scope controls | AuthenticationManager, LabArchivesAPIClient, scope validators |
-| **Configuration Management** | F-005, F-006, F-007 | Centralized configuration for security and scope | ServerConfiguration, CLI parser, environment handler |
-| **Audit Trail System** | F-008, All Features | Cross-cutting logging for all operations | StructuredFormatter, audit logger, rotating file handlers |
-
-### 2.3.3 Shared Components
-
-| **Component** | **Description** | **Used By Features** | **Implementation** |
-|---------------|-----------------|---------------------|-------------------|
-| **JSON Serialization** | Converts data between formats and validates structure | F-003, F-004, F-008 | pydantic models, safe_serialize utility |
-| **Error Handling** | Centralized exception management with context | All Features | LabArchivesMCPException hierarchy |
-| **Validation Service** | Input validation and configuration checks | F-005, F-006, F-007 | validators.py module with comprehensive rules |
-| **Security Service** | Authentication and authorization controls | F-002, F-005, F-007 | AuthenticationManager with credential handling |
-
----
+| Service | Used By Features | Purpose |
+|---------|------------------|---------|
+| **JSON Serialization Service** | F-003, F-004, F-008 | Standardized data formatting |
+| **Error Handling Service** | All Features | Consistent error reporting |
+| **Validation Service** | F-005, F-006, F-007 | Input and configuration validation |
+| **Security Service** | F-002, F-005, F-007 | Authentication and authorization |
 
 ## 2.4 IMPLEMENTATION CONSIDERATIONS
 
 ### 2.4.1 F-001: MCP Protocol Implementation
-
-| **Consideration** | **Details** |
-|------------------|-------------|
-| **Technical Constraints** | Must comply with MCP specification 2024-11-05, JSON-RPC 2.0 compatibility required, protocol version negotiation |
-| **Performance Requirements** | < 500ms response time for protocol messages, < 2 seconds startup time, support for concurrent clients |
-| **Scalability Considerations** | Single-user deployment model, stateless request handling, memory-efficient operation < 100MB |
-| **Security Implications** | Secure transport layer required, client authentication validation, no credential exposure in protocol logs |
-| **Maintenance Requirements** | MCP specification updates tracking, SDK version management, protocol compatibility testing |
+- **Technical Constraints**: Must comply with MCP specification, JSON-RPC 2.0 compatibility required
+- **Performance Requirements**: < 500ms response time for protocol messages, concurrent client support
+- **Scalability Considerations**: Single-user deployment model, stateless request handling
+- **Security Implications**: Secure transport layer, client authentication validation
+- **Maintenance Requirements**: MCP specification updates, SDK version management
 
 ### 2.4.2 F-002: LabArchives API Integration
-
-| **Consideration** | **Details** |
-|------------------|-------------|
-| **Technical Constraints** | API rate limits enforcement, XML/JSON response parsing, HMAC-SHA256 signing required, regional endpoints |
-| **Performance Requirements** | < 10 seconds for content retrieval, < 3 seconds authentication, efficient API usage with retry logic |
-| **Scalability Considerations** | Connection pooling, response caching strategies, regional endpoint optimization |
-| **Security Implications** | Secure credential handling, API token management, comprehensive audit trail for all API calls |
-| **Maintenance Requirements** | API version compatibility, endpoint URL updates, error handling improvements, credential rotation |
+- **Technical Constraints**: LabArchives API rate limits, XML/JSON response parsing
+- **Performance Requirements**: < 10 seconds for content retrieval, efficient API usage
+- **Scalability Considerations**: API call optimization, response caching strategies
+- **Security Implications**: Secure credential handling, API token management
+- **Maintenance Requirements**: API version compatibility, error handling updates
 
 ### 2.4.3 F-003: Resource Discovery and Listing
-
-| **Consideration** | **Details** |
-|------------------|-------------|
-| **Technical Constraints** | URI scheme compliance (`labarchives://`), hierarchical data representation, MCP resource format |
-| **Performance Requirements** | < 2 seconds for resource listing, memory-efficient for large notebooks, scalable hierarchy traversal |
-| **Scalability Considerations** | Pagination support for large datasets, efficient hierarchy traversal, caching optimization |
-| **Security Implications** | Permission-based filtering, scope enforcement at listing level, secure resource enumeration |
-| **Maintenance Requirements** | URI scheme evolution, hierarchy optimization, caching strategies, resource format updates |
+- **Technical Constraints**: MCP resource specification compliance, URI scheme design
+- **Performance Requirements**: < 2 seconds for resource listing, memory-efficient processing
+- **Scalability Considerations**: Large notebook handling, pagination support
+- **Security Implications**: Permission-based resource filtering, scope enforcement
+- **Maintenance Requirements**: Resource schema evolution, hierarchy optimization
 
 ### 2.4.4 F-004: Content Retrieval and Contextualization
-
-| **Consideration** | **Details** |
-|------------------|-------------|
-| **Technical Constraints** | JSON-LD specification compliance, content size limitations, metadata preservation requirements |
-| **Performance Requirements** | < 5 seconds for content retrieval, < 1 second for JSON conversion, streaming for large content |
-| **Scalability Considerations** | Memory usage optimization, content chunking for large entries, efficient serialization |
-| **Security Implications** | Content sanitization, metadata security, no binary content exposure in MVP |
-| **Maintenance Requirements** | Content format evolution, serialization updates, JSON-LD context maintenance |
+- **Technical Constraints**: JSON-LD specification compliance, content size limits
+- **Performance Requirements**: < 5 seconds for content retrieval, streaming for large content
+- **Scalability Considerations**: Memory usage optimization, content chunking
+- **Security Implications**: Content sanitization, metadata security
+- **Maintenance Requirements**: Content format evolution, serialization updates
 
 ### 2.4.5 F-005: Authentication and Security Management
-
-| **Consideration** | **Details** |
-|------------------|-------------|
-| **Technical Constraints** | 3600-second session lifetime, dual-mode authentication support, credential encryption |
-| **Performance Requirements** | < 1 second authentication validation, < 500ms session management, efficient credential handling |
-| **Scalability Considerations** | In-memory session storage, credential caching strategies, session cleanup |
-| **Security Implications** | Credential encryption, secure storage, comprehensive audit compliance, no credential logs |
-| **Maintenance Requirements** | Security updates, authentication protocol changes, token format evolution, compliance updates |
+- **Technical Constraints**: LabArchives authentication protocols, token lifecycle management
+- **Performance Requirements**: < 1 second for authentication validation, session efficiency
+- **Scalability Considerations**: Credential caching, session management
+- **Security Implications**: Credential encryption, secure storage, audit compliance
+- **Maintenance Requirements**: Security updates, authentication protocol changes
 
 ### 2.4.6 F-006: CLI Interface and Configuration
-
-| **Consideration** | **Details** |
-|------------------|-------------|
-| **Technical Constraints** | Cross-platform compatibility (Windows, macOS, Linux), standard CLI conventions, argparse framework, <span style="background-color: rgba(91, 57, 243, 0.2)">CLI must recognize -k / --access-key as an alias for --access-key-id while preserving existing flag</span> |
-| **Performance Requirements** | < 100ms for argument parsing, < 50ms for help display, immediate user feedback |
-| **Scalability Considerations** | Configuration complexity management, help system scalability, environment variable handling |
-| **Security Implications** | Secure credential input, configuration validation, no plaintext password display |
-| **Maintenance Requirements** | CLI evolution, documentation updates, new command additions, help system maintenance |
+- **Technical Constraints**: Cross-platform compatibility, standard CLI conventions
+- **Performance Requirements**: < 100ms for argument parsing, immediate feedback
+- **Scalability Considerations**: Configuration complexity management, help system
+- **Security Implications**: Secure credential input, configuration validation
+- **Maintenance Requirements**: CLI evolution, documentation updates
 
 ### 2.4.7 F-007: Scope Limitation and Access Control
-
-| **Consideration** | **Details** |
-|------------------|-------------|
-| **Technical Constraints** | LabArchives permission model alignment, multiple scope type support, boundary validation |
-| **Performance Requirements** | < 50ms for access decisions, < 100ms scope configuration, efficient permission checking |
-| **Scalability Considerations** | Complex scope configurations, permission caching, multiple scope type handling |
-| **Security Implications** | Access control bypass prevention, scope validation at all levels, secure boundary enforcement, <span style="background-color: rgba(91, 57, 243, 0.2)">enforcement uses exact FolderPath comparisons; prevents substring path bypass; all violations trigger 403 ScopeViolation</span> |
-| **Maintenance Requirements** | Permission model updates, scope configuration evolution, access control improvements |
+- **Technical Constraints**: LabArchives permission model alignment, scope granularity
+- **Performance Requirements**: < 50ms for access decisions, efficient scope checking
+- **Scalability Considerations**: Complex scope configurations, permission caching
+- **Security Implications**: Access control bypass prevention, scope validation
+- **Maintenance Requirements**: Permission model updates, scope configuration evolution
 
 ### 2.4.8 F-008: Comprehensive Audit Logging
-
-| **Consideration** | **Details** |
-|------------------|-------------|
-| **Technical Constraints** | Log format standards (JSON), storage requirements (rotating files), structured logging |
-| **Performance Requirements** | < 10ms logging overhead, < 5ms per access log, asynchronous processing capability |
-| **Scalability Considerations** | Log rotation (10MB/50MB limits), storage management, minimal performance impact |
-| **Security Implications** | Log integrity, sensitive data sanitization, secure log file access controls, <span style="background-color: rgba(91, 57, 243, 0.2)">secrets are scrubbed from argv before logger initialization ensuring zero credential leakage in any log stream</span> |
-| **Maintenance Requirements** | Log format evolution, compliance updates, analysis tool integration, retention policies |
-
-## 2.5 TRACEABILITY MATRIX
-
-### 2.5.1 Feature-to-Business-Objective Mapping
-
-| **Feature** | **Business Objective** | **Success Metric** | **Compliance Requirement** |
-|-------------|------------------------|-------------------|----------------------------|
-| **F-001** | AI-Enhanced Research Workflow | 60-80% time reduction | MCP Protocol Compliance |
-| **F-002** | Seamless Data Integration | 100% data access coverage | Enterprise Security Standards |
-| **F-003** | Efficient Data Discovery | < 2 seconds discovery time | Access Control Compliance |
-| **F-004** | Contextual AI Analysis | Structured JSON output | Data Privacy Regulations |
-| **F-005** | Secure Authentication | <span style="background-color: rgba(91, 57, 243, 0.2)">Grep of logs shows no literal secret/token strings in any code path</span> | SOC2/ISO 27001 Compliance |
-| **F-006** | Simple Deployment | <span style="background-color: rgba(91, 57, 243, 0.2)">CLI behaves exactly as documentation shows—both -k/--access-key and --access-key-id flags accepted</span> | Operational Standards |
-| **F-007** | Controlled Data Access | <span style="background-color: rgba(91, 57, 243, 0.2)">Attempting to list or read a page/entry outside the folder returns MCP error 403 ScopeViolation</span> | Data Governance Policies |
-| **F-008** | Regulatory Compliance | Complete audit trail | HIPAA/GDPR Requirements |
-
-### 2.5.2 Requirements-to-Test-Case Mapping
-
-| **Requirement** | **Test Case Category** | **Validation Method** | **Acceptance Criteria** |
-|----------------|------------------------|----------------------|------------------------|
-| **F-001-RQ-001** | Protocol Compliance | Automated Protocol Testing | MCP handshake success |
-| **F-002-RQ-001** | Authentication | Security Testing | Valid session < 3 seconds |
-| **F-003-RQ-001** | Resource Discovery | Functional Testing | Resource list generation |
-| **F-004-RQ-001** | Content Retrieval | Performance Testing | < 5 seconds retrieval |
-| **F-005-RQ-001** | Security Management | Security Testing | No credential exposure |
-| **F-006-RQ-001** | CLI Interface | Usability Testing | All options recognized |
-| **F-007-RQ-001** | Access Control | Security Testing | Scope enforcement |
-| **F-007-RQ-005** | <span style="background-color: rgba(91, 57, 243, 0.2)">Access Control</span> | <span style="background-color: rgba(91, 57, 243, 0.2)">Security Testing</span> | <span style="background-color: rgba(91, 57, 243, 0.2)">Exact folder path comparison passes negative test (Chem vs Chemistry)</span> |
-| **F-008-RQ-001** | Audit Logging | Compliance Testing | Complete event capture |
-
-### 2.5.3 Business-Objective-to-Compliance Mapping
-
-| **Business Objective** | **Regulatory Framework** | **Compliance Controls** | **Validation Evidence** |
-|------------------------|---------------------------|-------------------------|------------------------|
-| **AI-Enhanced Research Workflow** | MCP Protocol Standards | Protocol compliance testing, capability negotiation | Automated protocol validation suite, client compatibility testing |
-| **Seamless Data Integration** | Enterprise Security Standards | Authentication controls, secure API integration | Security audit logs, penetration testing results |
-| **Efficient Data Discovery** | Access Control Compliance | Permission-based filtering, scope enforcement | Access control testing, scope validation logs |
-| **Contextual AI Analysis** | Data Privacy Regulations | Content sanitization, metadata protection | Data handling audit, privacy impact assessment |
-| **Secure Authentication** | SOC2/ISO 27001 Compliance | Credential encryption, audit logging | Security assessment, compliance certification |
-| **Simple Deployment** | Operational Standards | Configuration validation, deployment testing | Installation testing, operational documentation |
-| **Controlled Data Access** | Data Governance Policies | Granular access control, scope limitation | Access control testing, policy compliance audit |
-| **Regulatory Compliance** | HIPAA/GDPR Requirements | Audit trail, data protection | Compliance assessment, regulatory audit |
-
-### 2.5.4 Feature-to-Architecture-Component Mapping
-
-| **Feature** | **Primary Components** | **Integration Points** | **Shared Services** |
-|-------------|------------------------|----------------------|---------------------|
-| **F-001** | MCPProtocolHandler, JSON-RPC transport | MCP Server, FastMCP framework | Error handling, validation service |
-| **F-002** | LabArchivesAPIClient, AuthenticationManager | Regional API endpoints, HMAC signing | Security service, audit logging |
-| **F-003** | ResourceManager, URI generation | MCP resource interface, hierarchy traversal | JSON serialization, error handling |
-| **F-004** | ContentRetriever, JSON-LD processor | Data transformation, metadata preservation | JSON serialization, validation service |
-| **F-005** | AuthenticationManager, SessionManager | Credential handling, token validation | Security service, audit logging |
-| **F-006** | CLI parser, ConfigurationManager | Command processing, environment handling | Validation service, error handling |
-| **F-007** | ScopeValidator, AccessController | Permission checking, boundary enforcement | Security service, audit logging |
-| **F-008** | AuditLogger, StructuredFormatter | Log rotation, compliance reporting | All features (cross-cutting) |
-
-### 2.5.5 Implementation-Priority Matrix
-
-| **Priority Level** | **Features** | **Implementation Order** | **Dependencies** |
-|-------------------|-------------|------------------------|------------------|
-| **Critical** | F-001, F-002, F-005 | Phase 1: Foundation | Core infrastructure, security framework |
-| **High** | F-003, F-004, F-007, F-008 | Phase 2: Core Functionality | Data access, content handling, security controls |
-| **Medium** | F-006 | Phase 3: User Interface | CLI development, configuration management |
-| **Enhancement** | JSON-LD support, advanced reporting | Phase 4: Advanced Features | Performance optimization, feature extensions |
-
----
+- **Technical Constraints**: Log format standards, storage requirements
+- **Performance Requirements**: < 10ms logging overhead, asynchronous processing
+- **Scalability Considerations**: Log rotation, storage management, performance impact
+- **Security Implications**: Log integrity, sensitive data handling, access controls
+- **Maintenance Requirements**: Log format evolution, compliance updates
 
 #### References
-
-- `blitzy/documentation/Input Prompt.md` - Product Requirements Document with functional/non-functional requirements
-- `blitzy/documentation/Technical Specifications_916f36fe-6c43-4713-80b6-8444416b5a59.md` - Feature catalog (F-001 to F-008) and detailed specifications
-- `src/cli/auth_manager.py` - Authentication implementation for dual-mode support
-- `src/cli/resource_manager.py` - Resource discovery and retrieval implementation
-- `src/cli/mcp/` - MCP protocol implementation directory (protocol.py, handlers.py, models.py, resources.py)
-- `src/cli/config.py` - Configuration management implementation
-- `src/cli/logging_setup.py` - Comprehensive audit logging implementation
-- `src/cli/cli_parser.py` - CLI interface implementation
-- `src/cli/validators.py` - Scope validation implementation
-- `src/cli/constants.py` - System constants and configuration defaults
+- Section 1.1 Executive Summary - Project overview and business context
+- Section 1.2 System Overview - Technical architecture and system capabilities
+- Section 1.3 Scope - Project boundaries and implementation scope
+- `README.md` - High-level project overview and usage documentation
+- `blitzy/documentation/Input Prompt.md` - Product Requirements Document with MVP specifications
+- `blitzy/documentation/Technical Specifications.md` - Technical design reference
+- MCP Protocol Specification - Standard for AI-data integration protocols
+- LabArchives API Documentation - External API integration specifications
 
 # 3. TECHNOLOGY STACK
 
 ## 3.1 PROGRAMMING LANGUAGES
 
 ### 3.1.1 Python 3.11+
+- **Platform**: Core application, CLI interface, and MCP server implementation
+- **Selection Criteria**: 
+  - Modern async/await support required for MCP protocol implementation
+  - Extensive ecosystem for scientific computing and AI integration
+  - Strong typing support via type hints for maintainability
+  - Rich library ecosystem for HTTP, JSON-RPC, and data validation
+  - Cross-platform compatibility for diverse research environments
+- **Constraints**: 
+  - Minimum version 3.11 required for latest language features and performance improvements
+  - Must maintain compatibility with MCP SDK and FastMCP framework
+  - Type hints enforced for code quality and maintainability
 
-**Platform**: Backend server implementation and CLI interface  
-**Selection Criteria**: 
-- Native support for the Model Context Protocol through the official Python SDK (mcp>=1.0.0)
-- Modern async/await capabilities essential for JSON-RPC 2.0 communication and concurrent request handling
-- Extensive ecosystem for API integration, HTTP client libraries, and CLI development frameworks
-- Cross-platform compatibility across Windows, macOS, and Linux environments as documented in deployment requirements
-- Strong typing support with modern type hints for enhanced code quality and IDE integration
+### 3.1.2 YAML
+- **Platform**: Configuration management, Kubernetes manifests, GitHub Actions workflows
+- **Selection Criteria**: Human-readable format ideal for configuration files and infrastructure as code
+- **Constraints**: Schema validation required for security and correctness
 
-**Constraints and Dependencies**:
-- Minimum Python 3.11 required for latest type hints, performance optimizations, and modern language features
-- Defined in pyproject.toml configuration as `requires-python = ">=3.11"`
-- Compatibility with the FastMCP framework and official MCP SDK requirements
-- Support for enterprise deployment environments across multiple operating systems
+### 3.1.3 HCL (HashiCorp Configuration Language)
+- **Platform**: Terraform infrastructure definitions and AWS resource provisioning
+- **Selection Criteria**: Native language for Terraform with strong typing and expression support
+- **Constraints**: Terraform >= 1.4.0 compatibility required for module support
+
+### 3.1.4 Bash
+- **Platform**: Deployment scripts, operational automation, and container entrypoints
+- **Selection Criteria**: Universal availability in Unix-like environments
+- **Constraints**: POSIX compliance for maximum portability
 
 ## 3.2 FRAMEWORKS & LIBRARIES
 
-### 3.2.1 Core MCP Framework
+### 3.2.1 Model Context Protocol (MCP) Framework
+- **MCP SDK >= 1.0.0**: Core Model Context Protocol implementation
+  - **Purpose**: Provides standardized protocol for AI-data integration
+  - **Justification**: Open standard adopted by OpenAI, Block, Replit, and Sourcegraph in 2025
+  - **Features**: JSON-RPC 2.0 transport, resource management, client libraries
+  - **Integration**: Native support for Claude Desktop and MCP-compatible AI systems
 
-**mcp>=1.0.0** - Model Context Protocol SDK
-- **Purpose**: Official Python SDK for implementing the Model Context Protocol specification (2024-11-05)
-- **Justification**: Required for protocol compliance, JSON-RPC 2.0 transport layer, and seamless integration with Claude Desktop and other MCP-compatible clients
-- **Integration**: Provides foundational protocol implementation for resource discovery and content retrieval capabilities
-
-**fastmcp>=1.0.0** - FastMCP Framework
-- **Purpose**: High-performance MCP server framework with optimized message handling
-- **Justification**: Ensures full MCP protocol compliance while providing performance optimizations for enterprise-grade deployments
-- **Integration**: Handles capability negotiation, JSON-RPC message processing, and client-server communication
+- **FastMCP >= 1.0.0**: High-level MCP framework for Python
+  - **Version**: 2.0 (production-ready release)
+  - **Purpose**: Simplified MCP server development with decorators and high-level abstractions
+  - **Justification**: Pythonic API design reduces complexity - "decorating a function is all you need"
+  - **Features**: Authentication systems, deployment tools, testing frameworks, production infrastructure patterns
 
 ### 3.2.2 Data Validation & Configuration Management
+- **Pydantic >= 2.11.7**: Data validation using Python type annotations
+  - **Purpose**: Type-safe configuration management and API response parsing
+  - **Justification**: Runtime type checking ensures data integrity and reduces bugs
+  - **Usage**: ServerConfiguration models, API response validation, MCP resource schemas
+  - **Features**: JSON Schema generation, validation error reporting, serialization
 
-**pydantic>=2.11.7** - Runtime Data Validation
-- **Purpose**: Type safety, runtime validation, and automatic data serialization/deserialization
-- **Justification**: Ensures data integrity for LabArchives API responses, configuration management, and MCP message validation
-- **Integration**: Validates all input/output data structures, configuration parameters, and API responses
+- **Pydantic-settings >= 2.10.1**: Settings management with Pydantic
+  - **Purpose**: Environment variable parsing with type safety
+  - **Justification**: Supports configuration precedence (CLI > environment > file > defaults)
+  - **Features**: Automatic type conversion, nested configuration support, validation
 
-**pydantic-settings>=2.10.1** - Configuration Management
-- **Purpose**: Hierarchical configuration with environment variable support and validation
-- **Justification**: Implements 12-factor app configuration principles with secure credential handling and multi-source configuration support
-- **Integration**: Manages CLI arguments, environment variables, and configuration files with precedence handling
+### 3.2.3 Command-Line Interface Framework
+- **Click >= 8.0.0**: Command-line interface creation kit
+  - **Purpose**: Comprehensive CLI with subcommands and argument parsing
+  - **Justification**: Declarative CLI design with automatic help generation
+  - **Features**: Nested commands, parameter validation, colored output, shell completion
+  - **Integration**: Supports both interactive and scripted usage patterns
 
-### 3.2.3 HTTP & API Integration
+### 3.2.4 HTTP Client Libraries
+- **Requests >= 2.31.0**: HTTP library for LabArchives API communication
+  - **Purpose**: Robust HTTP client with session management
+  - **Justification**: Mature library with comprehensive authentication support
+  - **Features**: Connection pooling, retry logic, SSL verification, timeout handling
+  - **Integration**: HMAC-SHA256 authentication for LabArchives API
 
-**requests>=2.31.0** - HTTP Client Library
-- **Purpose**: Robust HTTP communication with LabArchives REST API endpoints
-- **Justification**: Mature library with comprehensive error handling, retry logic, and connection pooling
-- **Integration**: Handles authentication, API calls, and response processing with built-in security features
+- **urllib3 >= 2.0.0**: Low-level HTTP client library
+  - **Purpose**: Advanced HTTP features and connection management
+  - **Justification**: Dependency of requests providing connection pooling and retry logic
+  - **Features**: Connection pooling, HTTP/2 support, SSL context management
 
-**urllib3>=2.0.0** - Advanced URL Handling
-- **Purpose**: Enhanced URL processing and connection management
-- **Justification**: Provides low-level HTTP functionality with security improvements and performance optimizations
-- **Integration**: Supports regional endpoint routing (US, Australia, UK) and connection pooling
-
-**labarchives-py>=0.1.0** - LabArchives Client Library
-- **Purpose**: Specialized client library for LabArchives API integration
-- **Justification**: Provides domain-specific functionality for notebook access, HMAC-SHA256 authentication, and API response parsing
-- **Integration**: Handles authentication workflows, data transformation, and API-specific error handling
-
-### 3.2.4 Command-Line Interface Framework
-
-**click>=8.0.0** - CLI Framework
-- **Purpose**: Rich command-line interface creation with comprehensive help systems
-- **Justification**: Provides intuitive CLI experience with subcommands, argument validation, and help documentation
-- **Integration**: Implements server control commands, configuration management, and user interaction workflows
-
-**argparse** (Python Standard Library)
-- **Purpose**: Core argument parsing functionality
-- **Justification**: Built-in library for basic argument processing with zero external dependencies
-- **Integration**: <span style="background-color: rgba(91, 57, 243, 0.2)">Handles primary argument parsing, including alias support for -k / --access-key (dest='access_key_id') while retaining backward compatibility with --access-key-id</span>
+### 3.2.5 LabArchives Integration
+- **labarchives-py >= 0.1.0**: Official LabArchives Python SDK
+  - **Purpose**: Native Python interface to LabArchives REST API
+  - **Justification**: Official SDK ensures compatibility and feature completeness
+  - **Features**: Authentication handling, API method wrapping, error management
+  - **Integration**: Supports all LabArchives regions (US, AU, UK)
 
 ## 3.3 OPEN SOURCE DEPENDENCIES
 
-### 3.3.1 Runtime Dependencies
-
-```python
-# Core MCP and Communication
-mcp>=1.0.0                    # Model Context Protocol SDK
-fastmcp>=1.0.0                # FastMCP high-performance framework
-  
-# Data Validation and Configuration
-pydantic>=2.11.7              # Runtime data validation and serialization
-pydantic-settings>=2.10.1     # Hierarchical configuration management
-
-#### HTTP and API Integration
-requests>=2.31.0              # HTTP client for LabArchives API
-urllib3>=2.0.0                # Advanced URL handling and connection pooling
-labarchives-py>=0.1.0         # LabArchives-specific client library
-
-#### CLI and Utilities
-click>=8.0.0                  # Command-line interface framework
-setuptools>=65.0.0            # Package management and distribution
+### 3.3.1 Production Dependencies
+```
+mcp >= 1.0.0                    # Model Context Protocol SDK
+fastmcp >= 1.0.0               # High-level MCP framework
+pydantic >= 2.11.7             # Data validation and settings
+pydantic-settings >= 2.10.1    # Environment-based configuration
+requests >= 2.31.0             # HTTP client library
+urllib3 >= 2.0.0              # Advanced HTTP features
+labarchives-py >= 0.1.0       # LabArchives API client
+click >= 8.0.0                # CLI framework
 ```
 
 ### 3.3.2 Development Dependencies
-
-```python
-# Testing Framework
-pytest>=7.0.0                 # Primary testing framework
-pytest-cov>=4.0.0            # Coverage reporting plugin
-pytest-asyncio>=0.21.0       # Async testing support for MCP protocol
-pytest-mock>=3.12.0          # Mocking utilities for API testing
-
-#### Code Quality and Static Analysis
-mypy>=1.0.0                  # Static type checking
-black>=23.0.0                # Code formatting and style enforcement
-isort>=5.12.0                # Import sorting and organization
-flake8>=6.0.0                # Python linting and style checking
-coverage>=7.0.0              # Code coverage analysis
-
-#### Testing and Mocking
-responses>=0.25.0            # HTTP response mocking for API testing
-types-requests>=2.31.0       # Type stubs for requests library
-
-#### Build and Distribution
-build                        # Python package building
-twine                        # PyPI package publishing
+```
+pytest >= 7.0.0               # Testing framework
+pytest-cov >= 4.0.0          # Coverage reporting
+pytest-asyncio >= 0.21.0     # Async test support
+pytest-mock >= 3.12.0        # Mock utilities
+mypy >= 1.0.0                # Static type checking
+black >= 23.0.0              # Code formatting
+isort >= 5.12.0              # Import sorting
+flake8 >= 6.0.0              # Code linting
+ruff >= 0.1.0                # Fast Python linter
+coverage >= 7.0.0            # Code coverage analysis
+responses >= 0.25.0          # HTTP request mocking
+types-requests >= 2.31.0.20240106  # Type stubs for requests
 ```
 
-### 3.3.3 Package Registries and Distribution
+### 3.3.3 Build & Deployment Dependencies
+```
+setuptools >= 65.0.0         # Python packaging
+build >= 0.10.0              # PEP 517 build system
+twine >= 4.0.0               # PyPI package upload
+wheel >= 0.40.0              # Binary package format
+```
 
-**Primary Registry**: PyPI (Python Package Index)
-- All Python dependencies sourced from PyPI for security and reliability
-- Automated dependency resolution and security scanning
-- Version pinning for reproducible builds
-
-**Container Registry**: Docker Hub
-- Base images: `python:3.11-slim-bookworm` for optimized container size
-- Multi-architecture support (amd64, arm64)
-- Automated vulnerability scanning and security updates
+### 3.3.4 Package Management
+- **Primary Registry**: PyPI (Python Package Index)
+- **Container Registry**: Docker Hub for base images
+- **Alternative Registry**: GitHub Container Registry for private distributions
+- **Dependency Resolution**: pip with requirements.txt and pyproject.toml
 
 ## 3.4 THIRD-PARTY SERVICES
 
-### 3.4.1 LabArchives API Integration
+### 3.4.1 LabArchives Platform Integration
+- **Service**: LabArchives REST API
+- **Endpoints**: 
+  - US: `https://api.labarchives.com/api`
+  - AU: `https://auapi.labarchives.com/api`  
+  - UK: `https://ukapi.labarchives.com/api`
+- **Authentication**: HMAC-SHA256 signed requests with access keys
+- **Purpose**: Primary data source for notebook content and metadata
+- **Integration**: RESTful API calls for notebook/page/entry operations
+- **Rate Limits**: Configurable request throttling for API compliance
 
-**Regional API Endpoints**:
-- **US**: `https://api.labarchives.com/api`
-- **Australia**: `https://auapi.labarchives.com/api`
-- **UK**: `https://ukapi.labarchives.com/api`
+### 3.4.2 AWS Cloud Services
+- **Amazon ECS Fargate**: Serverless container orchestration
+  - **Purpose**: Production deployment platform
+  - **Justification**: Managed container execution without infrastructure overhead
+  - **Features**: Auto-scaling, load balancing, health monitoring
+  - **Integration**: Task definitions and service configurations
 
-**Authentication Methods**:
-- **HMAC-SHA256**: Permanent API key authentication with cryptographic signing
-- **SSO Tokens**: Temporary user authentication tokens with 3600-second lifetime
-- **Session Management**: Automatic token renewal and session lifecycle management
+- **Amazon RDS PostgreSQL**: Optional managed database service
+  - **Version**: PostgreSQL 15.x
+  - **Purpose**: Metadata storage, caching, and audit logging
+  - **Features**: Multi-AZ deployment, automated backups, encryption at rest
+  - **Integration**: Connection pooling and credential management
 
-**Integration Capabilities**:
-- Notebook listing and hierarchical structure retrieval
-- Page content access with metadata preservation
-- Entry-level data extraction with full context
-- Real-time permission validation and access control
+- **AWS CloudWatch**: Monitoring and logging service
+  - **Purpose**: Centralized logging and metrics collection
+  - **Features**: Log aggregation, custom metrics, alerting
+  - **Integration**: Structured logging with JSON format
 
-### 3.4.2 Model Context Protocol (MCP) Infrastructure
+- **AWS KMS**: Key management service
+  - **Purpose**: Encryption key management for data at rest
+  - **Integration**: RDS encryption and CloudWatch log encryption
 
-**Protocol Specification**: MCP 2024-11-05
-- **Purpose**: Universal open standard for AI-data connectivity enabling seamless integration between AI systems and data sources
-- **Transport Layer**: JSON-RPC 2.0 for reliable message exchange
-- **Capability Set**: Resources listing and reading with comprehensive metadata support
+- **AWS Secrets Manager**: Credential management
+  - **Purpose**: Secure storage of API keys and database credentials
+  - **Features**: Automatic rotation, fine-grained access control
+  - **Integration**: Runtime credential retrieval
 
-**Client Compatibility**:
-- **Claude Desktop**: Primary target client for AI-powered research analysis
-- **Future MCP Clients**: Extensible architecture supporting emerging MCP-compatible applications
-- **Protocol Compliance**: Full adherence to MCP specification ensuring interoperability
+### 3.4.3 Monitoring & Observability
+- **Prometheus**: Metrics collection and monitoring
+  - **Purpose**: Application metrics and performance monitoring
+  - **Integration**: /metrics endpoint for scraping
+  - **Features**: Time-series data collection, alerting rules
 
-### 3.4.3 Container and Deployment Services
+- **Grafana**: Metrics visualization (optional)
+  - **Purpose**: Dashboard creation and metrics visualization
+  - **Integration**: Prometheus data source configuration
+  - **Features**: Custom dashboards, alerting, user management
 
-**Docker Hub**: Container registry for image distribution
-- **Repository**: `labarchives/mcp-server`
-- **Image Optimization**: Multi-stage builds with security scanning
-- **Automated Builds**: CI/CD integration for continuous deployment
+### 3.4.4 Certificate Management
+- **Let's Encrypt**: TLS certificate authority
+  - **Purpose**: Automated SSL/TLS certificate provisioning
+  - **Integration**: cert-manager for Kubernetes environments
+  - **Features**: Automatic renewal, domain validation
 
-**Kubernetes Integration**: Enterprise orchestration support
-- **Deployment Manifests**: Production-ready Kubernetes configurations
-- **Service Discovery**: Automated service registration and health checks
-- **Scaling Policies**: Horizontal and vertical scaling capabilities
+### 3.4.5 Container Registry Services
+- **Docker Hub**: Public container registry
+  - **Purpose**: Distribution of application container images
+  - **Integration**: Automated builds and deployments
+  - **Repository**: `labarchives/mcp-server`
 
-### 3.4.4 CI/CD and Development Services
-
-**GitHub Actions**: Automated testing and deployment pipeline
-- **Matrix Testing**: Cross-platform validation (Python 3.11/3.12, Ubuntu/Windows/macOS)
-- **Security Scanning**: Comprehensive vulnerability assessment
-- **Automated Releases**: PyPI and Docker Hub publishing
-
-**Code Quality Services**:
-- **Codecov**: Code coverage reporting and analysis
-- **Security Scanning**: Bandit, Semgrep, and CodeQL integration
-- **Dependency Management**: Automated security updates and vulnerability monitoring
+- **GitHub Container Registry**: Alternative container registry
+  - **Purpose**: Private or organization-specific image distribution
+  - **Integration**: GitHub Actions workflows for CI/CD
 
 ## 3.5 DATABASES & STORAGE
 
-### 3.5.1 Zero-Persistence Architecture
+### 3.5.1 Primary Data Source
+- **LabArchives Platform**: Primary data repository
+  - **Purpose**: Source of truth for all notebook data
+  - **Access Pattern**: On-demand retrieval via REST API
+  - **Architecture**: No local persistence required for core functionality
+  - **Justification**: Maintains data consistency and leverages existing infrastructure investment
 
-**Design Philosophy**: Stateless operation with no persistent data storage
-- **Justification**: Minimizes security risk, simplifies compliance, and eliminates data synchronization challenges
-- **Implementation**: All data retrieved on-demand from LabArchives API without local caching or persistence
-- **Benefits**: Ensures real-time data accuracy, reduces attack surface, and simplifies GDPR compliance
+### 3.5.2 Optional Metadata Storage
+- **AWS RDS PostgreSQL 15.x**: Managed relational database
+  - **Purpose**: Metadata caching, audit logs, session management
+  - **Configuration**: 
+    - Multi-AZ deployment for production environments
+    - Automated backup with 7-30 day retention
+    - Encryption at rest using AWS KMS
+    - Performance Insights enabled for monitoring
+  - **Justification**: Provides structured storage for operational data while maintaining ACID compliance
 
-### 3.5.2 Logging and Audit Storage
+### 3.5.3 Logging & Audit Storage
+- **AWS CloudWatch Logs**: Centralized log management
+  - **Purpose**: Application logs, audit trails, operational metrics
+  - **Configuration**: 
+    - Log group: `/aws/ecs/labarchives-mcp-server`
+    - Retention: Configurable (7-90 days)
+    - Encryption: KMS encryption for sensitive data
+  - **Integration**: Structured JSON logging with correlation IDs
 
-**Application Logging**:
-- **File**: `labarchives_mcp.log`
-- **Rotation**: 10MB file size limit with 5 backup files
-- **Format**: Structured key-value pairs for operational monitoring
-- **Retention**: Configurable retention policies for enterprise environments
-- <span style="background-color: rgba(91, 57, 243, 0.2)">**Secret Redaction**: All command-line arguments and credential values are scrubbed before any logger is configured, guaranteeing that no secrets are ever written to application or audit logs</span>
+- **Local Storage**: Development and testing
+  - **Purpose**: Local log files during development
+  - **Path**: `/app/logs` (containerized) or `./logs` (development)
+  - **Format**: Structured JSON with rotation support
 
-**Audit Logging**:
-- **File**: `labarchives_mcp_audit.log`
-- **Rotation**: 50MB file size limit with 10 backup files
-- **Format**: JSON-structured records for compliance and analysis
-- **Content**: Complete audit trail of all data access operations, authentication events, and system activities
-
-**Container Storage**:
-- **Docker Volumes**: Persistent volume mounts for log retention across container restarts
-- **Kubernetes Persistent Volumes**: Enterprise-grade storage with backup and disaster recovery capabilities
-- **Cloud Integration**: Optional cloud storage integration for centralized log management
-
-### 3.5.3 Configuration Storage
-
-**Configuration Sources** (in order of precedence):
-1. **Command-line Arguments**: Direct parameter specification
-2. **Environment Variables**: 12-factor app configuration support
-3. **Configuration Files**: JSON-formatted configuration files
-4. **Default Values**: Built-in fallback configuration
-
-**Secure Storage**:
-- **Credential Management**: No plaintext credential storage with environment variable encryption
-- **Configuration Validation**: Comprehensive validation of all configuration parameters
-- **Access Control**: Restricted file permissions and secure configuration handling
+### 3.5.4 Caching Strategy
+- **In-Memory Caching**: Default caching approach
+  - **Purpose**: Session-based caching for API responses
+  - **Implementation**: Python dictionaries with TTL support
+  - **Justification**: Reduces external dependencies while providing performance benefits
+  - **Scope**: Authentication tokens, resource metadata
 
 ## 3.6 DEVELOPMENT & DEPLOYMENT
 
-### 3.6.1 Containerization Technology
+### 3.6.1 Containerization
+- **Docker**: Container runtime and packaging
+  - **Base Image**: `python:3.11-slim-bookworm`
+  - **Multi-Stage Build**: Separate build and runtime stages for size optimization
+  - **Security**: Non-root user execution, minimal attack surface
+  - **Optimization**: Layer caching, dependency pre-installation
+  - **Health Checks**: Built-in health check endpoints
 
-**Docker Implementation**:
-- **Base Image**: `python:3.11-slim-bookworm` for optimized security and size
-- **Multi-stage Builds**: Separate build and runtime environments for minimal attack surface
-- **Non-root Execution**: Security-hardened container with dedicated user account
-- **Health Checks**: Built-in health monitoring and automatic restart capabilities
+### 3.6.2 Container Orchestration
+- **Kubernetes**: Production container orchestration
+  - **Version**: 1.24+ (tested compatibility)
+  - **Components**: 
+    - Deployment: Application pod management
+    - Service: Internal load balancing
+    - Ingress: External traffic routing
+    - ConfigMap: Configuration management
+    - Secret: Credential management
+  - **Ingress Controller**: NGINX Ingress Controller
+  - **Service Mesh**: Compatible with Istio/Linkerd (optional)
 
-**Container Orchestration**:
-- **Docker Compose**: Development and testing environment configuration
-  - `docker-compose.dev.yml`: Development environment with debugging support
-  - `docker-compose.prod.yml`: Production configuration with security hardening
-- **Kubernetes**: Enterprise production deployment
-  - **Deployments**: Scalable application instances with rolling updates
-  - **Services**: Load balancing and service discovery
-  - **Ingress**: External access with NGINX controller integration
-  - **NetworkPolicies**: Microsegmentation and security isolation
+### 3.6.3 Infrastructure as Code
+- **Terraform**: Infrastructure provisioning and management
+  - **Version**: >= 1.4.0 (required for module improvements)
+  - **Provider**: AWS Provider >= 5.0.0
+  - **Modules**: 
+    - ECS module for container deployment
+    - RDS module for database provisioning
+    - VPC module for network configuration
+  - **State Management**: Remote state with DynamoDB locking
+  - **Workspaces**: Environment separation (dev, staging, prod)
 
-### 3.6.2 Infrastructure as Code
+### 3.6.4 CI/CD Pipeline
+- **GitHub Actions**: Continuous integration and deployment
+  - **Workflows**: 
+    - CI: Code quality, testing, security scanning
+    - Deploy: Automated deployment to staging/production
+    - Release: Package publishing and tagging
+  - **Matrix Strategy**: Multi-version Python testing (3.11, 3.12)
+  - **Secrets Management**: GitHub Secrets for sensitive data
+  - **Artifacts**: Container images, Python packages, test reports
 
-**Terraform Configuration** (Version 1.4+):
-- **AWS Provider**: `>=5.0.0, <6.0.0` for cloud infrastructure management
-- **ECS Fargate Module**: Serverless container deployment with auto-scaling
-- **RDS PostgreSQL Module**: Optional database infrastructure for future enhancements
-- **CloudWatch Integration**: Comprehensive monitoring and alerting
-- **KMS Encryption**: End-to-end encryption for data at rest
+### 3.6.5 Build Tools & Package Management
+- **setuptools >= 65.0.0**: Python packaging system
+  - **Purpose**: Package building and distribution
+  - **Configuration**: pyproject.toml with PEP 621 metadata
+  - **Features**: Dependency resolution, entry points, metadata
 
-**Infrastructure Components**:
-- **VPC Configuration**: Isolated network environment with security groups
-- **IAM Roles**: Least-privilege access control for all services
-- **Load Balancers**: Application Load Balancer for high availability
-- **Auto Scaling**: Dynamic scaling based on demand and performance metrics
+- **pip**: Package installer and dependency manager
+  - **Purpose**: Runtime dependency installation
+  - **Features**: Requirements files, constraint files, editable installs
 
-### 3.6.3 CI/CD Pipeline Architecture
+- **uv**: Fast Python package installer (recommended)
+  - **Purpose**: Accelerated package installation and resolution
+  - **Justification**: Significant performance improvements over pip
+  - **Usage**: Optional replacement for pip in CI/CD
 
-**GitHub Actions Workflow**:
-- **Matrix Testing**: Comprehensive testing across multiple Python versions (3.11, 3.12) and operating systems (Ubuntu, Windows, macOS)
-- **Security Pipeline**: Integrated security scanning with Bandit, Semgrep, and CodeQL
-- **Code Quality**: Automated code formatting with Black, import sorting with isort, and static analysis with mypy
-- **Build Automation**: Automated package building and distribution to PyPI and Docker Hub
+### 3.6.6 Development Tools
+- **Pre-commit**: Git hook framework
+  - **Purpose**: Automated code quality checks before commits
+  - **Hooks**: Black formatting, isort imports, flake8 linting, mypy type checking
+  - **Integration**: Enforces code quality standards across development team
 
-**Security Integration**:
-- **SBOM Generation**: Software Bill of Materials for supply chain security
-- **Vulnerability Scanning**: Trivy container scanning and dependency vulnerability assessment
-- **Compliance Validation**: Automated compliance checking against security standards
-- **Automated Updates**: Dependency updates with security patch management
+- **Docker Compose**: Local development orchestration
+  - **Version**: 3.8 specification
+  - **Purpose**: Local development environment setup
+  - **Services**: Application, database, monitoring stack
+  - **Features**: Volume mounting, environment variable management
 
-### 3.6.4 Cloud Platform Integration
+### 3.6.7 Testing Infrastructure
+- **pytest**: Testing framework with extensive plugin ecosystem
+  - **Purpose**: Unit testing, integration testing, end-to-end testing
+  - **Plugins**: Coverage reporting, async support, mocking utilities
+  - **Configuration**: pytest.ini with custom markers and fixtures
 
-**AWS Services Integration**:
-- **ECS Fargate**: Serverless container hosting with automatic scaling
-- **CloudWatch**: Comprehensive logging, monitoring, and alerting
-- **IAM**: Identity and Access Management with role-based security
-- **KMS**: Key Management Service for encryption at rest
-- **Optional RDS**: Database infrastructure for future persistence requirements
+- **MCP Inspector**: Protocol debugging and validation tool
+  - **Purpose**: MCP protocol compliance testing
+  - **Features**: Message validation, protocol flow analysis
+  - **Integration**: Development and testing workflows
 
-**Monitoring and Observability**:
-- **CloudWatch Metrics**: System performance and application metrics
-- **CloudWatch Logs**: Centralized log aggregation and analysis
-- **CloudWatch Alarms**: Automated alerting for system issues
-- **AWS X-Ray**: Distributed tracing for performance optimization
+### 3.6.8 Security & Code Quality
+- **Static Analysis**: 
+  - **mypy**: Static type checking
+  - **bandit**: Security vulnerability scanning
+  - **safety**: Dependency vulnerability scanning
+  - **semgrep**: SAST (Static Application Security Testing)
 
-### 3.6.5 Development Tools and Automation
+- **Container Security**: 
+  - **Trivy**: Container image vulnerability scanning
+  - **Hadolint**: Dockerfile linting
+  - **Distroless**: Minimal base images for production
 
-**Development Environment**:
-- **Pre-commit Hooks**: Automated code quality checks before commit
-- **Make/Shell Scripts**: Build automation and development workflow management
-- **Git Configuration**: Comprehensive .gitignore patterns and branch protection
-- **IDE Integration**: Full support for VS Code, PyCharm, and other popular IDEs
+## 3.7 INTEGRATION ARCHITECTURE
 
-**Package Management**:
-- **Poetry**: Modern Python dependency management with lock files
-- **setuptools**: Traditional package management for compatibility
-- **pip-tools**: Dependency resolution and requirement management
-- **Virtual Environments**: Isolated development environments
+### 3.7.1 MCP Protocol Integration
+```mermaid
+graph TB
+    subgraph "MCP Client (Claude Desktop)"
+        A[AI Assistant]
+        B[MCP Client Library]
+    end
+    
+    subgraph "LabArchives MCP Server"
+        C[MCP Protocol Handler]
+        D[FastMCP Framework]
+        E[Resource Manager]
+        F[Authentication Manager]
+    end
+    
+    subgraph "External Services"
+        G[LabArchives API]
+        H[AWS Services]
+    end
+    
+    A --> B
+    B --> C
+    C --> D
+    D --> E
+    D --> F
+    E --> G
+    F --> H
+    
+    style C fill:#e1f5fe
+    style D fill:#e8f5e8
+    style G fill:#fff3e0
+```
 
-## 3.7 SECURITY & COMPLIANCE TOOLS
+### 3.7.2 Technology Stack Summary
 
-### 3.7.1 Security Scanning and Analysis
+| Component | Technology | Version | Purpose |
+|-----------|------------|---------|---------|
+| **Core Language** | Python | 3.11+ | Application runtime |
+| **MCP Framework** | FastMCP | >= 1.0.0 | Protocol implementation |
+| **Data Validation** | Pydantic | >= 2.11.7 | Type safety |
+| **HTTP Client** | Requests | >= 2.31.0 | API communication |
+| **CLI Framework** | Click | >= 8.0.0 | Command interface |
+| **Containerization** | Docker | Latest | Application packaging |
+| **Orchestration** | Kubernetes | 1.24+ | Container management |
+| **Infrastructure** | Terraform | >= 1.4.0 | Infrastructure as Code |
+| **CI/CD** | GitHub Actions | Latest | Automation |
+| **Database** | PostgreSQL | 15.x | Optional metadata storage |
+| **Monitoring** | Prometheus | Latest | Metrics collection |
+| **Cloud Platform** | AWS | Latest | Infrastructure |
 
-**Static Analysis Security Testing**:
-- **Bandit**: Python-specific security linting for common vulnerabilities
-- **Semgrep**: Advanced static analysis with custom security rules
-- **CodeQL**: GitHub's semantic code analysis for vulnerability detection
-- **mypy**: Static type checking for type safety and bug prevention
+### 3.7.3 Security & Compliance Considerations
 
-**Dependency Security**:
-- **Safety**: Python dependency vulnerability scanning
-- **Trivy**: Container image vulnerability scanning
-- **Snyk**: Comprehensive dependency and container security analysis
-- **OWASP Dependency Check**: Open-source dependency vulnerability scanning
+- **Authentication**: HMAC-SHA256 signed requests for LabArchives API
+- **Encryption**: TLS 1.3 for all external communications
+- **Container Security**: Non-root execution, minimal attack surface
+- **Credential Management**: AWS Secrets Manager integration
+- **Audit Logging**: Comprehensive request/response logging
+- **Compliance**: SOC2, ISO 27001, HIPAA, GDPR alignment
+- **Vulnerability Management**: Automated scanning in CI/CD pipeline
 
-### 3.7.2 Compliance and Governance
+### 3.7.4 References
 
-**Security Standards Compliance**:
-- **SOC2**: Service Organization Control 2 compliance for security and availability
-- **ISO 27001**: Information Security Management System standards
-- **HIPAA**: Health Insurance Portability and Accountability Act compliance
-- **GDPR**: General Data Protection Regulation compliance for EU data protection
+#### Repository Files Examined
+- `src/cli/requirements.txt` - Production dependencies and version constraints
+- `src/cli/pyproject.toml` - Build configuration and development dependencies
+- `src/cli/Dockerfile` - Container configuration and runtime environment
+- `infrastructure/terraform/` - Infrastructure as Code definitions
+- `infrastructure/kubernetes/` - Container orchestration manifests
+- `.github/workflows/` - CI/CD pipeline configurations
 
-**Implementation Features**:
-- **HMAC-SHA256 Authentication**: Cryptographically secure authentication
-- **Zero-persistence Architecture**: No local data storage to minimize compliance scope
-- **Comprehensive Audit Logging**: Complete audit trail for all operations
-- **Non-root Container Execution**: Security-hardened container deployment
-- **Network Isolation**: Microsegmentation and firewall policies
-- **TLS/HTTPS Enforcement**: Encrypted communication for all external connections
+#### External Research
+- Model Context Protocol (MCP) specification and ecosystem
+- FastMCP framework documentation and capabilities
+- LabArchives API documentation and integration patterns
+- AWS services documentation for cloud deployment
+- Kubernetes best practices for container orchestration
 
-### 3.7.3 Operational Security
-
-**Access Control**:
-- **Role-based Access Control**: Granular permissions for different user types
-- **Scope Limitation**: Configurable access boundaries for data exposure control
-- **Session Management**: Secure session handling with automatic expiration
-- **Credential Sanitization**: Complete credential scrubbing from logs and outputs
-
-**Monitoring and Alerting**:
-- **Real-time Security Monitoring**: Continuous monitoring of security events
-- **Anomaly Detection**: Automated detection of unusual access patterns
-- **Incident Response**: Automated alerting and response procedures
-- **Compliance Reporting**: Automated generation of compliance reports
-
-## 3.8 INTEGRATION REQUIREMENTS
-
-### 3.8.1 Inter-component Communication
-
-**MCP Protocol Integration**:
-- **JSON-RPC 2.0**: Standard message format for client-server communication
-- **Capability Negotiation**: Dynamic capability discovery and feature enablement
-- **Error Handling**: Standardized error responses and recovery mechanisms
-- **Performance Optimization**: Efficient message serialization and transport
-
-**API Integration Requirements**:
-- **LabArchives API**: RESTful API integration with regional endpoint support
-- **Authentication Flow**: Secure token management and session handling
-- **Data Transformation**: Conversion from LabArchives format to MCP-compatible structures
-- **Error Propagation**: Consistent error handling across all integration points
-
-### 3.8.2 Scalability and Performance
-
-**Horizontal Scaling**:
-- **Stateless Design**: No shared state enabling unlimited horizontal scaling
-- **Load Balancing**: Application-level load distribution
-- **Container Orchestration**: Kubernetes-based auto-scaling
-- **Resource Optimization**: Efficient memory and CPU utilization
-
-**Performance Optimization**:
-- **Connection Pooling**: Efficient HTTP connection management
-- **Request Optimization**: Minimal API calls with intelligent caching strategies
-- **Response Compression**: Optimized data transfer for large datasets
-- **Monitoring Integration**: Real-time performance metrics and alerting
-
-This comprehensive technology stack has been carefully architected to ensure full compliance with MCP protocol specifications, enterprise-grade security standards, and scalable cloud-native deployment patterns. The selection of each component directly supports the system's core objectives of providing secure, efficient, and compliant AI-data connectivity for research organizations.
-
-#### References
-
-**Technical Specification Sections Analyzed:**
-- `1.1 EXECUTIVE SUMMARY` - Project overview and business context
-- `1.2 SYSTEM OVERVIEW` - Architecture and technical approach
-- `2.1 FEATURE CATALOG` - Comprehensive feature requirements
-- `2.2 FUNCTIONAL REQUIREMENTS TABLE` - Detailed technical specifications
-
-**Configuration and Dependencies:**
-- `pyproject.toml` - Python package configuration and dependency management
-- `requirements.txt` - Runtime dependency specifications
-- `requirements-dev.txt` - Development dependency specifications
-
-**Infrastructure and Deployment:**
-- `docker-compose.dev.yml` - Development environment configuration
-- `docker-compose.prod.yml` - Production deployment configuration
-- `Dockerfile` - Container image build specification
-- `kubernetes/` - Kubernetes deployment manifests
-- `terraform/` - Infrastructure as Code definitions
-
-**CI/CD and Automation:**
-- `.github/workflows/` - GitHub Actions pipeline configuration
-- `Makefile` - Build automation and development scripts
-- `.pre-commit-config.yaml` - Code quality automation
+#### Technical Specifications Referenced
+- Section 1.1: Executive Summary - Project context and business value
+- Section 1.2: System Overview - Architectural context and system design
+- Section 2.1: Feature Catalog - Implementation details and dependencies
 
 # 4. PROCESS FLOWCHART
 
@@ -1879,2048 +1410,1111 @@ This comprehensive technology stack has been carefully architected to ensure ful
 
 #### 4.1.1.1 End-to-End User Journey
 
-The LabArchives MCP Server facilitates a seamless AI-enhanced research workflow through the following comprehensive user journey:
-
-**User Experience Flow:**
-1. **Research Context Creation**: Users configure the MCP server with appropriate scope limitations and authentication credentials
-2. **AI Application Connection**: Claude Desktop or other MCP-compatible clients establish connection to the server
-3. **Data Discovery**: Users browse their LabArchives notebooks through AI interface with hierarchical navigation
-4. **Content Analysis**: AI applications access and analyze specific research data with full context preservation
-5. **Insights Generation**: AI provides research insights while maintaining complete audit trail
-
-**Technical Implementation:**
-The system operates on a zero-persistence architecture, ensuring that no research data is stored locally while maintaining optimal performance for real-time AI interactions.
+The complete user journey begins with MCP client initialization and progresses through authentication, resource discovery, and content retrieval, addressing the fundamental N×M integration problem between AI applications and LabArchives data sources.
 
 ```mermaid
-graph TB
-    subgraph "User Journey"
-        A[User Initiates AI Research Session] --> B[Configure MCP Server]
-        B --> C[Launch AI Application]
-        C --> D[Connect to MCP Server]
-        D --> E[Browse LabArchives Data]
-        E --> F[AI Analysis & Insights]
-        F --> G[Audit Trail Generated]
-    end
+flowchart TB
+    Start([User Starts MCP Client]) --> A{Authentication<br/>Required?}
+    A -->|Yes| B[Provide Credentials]
+    A -->|No| C[Use Cached Session]
     
-    subgraph "System Response"
-        H[Authentication Validation] --> I[Scope Enforcement]
-        I --> J[Resource Discovery]
-        J --> K[Content Transformation]
-        K --> L[Audit Logging]
-    end
+    B --> D[Validate Credentials]
+    C --> E{Session Valid?}
     
-    B --> H
-    D --> I
-    E --> J
-    F --> K
-    G --> L
+    D --> F{Credentials<br/>Valid?}
+    F -->|No| B
+    F -->|Yes| G[Create Session]
+    
+    E -->|No| B
+    E -->|Yes| H[User Authenticated]
+    
+    G --> H
+    H --> I[Request Resources]
+    
+    I --> J{Scope<br/>Configured?}
+    J -->|Yes| K[Apply Scope Filter]
+    J -->|No| L[List All Resources]
+    
+    K --> M[Return Filtered Resources]
+    L --> N[Return All Resources]
+    
+    M --> O[User Selects Resource]
+    N --> O
+    
+    O --> P[Request Content]
+    P --> Q{Access<br/>Permitted?}
+    
+    Q -->|No| R[Access Denied]
+    Q -->|Yes| S[Retrieve Content]
+    
+    S --> T{JSON-LD<br/>Enabled?}
+    T -->|Yes| U[Add Semantic Context]
+    T -->|No| V[Return Plain JSON]
+    
+    U --> W[Return Enriched Content]
+    V --> W
+    
+    R --> X[Error Response]
+    W --> Y[Content Delivered]
+    
+    X --> End([Process Complete])
+    Y --> End
 ```
 
-#### 4.1.1.2 System Interactions
+#### 4.1.1.2 MCP Protocol Implementation Workflow
 
-**Primary System Interactions:**
-
-1. **Client-Server Communication**: JSON-RPC 2.0 protocol over stdin/stdout transport
-2. **Authentication Layer**: Secure credential management with automatic session renewal
-3. **Data Access Layer**: RESTful API integration with LabArchives platform
-4. **Security Layer**: Comprehensive access control and audit logging
-5. **Configuration Layer**: Multi-source configuration management (CLI, environment, file)
-
-**Integration Points:**
-- **External Systems**: LabArchives API (US/AU/UK regions), Claude Desktop, MCP-compatible clients
-- **Internal Components**: Resource Manager, Authentication Manager, Audit System
-- **Infrastructure**: Docker containers, Kubernetes orchestration, CI/CD pipelines
+The MCP protocol implementation serves as the foundation for all client-server communication, providing the standardized interface that enables AI systems to access LabArchives data through the universal MCP protocol.
 
 ```mermaid
-graph LR
-    subgraph "External Systems"
-        CLAUDE[Claude Desktop]
-        LABARCH[LabArchives API]
-        AUDIT_SYS[Audit System]
-    end
+sequenceDiagram
+    participant User
+    participant MCPClient as MCP Client
+    participant MCPServer as MCP Server
+    participant AuthMgr as Auth Manager
+    participant ResourceMgr as Resource Manager
+    participant LabAPI as LabArchives API
     
-    subgraph "MCP Server Core"
-        MCP_HANDLER[MCP Protocol Handler]
-        AUTH_MGR[Authentication Manager]
-        RESOURCE_MGR[Resource Manager]
-        API_CLIENT[LabArchives API Client]
-    end
+    User->>MCPClient: Start Session
+    MCPClient->>MCPServer: Initialize Protocol
+    MCPServer->>AuthMgr: Authenticate
+    AuthMgr->>LabAPI: Validate Credentials
+    LabAPI-->>AuthMgr: User Context
+    AuthMgr-->>MCPServer: Session Created
+    MCPServer-->>MCPClient: Initialized
     
-    CLAUDE <-->|JSON-RPC 2.0| MCP_HANDLER
-    MCP_HANDLER --> AUTH_MGR
-    MCP_HANDLER --> RESOURCE_MGR
-    RESOURCE_MGR --> API_CLIENT
-    API_CLIENT <-->|HTTPS/REST| LABARCH
-    AUTH_MGR --> AUDIT_SYS
-    RESOURCE_MGR --> AUDIT_SYS
+    User->>MCPClient: List Resources
+    MCPClient->>MCPServer: resources/list
+    MCPServer->>ResourceMgr: List Resources
+    ResourceMgr->>LabAPI: Get Notebooks/Pages
+    LabAPI-->>ResourceMgr: Resource Data
+    ResourceMgr-->>MCPServer: MCP Resources
+    MCPServer-->>MCPClient: Resource List
+    MCPClient-->>User: Display Resources
+    
+    User->>MCPClient: Read Content
+    MCPClient->>MCPServer: resources/read
+    MCPServer->>ResourceMgr: Read Resource
+    ResourceMgr->>LabAPI: Get Content
+    LabAPI-->>ResourceMgr: Content Data
+    ResourceMgr-->>MCPServer: MCP Content
+    MCPServer-->>MCPClient: Resource Content
+    MCPClient-->>User: Display Content
 ```
 
-#### 4.1.1.3 Decision Points
+#### 4.1.1.3 Research Data Access Workflow
 
-**Critical Decision Points in System Flow:**
-
-1. **Authentication Mode Selection**: 
-   - **Trigger**: Server startup with credential configuration
-   - **Decision**: API Key (permanent) vs SSO Token (temporary)
-   - **Impact**: Session management strategy and renewal mechanism
-
-2. **Scope Enforcement**:
-   - **Trigger**: Resource access request
-   - **Decision**: Within scope vs outside scope
-   - **Impact**: Access granted/denied with audit logging
-
-3. **Regional Endpoint Selection**:
-   - **Trigger**: LabArchives API initialization
-   - **Decision**: US/AU/UK endpoint based on configuration
-   - **Impact**: API performance and compliance requirements
-
-4. **Error Recovery Strategy**:
-   - **Trigger**: API failure or timeout
-   - **Decision**: Retry vs fail-fast based on error type
-   - **Impact**: System reliability and user experience
+This workflow represents the core value proposition of the system, enabling researchers to access their LabArchives electronic lab notebook data through AI applications with proper authentication and scope controls.
 
 ```mermaid
 flowchart TD
-    START[Server Startup] --> AUTH_CHECK{Authentication Available?}
-    AUTH_CHECK -->|Yes| AUTH_TYPE{API Key or SSO Token?}
-    AUTH_CHECK -->|No| ERROR_EXIT[Exit Code 2: Authentication Error]
+    subgraph "Research Context"
+        A[Researcher Question] --> B[AI Assistant]
+        B --> C[Identify Data Need]
+    end
     
-    AUTH_TYPE -->|API Key| PERM_AUTH[Permanent Authentication]
-    AUTH_TYPE -->|SSO Token| TEMP_AUTH[Temporary Authentication - 3600s]
+    subgraph "MCP Server Processing"
+        C --> D[Resource Discovery]
+        D --> E{Scope Filtering}
+        E -->|Notebook Scope| F[Filter by Notebook]
+        E -->|Folder Scope| G[Filter by Folder]
+        E -->|No Scope| H[All Accessible Data]
+        
+        F --> I[Apply Permissions]
+        G --> I
+        H --> I
+        
+        I --> J[Content Retrieval]
+        J --> K[Metadata Enrichment]
+        K --> L{JSON-LD Context?}
+        L -->|Yes| M[Add Semantic Context]
+        L -->|No| N[Standard JSON]
+    end
     
-    PERM_AUTH --> SCOPE_CHECK{Scope Configured?}
-    TEMP_AUTH --> SCOPE_CHECK
+    subgraph "AI Processing"
+        M --> O[Enhanced AI Analysis]
+        N --> P[Standard AI Analysis]
+        O --> Q[Research Insights]
+        P --> Q
+    end
     
-    SCOPE_CHECK -->|Yes| SCOPE_ENFORCE[Apply Scope Limitations]
-    SCOPE_CHECK -->|No| FULL_ACCESS[Full Access Mode]
+    subgraph "Audit & Compliance"
+        J --> R[Log Access]
+        R --> S[Audit Trail]
+        S --> T[Compliance Reporting]
+    end
     
-    SCOPE_ENFORCE --> SERVER_READY[Server Ready for MCP Connections]
-    FULL_ACCESS --> SERVER_READY
-    
-    SERVER_READY --> MCP_REQUEST{MCP Request Received?}
-    MCP_REQUEST -->|List Resources| RESOURCE_LIST[Resource Discovery]
-    MCP_REQUEST -->|Read Resource| CONTENT_RETRIEVE[Content Retrieval]
-    MCP_REQUEST -->|Other| PROTOCOL_ERROR[Protocol Error Response]
-    
-    RESOURCE_LIST --> SCOPE_FILTER{Within Scope?}
-    CONTENT_RETRIEVE --> SCOPE_FILTER
-    
-    SCOPE_FILTER -->|Yes| API_CALL[LabArchives API Call]
-    SCOPE_FILTER -->|No| SCOPE_VIOLATION[HTTP 403: ScopeViolation]
-    
-    API_CALL --> API_SUCCESS{API Success?}
-    API_SUCCESS -->|Yes| DATA_TRANSFORM[Transform to MCP Format]
-    API_SUCCESS -->|No| ERROR_HANDLER[Error Handler]
-    
-    DATA_TRANSFORM --> AUDIT_LOG[Audit Log Entry]
-    ERROR_HANDLER --> RETRY_LOGIC{Retry Possible?}
-    
-    RETRY_LOGIC -->|Yes| API_CALL
-    RETRY_LOGIC -->|No| ERROR_RESPONSE[Error Response to Client]
-    
-    AUDIT_LOG --> MCP_RESPONSE[MCP Response to Client]
-    SCOPE_VIOLATION -->|403 ScopeViolation| MCP_RESPONSE
-    ERROR_RESPONSE --> MCP_RESPONSE
-    PROTOCOL_ERROR --> MCP_RESPONSE
-    
-    MCP_RESPONSE --> MCP_REQUEST
-```
-
-#### 4.1.1.4 Error Handling Paths
-
-**Comprehensive Error Handling Strategy:**
-
-1. **Startup Errors**:
-   - **Configuration Error** (Exit Code 1): Invalid configuration parameters
-   - **Authentication Error** (Exit Code 2): Invalid credentials or API access
-   - **Startup Error** (Exit Code 3): System initialization failure
-   - **User Interruption** (Exit Code 130): Graceful shutdown on Ctrl+C
-
-2. **Runtime Errors**:
-   - **API Errors**: 401 (Unauthorized), <span style="background-color: rgba(91, 57, 243, 0.2)">403 (ScopeViolation)</span>, 429 (Rate Limited), 502 (Bad Gateway)
-   - **Protocol Errors**: Invalid JSON-RPC messages, unsupported methods
-   - **Resource Errors**: Invalid URIs, scope violations, permission failures
-
-3. **Recovery Mechanisms**:
-   - **Exponential Backoff**: For API rate limiting and temporary failures
-   - **Session Renewal**: Automatic token refresh for expired sessions
-   - **Graceful Degradation**: Continued operation with reduced functionality
-   - **Circuit Breaker**: Temporary service disable for persistent failures
-
-```mermaid
-flowchart TD
-    ERROR_TRIGGER[Error Detected] --> ERROR_TYPE{Error Type?}
-    
-    ERROR_TYPE -->|API Error| API_ERROR_HANDLER[API Error Handler]
-    ERROR_TYPE -->|Protocol Error| PROTOCOL_ERROR_HANDLER[Protocol Error Handler]
-    ERROR_TYPE -->|Authentication Error| AUTH_ERROR_HANDLER[Authentication Error Handler]
-    ERROR_TYPE -->|Resource Error| RESOURCE_ERROR_HANDLER[Resource Error Handler]
-    
-    API_ERROR_HANDLER --> API_ERROR_CODE{HTTP Status Code?}
-    API_ERROR_CODE -->|401| REAUTH[Reauthenticate]
-    API_ERROR_CODE -->|403| SCOPE_VIOLATION[HTTP 403: ScopeViolation]
-    API_ERROR_CODE -->|429| RATE_LIMIT[Apply Rate Limiting]
-    API_ERROR_CODE -->|502| RETRY_LOGIC[Exponential Backoff Retry]
-    
-    PROTOCOL_ERROR_HANDLER --> INVALID_JSON{Invalid JSON-RPC?}
-    INVALID_JSON -->|Yes| JSON_ERROR_RESPONSE[Return JSON-RPC Error]
-    INVALID_JSON -->|No| UNSUPPORTED_METHOD[Unsupported Method Response]
-    
-    AUTH_ERROR_HANDLER --> SESSION_EXPIRED{Session Expired?}
-    SESSION_EXPIRED -->|Yes| TOKEN_REFRESH[Refresh Authentication Token]
-    SESSION_EXPIRED -->|No| CREDENTIAL_INVALID[Invalid Credentials Error]
-    
-    RESOURCE_ERROR_HANDLER --> RESOURCE_ERROR_TYPE{Resource Error Type?}
-    RESOURCE_ERROR_TYPE -->|Invalid URI| URI_ERROR_RESPONSE[Invalid URI Response]
-    RESOURCE_ERROR_TYPE -->|Scope Violation| SCOPE_ERROR_RESPONSE[Scope Violation Response]
-    RESOURCE_ERROR_TYPE -->|Permission Denied| PERMISSION_ERROR_RESPONSE[Permission Denied Response]
-    
-    REAUTH --> RETRY_ORIGINAL[Retry Original Request]
-    TOKEN_REFRESH --> RETRY_ORIGINAL
-    RATE_LIMIT --> BACKOFF_WAIT[Wait with Exponential Backoff]
-    RETRY_LOGIC --> BACKOFF_WAIT
-    
-    BACKOFF_WAIT --> RETRY_ORIGINAL
-    RETRY_ORIGINAL --> SUCCESS_CHECK{Retry Successful?}
-    SUCCESS_CHECK -->|Yes| NORMAL_RESPONSE[Normal Response]
-    SUCCESS_CHECK -->|No| FINAL_ERROR[Final Error Response]
-    
-    SCOPE_VIOLATION --> AUDIT_LOG_ERROR[Audit Log Error]
-    JSON_ERROR_RESPONSE --> AUDIT_LOG_ERROR
-    UNSUPPORTED_METHOD --> AUDIT_LOG_ERROR
-    CREDENTIAL_INVALID --> AUDIT_LOG_ERROR
-    URI_ERROR_RESPONSE --> AUDIT_LOG_ERROR
-    SCOPE_ERROR_RESPONSE --> AUDIT_LOG_ERROR
-    PERMISSION_ERROR_RESPONSE --> AUDIT_LOG_ERROR
-    FINAL_ERROR --> AUDIT_LOG_ERROR
-    
-    AUDIT_LOG_ERROR --> CLIENT_ERROR_RESPONSE[Error Response to Client]
-    NORMAL_RESPONSE --> CLIENT_SUCCESS_RESPONSE[Success Response to Client]
+    Q --> U[Researcher Results]
 ```
 
 ### 4.1.2 Integration Workflows
 
-#### 4.1.2.1 Data Flow Between Systems
+#### 4.1.2.1 LabArchives API Integration Flow
 
-**Primary Data Flow Architecture:**
-
-1. **Client Request Flow**: JSON-RPC 2.0 messages from AI applications
-2. **Authentication Flow**: Secure credential validation and session management
-3. **Resource Discovery Flow**: Hierarchical browsing of LabArchives data
-4. **Content Retrieval Flow**: Structured data transformation and delivery
-5. **Audit Flow**: Comprehensive logging of all system interactions
-
-**Data Transformation Points:**
-- **MCP Protocol**: JSON-RPC 2.0 message parsing and response formatting
-- **LabArchives API**: REST API responses to structured Python objects
-- **Content Processing**: LabArchives data to MCP-compatible JSON/JSON-LD
-- **Audit Processing**: System events to structured log entries
+The LabArchives API integration provides secure, authenticated access to research data across all global LabArchives deployments, supporting both permanent API keys and temporary user tokens.
 
 ```mermaid
-sequenceDiagram
-    participant CLIENT as MCP Client
-    participant MCP as MCP Server
-    participant AUTH as Auth Manager
-    participant RESOURCE as Resource Manager
-    participant API as LabArchives API
-    participant AUDIT as Audit System
-    
-    CLIENT->>MCP: JSON-RPC Request
-    MCP->>AUTH: Validate Session
-    AUTH->>AUTH: Check Token Expiry
-    AUTH->>AUDIT: Log Authentication Event
-    AUTH->>MCP: Session Valid
-    
-    MCP->>RESOURCE: Process Request
-    RESOURCE->>RESOURCE: Apply Scope Filter
-    RESOURCE->>API: LabArchives API Call
-    API->>API: HTTP Request Processing
-    API->>RESOURCE: API Response
-    
-    RESOURCE->>RESOURCE: Transform Data
-    RESOURCE->>AUDIT: Log Data Access
-    RESOURCE->>MCP: Processed Data
-    MCP->>CLIENT: JSON-RPC Response
-```
-
-#### 4.1.2.2 API Interactions
-
-**LabArchives API Integration:**
-
-**Authentication Sequence:**
-1. **Initial Authentication**: HMAC-SHA256 signing with access key
-2. **Session Management**: 3600-second session lifetime with automatic renewal
-3. **Regional Endpoint Selection**: US/AU/UK based on configuration
-4. **Error Handling**: Comprehensive error mapping and recovery
-
-**API Request Patterns:**
-- **List Notebooks**: Retrieve accessible notebooks for authenticated user
-- **Get Page Content**: Fetch specific page data with hierarchy preservation
-- **Entry Retrieval**: Access individual entries with metadata
-- **Permission Validation**: Verify user access rights for each resource
-
-```mermaid
-sequenceDiagram
-    participant SERVER as MCP Server
-    participant AUTH as Auth Manager
-    participant API as LabArchives API
-    participant REGIONAL as Regional Endpoint
-    
-    SERVER->>AUTH: Initialize Authentication
-    AUTH->>AUTH: Select Auth Mode (API Key/SSO)
-    AUTH->>REGIONAL: Determine Regional Endpoint
-    REGIONAL->>API: HTTPS Connection
-    
-    AUTH->>API: Authentication Request
-    Note over API: HMAC-SHA256 Verification
-    API->>AUTH: Session Token (3600s)
-    
-    loop Every Request
-        SERVER->>AUTH: Validate Session
-        AUTH->>AUTH: Check Token Expiry
-        alt Token Valid
-            AUTH->>SERVER: Proceed with Request
-        else Token Expired
-            AUTH->>API: Refresh Token
-            API->>AUTH: New Session Token
-            AUTH->>SERVER: Proceed with Request
-        end
-    end
-    
-    SERVER->>API: Data Request
-    API->>API: Process Request
-    alt Success
-        API->>SERVER: Data Response
-    else Error
-        API->>SERVER: Error Response
-        SERVER->>SERVER: Apply Retry Logic
-    end
-```
-
-#### 4.1.2.3 Event Processing Flows
-
-**Event-Driven Architecture:**
-
-1. **MCP Protocol Events**: Connection, handshake, resource requests
-2. **Authentication Events**: Login, session renewal, logout
-3. **Resource Events**: Discovery, access, transformation
-4. **Error Events**: Failures, retries, recoveries
-5. **Audit Events**: All system interactions for compliance
-
-**Event Processing Patterns:**
-- **Synchronous Processing**: Real-time request/response for MCP protocol
-- **Asynchronous Logging**: Background audit log processing
-- **Event Correlation**: Linking related events for analysis
-- **Event Persistence**: Structured logging for compliance and monitoring
-
-```mermaid
-flowchart TD
-    subgraph "Event Sources"
-        MCP_EVENTS[MCP Protocol Events]
-        AUTH_EVENTS[Authentication Events]
-        RESOURCE_EVENTS[Resource Events]
-        ERROR_EVENTS[Error Events]
-    end
-    
-    subgraph "Event Processing"
-        EVENT_ROUTER[Event Router]
-        SYNC_PROCESSOR[Synchronous Processor]
-        ASYNC_PROCESSOR[Asynchronous Processor]
-        EVENT_CORRELATOR[Event Correlator]
-    end
-    
-    subgraph "Event Outputs"
-        MCP_RESPONSE[MCP Response]
-        AUDIT_LOG[Audit Log]
-        METRICS[Performance Metrics]
-        ALERTS[System Alerts]
-    end
-    
-    MCP_EVENTS --> EVENT_ROUTER
-    AUTH_EVENTS --> EVENT_ROUTER
-    RESOURCE_EVENTS --> EVENT_ROUTER
-    ERROR_EVENTS --> EVENT_ROUTER
-    
-    EVENT_ROUTER --> SYNC_PROCESSOR
-    EVENT_ROUTER --> ASYNC_PROCESSOR
-    
-    SYNC_PROCESSOR --> MCP_RESPONSE
-    ASYNC_PROCESSOR --> EVENT_CORRELATOR
-    
-    EVENT_CORRELATOR --> AUDIT_LOG
-    EVENT_CORRELATOR --> METRICS
-    EVENT_CORRELATOR --> ALERTS
-```
-
-#### 4.1.2.4 Batch Processing Sequences
-
-**Batch Processing Architecture:**
-
-While the system primarily operates in real-time mode, certain operations benefit from batch processing patterns:
-
-1. **Log Rotation**: Automated log file management with size and time-based rotation
-2. **Session Cleanup**: Periodic cleanup of expired authentication sessions
-3. **Performance Metrics**: Aggregation of operational metrics for monitoring
-4. **Compliance Reporting**: Batch generation of audit reports for regulatory compliance
-
-**Batch Processing Schedule:**
-- **Log Rotation**: Every 100MB or 24 hours
-- **Session Cleanup**: Every 30 minutes
-- **Metrics Aggregation**: Every 5 minutes
-- **Compliance Reports**: Daily, weekly, monthly
-
-```mermaid
-gantt
-    title Batch Processing Schedule
-    dateFormat  HH:mm
-    axisFormat  %H:%M
-    
-    section Log Management
-    Log Rotation Check    :active, log1, 00:00, 24h
-    Log Cleanup          :log2, after log1, 1h
-    
-    section Session Management
-    Session Cleanup      :active, session1, 00:00, 30m
-    Session Validation   :session2, after session1, 30m
-    
-    section Metrics
-    Performance Metrics  :active, metrics1, 00:00, 5m
-    Metric Aggregation   :metrics2, after metrics1, 5m
-    
-    section Compliance
-    Audit Report Daily   :audit1, 00:00, 24h
-    Compliance Check     :audit2, after audit1, 1h
-```
-
-### 4.1.3 State Management
-
-#### 4.1.3.1 State Transitions
-
-**Authentication State Machine:**
-
-The system maintains a sophisticated authentication state machine that manages the lifecycle of user sessions and credentials:
-
-1. **Initialization State**: Server startup with credential validation
-2. **Active Session State**: Valid authenticated session with LabArchives API
-3. **Session Renewal State**: Token refresh process during session expiration
-4. **Error State**: Authentication failures requiring user intervention
-5. **Shutdown State**: Graceful termination of all sessions
-
-**Resource Access State Machine:**
-
-Resource access follows a deterministic state machine ensuring consistent behavior:
-
-1. **Request Reception**: MCP client initiates resource request
-2. **Scope Validation**: Verify resource falls within configured scope boundaries
-3. **Permission Check**: Validate user access rights for specific resource
-4. **Data Retrieval**: Fetch data from LabArchives API
-5. **Content Transformation**: Convert to MCP-compatible format
-6. **Response Generation**: Return formatted response to client
-
-```mermaid
-stateDiagram-v2
-    [*] --> Initialization
-    Initialization --> ActiveSession: Valid Credentials
-    Initialization --> ErrorState: Invalid Credentials
-    
-    ActiveSession --> SessionRenewal: Token Expiry
-    ActiveSession --> DataProcessing: Resource Request
-    ActiveSession --> Shutdown: Server Termination
-    
-    SessionRenewal --> ActiveSession: Renewal Success
-    SessionRenewal --> ErrorState: Renewal Failure
-    
-    DataProcessing --> ScopeValidation: Validate Scope
-    ScopeValidation --> PermissionCheck: Within Scope
-    ScopeValidation --> ScopeViolation: Outside Scope
-    
-    PermissionCheck --> DataRetrieval: Authorized
-    PermissionCheck --> AccessDenied: Unauthorized
-    
-    DataRetrieval --> ContentTransformation: Success
-    DataRetrieval --> APIError: API Failure
-    
-    ContentTransformation --> ResponseGeneration: Complete
-    ResponseGeneration --> ActiveSession: Response Sent
-    
-    ScopeViolation --> ActiveSession: Error Response
-    AccessDenied --> ActiveSession: Error Response
-    APIError --> ActiveSession: Error Response
-    
-    ErrorState --> [*]: System Exit
-    Shutdown --> [*]: Graceful Termination
-```
-
-#### 4.1.3.2 Data Persistence Points
-
-**Zero-Persistence Architecture:**
-
-The system implements a zero-persistence architecture with specific data handling patterns:
-
-1. **Configuration Data**: Loaded at startup, maintained in memory throughout session
-2. **Authentication Tokens**: Temporary storage during session lifetime only
-3. **Resource Metadata**: Cached transiently for performance optimization
-4. **Audit Logs**: Persistent storage with structured logging and rotation
-5. **Performance Metrics**: Temporary aggregation for monitoring purposes
-
-**Persistence Strategy:**
-- **Volatile Data**: All research data and API responses (no persistence)
-- **Session Data**: In-memory storage with automatic cleanup
-- **Configuration**: File-based with environment variable override
-- **Audit Trails**: Persistent logs with compliance-grade retention
-- **Metrics**: Time-series data for operational monitoring
-
-```mermaid
-flowchart TD
-    subgraph "Persistent Storage"
-        CONFIG_FILE[Configuration Files]
-        AUDIT_LOGS[Audit Log Files]
-        METRICS_DB[Metrics Database]
-    end
-    
-    subgraph "Memory Storage"
-        SESSION_DATA[Session Data]
-        CACHE_DATA[Resource Cache]
-        RUNTIME_CONFIG[Runtime Configuration]
-    end
-    
-    subgraph "Volatile Processing"
-        API_RESPONSES[API Responses]
-        MCP_MESSAGES[MCP Messages]
-        TEMP_DATA[Temporary Data]
-    end
-    
-    CONFIG_FILE --> RUNTIME_CONFIG
-    RUNTIME_CONFIG --> SESSION_DATA
-    SESSION_DATA --> API_RESPONSES
-    API_RESPONSES --> MCP_MESSAGES
-    
-    MCP_MESSAGES --> AUDIT_LOGS
-    SESSION_DATA --> METRICS_DB
-    API_RESPONSES --> CACHE_DATA
-    
-    TEMP_DATA --> API_RESPONSES
-    CACHE_DATA --> TEMP_DATA
-```
-
-#### 4.1.3.3 Caching Requirements
-
-**Multi-Level Caching Strategy:**
-
-1. **Authentication Cache**: Token caching for session management
-2. **Resource Metadata Cache**: Notebook and page structure caching
-3. **Content Cache**: Limited-time caching of frequently accessed content
-4. **API Response Cache**: Transient caching for performance optimization
-5. **Configuration Cache**: Runtime configuration caching
-
-**Cache Invalidation Rules:**
-- **Authentication Cache**: 3600-second TTL with automatic refresh
-- **Resource Cache**: 300-second TTL with scope-based invalidation
-- **Content Cache**: 60-second TTL with modification-based invalidation
-- **API Cache**: 30-second TTL with error-based invalidation
-- **Configuration Cache**: Manual invalidation on configuration changes
-
-```mermaid
-flowchart TD
-    subgraph "Cache Layers"
-        AUTH_CACHE[Authentication Cache<br/>TTL: 3600s]
-        RESOURCE_CACHE[Resource Metadata Cache<br/>TTL: 300s]
-        CONTENT_CACHE[Content Cache<br/>TTL: 60s]
-        API_CACHE[API Response Cache<br/>TTL: 30s]
-        CONFIG_CACHE[Configuration Cache<br/>Manual Invalidation]
-    end
-    
-    subgraph "Cache Management"
-        TTL_MONITOR[TTL Monitor]
-        INVALIDATION_ENGINE[Invalidation Engine]
-        CACHE_STATS[Cache Statistics]
-    end
-    
-    subgraph "Data Sources"
-        LABARCHIVES_API[LabArchives API]
-        CONFIG_FILES[Configuration Files]
-        SESSION_TOKENS[Session Tokens]
-    end
-    
-    LABARCHIVES_API --> API_CACHE
-    API_CACHE --> CONTENT_CACHE
-    CONTENT_CACHE --> RESOURCE_CACHE
-    
-    SESSION_TOKENS --> AUTH_CACHE
-    CONFIG_FILES --> CONFIG_CACHE
-    
-    TTL_MONITOR --> AUTH_CACHE
-    TTL_MONITOR --> RESOURCE_CACHE
-    TTL_MONITOR --> CONTENT_CACHE
-    TTL_MONITOR --> API_CACHE
-    
-    INVALIDATION_ENGINE --> AUTH_CACHE
-    INVALIDATION_ENGINE --> RESOURCE_CACHE
-    INVALIDATION_ENGINE --> CONTENT_CACHE
-    INVALIDATION_ENGINE --> API_CACHE
-    INVALIDATION_ENGINE --> CONFIG_CACHE
-    
-    AUTH_CACHE --> CACHE_STATS
-    RESOURCE_CACHE --> CACHE_STATS
-    CONTENT_CACHE --> CACHE_STATS
-    API_CACHE --> CACHE_STATS
-    CONFIG_CACHE --> CACHE_STATS
-```
-
-#### 4.1.3.4 Transaction Boundaries
-
-**Transaction Scope Definition:**
-
-The system defines clear transaction boundaries for data consistency and error handling:
-
-1. **Authentication Transaction**: Complete authentication cycle with rollback capability
-2. **Resource Access Transaction**: Atomic resource request processing
-3. **API Communication Transaction**: Single API call with retry logic
-4. **Audit Logging Transaction**: Guaranteed audit trail persistence
-5. **Configuration Transaction**: Atomic configuration updates
-
-**Transaction Isolation Levels:**
-- **Read Uncommitted**: Performance-critical API response caching
-- **Read Committed**: Standard resource access operations
-- **Repeatable Read**: Configuration and authentication operations
-- **Serializable**: Audit logging and compliance operations
-
-```mermaid
-sequenceDiagram
-    participant CLIENT as MCP Client
-    participant SERVER as MCP Server
-    participant AUTH as Auth Manager
-    participant RESOURCE as Resource Manager
-    participant API as LabArchives API
-    participant AUDIT as Audit System
-    
-    Note over CLIENT,AUDIT: Resource Access Transaction
-    CLIENT->>SERVER: Begin Transaction
-    SERVER->>AUTH: Validate Session
-    
-    alt Session Valid
-        AUTH->>SERVER: Authentication Success
-        SERVER->>RESOURCE: Process Request
+flowchart TB
+    subgraph "Resource Manager"
+        A[API Request] --> B{Request<br/>Type}
+        B -->|List| C[List Notebooks]
+        B -->|Read| D[Get Content]
+        B -->|Auth| E[Validate Token]
         
-        alt Within Scope
-            RESOURCE->>API: API Call
-            
-            alt API Success
-                API->>RESOURCE: Data Response
-                RESOURCE->>SERVER: Processed Data
-                SERVER->>AUDIT: Log Success
-                SERVER->>CLIENT: Commit Transaction
-            else API Failure
-                API->>RESOURCE: Error Response
-                RESOURCE->>SERVER: Error State
-                SERVER->>AUDIT: Log Error
-                SERVER->>CLIENT: Rollback Transaction
-            end
-        else Scope Violation
-            RESOURCE->>SERVER: Scope Error
-            SERVER->>AUDIT: Log Violation
-            SERVER->>CLIENT: Rollback Transaction
-        end
-    else Session Invalid
-        AUTH->>SERVER: Authentication Failure
-        SERVER->>AUDIT: Log Auth Failure
-        SERVER->>CLIENT: Rollback Transaction
+        C --> F[Build API Call]
+        D --> F
+        E --> F
+    end
+    
+    subgraph "API Client"
+        F --> G[Add Authentication]
+        G --> H[Sign Request HMAC-SHA256]
+        H --> I[Send HTTP Request]
+    end
+    
+    subgraph "LabArchives API"
+        I --> J{Valid<br/>Auth?}
+        J -->|No| K[401 Unauthorized]
+        J -->|Yes| L{Permission<br/>Check}
+        
+        L -->|Denied| M[403 Forbidden]
+        L -->|Allowed| N[Process Request]
+        
+        N --> O{Data<br/>Found?}
+        O -->|No| P[404 Not Found]
+        O -->|Yes| Q[Return Data]
+    end
+    
+    subgraph "Response Processing"
+        K --> R[Auth Error]
+        M --> S[Permission Error]
+        P --> T[Not Found Error]
+        Q --> U[Parse Response]
+        
+        R --> V[Retry with New Auth]
+        S --> W[Log Access Violation]
+        T --> X[Return Empty]
+        U --> Y[Transform to MCP]
+        
+        V --> A
+        W --> Z[Error Response]
+        X --> Z
+        Y --> AA[Success Response]
     end
 ```
 
-### 4.1.4 Error Handling
+#### 4.1.2.2 Multi-Region Support Workflow
 
-#### 4.1.4.1 Retry Mechanisms
-
-**Intelligent Retry Strategy:**
-
-The system implements a sophisticated retry mechanism that adapts to different error types and conditions:
-
-1. **Exponential Backoff**: For rate limiting and temporary service failures
-2. **Linear Backoff**: For authentication and credential-related errors
-3. **Immediate Retry**: For transient network errors
-4. **No Retry**: For permanent errors and security violations
-5. **Circuit Breaker**: For persistent service failures
-
-**Retry Configuration:**
-- **Maximum Attempts**: 3 retries for recoverable errors
-- **Base Delay**: 100ms initial delay
-- **Multiplier**: 2.0 for exponential backoff
-- **Maximum Delay**: 30 seconds cap on retry delays
-- **Jitter**: ±10% randomization to prevent thundering herd
+Supporting all LabArchives regions (US, AU, UK) requires dynamic endpoint configuration and region-specific authentication handling.
 
 ```mermaid
-flowchart TD
-    ERROR_DETECTED[Error Detected] --> ERROR_CLASSIFICATION[Classify Error Type]
-    
-    ERROR_CLASSIFICATION --> TRANSIENT{Transient Error?}
-    ERROR_CLASSIFICATION --> RATE_LIMITED{Rate Limited?}
-    ERROR_CLASSIFICATION --> AUTH_ERROR{Auth Error?}
-    ERROR_CLASSIFICATION --> PERMANENT{Permanent Error?}
-    
-    TRANSIENT -->|Yes| IMMEDIATE_RETRY[Immediate Retry]
-    RATE_LIMITED -->|Yes| EXPONENTIAL_BACKOFF[Exponential Backoff]
-    AUTH_ERROR -->|Yes| LINEAR_BACKOFF[Linear Backoff]
-    PERMANENT -->|Yes| NO_RETRY[No Retry - Fail]
-    
-    IMMEDIATE_RETRY --> RETRY_COUNTER{Retry Count < 3?}
-    EXPONENTIAL_BACKOFF --> DELAY_CALC[Calculate Delay: 100ms × 2^attempt]
-    LINEAR_BACKOFF --> FIXED_DELAY[Fixed Delay: 1000ms]
-    
-    DELAY_CALC --> JITTER[Apply Jitter: ±10%]
-    FIXED_DELAY --> JITTER
-    JITTER --> WAIT[Wait for Delay]
-    WAIT --> RETRY_COUNTER
-    
-    RETRY_COUNTER -->|Yes| EXECUTE_RETRY[Execute Retry]
-    RETRY_COUNTER -->|No| CIRCUIT_BREAKER[Circuit Breaker Check]
-    
-    EXECUTE_RETRY --> SUCCESS_CHECK{Success?}
-    SUCCESS_CHECK -->|Yes| RETRY_SUCCESS[Retry Success]
-    SUCCESS_CHECK -->|No| ERROR_DETECTED
-    
-    CIRCUIT_BREAKER --> BREAKER_OPEN{Breaker Open?}
-    BREAKER_OPEN -->|Yes| FAIL_FAST[Fail Fast]
-    BREAKER_OPEN -->|No| FINAL_FAILURE[Final Failure]
-    
-    RETRY_SUCCESS --> RESET_BREAKER[Reset Circuit Breaker]
-    FAIL_FAST --> ERROR_RESPONSE[Error Response]
-    FINAL_FAILURE --> ERROR_RESPONSE
-    NO_RETRY --> ERROR_RESPONSE
-```
-
-#### 4.1.4.2 Fallback Processes
-
-**Graceful Degradation Strategy:**
-
-The system implements comprehensive fallback mechanisms to maintain service availability:
-
-1. **API Fallback**: Alternative API endpoints for regional failures
-2. **Authentication Fallback**: Fallback to alternative authentication methods
-3. **Cache Fallback**: Serve cached content during API unavailability
-4. **Configuration Fallback**: Default configuration when custom config fails
-5. **Logging Fallback**: Alternative logging destinations during storage failures
-
-**Fallback Hierarchy:**
-- **Primary Service**: Full functionality with real-time API access
-- **Degraded Service**: Cached content with limited functionality
-- **Minimal Service**: Basic MCP protocol support only
-- **Emergency Mode**: Error reporting and graceful shutdown
-
-```mermaid
-flowchart TD
-    SERVICE_REQUEST[Service Request] --> PRIMARY_SERVICE[Primary Service]
-    
-    PRIMARY_SERVICE --> PRIMARY_SUCCESS{Primary Success?}
-    PRIMARY_SUCCESS -->|Yes| NORMAL_RESPONSE[Normal Response]
-    PRIMARY_SUCCESS -->|No| DEGRADED_MODE[Degraded Mode]
-    
-    DEGRADED_MODE --> CACHE_CHECK{Cache Available?}
-    CACHE_CHECK -->|Yes| CACHE_RESPONSE[Cached Response]
-    CACHE_CHECK -->|No| MINIMAL_MODE[Minimal Mode]
-    
-    MINIMAL_MODE --> BASIC_FUNCTION{Basic Function Available?}
-    BASIC_FUNCTION -->|Yes| BASIC_RESPONSE[Basic Response]
-    BASIC_FUNCTION -->|No| EMERGENCY_MODE[Emergency Mode]
-    
-    EMERGENCY_MODE --> EMERGENCY_RESPONSE[Emergency Response]
-    EMERGENCY_RESPONSE --> GRACEFUL_SHUTDOWN[Graceful Shutdown]
-    
-    CACHE_RESPONSE --> CACHE_WARNING[Cache Warning to Client]
-    BASIC_RESPONSE --> DEGRADED_WARNING[Degraded Warning to Client]
-    
-    CACHE_WARNING --> CLIENT_NOTIFICATION[Client Notification]
-    DEGRADED_WARNING --> CLIENT_NOTIFICATION
-    NORMAL_RESPONSE --> CLIENT_NOTIFICATION
-```
-
-#### 4.1.4.3 Error Notification Flows
-
-**Comprehensive Error Notification System:**
-
-The system provides multi-channel error notification to ensure proper error handling and monitoring:
-
-1. **Client Notifications**: JSON-RPC error responses to MCP clients
-2. **System Logging**: Structured logging for operational monitoring
-3. **Audit Logging**: Compliance-grade error logging
-4. **Monitoring Alerts**: Real-time alerts for critical errors
-5. **Health Check Updates**: System health status updates
-
-**Notification Channels:**
-- **Synchronous**: Immediate error responses to clients
-- **Asynchronous**: Background logging and monitoring
-- **Batch**: Periodic error summaries and reports
-- **Real-time**: Live monitoring and alerting systems
-
-```mermaid
-sequenceDiagram
-    participant ERROR_SOURCE as Error Source
-    participant ERROR_HANDLER as Error Handler
-    participant CLIENT as MCP Client
-    participant AUDIT_LOG as Audit Log
-    participant MONITORING as Monitoring System
-    participant ALERT_MGR as Alert Manager
-    
-    ERROR_SOURCE->>ERROR_HANDLER: Error Detected
-    ERROR_HANDLER->>ERROR_HANDLER: Classify Error
-    
-    par Client Notification
-        ERROR_HANDLER->>CLIENT: JSON-RPC Error Response
-    and System Logging
-        ERROR_HANDLER->>AUDIT_LOG: Structured Log Entry
-    and Monitoring Update
-        ERROR_HANDLER->>MONITORING: Error Metrics Update
+flowchart LR
+    subgraph "Configuration"
+        A[User Credentials] --> B{Region<br/>Detection}
+        B -->|US| C[labarchives.com]
+        B -->|AU| D[au.labarchives.com]
+        B -->|UK| E[uk.labarchives.com]
+        B -->|Auto| F[Detect from Token]
     end
     
-    MONITORING->>MONITORING: Evaluate Severity
-    
-    alt Critical Error
-        MONITORING->>ALERT_MGR: Trigger Alert
-        ALERT_MGR->>ALERT_MGR: Send Notifications
-    else Warning Level
-        MONITORING->>MONITORING: Update Dashboard
+    subgraph "Authentication"
+        C --> G[US Auth Endpoint]
+        D --> H[AU Auth Endpoint]
+        E --> I[UK Auth Endpoint]
+        F --> J[Multi-Region Auth]
+        
+        G --> K[US API Base]
+        H --> L[AU API Base]
+        I --> M[UK API Base]
+        J --> N[Dynamic API Base]
     end
     
-    AUDIT_LOG->>AUDIT_LOG: Persist Error Record
-    CLIENT->>CLIENT: Handle Error Response
+    subgraph "API Operations"
+        K --> O[US Operations]
+        L --> P[AU Operations]
+        M --> Q[UK Operations]
+        N --> R[Region-Aware Operations]
+        
+        O --> S[Unified Response]
+        P --> S
+        Q --> S
+        R --> S
+    end
 ```
 
-#### 4.1.4.4 Recovery Procedures
+## 4.2 VALIDATION AND BUSINESS RULES
 
-**Automated Recovery Mechanisms:**
+### 4.2.1 Authentication and Authorization Flow (updated)
 
-The system implements comprehensive recovery procedures to restore service after failures:
+The authentication system implements comprehensive security controls supporting both permanent API keys and temporary user tokens, maintaining SOC2, ISO 27001, HIPAA, and GDPR compliance.
 
-1. **Session Recovery**: Automatic authentication session restoration
-2. **Connection Recovery**: Network connection reestablishment
-3. **State Recovery**: System state restoration after failures
-4. **Configuration Recovery**: Fallback to known good configurations
-5. **Service Recovery**: Systematic service restoration procedures
+```mermaid
+flowchart TB
+    Start([Auth Request]) --> A{Credentials<br/>Provided?}
+    A -->|No| B[Missing Credentials Error]
+    A -->|Yes| C{Auth<br/>Method?}
+    
+    B --> End1([Auth Failed])
+    
+    C -->|API Key| D[Use Access Key/Password]
+    C -->|User Token| E[Use Token + Username]
+    C -->|SSO Token| F[Use App Token]
+    
+    D --> G[Build Auth Request]
+    E --> G
+    F --> G
+    
+    G --> H[Sign with HMAC-SHA256]
+    H --> I[Send to LabArchives API]
+    
+    I --> J{Response<br/>Status?}
+    
+    J -->|401| K[Invalid Credentials]
+    J -->|403| L[Access Forbidden]
+    J -->|200| M[Extract User Context]
+    J -->|Other| N[API Error]
+    
+    K --> O[Log Auth Failure]
+    L --> O
+    N --> O
+    
+    O --> End1
+    
+    M --> P[Create Session]
+    P --> Q[Set Expiration]
+    Q --> R[Log Success]
+    R --> End2([Auth Success])
+```
 
-**Recovery Strategies:**
-- **Hot Recovery**: Immediate failover without service interruption
-- **Warm Recovery**: Quick service restoration with minimal downtime
-- **Cold Recovery**: Full system restart with complete initialization
-- **Manual Recovery**: Human intervention required for complex failures
+### 4.2.2 Scope Enforcement and Access Control (updated)
+
+The scope enforcement system provides granular access control for sensitive research data, supporting notebook-specific and folder-specific limitations. <span style="background-color: rgba(91, 57, 243, 0.2)">Scope validation operates in a fail-secure (deny-by-default) manner, ensuring any validation uncertainty results in access denial to maintain system security.</span>
 
 ```mermaid
 flowchart TD
-    FAILURE_DETECTED[Failure Detected] --> FAILURE_ANALYSIS[Analyze Failure]
+    Start([Access Request]) --> A{Scope<br/>Configured?}
     
-    FAILURE_ANALYSIS --> RECOVERY_TYPE{Recovery Type?}
+    A -->|No| B[Full Access Mode]
+    A -->|Yes| C{Scope<br/>Type?}
     
-    RECOVERY_TYPE -->|Hot| HOT_RECOVERY[Hot Recovery]
-    RECOVERY_TYPE -->|Warm| WARM_RECOVERY[Warm Recovery]
-    RECOVERY_TYPE -->|Cold| COLD_RECOVERY[Cold Recovery]
-    RECOVERY_TYPE -->|Manual| MANUAL_RECOVERY[Manual Recovery]
+    C -->|Notebook ID| D[Validate Notebook Access]
+    C -->|Notebook Name| E[Resolve Notebook ID]
+    C -->|Folder Path| F[Validate Folder Access]
     
-    HOT_RECOVERY --> FAILOVER[Immediate Failover]
-    FAILOVER --> HEALTH_CHECK[Health Check]
+    D --> G{User Has<br/>Permission?}
+    E --> H[Find Notebook]
+    H --> I{Notebook<br/>Found?}
+    I -->|No| J[Scope Error]
+    I -->|Yes| G
     
-    WARM_RECOVERY --> SERVICE_RESTART[Service Restart]
-    SERVICE_RESTART --> STATE_RESTORATION[State Restoration]
-    STATE_RESTORATION --> HEALTH_CHECK
+    F --> K[Parse Folder Path]
+    K --> L[Validate Folder Exists]
+    L --> M{Folder<br/>Valid?}
+    M -->|No| J
+    M -->|Yes| N{Is requested<br/>resource Notebook?}
     
-    COLD_RECOVERY --> SYSTEM_SHUTDOWN[System Shutdown]
-    SYSTEM_SHUTDOWN --> FULL_RESTART[Full System Restart]
-    FULL_RESTART --> INITIALIZATION[Complete Initialization]
-    INITIALIZATION --> HEALTH_CHECK
+    N -->|Yes| O{Only folder<br/>scope configured?}
+    N -->|No| G
+    O -->|Yes| J
+    O -->|No| G
     
-    MANUAL_RECOVERY --> ALERT_ADMIN[Alert Administrator]
-    ALERT_ADMIN --> MANUAL_INTERVENTION[Manual Intervention]
-    MANUAL_INTERVENTION --> HEALTH_CHECK
+    B --> P[Apply User Permissions]
+    G -->|No| J
+    G -->|Yes| Q[Apply Scope Filter]
     
-    HEALTH_CHECK --> SERVICE_VALIDATION{Service Valid?}
-    SERVICE_VALIDATION -->|Yes| RECOVERY_SUCCESS[Recovery Success]
-    SERVICE_VALIDATION -->|No| ESCALATION[Escalate Recovery]
+    J --> R[Access Denied]
+    Q --> P
+    P --> S[Allow Access]
     
-    RECOVERY_SUCCESS --> MONITORING_UPDATE[Update Monitoring]
-    ESCALATION --> MANUAL_RECOVERY
+    R --> End1([Access Blocked])
+    S --> End2([Access Granted])
 ```
 
-## 4.2 FLOWCHART REQUIREMENTS
+### 4.2.3 Resource Discovery Validation (updated)
 
-### 4.2.1 System Boundaries
-
-**External System Boundaries:**
-- **Client Boundary**: MCP-compatible applications (Claude Desktop, custom clients)
-- **API Boundary**: LabArchives REST API endpoints (US/AU/UK regions)
-- **Infrastructure Boundary**: Docker containers, Kubernetes clusters
-- **Compliance Boundary**: Audit systems, regulatory reporting
-
-**Internal System Boundaries:**
-- **Protocol Boundary**: JSON-RPC 2.0 message handling
-- **Authentication Boundary**: Secure credential management
-- **Resource Boundary**: Scope-based access control
-- **Data Boundary**: Zero-persistence architecture
-
-### 4.2.2 User Touchpoints
-
-**Primary User Interactions:**
-
-1. **Configuration Interface**: CLI commands for server setup and configuration
-2. **Authentication Interface**: Credential management and session handling
-3. **AI Application Interface**: MCP protocol communication through AI clients
-4. **Monitoring Interface**: Log analysis and performance monitoring
-5. **Compliance Interface**: Audit trail review and reporting
-
-**User Experience Optimization:**
-- **Startup Time**: < 2 seconds for immediate productivity
-- **Response Time**: < 500ms for real-time AI interaction
-- **Error Messaging**: Clear, actionable error messages with resolution guidance
-- **Documentation**: Comprehensive help system and troubleshooting guides
-
-### 4.2.3 Error States and Recovery Paths
-
-**Error State Classification:**
-
-1. **Transient Errors**: Network timeouts, temporary API unavailability
-2. **Configuration Errors**: Invalid settings, missing credentials
-3. **Authentication Errors**: Expired tokens, invalid credentials
-4. **Authorization Errors**: Scope violations, permission denials
-5. **Protocol Errors**: Invalid JSON-RPC messages, unsupported methods
-6. **System Errors**: Resource exhaustion, infrastructure failures
-
-**Recovery Path Implementation:**
+The resource discovery system implements comprehensive validation to ensure data integrity and proper hierarchical presentation of LabArchives content. <span style="background-color: rgba(91, 57, 243, 0.2)">For folder scope configurations, an empty folder_path or path set to "/" explicitly includes pages with null or empty folder assignment, ensuring root-level pages are accessible through folder-scoped queries.</span>
 
 ```mermaid
-stateDiagram-v2
-    [*] --> Normal_Operation
-    Normal_Operation --> Transient_Error : Network/API Failure
-    Normal_Operation --> Config_Error : Invalid Configuration
-    Normal_Operation --> Auth_Error : Authentication Failure
-    Normal_Operation --> Protocol_Error : Invalid Protocol Message
-    Normal_Operation --> System_Error : Resource Exhaustion
+flowchart TB
+    Start([List Resources]) --> A{Input<br/>Validation}
+    A -->|Invalid| B[Parameter Error]
+    A -->|Valid| C{Scope<br/>Type?}
     
-    Transient_Error --> Retry_Logic : Apply Exponential Backoff
-    Retry_Logic --> Normal_Operation : Retry Successful
-    Retry_Logic --> Permanent_Failure : Max Retries Exceeded
+    C -->|None| D[List All Notebooks]
+    C -->|Notebook ID| E[List Pages in Notebook]
+    C -->|Notebook Name| F[Find Notebook by Name]
+    C -->|Folder Path| G[Two-Phase Listing]
     
-    Config_Error --> Configuration_Fix : User Intervention Required
-    Configuration_Fix --> Normal_Operation : Configuration Corrected
-    Configuration_Fix --> Permanent_Failure : Invalid Configuration Persists
+    D --> H[Call list_notebooks API]
     
-    Auth_Error --> Token_Refresh : Attempt Token Renewal
-    Token_Refresh --> Normal_Operation : Token Refreshed
-    Token_Refresh --> Credential_Update : Credentials Invalid
-    Credential_Update --> Normal_Operation : Credentials Updated
-    Credential_Update --> Permanent_Failure : Authentication Impossible
+    E --> I[Validate Notebook ID]
+    I --> J{Valid<br/>Format?}
+    J -->|No| K[Invalid ID Error]
+    J -->|Yes| L[Call list_pages API]
     
-    Protocol_Error --> Error_Response : Send JSON-RPC Error
-    Error_Response --> Normal_Operation : Continue Processing
+    F --> M[Get All Notebooks]
+    M --> N[Filter by Name]
+    N --> O{Name<br/>Match?}
+    O -->|No| P[Not Found Error]
+    O -->|Yes| Q[Get Notebook Pages]
     
-    System_Error --> Resource_Cleanup : Free Resources
-    Resource_Cleanup --> Normal_Operation : Resources Available
-    Resource_Cleanup --> Graceful_Shutdown : Resources Exhausted
+    G --> R[Parse Folder Path]
+    R --> AA{Folder Path<br/>Empty or '/'?}
+    AA -->|Yes| X[Transform to MCP Resources]
+    AA -->|No| S[Get All Notebooks]
+    S --> T[Check Each Notebook]
+    T --> U{Contains<br/>Folder?}
+    U -->|No| V[Skip Notebook]
+    U -->|Yes| W[Get Pages in Folder]
     
-    Permanent_Failure --> Graceful_Shutdown : Clean Shutdown
-    Graceful_Shutdown --> [*]
+    B --> End1([Error Response])
+    K --> End1
+    P --> End1
+    
+    H --> X
+    L --> X
+    Q --> X
+    V --> T
+    W --> Y[Filter by Folder Path]
+    Y --> X
+    
+    X --> Z[Apply Permissions]
+    Z --> BB[Add Metadata]
+    BB --> CC[Build Response]
+    CC --> End2([Success Response])
 ```
 
-### 4.2.4 Timing and SLA Considerations
+### 4.2.4 Data Validation and Integrity Rules
 
-**Service Level Agreements:**
+#### 4.2.4.1 Input Validation Framework
 
-| **Operation** | **Target SLA** | **Measurement Method** | **Escalation Threshold** |
-|---------------|----------------|------------------------|---------------------------|
-| **Server Startup** | < 2 seconds | Application startup time | > 5 seconds |
-| **MCP Handshake** | < 1 second | Protocol negotiation time | > 3 seconds |
-| **Authentication** | < 3 seconds | Token validation time | > 10 seconds |
-| **Resource Listing** | < 2 seconds | API response + processing | > 5 seconds |
-| **Content Retrieval** | < 5 seconds | End-to-end response time | > 15 seconds |
-| **JSON-RPC Processing** | < 500ms | Message processing time | > 2 seconds |
+The system implements comprehensive input validation across all API interfaces to prevent injection attacks and ensure data integrity throughout the processing pipeline.
 
-**Performance Monitoring:**
-- **Real-time Metrics**: Response times, error rates, throughput
-- **Historical Analysis**: Performance trends, SLA compliance
-- **Alerting**: Threshold-based notifications for SLA violations
-- **Capacity Planning**: Resource utilization and scaling predictions
+```mermaid
+flowchart TD
+    Start([Input Received]) --> A[Sanitize Input Parameters]
+    A --> B{Parameter<br/>Validation}
+    
+    B -->|Invalid Format| C[Format Error]
+    B -->|Missing Required| D[Missing Parameter Error]
+    B -->|Valid| E[Type Validation]
+    
+    E --> F{Type<br/>Check}
+    F -->|Wrong Type| G[Type Error]
+    F -->|Correct| H[Range Validation]
+    
+    H --> I{Within<br/>Limits?}
+    I -->|No| J[Range Error]
+    I -->|Yes| K[Security Validation]
+    
+    K --> L{Injection<br/>Patterns?}
+    L -->|Detected| M[Security Error]
+    L -->|Clean| N[Business Rule Check]
+    
+    N --> O{Business Rules<br/>Valid?}
+    O -->|No| P[Business Logic Error]
+    O -->|Yes| Q[Input Accepted]
+    
+    C --> R[Reject Request]
+    D --> R
+    G --> R
+    J --> R
+    M --> R
+    P --> R
+    
+    R --> End1([Request Rejected])
+    Q --> End2([Validation Passed])
+```
+
+#### 4.2.4.2 Business Rule Enforcement
+
+Critical business rules are enforced at multiple validation checkpoints to maintain data consistency and regulatory compliance:
+
+- **Authentication Rules**: All API requests must include valid authentication credentials matching the configured authentication method
+- **Scope Enforcement Rules**: Resource access is restricted to configured scope boundaries with fail-secure validation
+- **Permission Validation Rules**: User permissions are verified against LabArchives native permission model before data access
+- **Rate Limiting Rules**: API request rates are monitored and throttled to prevent system abuse and ensure fair resource allocation
+- **Data Sensitivity Rules**: Sensitive content is filtered and logged according to institutional data governance policies
+
+### 4.2.5 Error Handling and Recovery Workflows
+
+#### 4.2.5.1 Comprehensive Error Classification
+
+The system implements a multi-tier error classification system that enables appropriate recovery strategies for different failure scenarios.
+
+```mermaid
+flowchart LR
+    subgraph "Client Errors (4xx)"
+        A[400 Bad Request] --> A1[Parameter Validation]
+        B[401 Unauthorized] --> B1[Authentication Failure]
+        C[403 Forbidden] --> C1[Permission Denied]
+        D[404 Not Found] --> D1[Resource Not Found]
+    end
+    
+    subgraph "Server Errors (5xx)"
+        E[500 Internal Error] --> E1[System Failure]
+        F[502 Bad Gateway] --> F1[API Unavailable]
+        G[503 Service Unavailable] --> G1[Rate Limited]
+        H[504 Gateway Timeout] --> H1[API Timeout]
+    end
+    
+    subgraph "Recovery Actions"
+        A1 --> I[Log and Reject]
+        B1 --> J[Retry with New Auth]
+        C1 --> I
+        D1 --> K[Return Empty Result]
+        E1 --> L[Log and Retry]
+        F1 --> M[Exponential Backoff]
+        G1 --> N[Respect Rate Limits]
+        H1 --> L
+    end
+```
+
+#### 4.2.5.2 Retry Logic and Circuit Breaker Pattern
+
+Advanced error recovery mechanisms ensure system resilience under various failure conditions:
+
+- **Exponential Backoff**: Failed requests are retried with increasing delay intervals to prevent overwhelming downstream services
+- **Circuit Breaker**: Repeated failures trigger circuit breaker activation, preventing cascading failures
+- **Graceful Degradation**: Non-critical failures allow continued operation with reduced functionality
+- **Health Check Integration**: System health monitoring enables proactive failure detection and recovery
+
+### 4.2.6 Audit Trail and Compliance Validation
+
+#### 4.2.6.1 Comprehensive Audit Logging
+
+The audit logging system captures all system events required for compliance and security monitoring, maintaining immutable records of data access and system operations.
+
+```mermaid
+flowchart TB
+    subgraph "Event Sources"
+        A[Authentication Events]
+        B[Resource Access Events]
+        C[Configuration Changes]
+        D[Error Conditions]
+    end
+    
+    subgraph "Audit Processing"
+        E[Event Collection] --> F[Sanitization]
+        F --> G[Structured Logging]
+        G --> H[Correlation ID Assignment]
+        H --> I[Timestamp Normalization]
+    end
+    
+    subgraph "Audit Storage"
+        I --> J[Secure Log Storage]
+        J --> K[Log Rotation]
+        K --> L[Archive Management]
+    end
+    
+    subgraph "Compliance Reporting"
+        L --> M[Access Pattern Analysis]
+        M --> N[Compliance Dashboard]
+        N --> O[Regulatory Reports]
+    end
+    
+    A --> E
+    B --> E
+    C --> E
+    D --> E
+```
+
+#### 4.2.6.2 Regulatory Compliance Validation
+
+The system maintains compliance with multiple regulatory frameworks through automated validation and reporting mechanisms:
+
+- **SOC2 Type II Compliance**: Comprehensive audit trails for security, availability, processing integrity, confidentiality, and privacy
+- **ISO 27001 Compliance**: Information security management system controls and risk assessment documentation
+- **HIPAA Compliance**: Protected health information access controls and audit requirements for healthcare research
+- **GDPR Compliance**: Data processing transparency, consent management, and individual rights protection mechanisms
 
 ## 4.3 TECHNICAL IMPLEMENTATION
 
 ### 4.3.1 State Management
 
-#### 4.3.1.1 State Transitions
+#### 4.3.1.1 Session State Transitions
 
-**Server Lifecycle States:**
-
-The LabArchives MCP Server implements a comprehensive state management system that tracks the server through its complete operational lifecycle:
+The session management system maintains stateless operations while providing proper lifecycle management for authentication and resource access.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Initializing
-    Initializing --> Configuring : Parse CLI Args
-    Configuring --> Authenticating : Config Valid
-    Authenticating --> Ready : Auth Successful
-    Ready --> Serving : MCP Client Connected
-    Serving --> Ready : Client Disconnected
-    Ready --> Maintenance : Scheduled Maintenance
-    Maintenance --> Ready : Maintenance Complete
+    [*] --> Uninitialized
     
-    Configuring --> Error : Invalid Configuration
-    Authenticating --> Error : Authentication Failed
-    Serving --> Error : Critical Error
-    Ready --> Error : System Failure
+    Uninitialized --> Authenticating: authenticate()
     
-    Error --> Recovering : Recovery Initiated
-    Recovering --> Ready : Recovery Successful
-    Recovering --> Shutdown : Recovery Failed
+    Authenticating --> Authenticated: Success
+    Authenticating --> AuthFailed: Failure
     
-    Ready --> Shutdown : Shutdown Signal
-    Serving --> Shutdown : Shutdown Signal
-    Maintenance --> Shutdown : Shutdown Signal
-    Shutdown --> [*]
+    AuthFailed --> Authenticating: Retry
+    AuthFailed --> [*]: Exit
+    
+    Authenticated --> Active: First Request
+    
+    Active --> Processing: Request Received
+    Processing --> Active: Response Sent
+    
+    Active --> Expired: Session Timeout
+    Expired --> Authenticating: Re-authenticate
+    
+    Active --> Terminating: Shutdown Signal
+    Processing --> Terminating: Shutdown Signal
+    
+    Terminating --> Cleanup: Save State
+    Cleanup --> [*]: Exit
 ```
 
-**Session State Management:**
+#### 4.3.1.2 Resource State Management
 
-Authentication sessions maintain their own state lifecycle with automatic renewal and security controls:
+The resource management system handles dynamic data access without caching requirements, maintaining performance while ensuring data freshness.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Unauthenticated
-    Unauthenticated --> Authenticating : Credentials Provided
-    Authenticating --> Authenticated : Validation Successful
-    Authenticated --> Active : Session Established
-    Active --> Renewing : Token Near Expiry
-    Renewing --> Active : Renewal Successful
-    Active --> Expired : 3600s Timeout
-    Expired --> Authenticating : Reauthentication Required
+    [*] --> Unloaded
     
-    Authenticating --> Invalid : Credentials Invalid
-    Renewing --> Invalid : Renewal Failed
-    Invalid --> Unauthenticated : Reset Required
+    Unloaded --> Loading: list_resources()
     
-    Active --> Terminated : Logout/Shutdown
-    Expired --> Terminated : Cleanup
-    Terminated --> [*]
+    Loading --> Loaded: Success
+    Loading --> LoadError: Failure
+    
+    LoadError --> Loading: Retry
+    LoadError --> [*]: Abort
+    
+    Loaded --> Filtering: Apply Scope
+    Filtering --> Filtered: Complete
+    
+    Filtered --> Transforming: To MCP Format
+    Transforming --> Ready: Complete
+    
+    Ready --> Serving: Send Response
+    Serving --> [*]: Complete
+    
+    note right of Loading
+        Fetch from LabArchives API
+        Handle pagination
+        Validate permissions
+    end note
+    
+    note right of Filtering
+        Apply notebook scope
+        Apply folder scope
+        Check access rights
+    end note
 ```
 
-#### 4.3.1.2 Data Persistence Points
+### 4.3.2 Error Handling and Recovery
 
-**Zero-Persistence Architecture:**
+#### 4.3.2.1 Comprehensive Error Handling Flow
 
-The system implements a zero-persistence architecture for research data while maintaining necessary operational state:
-
-**Persistent Data:**
-- **Configuration**: Server configuration parameters and scope settings
-- **Audit Logs**: Complete audit trail for compliance and monitoring
-- **Session Metadata**: Authentication session information (not credentials)
-- **Performance Metrics**: Operational metrics for monitoring and optimization
-
-**Non-Persistent Data:**
-- **Research Content**: No LabArchives data stored locally
-- **User Credentials**: No credential persistence (environment variables only)
-- **API Responses**: No caching of sensitive research data
-- **Session Content**: No conversation or interaction history
+The error handling system provides robust recovery mechanisms with comprehensive logging and graceful degradation capabilities.
 
 ```mermaid
-graph TB
-    subgraph "Persistent Storage"
-        CONFIG[Configuration Files]
-        AUDIT_LOGS[Audit Logs]
-        SESSION_META[Session Metadata]
-        METRICS[Performance Metrics]
-    end
+flowchart TB
+    Start([Error Occurs]) --> A{Error<br/>Type?}
     
-    subgraph "Memory-Only Data"
-        RESEARCH_DATA[Research Content]
-        API_RESPONSES[API Responses]
-        USER_CREDS[User Credentials]
-        SESSION_DATA[Session Data]
-    end
+    A -->|Network| B[Connection Error]
+    A -->|Auth| C[Authentication Error]
+    A -->|Permission| D[Access Error]
+    A -->|Validation| E[Input Error]
+    A -->|System| F[Internal Error]
     
-    subgraph "Data Flow"
-        LABARCHIVES[LabArchives API] --> RESEARCH_DATA
-        RESEARCH_DATA --> MCP_CLIENT[MCP Client]
-        RESEARCH_DATA --> AUDIT_LOGS
-        
-        USER_CREDS --> AUTHENTICATION[Authentication]
-        AUTHENTICATION --> SESSION_META
-        SESSION_META --> METRICS
-    end
+    B --> G{Retry<br/>Available?}
+    G -->|Yes| H[Exponential Backoff]
+    G -->|No| I[Log Network Error]
     
-    CONFIG --> PERSISTENT_DISK[(Persistent Disk)]
-    AUDIT_LOGS --> PERSISTENT_DISK
-    SESSION_META --> PERSISTENT_DISK
-    METRICS --> PERSISTENT_DISK
+    C --> J{Token<br/>Expired?}
+    J -->|Yes| K[Refresh Token]
+    J -->|No| L[Log Auth Error]
+    
+    D --> M[Log Access Violation]
+    E --> N[Log Validation Error]
+    F --> O[Log System Error]
+    
+    H --> P[Retry Request]
+    P --> Q{Success?}
+    Q -->|Yes| End1([Recovery Success])
+    Q -->|No| G
+    
+    K --> R[Re-authenticate]
+    R --> S{Success?}
+    S -->|Yes| T[Retry Original Request]
+    S -->|No| L
+    
+    I --> U[Build Error Response]
+    L --> U
+    M --> U
+    N --> U
+    O --> U
+    
+    U --> V[Add Error Context]
+    V --> W[Log to Audit]
+    W --> X[Send Error Response]
+    X --> End2([Error Handled])
+    
+    T --> End1
 ```
 
-#### 4.3.1.3 Caching Requirements
+#### 4.3.2.2 Retry Mechanisms
 
-**Strategic Caching Implementation:**
+The retry system implements exponential backoff with jitter to handle transient failures gracefully while avoiding API rate limits.
 
-While maintaining zero-persistence for research data, the system implements strategic caching for operational efficiency:
+```mermaid
+flowchart LR
+    subgraph "Retry Configuration"
+        A[Max Retries: 3] 
+        B[Base Delay: 2s]
+        C[Max Delay: 30s]
+        D[Backoff: 2x]
+    end
+    
+    subgraph "Retry Logic"
+        E[Request Failed] --> F{Retryable<br/>Error?}
+        F -->|No| G[Return Error]
+        F -->|Yes| H{Retries<br/>Left?}
+        
+        H -->|No| I[Max Retries Exceeded]
+        H -->|Yes| J[Calculate Delay]
+        
+        J --> K[Wait Delay]
+        K --> L[Increment Counter]
+        L --> M[Retry Request]
+        
+        M --> N{Success?}
+        N -->|Yes| O[Return Success]
+        N -->|No| E
+        
+        I --> G
+    end
+    
+    subgraph "Delay Calculation"
+        P["delay = min(base * (2^attempt), max)"]
+        Q["Add Jitter: ±10%"]
+    end
+    
+    J -.-> P
+    P -.-> Q
+    Q -.-> K
+```
 
-**Caching Layers:**
-1. **Connection Pooling**: HTTP connection reuse for LabArchives API
-2. **Session Caching**: In-memory session state for performance
-3. **Configuration Caching**: Parsed configuration for rapid access
-4. **Metadata Caching**: Resource metadata for navigation optimization
+## 4.4 DEPLOYMENT AND OPERATIONAL WORKFLOWS
 
-**Cache Invalidation Strategy:**
-- **Time-Based**: Automatic expiration for session data
-- **Event-Based**: Configuration changes trigger cache invalidation
-- **Manual**: Administrative cache clearing commands
-- **Error-Based**: Cache clearing on authentication failures
+### 4.4.1 Server Startup and Initialization
+
+The server startup process provides comprehensive initialization with proper error handling and graceful shutdown capabilities.
 
 ```mermaid
 flowchart TD
-    subgraph "Caching Strategy"
-        REQUEST[Incoming Request] --> CACHE_CHECK{Cache Hit?}
-        CACHE_CHECK -->|Yes| CACHE_RESPONSE[Return Cached Data]
-        CACHE_CHECK -->|No| FETCH_DATA[Fetch from Source]
-        
-        FETCH_DATA --> VALIDATE_DATA{Data Valid?}
-        VALIDATE_DATA -->|Yes| CACHE_STORE[Store in Cache]
-        VALIDATE_DATA -->|No| ERROR_RESPONSE[Return Error]
-        
-        CACHE_STORE --> RETURN_DATA[Return Fresh Data]
-        
-        CACHE_RESPONSE --> CACHE_VALIDATE{Cache Valid?}
-        CACHE_VALIDATE -->|Yes| FINAL_RESPONSE[Return to Client]
-        CACHE_VALIDATE -->|No| CACHE_INVALIDATE[Invalidate Cache]
-        
-        CACHE_INVALIDATE --> FETCH_DATA
-        RETURN_DATA --> FINAL_RESPONSE
-        ERROR_RESPONSE --> FINAL_RESPONSE
-    end
+    Start([Server Start]) --> A[Parse CLI Arguments]
     
-    subgraph "Cache Types"
-        CONNECTION_POOL[HTTP Connection Pool]
-        SESSION_CACHE[Session State Cache]
-        CONFIG_CACHE[Configuration Cache]
-        META_CACHE[Metadata Cache]
-    end
+    A --> B{Valid<br/>Arguments?}
+    B -->|No| C[Display Help/Error]
+    B -->|Yes| D[Load Configuration]
     
-    CACHE_STORE --> CONNECTION_POOL
-    CACHE_STORE --> SESSION_CACHE
-    CACHE_STORE --> CONFIG_CACHE
-    CACHE_STORE --> META_CACHE
+    C --> End1([Exit with Error])
+    
+    D --> E{Config<br/>Valid?}
+    E -->|No| F[Configuration Error]
+    E -->|Yes| G[Initialize Logging]
+    
+    F --> End1
+    
+    G --> H[Setup Audit Logger]
+    H --> I[Initialize Auth Manager]
+    
+    I --> J[Authenticate with LabArchives]
+    J --> K{Auth<br/>Success?}
+    
+    K -->|No| L[Authentication Error]
+    K -->|Yes| M[Create Session]
+    
+    L --> End1
+    
+    M --> N[Initialize Resource Manager]
+    N --> O[Setup MCP Protocol Handler]
+    
+    O --> P[Register Signal Handlers]
+    P --> Q[Start MCP Session Loop]
+    
+    Q --> R{Message<br/>Received?}
+    R -->|Yes| S[Process Message]
+    R -->|No| T{Shutdown<br/>Signal?}
+    
+    S --> U[Send Response]
+    U --> R
+    
+    T -->|No| R
+    T -->|Yes| V[Graceful Shutdown]
+    
+    V --> W[Flush Logs]
+    W --> X[Clean Resources]
+    X --> End2([Exit Success])
 ```
 
-#### 4.3.1.4 Transaction Boundaries
+### 4.4.2 High-Level System Architecture Flow
 
-**Transaction Management:**
-
-The system implements logical transaction boundaries for data consistency and audit trail integrity:
-
-**Transaction Scopes:**
-1. **Request Transaction**: Complete MCP request/response cycle
-2. **Authentication Transaction**: Login/logout operations
-3. **Audit Transaction**: Log entry creation and persistence
-4. **Configuration Transaction**: Settings update operations
-
-**ACID Properties Implementation:**
-- **Atomicity**: Complete operations or full rollback
-- **Consistency**: State validation at transaction boundaries
-- **Isolation**: Concurrent request handling without interference
-- **Durability**: Audit logs persisted immediately
+The overall system architecture demonstrates the integration between AI clients, the MCP server, and LabArchives services with proper security and monitoring.
 
 ```mermaid
-sequenceDiagram
-    participant CLIENT as MCP Client
-    participant SERVER as MCP Server
-    participant AUTH as Auth Manager
-    participant AUDIT as Audit System
-    participant STORAGE as Storage
-    
-    CLIENT->>SERVER: Begin Request Transaction
-    SERVER->>AUTH: Begin Auth Transaction
-    AUTH->>AUTH: Validate Session
-    AUTH->>AUDIT: Begin Audit Transaction
-    AUDIT->>STORAGE: Write Audit Log
-    STORAGE->>AUDIT: Commit Audit
-    AUDIT->>AUTH: Audit Complete
-    AUTH->>SERVER: Auth Complete
-    
-    SERVER->>SERVER: Process Request
-    alt Success
-        SERVER->>AUDIT: Log Success
-        AUDIT->>STORAGE: Write Success Log
-        SERVER->>CLIENT: Success Response
-    else Error
-        SERVER->>AUDIT: Log Error
-        AUDIT->>STORAGE: Write Error Log
-        SERVER->>CLIENT: Error Response
+flowchart TB
+    subgraph "AI Client Layer"
+        U1[Claude Desktop]
+        U2[Other MCP Clients]
+        U3[Custom AI Applications]
     end
     
-    SERVER->>SERVER: End Request Transaction
+    subgraph "MCP Server Core"
+        direction TB
+        A[CLI Entry Point] --> B[Configuration Manager]
+        B --> C[Authentication Manager]
+        C --> D[MCP Protocol Handler]
+        D --> E[Resource Manager]
+        
+        F[Logging System]
+        G[Error Handler]
+        H[Scope Enforcement]
+        
+        D -.-> F
+        D -.-> G
+        E -.-> F
+        E -.-> G
+        E -.-> H
+    end
+    
+    subgraph "External Services"
+        I[LabArchives API US]
+        J[LabArchives API AU]
+        K[LabArchives API UK]
+        L[Audit Storage]
+        M[Monitoring Systems]
+    end
+    
+    U1 -->|JSON-RPC over stdio| A
+    U2 -->|JSON-RPC over stdio| A
+    U3 -->|JSON-RPC over stdio| A
+    
+    E -->|REST API| I
+    E -->|REST API| J
+    E -->|REST API| K
+    F -->|Logs| L
+    F -->|Metrics| M
+    
+    style U1 fill:#e1f5fe
+    style U2 fill:#e1f5fe
+    style U3 fill:#e1f5fe
+    style I fill:#fff3e0
+    style J fill:#fff3e0
+    style K fill:#fff3e0
+    style L fill:#fff3e0
+    style M fill:#fff3e0
 ```
 
-### 4.3.2 Error Handling
+### 4.4.3 Data Flow Between Systems
 
-#### 4.3.2.1 Retry Mechanisms
+The data flow demonstrates how research data moves from LabArchives through the MCP server to AI applications with proper transformation and context preservation.
 
-**Intelligent Retry Strategy:**
+```mermaid
+flowchart LR
+    subgraph "LabArchives Data"
+        A1[Notebooks]
+        A2[Pages]
+        A3[Entries]
+        A4[Metadata]
+    end
+    
+    subgraph "LabArchives API"
+        B1[REST Endpoints]
+        B2[Authentication]
+        B3[Rate Limiting]
+        B4[Permission Control]
+    end
+    
+    subgraph "MCP Server Processing"
+        C1[API Client]
+        C2[Data Transform]
+        C3[Scope Filter]
+        C4[JSON-LD Context]
+        C5[Audit Logger]
+    end
+    
+    subgraph "MCP Protocol"
+        D1[Resource URI]
+        D2[Structured Content]
+        D3[Semantic Context]
+        D4[Metadata]
+    end
+    
+    subgraph "AI Applications"
+        E1[Claude Desktop]
+        E2[Custom AI Agents]
+        E3[Research Analytics]
+    end
+    
+    A1 --> B1
+    A2 --> B1
+    A3 --> B1
+    A4 --> B1
+    
+    B1 --> C1
+    B2 --> C1
+    B3 --> C1
+    B4 --> C1
+    
+    C1 --> C2
+    C2 --> C3
+    C3 --> C4
+    C4 --> C5
+    
+    C4 --> D1
+    C4 --> D2
+    C4 --> D3
+    C4 --> D4
+    
+    D1 --> E1
+    D2 --> E1
+    D3 --> E1
+    D4 --> E1
+    
+    D1 --> E2
+    D2 --> E2
+    D3 --> E2
+    D4 --> E2
+    
+    D1 --> E3
+    D2 --> E3
+    D3 --> E3
+    D4 --> E3
+```
 
-The system implements sophisticated retry mechanisms with exponential backoff and circuit breaker patterns:
+## 4.5 PERFORMANCE AND SLA REQUIREMENTS
 
-**Retry Categories:**
-1. **Transient Errors**: Network timeouts, temporary API unavailability
-2. **Rate Limiting**: API throttling responses (HTTP 429)
-3. **Authentication Errors**: Token expiration requiring renewal
-4. **Connection Errors**: Network connectivity issues
+### 4.5.1 Performance Benchmarks
 
-**Retry Configuration:**
-- **Initial Delay**: 1 second
-- **Maximum Delay**: 30 seconds
-- **Backoff Multiplier**: 2.0
-- **Maximum Attempts**: 5
-- **Jitter**: ±25% random variation
+The system maintains specific performance targets to ensure responsive AI-assisted research workflows:
+
+| Operation | Target SLA | Maximum Time | Measurement Point | Retry Policy |
+|-----------|------------|--------------|-------------------|--------------|
+| Protocol Initialization | < 500ms | 1s | Handshake Complete | No retry |
+| Authentication | < 1s | 3s | Token Validation | 1 retry |
+| Resource Listing | < 2s | 5s | Complete Response | 3 retries |
+| Content Retrieval | < 5s | 10s | Full Content | 3 retries |
+| Error Response | < 100ms | 500ms | Error Generated | No retry |
+
+### 4.5.2 Scalability Considerations
+
+The system architecture supports horizontal scaling through stateless design and efficient resource management:
+
+```mermaid
+flowchart TB
+    subgraph "Load Balancing"
+        A[Load Balancer] --> B[MCP Server Instance 1]
+        A --> C[MCP Server Instance 2]
+        A --> D[MCP Server Instance N]
+    end
+    
+    subgraph "Shared Services"
+        E[LabArchives API]
+        F[Audit Storage]
+        G[Configuration Store]
+    end
+    
+    B --> E
+    C --> E
+    D --> E
+    
+    B --> F
+    C --> F
+    D --> F
+    
+    B --> G
+    C --> G
+    D --> G
+    
+    subgraph "Monitoring"
+        H[Metrics Collection]
+        I[Health Checks]
+        J[Performance Monitoring]
+    end
+    
+    B -.-> H
+    C -.-> H
+    D -.-> H
+    
+    H --> I
+    I --> J
+```
+
+### 4.5.3 Error Recovery and Fallback Strategies
+
+The system implements comprehensive error recovery with multiple fallback mechanisms:
 
 ```mermaid
 flowchart TD
-    API_CALL[API Call] --> RESPONSE_CHECK{Response Status?}
-    RESPONSE_CHECK -->|Success| SUCCESS_RESPONSE[Return Success]
-    RESPONSE_CHECK -->|Error| ERROR_TYPE{Error Type?}
+    Start([Error Detected]) --> A{Error<br/>Severity?}
     
-    ERROR_TYPE -->|Transient| RETRY_CHECK{Retry Attempts < Max?}
-    ERROR_TYPE -->|Rate Limited| RATE_LIMIT_WAIT[Wait for Rate Limit]
-    ERROR_TYPE -->|Auth Error| TOKEN_REFRESH[Refresh Token]
-    ERROR_TYPE -->|Permanent| PERMANENT_FAILURE[Return Error]
+    A -->|Critical| B[System Failure]
+    A -->|High| C[Service Degradation]
+    A -->|Medium| D[Feature Failure]
+    A -->|Low| E[Warning Only]
     
-    RETRY_CHECK -->|Yes| BACKOFF_CALC[Calculate Backoff Delay]
-    RETRY_CHECK -->|No| MAX_RETRIES[Max Retries Exceeded]
+    B --> F[Immediate Alert]
+    F --> G[Graceful Shutdown]
+    G --> H[Preserve State]
+    H --> I[Restart Service]
     
-    BACKOFF_CALC --> WAIT_PERIOD[Wait Period]
-    WAIT_PERIOD --> API_CALL
+    C --> J[Alert On-Call]
+    J --> K[Enable Degraded Mode]
+    K --> L[Disable Affected Features]
     
-    RATE_LIMIT_WAIT --> RATE_LIMIT_CHECK{Rate Limit Cleared?}
-    RATE_LIMIT_CHECK -->|Yes| API_CALL
-    RATE_LIMIT_CHECK -->|No| RATE_LIMIT_TIMEOUT[Rate Limit Timeout]
+    D --> M[Log Error]
+    M --> N[Retry Operation]
+    N --> O{Success?}
+    O -->|No| P[Use Fallback]
+    O -->|Yes| Q[Continue Normal]
     
-    TOKEN_REFRESH --> REFRESH_SUCCESS{Token Refreshed?}
-    REFRESH_SUCCESS -->|Yes| API_CALL
-    REFRESH_SUCCESS -->|No| AUTH_FAILURE[Authentication Failed]
+    E --> R[Log Warning]
+    R --> S[Monitor Frequency]
+    S --> T{Threshold<br/>Exceeded?}
+    T -->|Yes| D
+    T -->|No| Q
     
-    MAX_RETRIES --> PERMANENT_FAILURE
-    RATE_LIMIT_TIMEOUT --> PERMANENT_FAILURE
-    AUTH_FAILURE --> PERMANENT_FAILURE
+    I --> U{Service<br/>Healthy?}
+    U -->|No| F
+    U -->|Yes| V[Resume Normal]
+    
+    L --> W[Monitor Recovery]
+    W --> X{Issue<br/>Resolved?}
+    X -->|No| W
+    X -->|Yes| Y[Re-enable Features]
+    
+    P --> Q
+    V --> End([Recovery Complete])
+    Y --> V
+    Q --> End
 ```
 
-#### 4.3.2.2 Fallback Processes
+## 4.6 COMPLIANCE AND AUDIT WORKFLOWS
 
-**Graceful Degradation Strategy:**
+### 4.6.1 Comprehensive Audit Trail
 
-The system implements comprehensive fallback mechanisms to maintain service availability:
-
-**Fallback Levels:**
-1. **Service Degradation**: Reduced functionality with core features available
-2. **Read-Only Mode**: Disable write operations, maintain read access
-3. **Cached Response**: Return cached data when live data unavailable
-4. **Graceful Shutdown**: Clean service termination with proper cleanup
-
-**Fallback Triggers:**
-- **API Unavailability**: LabArchives API completely unreachable
-- **Authentication Failure**: Unable to maintain valid session
-- **Resource Exhaustion**: System resources critically low
-- **Configuration Error**: Invalid or corrupted configuration
+The audit logging system provides complete traceability for all data access operations, supporting regulatory compliance and security monitoring:
 
 ```mermaid
-stateDiagram-v2
-    [*] --> Full_Service
-    Full_Service --> Degraded_Service : API Intermittent
-    Full_Service --> Read_Only : API Write Errors
-    Full_Service --> Cached_Mode : API Unavailable
-    Full_Service --> Graceful_Shutdown : Critical Failure
+flowchart LR
+    subgraph "Audit Events"
+        A[Authentication Events]
+        B[Resource Access]
+        C[Configuration Changes]
+        D[Error Events]
+        E[System Events]
+    end
     
-    Degraded_Service --> Full_Service : API Restored
-    Degraded_Service --> Read_Only : Write Operations Failed
-    Degraded_Service --> Cached_Mode : API Completely Down
-    Degraded_Service --> Graceful_Shutdown : System Failure
+    subgraph "Audit Processing"
+        F[Event Collection]
+        G[Structured Logging]
+        H[Data Enrichment]
+        I[Compliance Formatting]
+    end
     
-    Read_Only --> Full_Service : API Fully Restored
-    Read_Only --> Degraded_Service : Partial API Recovery
-    Read_Only --> Cached_Mode : API Read Failures
-    Read_Only --> Graceful_Shutdown : System Failure
+    subgraph "Audit Storage"
+        J[Local Logs]
+        K[Centralized Storage]
+        L[Long-term Archive]
+    end
     
-    Cached_Mode --> Full_Service : API Fully Restored
-    Cached_Mode --> Degraded_Service : API Partially Restored
-    Cached_Mode --> Read_Only : API Read Restored
-    Cached_Mode --> Graceful_Shutdown : Cache Exhausted
+    subgraph "Reporting"
+        M[Compliance Reports]
+        N[Security Analytics]
+        O[Performance Metrics]
+    end
     
-    Graceful_Shutdown --> [*]
+    A --> F
+    B --> F
+    C --> F
+    D --> F
+    E --> F
+    
+    F --> G
+    G --> H
+    H --> I
+    
+    I --> J
+    I --> K
+    I --> L
+    
+    K --> M
+    K --> N
+    K --> O
 ```
 
-#### 4.3.2.3 Error Notification Flows
+### 4.6.2 Security Validation Checkpoints
 
-**Comprehensive Error Notification System:**
-
-The system implements multi-channel error notification to ensure rapid issue resolution:
-
-**Notification Channels:**
-1. **Client Response**: Immediate JSON-RPC error responses
-2. **Audit Logging**: Structured error logs for analysis
-3. **Monitoring Alerts**: Real-time alerting for critical issues
-4. **System Notifications**: Infrastructure-level notifications
-
-**Error Severity Levels:**
-- **Critical**: System unavailable, immediate intervention required
-- **High**: Major functionality impaired, quick resolution needed
-- **Medium**: Minor functionality affected, resolution within SLA
-- **Low**: Informational, monitoring for trends
+The system implements multiple security validation checkpoints throughout the request processing pipeline:
 
 ```mermaid
 flowchart TD
-    ERROR_DETECTED[Error Detected] --> SEVERITY_ASSESSMENT{Assess Severity}
-    
-    SEVERITY_ASSESSMENT -->|Critical| CRITICAL_ALERT[Critical Alert]
-    SEVERITY_ASSESSMENT -->|High| HIGH_ALERT[High Priority Alert]
-    SEVERITY_ASSESSMENT -->|Medium| MEDIUM_ALERT[Medium Priority Alert]
-    SEVERITY_ASSESSMENT -->|Low| LOW_ALERT[Low Priority Alert]
-    
-    subgraph "Notification Channels"
-        CLIENT_RESPONSE[Client Error Response]
-        AUDIT_LOG[Audit Log Entry]
-        MONITORING[Monitoring Alert]
-        SYSTEM_NOTIFY[System Notification]
-    end
-    
-    CRITICAL_ALERT --> CLIENT_RESPONSE
-    CRITICAL_ALERT --> AUDIT_LOG
-    CRITICAL_ALERT --> MONITORING
-    CRITICAL_ALERT --> SYSTEM_NOTIFY
-    
-    HIGH_ALERT --> CLIENT_RESPONSE
-    HIGH_ALERT --> AUDIT_LOG
-    HIGH_ALERT --> MONITORING
-    
-    MEDIUM_ALERT --> CLIENT_RESPONSE
-    MEDIUM_ALERT --> AUDIT_LOG
-    
-    LOW_ALERT --> AUDIT_LOG
-    
-    subgraph "Response Actions"
-        IMMEDIATE_RESPONSE[Immediate Response < 1min]
-        QUICK_RESPONSE[Quick Response < 15min]
-        STANDARD_RESPONSE[Standard Response < 4hr]
-        TRACKING_RESPONSE[Tracking Response < 24hr]
-    end
-    
-    CRITICAL_ALERT --> IMMEDIATE_RESPONSE
-    HIGH_ALERT --> QUICK_RESPONSE
-    MEDIUM_ALERT --> STANDARD_RESPONSE
-    LOW_ALERT --> TRACKING_RESPONSE
-```
-
-#### 4.3.2.4 Recovery Procedures
-
-**Systematic Recovery Operations:**
-
-The system implements automated and manual recovery procedures for various failure scenarios:
-
-**Recovery Procedure Types:**
-1. **Automatic Recovery**: Self-healing capabilities for common issues
-2. **Semi-Automatic Recovery**: Guided recovery with minimal intervention
-3. **Manual Recovery**: Step-by-step procedures for complex issues
-4. **Disaster Recovery**: Full system restoration procedures
-
-**Recovery Scope:**
-- **Service Recovery**: Restore normal service operation
-- **Data Recovery**: Ensure audit log integrity and availability
-- **Configuration Recovery**: Restore system configuration
-- **Session Recovery**: Re-establish authentication sessions
-
-```mermaid
-flowchart TD
-    FAILURE_DETECTED[Failure Detected] --> RECOVERY_ASSESSMENT{Recovery Assessment}
-    
-    RECOVERY_ASSESSMENT -->|Automatic| AUTO_RECOVERY[Automatic Recovery]
-    RECOVERY_ASSESSMENT -->|Semi-Auto| SEMI_AUTO_RECOVERY[Semi-Automatic Recovery]
-    RECOVERY_ASSESSMENT -->|Manual| MANUAL_RECOVERY[Manual Recovery]
-    RECOVERY_ASSESSMENT -->|Disaster| DISASTER_RECOVERY[Disaster Recovery]
-    
-    subgraph "Automatic Recovery"
-        AUTO_RESTART[Service Restart]
-        AUTO_RECONNECT[API Reconnection]
-        AUTO_CLEANUP[Resource Cleanup]
-        AUTO_VALIDATE[Validation Check]
-    end
-    
-    subgraph "Semi-Automatic Recovery"
-        GUIDED_DIAG[Guided Diagnostics]
-        GUIDED_REPAIR[Guided Repair]
-        GUIDED_VALIDATE[Guided Validation]
-        GUIDED_RESTART[Guided Restart]
-    end
-    
-    subgraph "Manual Recovery"
-        MANUAL_DIAG[Manual Diagnostics]
-        MANUAL_CONFIG[Configuration Fix]
-        MANUAL_REPAIR[Manual Repair]
-        MANUAL_VALIDATE[Manual Validation]
-    end
-    
-    subgraph "Disaster Recovery"
-        BACKUP_RESTORE[Backup Restore]
-        FULL_REBUILD[Full System Rebuild]
-        DATA_RECOVERY[Data Recovery]
-        SERVICE_MIGRATION[Service Migration]
-    end
-    
-    AUTO_RECOVERY --> AUTO_RESTART
-    AUTO_RESTART --> AUTO_RECONNECT
-    AUTO_RECONNECT --> AUTO_CLEANUP
-    AUTO_CLEANUP --> AUTO_VALIDATE
-    AUTO_VALIDATE --> RECOVERY_SUCCESS{Recovery Successful?}
-    
-    SEMI_AUTO_RECOVERY --> GUIDED_DIAG
-    GUIDED_DIAG --> GUIDED_REPAIR
-    GUIDED_REPAIR --> GUIDED_VALIDATE
-    GUIDED_VALIDATE --> GUIDED_RESTART
-    GUIDED_RESTART --> RECOVERY_SUCCESS
-    
-    MANUAL_RECOVERY --> MANUAL_DIAG
-    MANUAL_DIAG --> MANUAL_CONFIG
-    MANUAL_CONFIG --> MANUAL_REPAIR
-    MANUAL_REPAIR --> MANUAL_VALIDATE
-    MANUAL_VALIDATE --> RECOVERY_SUCCESS
-    
-    DISASTER_RECOVERY --> BACKUP_RESTORE
-    BACKUP_RESTORE --> FULL_REBUILD
-    FULL_REBUILD --> DATA_RECOVERY
-    DATA_RECOVERY --> SERVICE_MIGRATION
-    SERVICE_MIGRATION --> RECOVERY_SUCCESS
-    
-    RECOVERY_SUCCESS -->|Yes| SERVICE_RESTORED[Service Restored]
-    RECOVERY_SUCCESS -->|No| ESCALATE_RECOVERY[Escalate Recovery]
-    
-    ESCALATE_RECOVERY --> MANUAL_RECOVERY
-    MANUAL_RECOVERY --> DISASTER_RECOVERY
-```
-
-## 4.4 REQUIRED DIAGRAMS
-
-### 4.4.1 High-Level System Workflow
-
-**Complete System Architecture and Flow:**
-
-```mermaid
-graph TB
-    subgraph "External Systems"
-        CLAUDE[Claude Desktop]
-        LABARCHIVES[LabArchives Platform]
-        MONITORING[Monitoring System]
-        AUDIT_STORAGE[Audit Storage]
-    end
-    
-    subgraph "LabArchives MCP Server"
-        subgraph "Entry Layer"
-            CLI[CLI Interface]
-            CONFIG[Configuration Manager]
-        end
-        
-        subgraph "Protocol Layer"
-            MCP_HANDLER[MCP Protocol Handler]
-            JSON_RPC["JSON-RPC 2.0 Transport"]
-        end
-        
-        subgraph "Business Logic Layer"
-            AUTH_MGR[Authentication Manager]
-            RESOURCE_MGR[Resource Manager]
-            SCOPE_MGR[Scope Manager]
-        end
-        
-        subgraph "Integration Layer"
-            API_CLIENT[LabArchives API Client]
-            RETRY_MGR[Retry Manager]
-            CIRCUIT_BREAKER[Circuit Breaker]
-        end
-        
-        subgraph "Cross-Cutting Services"
-            SECRET_SCRUBBER[Secret Scrubber]
-            AUDIT_SYS[Audit System]
-            LOGGING[Logging Service]
-            METRICS[Metrics Collection]
-        end
-    end
-    
-    subgraph "Infrastructure"
-        DOCKER[Docker Container]
-        KUBERNETES[Kubernetes Cluster]
-        STORAGE[Persistent Storage]
-    end
-    
-    %% External connections
-    CLAUDE <-->|JSON-RPC 2.0| MCP_HANDLER
-    LABARCHIVES <-->|HTTPS/REST| API_CLIENT
-    METRICS --> MONITORING
-    AUDIT_SYS --> AUDIT_STORAGE
-    
-    %% Internal connections
-    CLI --> CONFIG
-    CONFIG --> AUTH_MGR
-    CONFIG --> SCOPE_MGR
-    
-    MCP_HANDLER --> JSON_RPC
-    JSON_RPC --> AUTH_MGR
-    JSON_RPC --> RESOURCE_MGR
-    
-    AUTH_MGR --> API_CLIENT
-    RESOURCE_MGR --> API_CLIENT
-    RESOURCE_MGR --> SCOPE_MGR
-    
-    API_CLIENT --> RETRY_MGR
-    RETRY_MGR --> CIRCUIT_BREAKER
-    
-    AUTH_MGR --> AUDIT_SYS
-    RESOURCE_MGR --> AUDIT_SYS
-    API_CLIENT --> AUDIT_SYS
-    
-    %% Security workflow
-    CLI --> SECRET_SCRUBBER
-    SECRET_SCRUBBER --> LOGGING
-    
-    AUDIT_SYS --> LOGGING
-    LOGGING --> METRICS
-    
-    %% Infrastructure connections
-    DOCKER --> KUBERNETES
-    KUBERNETES --> STORAGE
-    AUDIT_SYS --> STORAGE
-```
-
-### 4.4.2 Detailed Process Flows for Core Features
-
-#### 4.4.2.1 Server Initialization Process
-
-**Server Startup Security and Configuration Flow:**
-
-The server initialization process implements comprehensive security controls from startup, ensuring that sensitive credentials are properly handled before any logging systems are activated. <span style="background-color: rgba(91, 57, 243, 0.2)">The process includes critical security steps including argument sanitization to prevent credential leakage in logs or system outputs.</span>
-
-**Key Security Steps:**
-- Parse command-line arguments and environment variables
-- <span style="background-color: rgba(91, 57, 243, 0.2)">Sanitize CLI arguments (scrub_argv) to remove credentials before any logger is configured</span>
-- Load and validate configuration parameters
-- Initialize logging systems with sanitized argument data
-- Establish secure authentication with credential protection
-- Apply scope limitations and access controls
-- Initialize MCP protocol handlers with security validation
-
-```mermaid
-flowchart TD
-    START[Server Startup] --> PARSE_ARGS[Parse CLI Arguments]
-    PARSE_ARGS --> SCRUB_ARGV[Scrub Secrets from argv]
-    SCRUB_ARGV --> CONFIG_LOAD[Load Configuration]
-    CONFIG_LOAD --> CONFIG_VALID{Configuration Valid?}
-    CONFIG_VALID -->|No| CONFIG_ERROR[Exit Code 1: Config Error]
-    CONFIG_VALID -->|Yes| LOGGING_INIT[Initialize Logging]
-    
-    LOGGING_INIT --> AUTH_INIT[Initialize Authentication]
-    AUTH_INIT --> AUTH_TEST[Test Authentication]
-    AUTH_TEST --> AUTH_VALID{Authentication Valid?}
-    AUTH_VALID -->|No| AUTH_ERROR[Exit Code 2: Auth Error]
-    AUTH_VALID -->|Yes| RESOURCE_INIT[Initialize Resource Manager]
-    
-    RESOURCE_INIT --> SCOPE_APPLY[Apply Scope Configuration]
-    SCOPE_APPLY --> MCP_INIT[Initialize MCP Server]
-    MCP_INIT --> MCP_VALID{MCP Server Ready?}
-    MCP_VALID -->|No| STARTUP_ERROR[Exit Code 3: Startup Error]
-    MCP_VALID -->|Yes| SIGNAL_HANDLER[Register Signal Handlers]
-    
-    SIGNAL_HANDLER --> AUDIT_INIT[Initialize Audit System]
-    AUDIT_INIT --> SERVER_READY[Server Ready - Listening]
-    SERVER_READY --> HEALTH_CHECK[Health Check Loop]
-    
-    HEALTH_CHECK --> SHUTDOWN_SIGNAL{Shutdown Signal?}
-    SHUTDOWN_SIGNAL -->|No| HEALTH_CHECK
-    SHUTDOWN_SIGNAL -->|Yes| GRACEFUL_SHUTDOWN[Graceful Shutdown]
-    
-    GRACEFUL_SHUTDOWN --> CLEANUP[Cleanup Resources]
-    CLEANUP --> AUDIT_FINAL[Final Audit Log]
-    AUDIT_FINAL --> EXIT_SUCCESS[Exit Code 0: Success]
-    
-    CONFIG_ERROR --> EXIT_ERROR[Error Exit]
-    AUTH_ERROR --> EXIT_ERROR
-    STARTUP_ERROR --> EXIT_ERROR
-    EXIT_ERROR --> END[Process End]
-    EXIT_SUCCESS --> END
-```
-
-#### 4.4.2.2 MCP Resource Listing Flow
-
-```mermaid
-flowchart TD
-    MCP_REQUEST[MCP List Request] --> VALIDATE_REQUEST{Valid JSON-RPC?}
-    VALIDATE_REQUEST -->|No| INVALID_REQUEST[Invalid Request Error]
-    VALIDATE_REQUEST -->|Yes| AUTH_CHECK[Check Authentication]
-    
-    AUTH_CHECK --> AUTH_VALID{Session Valid?}
-    AUTH_VALID -->|No| REAUTH[Attempt Reauthentication]
-    AUTH_VALID -->|Yes| SCOPE_CHECK[Apply Scope Filter]
-    
-    REAUTH --> REAUTH_SUCCESS{Reauth Successful?}
-    REAUTH_SUCCESS -->|No| AUTH_FAILED[Authentication Failed]
-    REAUTH_SUCCESS -->|Yes| SCOPE_CHECK
-    
-    SCOPE_CHECK --> API_CALL[LabArchives API Call]
-    API_CALL --> API_RESPONSE{API Success?}
-    API_RESPONSE -->|No| ERROR_HANDLER[Handle API Error]
-    API_RESPONSE -->|Yes| PARSE_RESPONSE[Parse API Response]
-    
-    PARSE_RESPONSE --> FILTER_SCOPE[Apply Scope Filtering]
-    FILTER_SCOPE --> TRANSFORM_DATA[Transform to MCP Format]
-    TRANSFORM_DATA --> GENERATE_URIS[Generate Resource URIs]
-    GENERATE_URIS --> BUILD_RESPONSE[Build MCP Response]
-    
-    BUILD_RESPONSE --> AUDIT_LOG[Log Resource Access]
-    AUDIT_LOG --> SEND_RESPONSE[Send Response to Client]
-    
-    ERROR_HANDLER --> RETRY_DECISION{Retry Possible?}
-    RETRY_DECISION -->|Yes| RETRY_DELAY[Apply Retry Delay]
-    RETRY_DECISION -->|No| ERROR_RESPONSE[Send Error Response]
-    
-    RETRY_DELAY --> API_CALL
-    ERROR_RESPONSE --> AUDIT_LOG
-    
-    INVALID_REQUEST --> SEND_ERROR[Send Protocol Error]
-    AUTH_FAILED --> SEND_ERROR
-    SEND_ERROR --> END[End Request Processing]
-    SEND_RESPONSE --> END
-```
-
-#### 4.4.2.3 Content Retrieval Process
-
-```mermaid
-flowchart TD
-    READ_REQUEST[MCP Read Request] --> VALIDATE_URI{Valid Resource URI?}
-    VALIDATE_URI -->|No| INVALID_URI[Invalid URI Error]
-    VALIDATE_URI -->|Yes| PARSE_URI[Parse Resource URI]
-    
-    PARSE_URI --> SCOPE_VALIDATE[Validate Against Scope]
-    SCOPE_VALIDATE --> SCOPE_VALID{Within Scope?}
-    SCOPE_VALID -->|No| SCOPE_VIOLATION[Scope Violation Error]
-    SCOPE_VALID -->|Yes| AUTH_CHECK[Check Authentication]
-    
-    AUTH_CHECK --> SESSION_VALID{Session Valid?}
-    SESSION_VALID -->|No| REFRESH_TOKEN[Refresh Authentication]
-    SESSION_VALID -->|Yes| FETCH_CONTENT[Fetch from LabArchives]
-    
-    REFRESH_TOKEN --> REFRESH_SUCCESS{Refresh Success?}
-    REFRESH_SUCCESS -->|No| AUTH_ERROR[Authentication Error]
-    REFRESH_SUCCESS -->|Yes| FETCH_CONTENT
-    
-    FETCH_CONTENT --> API_CALL[LabArchives API Call]
-    API_CALL --> API_SUCCESS{API Success?}
-    API_SUCCESS -->|No| API_ERROR[Handle API Error]
-    API_SUCCESS -->|Yes| PARSE_CONTENT[Parse Content Response]
-    
-    PARSE_CONTENT --> EXTRACT_METADATA[Extract Metadata]
-    EXTRACT_METADATA --> TRANSFORM_JSON[Transform to JSON]
-    TRANSFORM_JSON --> JSONLD_OPTION{JSON-LD Requested?}
-    JSONLD_OPTION -->|Yes| ADD_JSONLD[Add JSON-LD Context]
-    JSONLD_OPTION -->|No| VALIDATE_OUTPUT[Validate Output]
-    
-    ADD_JSONLD --> VALIDATE_OUTPUT
-    VALIDATE_OUTPUT --> AUDIT_ACCESS[Audit Content Access]
-    AUDIT_ACCESS --> SEND_CONTENT[Send Content Response]
-    
-    API_ERROR --> RETRY_CHECK{Retry Possible?}
-    RETRY_CHECK -->|Yes| APPLY_BACKOFF[Apply Exponential Backoff]
-    RETRY_CHECK -->|No| FINAL_ERROR[Final Error Response]
-    
-    APPLY_BACKOFF --> API_CALL
-    FINAL_ERROR --> AUDIT_ERROR[Audit Error]
-    
-    INVALID_URI --> SEND_ERROR[Send Error Response]
-    SCOPE_VIOLATION --> SEND_ERROR
-    AUTH_ERROR --> SEND_ERROR
-    AUDIT_ERROR --> SEND_ERROR
-    
-    SEND_CONTENT --> END[End Request Processing]
-    SEND_ERROR --> END
-```
-
-### 4.4.3 Error Handling Flowcharts
-
-#### 4.4.3.1 Authentication Error Handling
-
-```mermaid
-flowchart TD
-    AUTH_ERROR[Authentication Error] --> ERROR_TYPE{Error Type?}
-    
-    ERROR_TYPE -->|Token Expired| TOKEN_EXPIRED[Token Expired]
-    ERROR_TYPE -->|Invalid Credentials| INVALID_CREDS[Invalid Credentials]
-    ERROR_TYPE -->|API Unavailable| API_DOWN[API Unavailable]
-    ERROR_TYPE -->|Rate Limited| RATE_LIMITED[Rate Limited]
-    
-    TOKEN_EXPIRED --> REFRESH_ATTEMPT[Attempt Token Refresh]
-    REFRESH_ATTEMPT --> REFRESH_SUCCESS{Refresh Success?}
-    REFRESH_SUCCESS -->|Yes| AUTH_RESTORED[Authentication Restored]
-    REFRESH_SUCCESS -->|No| REFRESH_FAILED[Refresh Failed]
-    
-    INVALID_CREDS --> CRED_CHECK[Check Credential Format]
-    CRED_CHECK --> CRED_VALID{Credentials Valid Format?}
-    CRED_VALID -->|Yes| PERM_AUTH_ERROR[Permanent Auth Error]
-    CRED_VALID -->|No| CONFIG_ERROR[Configuration Error]
-    
-    API_DOWN --> RETRY_AUTH[Retry Authentication]
-    RETRY_AUTH --> RETRY_COUNT{Retry Count < Max?}
-    RETRY_COUNT -->|Yes| BACKOFF_WAIT[Exponential Backoff]
-    RETRY_COUNT -->|No| MAX_RETRIES[Max Retries Exceeded]
-    
-    BACKOFF_WAIT --> API_DOWN
-    MAX_RETRIES --> SERVICE_UNAVAILABLE[Service Unavailable]
-    
-    RATE_LIMITED --> RATE_WAIT[Wait for Rate Limit]
-    RATE_WAIT --> RATE_CLEARED{Rate Limit Cleared?}
-    RATE_CLEARED -->|Yes| RETRY_AUTH
-    RATE_CLEARED -->|No| RATE_TIMEOUT[Rate Limit Timeout]
-    
-    AUTH_RESTORED --> AUDIT_SUCCESS[Audit Success]
-    PERM_AUTH_ERROR --> AUDIT_ERROR[Audit Error]
-    CONFIG_ERROR --> AUDIT_ERROR
-    SERVICE_UNAVAILABLE --> AUDIT_ERROR
-    RATE_TIMEOUT --> AUDIT_ERROR
-    REFRESH_FAILED --> AUDIT_ERROR
-    
-    AUDIT_SUCCESS --> CONTINUE_OPERATION[Continue Operation]
-    AUDIT_ERROR --> ERROR_RESPONSE[Return Error Response]
-    
-    CONTINUE_OPERATION --> END[End Error Handling]
-    ERROR_RESPONSE --> END
-```
-
-#### 4.4.3.2 API Error Recovery Flow
-
-```mermaid
-flowchart TD
-    API_ERROR[API Error Detected] --> ERROR_CODE{HTTP Status Code?}
-    
-    ERROR_CODE -->|401| UNAUTHORIZED[401 Unauthorized]
-    ERROR_CODE -->|403| FORBIDDEN[403 Forbidden]
-    ERROR_CODE -->|429| RATE_LIMITED[429 Rate Limited]
-    ERROR_CODE -->|500| SERVER_ERROR[500 Server Error]
-    ERROR_CODE -->|502| BAD_GATEWAY[502 Bad Gateway]
-    ERROR_CODE -->|503| SERVICE_UNAVAILABLE[503 Service Unavailable]
-    ERROR_CODE -->|Other| UNKNOWN_ERROR[Unknown Error]
-    
-    UNAUTHORIZED --> REAUTH_FLOW[Reauthentication Flow]
-    REAUTH_FLOW --> REAUTH_SUCCESS{Reauth Success?}
-    REAUTH_SUCCESS -->|Yes| RETRY_ORIGINAL[Retry Original Request]
-    REAUTH_SUCCESS -->|No| AUTH_FAILURE[Authentication Failure]
-    
-    FORBIDDEN --> PERMISSION_CHECK[Check Permissions]
-    PERMISSION_CHECK --> SCOPE_VIOLATION[Scope Violation]
-    SCOPE_VIOLATION --> PERMISSION_ERROR[Permission Error Response]
-    
-    RATE_LIMITED --> RATE_LIMIT_HANDLER[Rate Limit Handler]
-    RATE_LIMIT_HANDLER --> EXTRACT_RETRY_AFTER[Extract Retry-After Header]
-    EXTRACT_RETRY_AFTER --> WAIT_PERIOD[Wait for Specified Period]
-    WAIT_PERIOD --> RETRY_AFTER_WAIT[Retry After Wait]
-    
-    SERVER_ERROR --> RETRY_LOGIC[Apply Retry Logic]
-    BAD_GATEWAY --> RETRY_LOGIC
-    SERVICE_UNAVAILABLE --> RETRY_LOGIC
-    
-    RETRY_LOGIC --> RETRY_COUNT{Retry Count < Max?}
-    RETRY_COUNT -->|Yes| EXPONENTIAL_BACKOFF[Exponential Backoff]
-    RETRY_COUNT -->|No| MAX_RETRIES_EXCEEDED[Max Retries Exceeded]
-    
-    EXPONENTIAL_BACKOFF --> BACKOFF_DELAY[Calculate Backoff Delay]
-    BACKOFF_DELAY --> WAIT_BACKOFF[Wait for Backoff Period]
-    WAIT_BACKOFF --> RETRY_REQUEST[Retry Request]
-    
-    UNKNOWN_ERROR --> LOG_UNKNOWN[Log Unknown Error]
-    LOG_UNKNOWN --> GENERIC_RETRY[Apply Generic Retry]
-    
-    RETRY_ORIGINAL --> SUCCESS_CHECK{Request Success?}
-    RETRY_AFTER_WAIT --> SUCCESS_CHECK
-    RETRY_REQUEST --> SUCCESS_CHECK
-    GENERIC_RETRY --> SUCCESS_CHECK
-    
-    SUCCESS_CHECK -->|Yes| RECOVERY_SUCCESS[Recovery Successful]
-    SUCCESS_CHECK -->|No| RECOVERY_FAILED[Recovery Failed]
-    
-    AUTH_FAILURE --> FINAL_ERROR[Final Error Response]
-    PERMISSION_ERROR --> FINAL_ERROR
-    MAX_RETRIES_EXCEEDED --> FINAL_ERROR
-    RECOVERY_FAILED --> FINAL_ERROR
-    
-    RECOVERY_SUCCESS --> AUDIT_RECOVERY[Audit Recovery]
-    FINAL_ERROR --> AUDIT_ERROR[Audit Error]
-    
-    AUDIT_RECOVERY --> RETURN_SUCCESS[Return Success Response]
-    AUDIT_ERROR --> RETURN_ERROR[Return Error Response]
-    
-    RETURN_SUCCESS --> END[End Error Handling]
-    RETURN_ERROR --> END
-```
-
-### 4.4.4 Integration Sequence Diagrams
-
-#### 4.4.4.1 Complete MCP Protocol Interaction
-
-```mermaid
-sequenceDiagram
-    participant CLIENT as Claude Desktop
-    participant MCP as MCP Server
-    participant AUTH as Auth Manager
-    participant RESOURCE as Resource Manager
-    participant API as LabArchives API
-    participant AUDIT as Audit System
-    
-    Note over CLIENT,AUDIT: MCP Protocol Handshake
-    CLIENT->>MCP: Initialize Request
-    MCP->>MCP: Parse JSON-RPC Message
-    MCP->>CLIENT: Initialize Response (Capabilities)
-    
-    Note over CLIENT,AUDIT: Authentication Phase
-    CLIENT->>MCP: First Request
-    MCP->>AUTH: Validate Session
-    AUTH->>AUTH: Check Token Expiry
-    
-    alt Token Valid
-        AUTH->>MCP: Session Valid
-    else Token Expired
-        AUTH->>API: Refresh Token
-        API->>AUTH: New Token
-        AUTH->>MCP: Session Refreshed
-    end
-    
-    AUTH->>AUDIT: Log Authentication Event
-    
-    Note over CLIENT,AUDIT: Resource Discovery
-    CLIENT->>MCP: resources/list
-    MCP->>RESOURCE: List Resources
-    RESOURCE->>RESOURCE: Apply Scope Filter
-    RESOURCE->>API: Get Notebooks
-    API->>RESOURCE: Notebook List
-    RESOURCE->>RESOURCE: Transform to MCP Format
-    RESOURCE->>AUDIT: Log Resource Access
-    RESOURCE->>MCP: Resource List
-    MCP->>CLIENT: resources/list Response
-    
-    Note over CLIENT,AUDIT: Content Retrieval
-    CLIENT->>MCP: resources/read
-    MCP->>RESOURCE: Read Resource
-    RESOURCE->>RESOURCE: Validate URI & Scope
-    RESOURCE->>API: Get Content
-    API->>RESOURCE: Content Data
-    RESOURCE->>RESOURCE: Transform to JSON
-    RESOURCE->>AUDIT: Log Content Access
-    RESOURCE->>MCP: Content Response
-    MCP->>CLIENT: resources/read Response
-    
-    Note over CLIENT,AUDIT: Error Handling Example
-    CLIENT->>MCP: resources/read (Invalid URI)
-    MCP->>RESOURCE: Read Resource
-    RESOURCE->>RESOURCE: Validate URI
-    RESOURCE->>MCP: Invalid URI Error
-    MCP->>AUDIT: Log Error
-    MCP->>CLIENT: Error Response
-    
-    Note over CLIENT,AUDIT: Graceful Shutdown
-    CLIENT->>MCP: Disconnect
-    MCP->>AUTH: Cleanup Session
-    MCP->>AUDIT: Log Disconnection
-    MCP->>MCP: Prepare for Next Client
-```
-
-#### 4.4.4.2 Authentication and Session Management
-
-```mermaid
-sequenceDiagram
-    participant SERVER as MCP Server
-    participant AUTH as Auth Manager
-    participant API as LabArchives API
-    participant STORAGE as Session Storage
-    participant AUDIT as Audit System
-    
-    Note over SERVER,AUDIT: Initial Authentication
-    SERVER->>AUTH: Initialize Authentication
-    AUTH->>AUTH: Determine Auth Mode
-    
-    alt API Key Mode
-        AUTH->>AUTH: Load API Key from Environment
-        AUTH->>API: Authenticate with API Key
-    else SSO Token Mode
-        AUTH->>AUTH: Load SSO Token
-        AUTH->>API: Authenticate with SSO Token
-    end
-    
-    API->>AUTH: Session Token (3600s TTL)
-    AUTH->>STORAGE: Store Session Metadata
-    AUTH->>AUDIT: Log Successful Authentication
-    AUTH->>SERVER: Authentication Complete
-    
-    Note over SERVER,AUDIT: Session Validation Loop
-    loop Every Request
-        SERVER->>AUTH: Validate Session
-        AUTH->>AUTH: Check Token Expiry
-        
-        alt Token Valid
-            AUTH->>SERVER: Session Valid
-        else Token Near Expiry (< 300s)
-            AUTH->>API: Refresh Token
-            API->>AUTH: New Session Token
-            AUTH->>STORAGE: Update Session Metadata
-            AUTH->>AUDIT: Log Token Refresh
-            AUTH->>SERVER: Session Refreshed
-        else Token Expired
-            AUTH->>API: Reauthenticate
-            
-            alt Reauthentication Success
-                API->>AUTH: New Session Token
-                AUTH->>STORAGE: Update Session Metadata
-                AUTH->>AUDIT: Log Reauthentication
-                AUTH->>SERVER: Session Restored
-            else Reauthentication Failed
-                AUTH->>AUDIT: Log Authentication Failure
-                AUTH->>SERVER: Authentication Failed
-            end
-        end
-    end
-    
-    Note over SERVER,AUDIT: Session Cleanup
-    SERVER->>AUTH: Shutdown Signal
-    AUTH->>STORAGE: Clear Session Data
-    AUTH->>AUDIT: Log Session Termination
-    AUTH->>SERVER: Cleanup Complete
-```
-
-### 4.4.5 State Transition Diagrams
-
-#### 4.4.5.1 Server Lifecycle States
-
-```mermaid
-stateDiagram-v2
-    [*] --> Starting
-    Starting --> Initializing : Parse CLI Args
-    Initializing --> Scrubbing : Argument Parsing Complete
-    Scrubbing --> Configuring : Credentials Sanitized
-    Configuring --> Authenticating : Configuration Valid
-    Authenticating --> ResourceInit : Authentication Success
-    ResourceInit --> MCPInit : Resource Manager Ready
-    MCPInit --> Ready : MCP Server Started
-    
-    Ready --> Serving : Client Connection
-    Serving --> Ready : Client Disconnection
-    Ready --> Maintenance : Maintenance Mode
-    Maintenance --> Ready : Maintenance Complete
-    
-    %% Error States
-    Configuring --> ConfigError : Invalid Configuration
-    Authenticating --> AuthError : Authentication Failed  
-    ResourceInit --> InitError : Resource Init Failed
-    MCPInit --> InitError : MCP Init Failed
-    
-    %% Error Recovery
-    ConfigError --> Configuring : Fix Configuration
-    AuthError --> Authenticating : Fix Authentication
-    InitError --> Starting : Restart Required
-    
-    %% Shutdown States
-    Ready --> Shutting : Shutdown Signal
-    Serving --> Shutting : Shutdown Signal
-    Maintenance --> Shutting : Shutdown Signal
-    ConfigError --> Shutting : Fatal Error
-    AuthError --> Shutting : Fatal Error
-    InitError --> Shutting : Fatal Error
-    
-    Shutting --> Cleanup : Begin Cleanup
-    Cleanup --> [*] : Cleanup Complete
-    
-    %% State Annotations
-    state Starting {
-        [*] --> ParseArgs
-        ParseArgs --> ValidateArgs
-        ValidateArgs --> [*]
-    }
-    
-    state Scrubbing {
-        [*] --> ScrubCredentials
-        ScrubCredentials --> ValidateScrubbing
-        ValidateScrubbing --> [*]
-    }
-    
-    state Serving {
-        [*] --> ProcessingRequest
-        ProcessingRequest --> WaitingForRequest
-        WaitingForRequest --> ProcessingRequest
-        ProcessingRequest --> [*]
-    }
-    
-    state Maintenance {
-        [*] --> LogRotation
-        LogRotation --> HealthCheck
-        HealthCheck --> MetricsCollection
-        MetricsCollection --> [*]
-    }
-```
-
-#### 4.4.5.2 Authentication Session States
-
-```mermaid
-stateDiagram-v2
-    [*] --> Unauthenticated
-    Unauthenticated --> Authenticating : Credentials Provided
-    Authenticating --> Authenticated : Validation Success
-    Authenticated --> Active : Session Established
-    
-    Active --> Renewing : Token Near Expiry
-    Renewing --> Active : Renewal Success
-    Renewing --> Expired : Renewal Failed
-    
-    Active --> Expired : Session Timeout
-    Expired --> Authenticating : Reauthentication
-    
-    Authenticating --> Invalid : Invalid Credentials
-    Invalid --> Unauthenticated : Reset Credentials
-    
-    Active --> Terminated : Explicit Logout
-    Expired --> Terminated : Cleanup
-    Terminated --> [*]
-    
-    %% Session Monitoring
-    state Active {
-        [*] --> Monitoring
-        Monitoring --> ValidatingRequests
-        ValidatingRequests --> Monitoring
-        Monitoring --> [*]
-    }
-    
-    state Renewing {
-        [*] --> TokenRefresh
-        TokenRefresh --> ValidationCheck
-        ValidationCheck --> [*]
-    }
-    
-    state Expired {
-        [*] --> CleanupSession
-        CleanupSession --> LogExpiration
-        LogExpiration --> [*]
-    }
+    Start([Request Received]) --> A{Valid<br/>JSON-RPC?}
+    A -->|No| B[Protocol Error]
+    A -->|Yes| C{Valid<br/>Method?}
+    
+    C -->|No| D[Method Not Found]
+    C -->|Yes| E{Auth<br/>Required?}
+    
+    E -->|Yes| F{Valid<br/>Session?}
+    E -->|No| G[Process Request]
+    
+    F -->|No| H[Auth Error]
+    F -->|Yes| I{Scope<br/>Check?}
+    
+    I -->|Fail| J[Access Denied]
+    I -->|Pass| K{Rate<br/>Limit?}
+    
+    K -->|Exceeded| L[Rate Limit Error]
+    K -->|OK| G
+    
+    G --> M{Valid<br/>Parameters?}
+    M -->|No| N[Validation Error]
+    M -->|Yes| O[Execute Request]
+    
+    B --> P[Error Response]
+    D --> P
+    H --> P
+    J --> P
+    L --> P
+    N --> P
+    
+    O --> Q{Success?}
+    Q -->|No| R[Operation Error]
+    Q -->|Yes| S[Success Response]
+    
+    R --> P
+    P --> T[Log Event]
+    S --> T
+    T --> End([Response Sent])
 ```
 
 #### References
 
-**System Architecture Analysis:**
-- `src/cli/main.py` - Main application entry point and startup workflow
-- `src/cli/mcp_server.py` - MCP server orchestration and lifecycle management
-- `src/cli/commands/start.py` - Start command implementation and configuration
-- `src/cli/mcp/handlers.py` - MCP protocol message handling and routing
-- `src/cli/resource_manager.py` - Resource discovery and retrieval implementation
-- `src/cli/api/client.py` - LabArchives API client and integration layer
+#### Technical Specification Sections
+- `1.1 EXECUTIVE SUMMARY` - Project overview and business context
+- `1.2 SYSTEM OVERVIEW` - System architecture and component integration
+- `2.1 FEATURE CATALOG` - Complete feature implementations (F-001 through F-008)
+- `3.7 INTEGRATION ARCHITECTURE` - Technology stack and integration patterns
 
-**Technical Specification References:**
-- `1.2 SYSTEM OVERVIEW` - High-level architecture and component interactions
-- `2.1 FEATURE CATALOG` - Comprehensive feature requirements and implementations
-- `2.2 FUNCTIONAL REQUIREMENTS TABLE` - Detailed performance and technical specifications
-- `3.8 INTEGRATION REQUIREMENTS` - System integration patterns and scalability
+#### Implementation Analysis
+- MCP Protocol implementation and JSON-RPC 2.0 communication patterns
+- LabArchives API integration across multiple regions (US, AU, UK)
+- Authentication mechanisms supporting API keys and user tokens
+- Resource discovery and content retrieval workflows
+- Scope enforcement and access control implementations
+- Comprehensive audit logging and compliance requirements
+- Error handling and retry mechanisms
+- Performance requirements and SLA considerations
 
-**Security and Compliance Documentation:**
-- `2.1.5 F-005: Authentication and Security Management` - Security control implementation
-- `2.1.8 F-008: Comprehensive Audit Logging` - Audit trail and credential protection
-- `3.7 SECURITY & COMPLIANCE TOOLS` - Security tooling and compliance frameworks
-- `4.1 SYSTEM WORKFLOWS` - Comprehensive workflow documentation with security controls
-
-**Infrastructure and Deployment:**
-- `infrastructure/docker-compose.*.yml` - Container orchestration and deployment
-- `infrastructure/kubernetes/` - Kubernetes manifests and service definitions
-- `.github/workflows/ci.yml` - CI/CD pipeline and automated testing
-- `.github/workflows/deploy.yml` - Deployment automation and release management
+#### External Standards
+- Model Context Protocol (MCP) specification for AI-data integration
+- JSON-RPC 2.0 protocol for client-server communication
+- REST API patterns for LabArchives integration
+- Security standards: SOC2, ISO 27001, HIPAA, GDPR compliance
+- Container orchestration with Docker and Kubernetes
+- Infrastructure as Code with Terraform
 
 # 5. SYSTEM ARCHITECTURE
 
@@ -3928,5960 +2522,6026 @@ stateDiagram-v2
 
 ### 5.1.1 System Overview
 
-The LabArchives MCP Server implements a **sophisticated client-server architecture** that serves as a strategic bridge between AI systems and LabArchives electronic lab notebooks. The architecture follows the **Bridge/Adapter pattern** to seamlessly connect disparate systems while maintaining strict security and compliance requirements. <span style="background-color: rgba(91, 57, 243, 0.2)">The system now enforces exact folder-scoped access control through the FolderPath value object, guaranteeing 403 ScopeViolation errors for any out-of-scope list or read operations.</span>
+The LabArchives MCP Server implements a **stateless client-server architecture** following the Model Context Protocol (MCP) specifications, specifically designed to bridge the gap between AI applications and laboratory research data. The system employs a **layered architecture pattern** with clear separation of concerns across five distinct layers:
 
-**Architecture Style and Rationale:**
-The system employs a **microservices-oriented client-server architecture** with stateless operation principles. This design choice supports horizontal scaling, fault tolerance, and simplified deployment across diverse environments. The architecture prioritizes **zero-persistence for research data** while maintaining essential operational state, ensuring compliance with data governance requirements and minimizing security risks.
+1. **Protocol Layer**: Handles MCP/JSON-RPC 2.0 communication with AI clients
+2. **Authentication Layer**: Manages HMAC-SHA256 based security and session management <span style="background-color: rgba(91, 57, 243, 0.2)">with automatic session-refresh checks and re-authentication before each API call, eliminating hard-coded session lifetime assumptions</span>
+3. **Business Logic Layer**: Orchestrates resource management and <span style="background-color: rgba(91, 57, 243, 0.2)">immediate, fail-secure (deny-by-default) scope enforcement</span>
+4. **Integration Layer**: Provides standardized interface to LabArchives REST API
+5. **Infrastructure Layer**: Supports container orchestration and cloud deployment
 
-**Key Architectural Principles:**
-- **Protocol Compliance**: Full adherence to Model Context Protocol specification (2024-11-05)
-- **Security-First Design**: Multi-layered security with comprehensive audit logging
-- **Stateless Operation**: No research data persistence, only operational state management
-- **Enterprise-Grade Scalability**: Containerized deployment with Kubernetes orchestration
-- **Fault Tolerance**: Comprehensive error handling with graceful degradation
-- <span style="background-color: rgba(91, 57, 243, 0.2)">**Exact Folder-Scoped Access Control**: Using FolderPath tuple-based comparison (no substring matching)</span>
+The architecture follows **security-first design principles** with comprehensive audit logging, **cross-platform compatibility** supporting Windows, macOS, and Linux environments, and **horizontal scalability** through container orchestration. The system maintains **stateless operations** with no persistent storage requirements, enabling **on-demand data retrieval** without caching or synchronization overhead.
 
-**System Boundaries and Major Interfaces:**
-The system operates within clearly defined boundaries, interfacing with MCP-compatible clients through JSON-RPC 2.0 transport and connecting to LabArchives REST API endpoints across regional deployments. <span style="background-color: rgba(91, 57, 243, 0.2)">The architecture enforces strict scope limitations and access controls with mandatory 403 ScopeViolation response semantics for out-of-scope requests,</span> maintaining data security while enabling AI-enhanced research workflows.
+<span style="background-color: rgba(91, 57, 243, 0.2)">The system incorporates a new **Security Utilities module** that provides cross-cutting security capabilities including URL-parameter sanitization and reusable scope-validation helpers. These utilities are leveraged across multiple architectural layers to ensure consistent security practices and prevent sensitive information exposure in logs and debug outputs.</span>
+
+The architectural approach addresses the fundamental N×M integration problem by providing a single, standardized interface that enables any MCP-compatible AI application to access LabArchives data across all global regions (US, AU, UK) without requiring custom integration development.
 
 ### 5.1.2 Core Components Table
 
-| Component Name | Primary Responsibility | Key Dependencies | Integration Points | Critical Considerations |
-|---------------|----------------------|------------------|-------------------|----------------------|
-| **MCP Protocol Handler** | JSON-RPC 2.0 message processing and capability negotiation | FastMCP framework, Pydantic models | Claude Desktop, MCP clients | Protocol compliance, message validation |
-| **Authentication Manager** | Dual-mode authentication with session management | HMAC-SHA256, environment variables | LabArchives API, credential storage | Security, session lifecycle, token renewal |
-| **Resource Manager** | URI parsing, scope enforcement, resource discovery | MCP SDK, authentication manager, <span style="background-color: rgba(91, 57, 243, 0.2)">FolderPath value object</span> | API client, protocol handler | <span style="background-color: rgba(91, 57, 243, 0.2)">Exact hierarchical scope validation (no substring matching) and two-phase listing logic</span> |
-| **API Integration Layer** | LabArchives REST API communication | HTTP requests, retry mechanisms | LabArchives endpoints, response parser | Regional endpoints, error handling |
+| Component Name | Primary Responsibility | Key Dependencies | Integration Points |
+|---------------|----------------------|------------------|-------------------|
+| **MCP Protocol Handler** | JSON-RPC 2.0 communication management and protocol routing | FastMCP ≥1.0.0, Python 3.11+ | AI clients via stdin/stdout, Resource Manager |
+| **Authentication Manager** | Credential management, session security, <span style="background-color: rgba(91, 57, 243, 0.2)">and automatic session refresh</span> | labarchives-py ≥0.1.0, requests ≥2.31.0 | LabArchives API, Configuration Manager |
+| **Resource Manager** | Hierarchical resource discovery, MCP transformation, <span style="background-color: rgba(91, 57, 243, 0.2)">immediate fail-secure scope checks and root-level page inclusion logic</span> | Pydantic ≥2.11.7, JSON-LD context | LabArchives API, Scope Enforcement Service |
+| **LabArchives API Client** | REST API integration with multi-region support <span style="background-color: rgba(91, 57, 243, 0.2)">and sanitized debug logging</span> | requests ≥2.31.0, urllib3 ≥2.0.0, <span style="background-color: rgba(91, 57, 243, 0.2)">Security Utilities.sanitizers</span> | LabArchives endpoints, Authentication Manager |
+| <span style="background-color: rgba(91, 57, 243, 0.2)">**Security Utilities**</span> | <span style="background-color: rgba(91, 57, 243, 0.2)">URL/parameter sanitization and shared scope validators</span> | <span style="background-color: rgba(91, 57, 243, 0.2)">urllib.parse (stdlib)</span> | <span style="background-color: rgba(91, 57, 243, 0.2)">Logging Setup, Resource Manager, API Client</span> |
 
 ### 5.1.3 Data Flow Description
 
-**Primary Data Flow Pattern:**
-The system implements a **request-response data flow** with real-time processing and zero-persistence architecture. Data flows unidirectionally from LabArchives through the MCP server to AI clients, with no local storage of research content.
+The system implements **three primary data flows** that enable seamless AI-research data integration:
 
-**Integration Patterns and Protocols:**
-- **MCP Client Communication**: JSON-RPC 2.0 over stdin/stdout with structured capability negotiation
-- **LabArchives API Integration**: REST API with HMAC-SHA256 authentication and regional endpoint support
-- **Authentication Flow**: Dual-mode authentication supporting permanent API keys and temporary SSO tokens
-- **Error Propagation**: Structured error handling with comprehensive retry mechanisms
+**Authentication Flow**: Client credentials are processed through the Authentication Manager, which validates them against the appropriate LabArchives regional endpoint using HMAC-SHA256 signing. <span style="background-color: rgba(91, 57, 243, 0.2)">Before each API operation, the system checks for session expiration and automatically re-authenticates as needed, ensuring continuous availability without manual intervention.</span> Successful authentication creates a session context enabling subsequent resource operations without re-authentication overhead.
 
-**Data Transformation Points:**
-- **API Response Parsing**: XML/JSON transformation to structured Python objects
-- **MCP Resource Formatting**: Conversion to MCP-compliant resource representations
-- **JSON-LD Enrichment**: Optional semantic web context for enhanced interoperability
-- **Audit Log Generation**: Structured logging for compliance and monitoring
+**Resource Discovery Flow**: MCP clients request resource listings through the Protocol Handler, which routes requests to the Resource Manager. The Resource Manager queries the LabArchives API for hierarchical data (notebooks → pages → entries), applies scope filtering based on configuration, and transforms the results into MCP-compliant resource objects with proper URI formatting and metadata preservation. <span style="background-color: rgba(91, 57, 243, 0.2)">When `folder_path` is empty or set to `/`, the system explicitly includes root-level pages to ensure complete data visibility within the configured scope.</span>
 
-**Key Data Stores and Caches:**
-- **Configuration Cache**: In-memory parsed configuration with hierarchical precedence
-- **Session Cache**: Temporary authentication state with 3600-second lifetime
-- **Connection Pool**: HTTP connection reuse for performance optimization
-- **Audit Storage**: Persistent structured logs with rotation and retention policies
+**Content Retrieval Flow**: Content requests are parsed for resource URIs, validated against scope permissions, and forwarded to the LabArchives API. Retrieved content undergoes transformation to structured JSON format with optional JSON-LD semantic context enrichment, providing AI applications with properly formatted research data while maintaining audit trails.
+
+The system employs **integration patterns** including exponential backoff with jitter for retry logic, connection pooling for API efficiency, and comprehensive error handling with graceful degradation capabilities. **Key data stores** include temporary session storage for authentication contexts and structured audit logs for compliance requirements.
 
 ### 5.1.4 External Integration Points
 
-| System Name | Integration Type | Data Exchange Pattern | Protocol/Format | SLA Requirements |
-|-------------|------------------|----------------------|-----------------|------------------|
-| **LabArchives API** | REST API Integration | Request/Response | HTTPS, JSON/XML | <2s P95 latency |
-| **Claude Desktop** | MCP Client | Bidirectional RPC | JSON-RPC 2.0 | Real-time interaction |
-| **MCP Clients** | Protocol Implementation | Resource Discovery | JSON-RPC 2.0 | MCP specification compliance |
-| **Audit Systems** | Logging Integration | Structured Logging | JSON format | 99.9% availability |
+| System Name | Integration Type | Data Exchange Pattern | Protocol/Format |
+|-------------|------------------|----------------------|-----------------|
+| **LabArchives API** | REST API Client | Request-response with authentication | HTTPS/JSON with HMAC-SHA256 |
+| **MCP Clients** | Protocol Server | Bidirectional messaging | JSON-RPC 2.0 over stdin/stdout |
+| **AWS CloudWatch** | Monitoring Service | Metrics and log streaming | CloudWatch API/JSON |
+| **Kubernetes** | Container Orchestration | Health checks and service discovery | HTTP/JSON health endpoints |
 
 ## 5.2 COMPONENT DETAILS
 
 ### 5.2.1 MCP Protocol Handler
 
-**Purpose and Responsibilities:**
-The MCP Protocol Handler serves as the primary communication interface, implementing complete JSON-RPC 2.0 message processing with capability negotiation and resource management. It orchestrates the entire request lifecycle from client connection through response delivery.
+**Purpose and Responsibilities**: The MCP Protocol Handler serves as the core communication interface, managing all JSON-RPC 2.0 protocol operations including initialization, capability negotiation, and request routing. It maintains protocol compliance while providing robust error handling and response formatting.
 
-**Technologies and Frameworks:**
-- **FastMCP Framework (>=1.0.0)**: High-performance MCP server implementation
-- **Official MCP SDK (>=1.0.0)**: Protocol compliance and message handling
-- **Pydantic (>=2.11.7)**: Data validation and serialization
-- **JSON-RPC 2.0**: Transport protocol implementation
+**Technologies and Frameworks**: Built on FastMCP ≥1.0.0 framework with Python 3.11+ runtime, utilizing Click ≥8.0.0 for CLI integration and Pydantic ≥2.11.7 for message validation and serialization.
 
-**Key Interfaces and APIs:**
-- **Client Interface**: stdin/stdout communication with JSON-RPC 2.0 protocol
-- **Capability Negotiation**: Server capabilities advertisement and client compatibility
-- **Resource Operations**: List and read operations with URI-based resource identification
-- **Error Handling**: Structured error responses with detailed diagnostics
+**Key Interfaces and APIs**: Implements MCP protocol methods including `initialize`, `resources/list`, `resources/read`, and `notifications/cancelled`. Provides stdin/stdout communication channel for AI clients and internal API for component integration.
 
-**Scaling Considerations:**
-The protocol handler is designed for horizontal scaling with stateless operation, supporting multiple concurrent client connections through efficient message routing and connection pooling.
+**Data Persistence Requirements**: Maintains no persistent storage, operating in stateless mode with all session data managed in-memory with configurable timeouts.
 
-```mermaid
-graph TD
-    subgraph "MCP Protocol Handler"
-        JSON_RPC[JSON-RPC 2.0 Parser]
-        CAP_NEG[Capability Negotiation]
-        MSG_ROUTER[Message Router]
-        RESPONSE[Response Handler]
-        ERROR[Error Handler]
-    end
-    
-    CLIENT[MCP Client] --> JSON_RPC
-    JSON_RPC --> CAP_NEG
-    CAP_NEG --> MSG_ROUTER
-    MSG_ROUTER --> RESPONSE
-    MSG_ROUTER --> ERROR
-    RESPONSE --> CLIENT
-    ERROR --> CLIENT
-```
-
-### 5.2.2 Authentication Manager
-
-**Purpose and Responsibilities:**
-Manages dual-mode authentication supporting both permanent API keys and temporary SSO tokens, with comprehensive session lifecycle management and automatic token renewal capabilities.
-
-**Technologies and Frameworks:**
-- **HMAC-SHA256**: Cryptographic signing for API requests
-- **Environment Variables**: Secure credential storage
-- **Session Management**: In-memory session state with automatic cleanup
-- **Token Validation**: Real-time authentication state verification
-
-**Key Interfaces and APIs:**
-- **Credential Validation**: Multi-mode authentication support
-- **Session Management**: 3600-second session lifecycle with renewal
-- **Token Refresh**: Automatic token renewal near expiration
-- **Audit Integration**: Comprehensive security event logging
-
-**Data Persistence Requirements:**
-Zero-persistence for credentials with session metadata stored in memory only. Audit logs maintain authentication events for compliance requirements.
-
-```mermaid
-stateDiagram-v2
-    [*] --> Unauthenticated
-    Unauthenticated --> Authenticating : Credentials Provided
-    Authenticating --> Authenticated : Validation Success
-    Authenticated --> Active : Session Established
-    Active --> Renewing : Token Near Expiry
-    Renewing --> Active : Renewal Success
-    Active --> Expired : 3600s Timeout
-    Expired --> Authenticating : Reauthentication
-    Authenticating --> Failed : Invalid Credentials
-    Failed --> Unauthenticated : Reset Required
-```
-
-### 5.2.3 Resource Manager
-
-**Purpose and Responsibilities:**
-Provides hierarchical resource discovery and access control, implementing <span style="background-color: rgba(91, 57, 243, 0.2)">strict folder-scoped access control</span> and URI-based resource identification with intelligent filtering and organization. <span style="background-color: rgba(91, 57, 243, 0.2)">The system enforces exact folder-scoped access control via FolderPath.is_parent_of() comparisons and blocks out-of-scope access with code 403 ScopeViolation responses.</span>
-
-**Technologies and Frameworks:**
-- **URI Parsing**: Custom `labarchives://` scheme implementation
-- **Scope Enforcement**: Configurable access control mechanisms
-- **Resource Enumeration**: Hierarchical structure representation
-- **Permission Validation**: Integration with LabArchives permission model
-- <span style="background-color: rgba(91, 57, 243, 0.2)">**FolderPath value object (models/scoping.py)**: Immutable tuple-based folder path comparison with exact prefix matching</span>
-
-**Key Interfaces and APIs:**
-- **Resource Discovery**: Hierarchical listing with scope filtering
-- **Content Retrieval**: Individual resource access with context preservation
-- **Scope Validation**: Multi-level permission enforcement
-- **URI Generation**: Standardized resource identification
-- <span style="background-color: rgba(91, 57, 243, 0.2)">**Error Handling**: read_resource() raises a 403 ScopeViolation error when a requested page or entry is outside the configured folder scope</span>
-
-**Scaling Considerations:**
-Optimized for large dataset navigation with intelligent caching and lazy loading mechanisms to handle extensive notebook collections efficiently. <span style="background-color: rgba(91, 57, 243, 0.2)">The system implements a two-phase listing algorithm: notebook filtering followed by page filtering, ensuring complete scope enforcement while maintaining performance for hierarchical resource discovery.</span>
-
-```mermaid
-graph LR
-    subgraph "Resource Hierarchy"
-        SCOPE[Scope Configuration]
-        NOTEBOOK[Notebook Level]
-        PAGE[Page Level]
-        ENTRY[Entry Level]
-    end
-    
-    SCOPE --> NOTEBOOK
-    NOTEBOOK --> PAGE
-    PAGE --> ENTRY
-    
-    subgraph "Access Control"
-        SCOPE_CHECK[Scope Validation]
-        PERM_CHECK[Permission Check]
-        RESOURCE_GEN[Resource Generation]
-    end
-    
-    SCOPE --> SCOPE_CHECK
-    SCOPE_CHECK --> PERM_CHECK
-    PERM_CHECK --> RESOURCE_GEN
-```
-
-### 5.2.4 API Integration Layer
-
-**Purpose and Responsibilities:**
-Manages all communication with LabArchives REST API endpoints, implementing comprehensive error handling, retry mechanisms, and regional endpoint support with performance optimization.
-
-**Technologies and Frameworks:**
-- **HTTP Requests (>=2.31.0)**: Primary HTTP client library
-- **Connection Pooling**: Performance optimization for API calls
-- **Retry Mechanisms**: Exponential backoff with circuit breaker patterns
-- **Regional Endpoints**: Multi-region support for global deployments
-
-**Key Interfaces and APIs:**
-- **REST API Client**: LabArchives API communication
-- **Response Processing**: XML/JSON parsing and validation
-- **Error Handling**: Structured exception hierarchy
-- **Performance Monitoring**: Request/response metrics collection
-
-**Data Persistence Requirements:**
-No persistence of API responses, with connection pooling for performance optimization and audit logging for all API interactions.
+**Scaling Considerations**: Supports horizontal scaling through container replication with load balancing. Each instance operates independently without shared state requirements.
 
 ```mermaid
 sequenceDiagram
-    participant CLIENT as MCP Client
-    participant SERVER as MCP Server
+    participant Client as MCP Client
+    participant Handler as Protocol Handler
+    participant Auth as Auth Manager
+    participant Resource as Resource Manager
     participant API as LabArchives API
-    participant AUDIT as Audit System
     
-    CLIENT->>SERVER: Resource Request
-    SERVER->>API: Authenticated API Call
-    API->>SERVER: API Response
-    SERVER->>AUDIT: Log API Access
-    SERVER->>CLIENT: Formatted Response
+    Client->>Handler: initialize
+    Handler->>Auth: validate_credentials
+    Auth->>API: authenticate
+    API-->>Auth: session_token
+    Auth-->>Handler: authenticated
+    Handler-->>Client: initialized
     
-    Note over SERVER,API: Retry Logic with Exponential Backoff
-    Note over SERVER,AUDIT: Comprehensive Audit Trail
+    Client->>Handler: resources/list
+    Handler->>Resource: list_resources
+    Resource->>API: get_notebooks
+    API-->>Resource: notebook_data
+    Resource-->>Handler: mcp_resources
+    Handler-->>Client: resource_list
+    
+    Client->>Handler: resources/read
+    Handler->>Resource: read_resource
+    Resource->>API: get_content
+    API-->>Resource: content_data
+    Resource-->>Handler: mcp_content
+    Handler-->>Client: resource_content
+```
+
+### 5.2.2 Authentication Manager (updated)
+
+**Purpose and Responsibilities**: Manages secure authentication workflows supporting both API keys and temporary user tokens. Handles session lifecycle management, credential validation, and multi-region authentication routing. <span style="background-color: rgba(91, 57, 243, 0.2)">Ensures correct use of `access_password` parameter when instantiating LabArchivesAPI for secure credential handling</span>. <span style="background-color: rgba(91, 57, 243, 0.2)">Performs proactive session refresh when token is near expiry</span> to maintain continuous availability without manual intervention.
+
+**Technologies and Frameworks**: Utilizes labarchives-py ≥0.1.0 SDK for official LabArchives integration, requests ≥2.31.0 for HTTP operations, and built-in hashlib for HMAC-SHA256 signature generation.
+
+**Key Interfaces and APIs**: Provides authentication API with methods for credential validation, session creation, token refresh, and region detection. Integrates with Configuration Manager for credential sourcing.
+
+**Data Persistence Requirements**: Maintains temporary session storage with 3600-second expiration. No persistent credential storage for security compliance.
+
+**Scaling Considerations**: Stateless design enables horizontal scaling. Session state maintained per-instance without cross-instance dependencies.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Uninitialized
+    Uninitialized --> Authenticating: credentials_provided
+    Authenticating --> Authenticated: success
+    Authenticating --> Failed: invalid_credentials
+    Failed --> Authenticating: retry
+    Authenticated --> Active: first_request
+    Active --> Refreshing: expiration_warning
+    Refreshing --> Active: refresh_success
+    Refreshing --> Failed: refresh_failure
+    Active --> Expired: timeout
+    Expired --> Authenticating: re_authenticate
+    Active --> [*]: logout
+```
+
+### 5.2.3 Resource Manager (updated)
+
+**Purpose and Responsibilities**: Orchestrates hierarchical resource discovery and MCP transformation. Manages scope enforcement, content retrieval, and metadata enrichment while maintaining proper URI formatting and semantic context. <span style="background-color: rgba(91, 57, 243, 0.2)">Implements immediate, fail-secure validation via Security Utilities.validators</span>, ensuring unauthorized access attempts fail securely without exposing sensitive information. <span style="background-color: rgba(91, 57, 243, 0.2)">Incorporates logic that blocks reads when notebook is outside configured scope and includes special handling for root-level pages when folder scope is configured</span>.
+
+**Technologies and Frameworks**: Built with Pydantic ≥2.11.7 for data validation and transformation, utilizing JSON-LD context for semantic enrichment and custom URI parsing for resource identification. <span style="background-color: rgba(91, 57, 243, 0.2)">Integrates Security Utilities module for consistent scope validation across all operations</span>.
+
+**Key Interfaces and APIs**: Exposes resource management API with methods for listing, reading, and scope filtering. Implements MCP resource transformation with proper URI generation and metadata preservation. <span style="background-color: rgba(91, 57, 243, 0.2)">Utilizes Security Utilities.validators for all scope enforcement decisions</span>.
+
+**Data Persistence Requirements**: No persistent storage required. Operates on-demand with real-time API queries and dynamic transformation.
+
+**Scaling Considerations**: Stateless operation enables horizontal scaling. Resource operations are independent and can be load-balanced across multiple instances.
+
+```mermaid
+flowchart TD
+    A[Resource Request] --> B{Scope Filter<br/>via Security Utils}
+    B -->|Invalid Scope| C[Access Denied]
+    B -->|Notebook Scope| D[Validate Notebook Access]
+    B -->|Folder Scope| E[Check Folder Access]
+    B -->|Root Folder '/'| F[Include Root Pages]
+    B -->|No Scope| G[Apply Permissions]
+    
+    C --> H[Return Error]
+    D --> I{Notebook<br/>in Scope?}
+    I -->|No| C
+    I -->|Yes| G
+    
+    E --> J{Resource Type<br/>Notebook?}
+    J -->|Yes + Folder Only| C
+    J -->|No| G
+    
+    F --> G
+    G --> K[Fetch from API]
+    K --> L[Transform to MCP]
+    L --> M{JSON-LD Context?}
+    M -->|Yes| N[Add Semantic Context]
+    M -->|No| O[Standard Format]
+    
+    N --> P[Return Response]
+    O --> P
+```
+
+### 5.2.4 LabArchives API Client (updated)
+
+**Purpose and Responsibilities**: Provides standardized interface to LabArchives REST API across all global regions. Handles authentication, request signing, response parsing, and error management with comprehensive retry logic. <span style="background-color: rgba(91, 57, 243, 0.2)">Sanitizes sensitive query parameters in all debug logs via Security Utilities.sanitizers</span> to prevent credential exposure in logs and monitoring systems.
+
+**Technologies and Frameworks**: Built on requests ≥2.31.0 with urllib3 ≥2.0.0 for connection management. Integrates labarchives-py ≥0.1.0 for official API support and maintains compatibility across all LabArchives regions. <span style="background-color: rgba(91, 57, 243, 0.2)">Utilizes Security Utilities module for parameter sanitization</span>.
+
+**Key Interfaces and APIs**: Implements REST client with methods for authentication, resource listing, content retrieval, and user management. Provides unified API regardless of regional deployment. <span style="background-color: rgba(91, 57, 243, 0.2)">Includes internal helper `mask_sensitive_query_params()` for secure debug logging</span>.
+
+**Data Persistence Requirements**: No persistent storage. Connection pooling and session management handled in-memory with configurable timeout settings.
+
+**Scaling Considerations**: Thread-safe design with connection pooling enables concurrent operations. Regional load balancing supported for multi-region deployments.
+
+```mermaid
+flowchart LR
+    subgraph "API Client"
+        A[Request] --> B[Add Auth]
+        B --> C[Sign HMAC]
+        C --> D[Sanitize Debug Logs]
+        D --> E[Send Request]
+    end
+    
+    subgraph "Regional Endpoints"
+        F[US API]
+        G[AU API]
+        H[UK API]
+    end
+    
+    subgraph "Response Handling"
+        I[Parse Response]
+        J[Error Handling]
+        K[Retry Logic]
+    end
+    
+    E --> F
+    E --> G
+    E --> H
+    
+    F --> I
+    G --> I
+    H --> I
+    
+    I --> J
+    J --> K
+    K --> A
+```
+
+### 5.2.5 Security Utilities Module (updated)
+
+**Purpose and Responsibilities**: Provides centralized security utilities for URL sanitization, parameter masking, and scope validation across all system components. Implements fail-secure validation patterns and consistent sanitization policies to prevent sensitive data exposure in logs and ensure secure resource access controls. Serves as the authoritative source for security-related validation and transformation logic.
+
+**Technologies and Frameworks**: Built using Python standard library components including urllib.parse for URL manipulation, re (regular expressions) for pattern matching and sanitization, and built-in security modules for consistent validation patterns.
+
+**Key Interfaces and APIs**: Exposes core security functions including `sanitize_url(url)` for URL parameter cleaning, `is_resource_in_scope(resource, scope)` for resource access validation, `mask_sensitive_query_params(params_dict)` for debug log sanitization, and `validate_scope_configuration(scope_config)` for configuration validation.
+
+**Data Persistence Requirements**: Purely functional module with no persistent storage requirements. All operations are stateless with no caching or session management.
+
+**Scaling Considerations**: Fully stateless and functional design enables unlimited horizontal scaling. All methods are thread-safe and can be called concurrently across multiple instances without coordination requirements.
+
+```mermaid
+flowchart TB
+    subgraph "URL Sanitization"
+        A[Input URL] --> B[Parse Components]
+        B --> C[Identify Sensitive Params]
+        C --> D[Apply Masking Rules]
+        D --> E[Rebuild Clean URL]
+    end
+    
+    subgraph "Scope Validation"
+        F[Resource + Scope] --> G[Parse Scope Rules]
+        G --> H{Scope Type?}
+        H -->|Notebook| I[Validate Notebook ID]
+        H -->|Folder| J[Validate Folder Path]
+        H -->|None| K[Allow All]
+        
+        I --> L{Match?}
+        J --> L
+        K --> M[Access Granted]
+        L -->|Yes| M
+        L -->|No| N[Access Denied]
+    end
+    
+    subgraph "Parameter Masking"
+        O[Query Parameters] --> P[Detect Sensitive Keys]
+        P --> Q[Apply Masking Pattern]
+        Q --> R[Return Masked Dict]
+    end
 ```
 
 ## 5.3 TECHNICAL DECISIONS
 
 ### 5.3.1 Architecture Style Decisions
 
-**Client-Server Architecture with MCP Protocol:**
+**Stateless Client-Server Architecture**: The decision to implement stateless architecture eliminates the need for persistent storage and session synchronization, enabling horizontal scaling and simplified deployment. This approach aligns with MCP protocol specifications and reduces operational complexity while maintaining security through token-based authentication.
 
-| Decision Factor | Rationale | Trade-offs | Alternative Considered |
-|----------------|-----------|------------|----------------------|
-| **Protocol Choice** | JSON-RPC 2.0 ensures compatibility with MCP ecosystem | Overhead vs. direct HTTP | Direct REST API |
-| **Stateless Design** | Scalability and security benefits | Performance vs. caching | Stateful session management |
-| **Zero-Persistence** | Compliance and security requirements | Performance vs. data protection | Local data caching |
+**Layered Architecture Pattern**: The five-layer design provides clear separation of concerns, enabling independent testing, maintenance, and scaling of each layer. This decision supports maintainability and allows for component replacement without affecting the entire system.
 
-**Decision Tree for Architecture Pattern:**
+**JSON-RPC 2.0 Protocol Choice**: Adoption of JSON-RPC 2.0 ensures compatibility with MCP specifications and provides standardized error handling, request/response patterns, and transport independence. This decision enables interoperability with all MCP-compatible AI applications.
+
+**<span style="background-color: rgba(91, 57, 243, 0.2)">Fail-Secure Scope Validation Architecture</span>**: <span style="background-color: rgba(91, 57, 243, 0.2)">The architectural decision to implement immediate fail-secure scope validation replaces the previous defer-check approach with strict boundary enforcement. This ensures that resource access validation occurs at the earliest possible point in the request lifecycle, preventing unauthorized access attempts from propagating through the system. The fail-secure design denies access by default when scope boundaries cannot be definitively validated, eliminating potential security gaps inherent in deferred validation patterns.</span>
 
 ```mermaid
-graph TD
-    START[Architecture Decision] --> PROTOCOL{Protocol Standard?}
-    PROTOCOL -->|Yes| MCP_CHOICE[MCP Protocol]
-    PROTOCOL -->|No| CUSTOM[Custom Protocol]
-    
-    MCP_CHOICE --> STATE{State Management?}
-    STATE -->|Stateless| ZERO_PERSIST[Zero-Persistence]
-    STATE -->|Stateful| CACHE_PERSIST[Caching Layer]
-    
-    ZERO_PERSIST --> SECURITY[Enhanced Security]
-    CACHE_PERSIST --> PERFORMANCE[Enhanced Performance]
-    
-    SECURITY --> FINAL[Selected Architecture]
-    PERFORMANCE --> COMPLIANCE{Compliance Requirements?}
-    COMPLIANCE -->|High| FINAL
-    COMPLIANCE -->|Low| CACHE_PERSIST
+graph TB
+    subgraph "Architecture Decision Tree"
+        A[Integration Requirements] --> B{Protocol Standard?}
+        B -->|MCP Required| C[JSON-RPC 2.0]
+        B -->|Custom| D[REST API]
+        
+        C --> E{State Management?}
+        E -->|Stateless| F[No Storage]
+        E -->|Stateful| G[Database Required]
+        
+        F --> H{Scaling Strategy?}
+        H -->|Horizontal| I[Container Orchestration]
+        H -->|Vertical| J[Resource Scaling]
+        
+        I --> K[Selected Architecture]
+    end
 ```
-
-**Additional Architecture Decisions:**
-- <span style="background-color: rgba(91, 57, 243, 0.2)">**CLI Flag Harmonization**: Introduced --access-key / -k as an alias for --access-key-id while retaining backward compatibility to improve user experience and maintain existing integrations</span>
 
 ### 5.3.2 Communication Pattern Choices
 
-**JSON-RPC 2.0 Selection:**
-The decision to implement JSON-RPC 2.0 over stdin/stdout provides several advantages:
-- **Standardization**: Full compliance with MCP specification
-- **Simplicity**: Direct communication without complex networking
-- **Security**: Process-level isolation and communication
-- **Performance**: Minimal overhead for local communication
+**Request-Response Pattern**: The synchronous request-response pattern provides predictable behavior and simplified error handling, essential for AI applications requiring reliable data access. This decision ensures consistent user experience and straightforward debugging.
 
-**Alternative Communication Patterns Evaluated:**
-- **HTTP REST API**: Rejected due to complexity and security concerns
-- **gRPC**: Rejected due to MCP protocol requirements
-- **WebSocket**: Rejected due to deployment complexity
+**Exponential Backoff with Jitter**: Implementation of exponential backoff with jitter for retry logic prevents API rate limiting and reduces system load during failures. The decision to use 2-second base delay with 2x backoff factor and 30-second maximum delay balances responsiveness with API protection.
+
+**Connection Pooling**: Utilization of connection pooling reduces establishment overhead and improves performance for multiple API calls. This decision optimizes resource utilization while maintaining security through proper connection lifecycle management.
+
+**<span style="background-color: rgba(91, 57, 243, 0.2)">Implicit Session Refresh Pattern</span>**: <span style="background-color: rgba(91, 57, 243, 0.2)">The decision to implement transparent session refresh triggered by HTTP 401 responses provides seamless authentication management without requiring explicit client intervention. This pattern automatically detects token expiration during normal operations and initiates re-authentication flows behind the scenes, maintaining session continuity with minimal latency impact. The implicit refresh mechanism adds approximately 50-100ms overhead only when authentication renewal is required, preserving the user experience while ensuring secure session management throughout extended research workflows.</span>
 
 ### 5.3.3 Data Storage Solution Rationale
 
-**Zero-Persistence Architecture:**
+**No Persistent Storage**: The decision to eliminate persistent storage reduces operational complexity, eliminates data synchronization issues, and improves security by preventing credential persistence. This approach aligns with MCP protocol design and research data sensitivity requirements.
 
-| Aspect | Decision | Justification |
-|--------|----------|---------------|
-| **Research Data** | No local storage | Security, compliance, data governance |
-| **Configuration** | File-based with validation | Deployment flexibility, version control |
-| **Session State** | In-memory with timeout | Performance, security, automatic cleanup |
-| **Audit Logs** | Persistent with rotation | Compliance requirements, monitoring |
+**In-Memory Session Management**: Session data stored in-memory with 3600-second expiration provides security through automatic cleanup while maintaining performance for typical research workflows. This decision balances security requirements with user experience.
 
-### 5.3.4 Caching Strategy Justification
+**Real-Time API Queries**: On-demand data retrieval ensures data freshness and eliminates cache invalidation complexity. This decision prioritizes data accuracy over performance, suitable for research environments where data currency is critical.
 
-**Strategic Caching Implementation:**
+### 5.3.4 Security Mechanism Selection
 
-```mermaid
-graph TD
-    subgraph "Caching Layers"
-        CONN_POOL[Connection Pool]
-        SESSION[Session Cache]
-        CONFIG[Configuration Cache]
-        META[Metadata Cache]
-    end
-    
-    subgraph "Cache Policies"
-        TIME_BASED[Time-Based Expiration]
-        EVENT_BASED[Event-Based Invalidation]
-        MANUAL[Manual Invalidation]
-    end
-    
-    CONN_POOL --> TIME_BASED
-    SESSION --> TIME_BASED
-    CONFIG --> EVENT_BASED
-    META --> MANUAL
-```
+**HMAC-SHA256 Authentication**: Selection of HMAC-SHA256 for API request signing provides cryptographic security while maintaining compatibility with LabArchives authentication requirements. This decision ensures secure communication without requiring certificate management.
 
-**Cache Design Decisions:**
-- **Connection Pooling**: Reuse HTTP connections for performance
-- **Session Caching**: Temporary authentication state storage
-- **Configuration Caching**: Avoid repeated file parsing
-- **No Research Data Caching**: Maintain zero-persistence architecture
+**TLS 1.3 Encryption**: Mandatory TLS 1.3 for all external communications provides transport security with modern cryptographic standards. This decision ensures data protection during transmission across all network segments.
 
-### 5.3.5 Security Mechanism Selection
+**Least Privilege Access**: Implementation of configurable scope limitations (notebook/folder level) follows security best practices by limiting data access to minimum required levels. This decision supports compliance requirements and reduces security exposure.
 
-**Multi-Layered Security Architecture:**
-
-| Security Layer | Implementation | Justification |
-|---------------|----------------|---------------|
-| **Authentication** | HMAC-SHA256 with dual-mode support | Industry standard, flexible deployment |
-| **Transport Security** | Process-level isolation | Simple, secure communication |
-| **Access Control** | Scope-based limitations | Granular permission management |
-| **Audit Logging** | Comprehensive event tracking | Compliance and monitoring requirements |
-| **<span style="background-color: rgba(91, 57, 243, 0.2)">Secret Redaction</span>** | **<span style="background-color: rgba(91, 57, 243, 0.2)">Early argv scrubbing before logger initialization</span>** | **<span style="background-color: rgba(91, 57, 243, 0.2)">Guarantees zero credential leakage to logs</span>** |
-
-**<span style="background-color: rgba(91, 57, 243, 0.2)">Path Security Implementation</span>:**
-<span style="background-color: rgba(91, 57, 243, 0.2)">The adoption of the FolderPath value object for exact path comparison provides enhanced security through precise path matching. This approach eliminates substring vulnerabilities by ensuring that path comparisons are performed using complete path segments rather than partial string matches, preventing potential security bypasses through crafted directory names that could match partial paths.</span>
-
-**Security Decision Rationale:**
-- **Process Isolation**: Eliminates network-based attack vectors
-- **Stateless Authentication**: Reduces session hijacking risks
-- **Comprehensive Logging**: Enables security monitoring and compliance
-- **<span style="background-color: rgba(91, 57, 243, 0.2)">Exact Path Matching**: Prevents directory traversal and substring-based security vulnerabilities</span>
-- **<span style="background-color: rgba(91, 57, 243, 0.2)">Credential Protection**: Ensures sensitive information never reaches logging systems</span>
+**<span style="background-color: rgba(91, 57, 243, 0.2)">Mandatory Parameter Sanitization</span>**: <span style="background-color: rgba(91, 57, 243, 0.2)">The architectural decision to implement comprehensive log sanitization of sensitive URL parameters and request data prevents inadvertent exposure of authentication credentials and personally identifiable information in system logs. This security enhancement utilizes a centralized Security Utilities module (src/cli/security/sanitizers.py) that provides standardized parameter masking functions across all logging contexts. The sanitization approach maintains debugging capability while ensuring sensitive data such as API keys, tokens, and user credentials are automatically redacted from debug outputs, audit trails, and error logs.</span>
 
 ## 5.4 CROSS-CUTTING CONCERNS
 
 ### 5.4.1 Monitoring and Observability Approach
 
-**Comprehensive Monitoring Strategy:**
-The system implements multi-layered monitoring with structured logging, metrics collection, and health check endpoints to ensure operational visibility and performance optimization.
+The system implements comprehensive monitoring through **structured logging** with both JSON and key-value formats, enabling efficient log analysis and automated alerting. **Prometheus metrics** are exposed via `/metrics` endpoint, providing real-time performance monitoring and resource utilization tracking.
 
-**Monitoring Components:**
-- **Application Metrics**: Request/response times, error rates, throughput
-- **System Metrics**: Memory usage, CPU utilization, connection counts
-- **Business Metrics**: Authentication success rates, resource access patterns
-- **Security Metrics**: Failed authentication attempts, scope violations, <span style="background-color: rgba(91, 57, 243, 0.2)">credential redaction violations (should be 0)</span>
+**Health check endpoints** (`/health/live` and `/health/ready`) support Kubernetes orchestration and enable automated failover capabilities. **CloudWatch integration** provides centralized log aggregation and metric collection for cloud deployments.
 
-**Observability Tools Integration:**
-- **Prometheus**: Metrics collection and alerting
-- **Grafana**: Dashboard visualization and monitoring
-- **CloudWatch**: AWS-native monitoring and logging
-- **ELK Stack**: Log aggregation and analysis
+**Distributed tracing** capabilities enable end-to-end request tracking across all system components, facilitating performance optimization and troubleshooting. **Audit logging** provides comprehensive compliance reporting with detailed request/response tracking.
 
-### 5.4.2 Logging and Tracing Strategy (updated)
+### 5.4.2 Logging and Tracing Strategy
 
-**Dual Logging Architecture:**
+**Structured Logging Implementation**: All log entries utilize consistent JSON structure with standardized fields including timestamp, level, component, request_id, and contextual metadata. This approach enables efficient log parsing and automated analysis.
 
-<span style="background-color: rgba(91, 57, 243, 0.2)">All logging operations are preceded by `utils.scrub_argv()` invocation to ensure complete credential redaction before any handler is configured, guaranteeing zero credential exposure in audit trails.</span>
+**<span style="background-color: rgba(91, 57, 243, 0.2)">Sensitive Parameter Sanitization</span>**: <span style="background-color: rgba(91, 57, 243, 0.2)">All log outputs automatically mask sensitive URL parameters including `token`, `password`, and `secret` query parameters using Security Utilities.sanitizers module. Sanitization is performed before log formatting to avoid performance overhead during log processing, ensuring credentials and sensitive data never appear in system logs, debug outputs, or audit trails.</span>
 
-| Log Stream | Purpose | Format | Retention |
-|-----------|---------|--------|-----------|
-| **Application Logs** | Operational events | JSON structured | 10MB rotation, 5 backups |
-| **Audit Logs** | Compliance tracking | JSON structured | 50MB rotation, 10 backups |
-| **Performance Logs** | Metrics and timing | JSON structured | 5MB rotation, 3 backups |
-| **Security Logs** | Authentication events | JSON structured | 20MB rotation, 7 backups |
+**Rotating Log Files**: Main application logs rotate at 10MB with 5 backup files, while audit logs rotate at 50MB with 10 backup files, ensuring adequate retention while managing storage requirements.
 
-**Credential Protection Protocol:**
-<span style="background-color: rgba(91, 57, 243, 0.2)">The system implements a mandatory credential scrubbing process where `utils.scrub_argv()` is executed before any logging handler initialization, ensuring that no literal secret or token strings can reach any logger regardless of configuration or error conditions.</span>
-
-**Tracing Implementation:**
-- **Request Tracing**: Complete request lifecycle tracking
-- **API Call Tracing**: LabArchives API interaction monitoring
-- **Authentication Tracing**: Security event tracking
-- **Error Tracing**: Exception and error propagation
+**Audit Trail Maintenance**: Comprehensive audit logging captures all authentication events, resource access, and API operations with cryptographic integrity protection. This supports compliance requirements and security monitoring.
 
 ### 5.4.3 Error Handling Patterns
 
-**Hierarchical Error Handling:**
+The system implements **hierarchical error handling** with custom exception types (`LabArchivesMCPException`) providing specific error categorization and recovery strategies. **<span style="background-color: rgba(91, 57, 243, 0.2)">Enhanced scope violation handling includes specialized `NotebookScopeViolation` and `FolderScopeViolation` exceptions</span>** <span style="background-color: rgba(91, 57, 243, 0.2)">replacing generic `ScopeViolation` errors for improved error specificity and targeted recovery mechanisms</span>. **Graceful degradation** ensures system availability during partial failures.
+
+**Retry mechanisms** with exponential backoff protect against transient failures while preventing cascade effects. **Circuit breaker patterns** prevent system overload during extended outages.
 
 ```mermaid
-graph TD
-    ERROR[Error Detected] --> CLASSIFY{Error Classification}
+flowchart TD
+    A[Error Occurs] --> B{Error Type?}
+    B -->|Transient| C[Retry with Backoff]
+    B -->|Auth| D[Re-authenticate]
+    B -->|Notebook Permission| E[NotebookScopeViolation]
+    B -->|Folder Permission| F[FolderScopeViolation]
+    B -->|System| G[Graceful Degradation]
     
-    CLASSIFY -->|Transient| RETRY[Retry Logic]
-    CLASSIFY -->|Authentication| AUTH_REFRESH[Token Refresh]
-    CLASSIFY -->|Rate Limit| BACKOFF[Exponential Backoff]
-    CLASSIFY -->|Critical| ALERT[Critical Alert]
+    C --> H{Success?}
+    H -->|Yes| I[Continue Operation]
+    H -->|No| J[Circuit Breaker]
     
-    RETRY --> SUCCESS{Success?}
-    SUCCESS -->|Yes| CONTINUE[Continue Operation]
-    SUCCESS -->|No| ESCALATE[Escalate Error]
+    D --> K{Auth Success?}
+    K -->|Yes| L[Retry Original Request]
+    K -->|No| M[Report Auth Failure]
     
-    AUTH_REFRESH --> RETRY
-    BACKOFF --> RETRY
-    ALERT --> IMMEDIATE[Immediate Response]
-    ESCALATE --> FALLBACK[Fallback Mode]
+    E --> N[Log Notebook Violation]
+    F --> O[Log Folder Violation]
+    G --> P[Fallback Mode]
+    
+    J --> P
+    M --> P
+    N --> Q[Security Alert]
+    O --> Q
+    Q --> P
+    P --> R[Maintain Availability]
 ```
-
-**Error Recovery Mechanisms:**
-- **Automatic Retry**: Exponential backoff with maximum attempts
-- **Circuit Breaker**: Prevent cascading failures
-- **Graceful Degradation**: Maintain core functionality during issues
-- **Fallback Modes**: Alternative operation modes for critical failures
 
 ### 5.4.4 Authentication and Authorization Framework
 
-**Security Framework Architecture:**
+**Multi-Factor Authentication Support**: The system supports both API keys and temporary user tokens, enabling flexible authentication strategies for different deployment scenarios. **<span style="background-color: rgba(91, 57, 243, 0.2)">Session management includes automatic session refresh workflow with explicit 401-retry logic, transparently handling token expiration during normal operations without requiring client intervention</span>**. <span style="background-color: rgba(91, 57, 243, 0.2)">The implicit refresh mechanism adds minimal latency (50-100ms) only when authentication renewal is required, maintaining seamless user experience throughout extended research workflows.</span>
 
-| Component | Implementation | Scope |
-|-----------|----------------|-------|
-| **Authentication** | HMAC-SHA256 with dual-mode support | System-wide access control |
-| **Authorization** | Scope-based resource limitations | Resource-level permissions |
-| **Session Management** | 3600-second lifecycle with renewal | Active session control |
-| **Audit Trail** | Comprehensive security event logging | Complete access tracking |
+**Role-Based Access Control**: Scope enforcement mechanisms implement granular access control at notebook and folder levels, supporting organizational security policies. **<span style="background-color: rgba(91, 57, 243, 0.2)">Authorization checks now default to `deny` on ambiguous scope evaluation, implementing fail-secure validation that prevents unauthorized access when scope boundaries cannot be definitively determined</span>**. **<span style="background-color: rgba(91, 57, 243, 0.2)">Folder-only scopes block direct notebook reads unless pages exist within that specific folder</span>**, ensuring precise access control alignment with organizational data governance policies. **Audit logging** tracks all authentication and authorization events for compliance reporting.
 
-**Authorization Enforcement Points:**
-- **Resource Discovery**: Scope validation during listing operations
-- **Content Retrieval**: Permission verification for individual resources
-- **API Access**: Authentication validation for all operations
-- **Configuration Access**: Administrative permission requirements
+**Regional Authentication**: Multi-region support enables authentication against appropriate LabArchives endpoints (US, AU, UK) with automatic region detection and routing.
 
 ### 5.4.5 Performance Requirements and SLAs
 
-**Performance Targets:**
+The system maintains specific performance targets optimized for AI-assisted research workflows:
 
-| Metric | Target | Measurement | Monitoring |
-|--------|--------|-------------|------------|
-| **Response Time** | <2s P95 latency | End-to-end request processing | Real-time monitoring |
-| **Memory Usage** | <100MB runtime footprint | Process memory consumption | Continuous tracking |
-| **Availability** | 99.9% uptime | Service availability | 24/7 monitoring |
-| **Throughput** | 100 requests/minute | Concurrent request handling | Load testing |
+| Operation | Target SLA | Rationale |
+|-----------|------------|-----------|
+| **Protocol Initialization** | < 500ms | Ensures responsive AI client startup |
+| **Authentication** | < 1s | Balances security validation with user experience |
+| **Resource Listing** | < 2s | Enables efficient research data discovery |
+| **Content Retrieval** | < 5s | Supports comprehensive data analysis workflows |
 
-**SLA Monitoring and Enforcement:**
-- **Real-time Alerting**: Immediate notification for SLA breaches
-- **Performance Dashboards**: Continuous performance visibility
-- **Capacity Planning**: Proactive resource allocation
-- **Load Testing**: Regular performance validation
+**Scalability targets** include support for 100+ concurrent sessions with horizontal scaling capabilities. **Throughput requirements** accommodate typical research workflow patterns with burst capacity for intensive analysis periods.
 
 ### 5.4.6 Disaster Recovery Procedures
 
-**Recovery Strategy Framework:**
+**Automatic Recovery**: The system implements automatic restart capabilities with health check validation and graceful shutdown procedures. **State preservation** ensures session continuity during planned maintenance.
 
-```mermaid
-graph TD
-    INCIDENT[Incident Detection] --> ASSESS[Impact Assessment]
-    ASSESS --> CLASSIFY{Severity Classification}
-    
-    CLASSIFY -->|Low| STANDARD[Standard Recovery]
-    CLASSIFY -->|Medium| EXPEDITED[Expedited Recovery]
-    CLASSIFY -->|High| EMERGENCY[Emergency Recovery]
-    CLASSIFY -->|Critical| DISASTER[Disaster Recovery]
-    
-    STANDARD --> AUTO_RECOVERY[Automatic Recovery]
-    EXPEDITED --> MANUAL_RECOVERY[Manual Recovery]
-    EMERGENCY --> RAPID_RESPONSE[Rapid Response Team]
-    DISASTER --> FULL_REBUILD[Full System Rebuild]
-    
-    AUTO_RECOVERY --> VALIDATE[Validation Testing]
-    MANUAL_RECOVERY --> VALIDATE
-    RAPID_RESPONSE --> VALIDATE
-    FULL_REBUILD --> VALIDATE
-    
-    VALIDATE --> RESTORED[Service Restored]
-```
+**Backup Strategies**: Audit logs are automatically backed up to persistent storage with configurable retention policies. **Configuration backup** enables rapid system restoration.
 
-**Recovery Procedures:**
-- **Automatic Recovery**: Self-healing capabilities for common issues
-- **Manual Recovery**: Guided procedures for complex problems
-- **Rapid Response**: Emergency team activation for critical issues
-- **Full Rebuild**: Complete system restoration from backup
+**Failover Mechanisms**: Container orchestration provides automatic failover with health check monitoring. **Load balancing** distributes traffic across healthy instances during partial failures.
 
 #### References
 
 **Technical Specification Sections Retrieved:**
-- `1.2 SYSTEM OVERVIEW` - System context and high-level architecture
-- `4.3 TECHNICAL IMPLEMENTATION` - State management and error handling details
-- `3.2 FRAMEWORKS & LIBRARIES` - Technology stack and framework information
-- `2.1 FEATURE CATALOG` - Feature-architecture relationship mapping
+- `3.2 FRAMEWORKS & LIBRARIES` - Security utilities and framework capabilities including parameter sanitization
+- `4.1 SYSTEM WORKFLOWS` - Authentication workflows and session management patterns
+- `4.3 TECHNICAL IMPLEMENTATION` - Error handling implementation and state management details
+- `5.3 TECHNICAL DECISIONS` - Security architecture decisions and fail-secure validation patterns
 
 **Repository Analysis:**
-- Complete architectural analysis based on provided section-specific details covering all system components, data flows, and infrastructure patterns
-- Comprehensive evaluation of deployment configurations including Docker, Kubernetes, and AWS infrastructure
-- Security architecture analysis including authentication, authorization, and compliance requirements
-- Performance and scalability considerations across all architectural layers
+- `/src/cli/` - Main CLI application package with core components
+- `/src/cli/api/` - LabArchives API integration layer
+- `/src/cli/mcp/` - MCP protocol implementation
+- `/src/cli/commands/` - CLI command implementations
+- `/src/cli/security/sanitizers.py` - Security utilities for parameter sanitization
+- `/infrastructure/kubernetes/` - Container orchestration manifests
+- `/infrastructure/terraform/` - Infrastructure as Code definitions
 
 # 6. SYSTEM COMPONENTS DESIGN
 
 ## 6.1 CORE SERVICES ARCHITECTURE
 
-### 6.1.1 Architecture Classification and Applicability
+### 6.1.1 Architecture Pattern Analysis
 
-**Core Services Architecture is not applicable for this system** because the LabArchives MCP Server implements a **monolithic application architecture** with internal modular components rather than a distributed microservices or service-oriented architecture.
+The system is designed as a **single deployable unit** with the following architectural characteristics:
 
-### 6.1.1 Architecture Classification and Applicability
+#### 6.1.1.1 Monolithic Application Design
 
-#### 6.1.1.1 Architectural Assessment
+The LabArchives MCP Server follows a **layered monolithic architecture** with clear separation of concerns across five distinct layers:
 
-**System Architecture Type**: Monolithic Client-Server Application
+1. **Protocol Layer**: Handles MCP/JSON-RPC 2.0 communication with AI clients
+2. **Authentication Layer**: Manages HMAC-SHA256 based security and session management  
+3. **Business Logic Layer**: Orchestrates resource management and scope enforcement
+4. **Integration Layer**: Provides standardized interface to LabArchives REST API
+5. **Infrastructure Layer**: Supports container orchestration and cloud deployment
 
-**Evidence-Based Analysis**:
+#### 6.1.1.2 Stateless Design Principles
 
-| Architectural Aspect | Monolithic Implementation | Microservices Alternative |
-|---------------------|---------------------------|---------------------------|
-| **Deployment Model** | Single container deployment | Multiple independent services |
-| **Communication Pattern** | Direct method calls in shared memory | Network-based inter-service communication |
-| **Service Boundaries** | Internal module boundaries | Distributed service boundaries |
-| **Scaling Approach** | Horizontal container replication | Independent service scaling |
+The system maintains **stateless operations** with no persistent storage requirements, enabling:
+- On-demand data retrieval without caching overhead
+- Horizontal scaling through container replication
+- Session state managed in-memory with configurable timeouts (3600 seconds)
+- Independent instance operation without cross-instance dependencies
 
-#### 6.1.1.2 Modular Component Architecture
+#### 6.1.1.3 Client-Server Communication Model
 
-While not implementing true microservices, the system follows **microservices design principles** through internal modular components:
+The architecture implements a **client-server model** where:
+- MCP clients communicate via JSON-RPC 2.0 over stdin/stdout
+- Single communication channel per client instance
+- Bidirectional messaging with request-response patterns
+- Protocol compliance with MCP specification requirements
+
+### 6.1.2 Why Microservices Architecture is Not Required
+
+The LabArchives MCP Server does not require microservices architecture for the following reasons:
+
+| Microservices Criteria | System Assessment | Rationale |
+|------------------------|-------------------|-----------|
+| **Service Boundaries** | Single domain responsibility | System has one clear purpose: bridging AI applications with LabArchives data |
+| **Independent Scaling** | Uniform scaling requirements | All components scale together based on overall system load |
+| **Technology Diversity** | Uniform technology stack | Python-based stack with consistent frameworks across components |
+| **Team Ownership** | Single development team | No organizational need for separate service ownership |
+
+#### 6.1.2.1 Component Coupling Analysis
+
+The system's components are **intentionally tightly coupled** for optimal performance:
 
 ```mermaid
 graph TB
-    subgraph "Single Process/Container"
-        subgraph "MCP Protocol Layer"
-            MCP[MCP Protocol Handler]
-        end
+    subgraph "Monolithic Application"
+        A[MCP Protocol Handler] --> B[Authentication Manager]
+        A --> C[Resource Manager]
+        C --> D[LabArchives API Client]
+        B --> D
         
-        subgraph "Business Logic Layer"
-            AUTH[Authentication Manager]
-            RESOURCE[Resource Manager]
-            SCOPING["FolderPath – Scoping Module"]
-        end
+        E[Configuration Manager] --> A
+        E --> B
+        E --> C
         
-        subgraph "Integration Layer"
-            API[API Integration Layer]
-            AUDIT[Audit System]
-            LOGSETUP["Logging Setup (scrub_argv)"]
-        end
-        
-        subgraph "Interface Layer"
-            CLI[CLI Interface]
-        end
+        F[Logging System] --> A
+        F --> B
+        F --> C
+        F --> D
     end
     
     subgraph "External Systems"
-        CLIENT[MCP Clients]
-        LABARCH[LabArchives API]
-        LOGS[Audit Logs]
+        G[LabArchives API]
+        H[MCP Clients]
+        I[Monitoring Services]
     end
     
-    CLIENT <--> MCP
-    MCP --> AUTH
-    MCP --> RESOURCE
-    RESOURCE <--> SCOPING
-    API <--> LABARCH
-    AUTH --> AUDIT
-    RESOURCE --> AUDIT
-    AUDIT --> LOGS
-    CLI --> AUTH
-    CLI --> RESOURCE
+    D --> G
+    A --> H
+    F --> I
     
-    MCP -.-> LOGSETUP
-    AUTH -.-> LOGSETUP
-    RESOURCE -.-> LOGSETUP
-    
-    style SCOPING fill:#5b39f3,fill-opacity:0.2
-    style LOGSETUP fill:#5b39f3,fill-opacity:0.2
+    style A fill:#e1f5fe
+    style B fill:#e8f5e8
+    style C fill:#fff3e0
+    style D fill:#fce4ec
 ```
 
-<span style="background-color: rgba(91, 57, 243, 0.2)">The Business Logic layer now contains a dedicated Scoping component implementing FolderPath for exact folder-scope enforcement, and an early-initialised Logging Setup module performs argv scrubbing to guarantee secret redaction.</span>
+#### 6.1.2.2 Operational Complexity Considerations
 
-### 6.1.2 Rationale for Monolithic Architecture
+The monolithic approach provides significant operational advantages:
 
-#### 6.1.2.1 Design Decision Justification
+- **Simplified Deployment**: Single container deployment reduces orchestration complexity
+- **Unified Monitoring**: Single application monitoring without distributed tracing overhead
+- **Consistent Logging**: Unified log format and centralized audit trail
+- **Reduced Network Latency**: In-process communication eliminates network overhead
+- **Atomic Operations**: All operations complete within single transaction boundary
 
-The monolithic architecture was selected based on the following technical and operational considerations:
+### 6.1.3 Enterprise-Grade Scaling Architecture
 
-**Complexity Management**:
-- **Single Point of Deployment**: Simplified deployment and maintenance operations
-- **Unified Error Handling**: Centralized error management and logging
-- **Consistent Security Model**: Uniform security policies across all components
-- **Simplified Development**: Reduced complexity in development and testing workflows
+Despite being monolithic, the system implements **enterprise-grade scaling patterns** through container orchestration:
 
-**Performance Optimization**:
-- **Zero Network Latency**: Direct method calls eliminate inter-service communication overhead
-- **Shared Memory Access**: Efficient data sharing between components
-- **Connection Pooling**: Optimized resource utilization for external API calls
-- **Minimal Resource Footprint**: Target of <100MB runtime memory usage
-
-**Operational Efficiency**:
-- **Single Process Monitoring**: Simplified operational monitoring and management
-- **Unified Logging**: Centralized audit trail and error reporting
-- **Atomic Deployments**: Single-unit deployment reduces complexity
-- **Consistent Configuration**: Unified configuration management across all components
-
-#### 6.1.2.2 Scalability Through Container Orchestration
-
-**Horizontal Scaling Model**:
-
-```mermaid
-graph TB
-    subgraph "Container Orchestration"
-        subgraph "Load Balancer"
-            ALB[Application Load Balancer]
-        end
-        
-        subgraph "Container Cluster"
-            CONTAINER1[MCP Server Instance 1]
-            CONTAINER2[MCP Server Instance 2]
-            CONTAINER3[MCP Server Instance N]
-        end
-        
-        subgraph "Shared Dependencies"
-            LABARCH[LabArchives API]
-            AUDIT[Audit Storage]
-        end
-    end
-    
-    subgraph "MCP Clients"
-        CLIENT1[Claude Desktop]
-        CLIENT2[MCP Client 2]
-        CLIENT3[MCP Client N]
-    end
-    
-    CLIENT1 --> ALB
-    CLIENT2 --> ALB
-    CLIENT3 --> ALB
-    
-    ALB --> CONTAINER1
-    ALB --> CONTAINER2
-    ALB --> CONTAINER3
-    
-    CONTAINER1 --> LABARCH
-    CONTAINER2 --> LABARCH
-    CONTAINER3 --> LABARCH
-    
-    CONTAINER1 --> AUDIT
-    CONTAINER2 --> AUDIT
-    CONTAINER3 --> AUDIT
-```
-
-### 6.1.3 Alternative Architecture Patterns Considered
-
-#### 6.1.3.1 Microservices Architecture Evaluation
-
-**Potential Microservices Decomposition**:
-
-| Service Component | Responsibility | Rejected Rationale |
-|------------------|----------------|-------------------|
-| **Authentication Service** | Token management and validation | Adds complexity without scalability benefits |
-| **Resource Service** | Resource discovery and enumeration | Tight coupling with authentication reduces benefits |
-| **API Gateway Service** | Request routing and protocol translation | Single protocol endpoint eliminates gateway necessity |
-| **Audit Service** | Logging and monitoring | Shared logging infrastructure more efficient |
-
-#### 6.1.3.2 Service-Oriented Architecture (SOA) Evaluation
-
-**SOA Implementation Considerations**:
-- **Service Bus Complexity**: AMQP/RabbitMQ infrastructure overhead
-- **Service Registry**: Consul/Eureka operational complexity
-- **Circuit Breaker Requirements**: Hystrix-style patterns unnecessary for single API endpoint
-- **Distributed Tracing**: OpenTelemetry overhead without proportional benefit
-
-### 6.1.4 Scalability and Resilience Patterns
-
-#### 6.1.4.1 Implemented Scalability Patterns
-
-**Container-Level Scaling**:
-
-```mermaid
-graph LR
-    subgraph "Scaling Triggers"
-        CPU[CPU Utilization > 70%]
-        MEM[Memory Usage > 80%]
-        REQ[Request Rate > 1000/min]
-    end
-    
-    subgraph "Scaling Actions"
-        HORIZONTAL[Horizontal Pod Autoscaling]
-        VERTICAL[Vertical Resource Scaling]
-        CLUSTER[Cluster Autoscaling]
-    end
-    
-    subgraph "Scaling Outcomes"
-        PERFORMANCE[Maintained <2s P95 Latency]
-        AVAILABILITY[99.9% Uptime SLA]
-        CAPACITY[Dynamic Capacity Management]
-    end
-    
-    CPU --> HORIZONTAL
-    MEM --> VERTICAL
-    REQ --> HORIZONTAL
-    
-    HORIZONTAL --> PERFORMANCE
-    VERTICAL --> PERFORMANCE
-    CLUSTER --> AVAILABILITY
-    
-    PERFORMANCE --> CAPACITY
-    AVAILABILITY --> CAPACITY
-```
-
-#### 6.1.4.2 Resilience Patterns Implementation
-
-**Fault Tolerance Mechanisms**:
-
-| Pattern | Implementation | Benefit |
-|---------|---------------|---------|
-| **Circuit Breaker** | Exponential backoff for LabArchives API calls | Prevents cascade failures |
-| **Retry Logic** | Configurable retry attempts with jitter | Handles transient failures |
-| **Timeout Management** | 30-second default timeout with configuration | Prevents resource exhaustion |
-| **Graceful Degradation** | Structured error responses to clients | Maintains service availability |
-
-### 6.1.5 Performance and Monitoring Considerations
-
-#### 6.1.5.1 Performance Optimization Patterns
-
-**Resource Optimization**:
-- **Connection Pooling**: HTTP connection reuse for LabArchives API
-- **In-Memory Caching**: Session and configuration data caching
-- **Lazy Loading**: On-demand resource discovery
-- **Stateless Operation**: Zero-persistence architecture for optimal scalability
-
-#### 6.1.5.2 Monitoring and Observability
-
-**Structured Logging**:
-
-The system implements comprehensive structured logging with built-in security controls to ensure operational visibility while maintaining strict confidentiality requirements:
-
-- **JSON-formatted Log Entries**: Standardized log format for efficient parsing and analysis
-- **Hierarchical Log Levels**: DEBUG, INFO, WARNING, ERROR, CRITICAL with configurable verbosity
-- **Contextual Metadata**: Request correlation IDs, session tracking, and operational context
-- **Audit Trail Integration**: Complete audit logging for compliance and security monitoring
-- <span style="background-color: rgba(91, 57, 243, 0.2)">**All command-line arguments are sanitized by the scrub_argv utility before any logger is configured, guaranteeing zero leakage of secrets/tokens in log streams (G-3).**</span>
-
-**Operational Monitoring**:
-
-```mermaid
-graph TD
-    subgraph "Input Processing"
-        CLI[CLI Input] --> SANITIZER[argv Scrubber]
-        SANITIZER --> LOGS[Structured Logging]
-    end
-    
-    subgraph "Monitoring Stack"
-        METRICS[Application Metrics]
-        LOGS
-        TRACES[Request Tracing]
-        HEALTH[Health Checks]
-    end
-    
-    subgraph "Monitoring Targets"
-        RESPONSE[Response Time]
-        THROUGHPUT[Request Throughput]
-        ERROR[Error Rate]
-        RESOURCE[Resource Usage]
-    end
-    
-    subgraph "Alerting"
-        ALERT[Alert Manager]
-        NOTIF[Notification System]
-        DASH[Monitoring Dashboard]
-    end
-    
-    METRICS --> RESPONSE
-    LOGS --> ERROR
-    TRACES --> RESPONSE
-    HEALTH --> RESOURCE
-    
-    RESPONSE --> ALERT
-    THROUGHPUT --> ALERT
-    ERROR --> ALERT
-    RESOURCE --> ALERT
-    
-    ALERT --> NOTIF
-    ALERT --> DASH
-```
-
-**Performance Metrics Collection**:
-
-| Metric Category | Key Indicators | Collection Method | Alert Thresholds |
-|----------------|----------------|-------------------|------------------|
-| **Response Time** | P95 latency, median response time | Request instrumentation | >2s P95 |
-| **Throughput** | Requests per second, concurrent sessions | Connection counting | <100 RPS |
-| **Error Rate** | 4xx/5xx responses, exception frequency | Error tracking | >5% error rate |
-| **Resource Usage** | CPU, memory, connection pools | System monitoring | >80% utilization |
-
-**Health Check Implementation**:
-
-The system provides comprehensive health monitoring through multiple health check endpoints:
-
-- **Liveness Probe**: Basic service availability and startup completion
-- **Readiness Probe**: LabArchives API connectivity and authentication status
-- **Dependency Health**: External service availability and response times
-- **Resource Health**: System resource utilization and performance metrics
-
-**Alerting and Notification Strategy**:
-
-**Alert Severity Levels**:
-- **Critical**: Service unavailable, requires immediate intervention
-- **High**: Performance degradation, API failures, authentication issues
-- **Medium**: Resource utilization warnings, non-critical errors
-- **Low**: Informational alerts, trend monitoring
-
-**Notification Channels**:
-- **Real-time Alerts**: Immediate notifications for critical issues
-- **Dashboard Integration**: Visual monitoring with trend analysis
-- **Audit Log Integration**: Structured logging for compliance requirements
-- **Performance Reports**: Periodic performance and utilization summaries
-
-### 6.1.6 Future Architecture Evolution
-
-#### 6.1.6.1 Potential Service Decomposition Scenarios
-
-**Evolutionary Path to Microservices**:
-
-Should the system requirements evolve to warrant microservices architecture, the following decomposition strategy would be implemented:
-
-| Evolution Stage | Decomposition Strategy | Trigger Conditions |
-|----------------|------------------------|-------------------|
-| **Stage 1** | Extract Authentication Service | >10,000 concurrent users |
-| **Stage 2** | Separate Resource Discovery Service | Multiple LabArchives instances |
-| **Stage 3** | Implement API Gateway Pattern | >5 different MCP protocols |
-| **Stage 4** | Full Service Mesh Architecture | Multi-region deployments |
-
-#### 6.1.6.2 Architecture Migration Considerations
-
-**Migration Planning**:
-- **Backward Compatibility**: Maintain existing MCP client compatibility
-- **Gradual Decomposition**: Phased service extraction approach
-- **Data Migration**: Zero-persistence architecture simplifies migration
-- **Testing Strategy**: Comprehensive integration testing for service boundaries
-
-### 6.1.7 Conclusion
-
-The LabArchives MCP Server successfully achieves its design objectives through a **monolithic architecture with modular components** rather than a distributed microservices approach. This architectural decision optimizes for:
-
-- **Operational Simplicity**: Single deployment unit with unified management
-- **Performance Efficiency**: Zero-latency internal communication
-- **Security Consistency**: Uniform security model across all components
-- **Development Velocity**: Simplified development and testing workflows
-
-The system demonstrates that **monolithic architecture remains the optimal choice** for focused, single-purpose applications with clear operational boundaries and performance requirements.
-
-#### References
-
-**Technical Specification Sections Referenced**:
-- `5.1 HIGH-LEVEL ARCHITECTURE` - System overview and architectural principles
-- `5.2 COMPONENT DETAILS` - Detailed component analysis and interactions
-- `5.3 TECHNICAL DECISIONS` - Architecture decision rationale and trade-offs
-- `1.2 SYSTEM OVERVIEW` - Project context and system capabilities
-
-**Repository Analysis Evidence**:
-- `src/cli/` - Monolithic Python package structure
-- `src/cli/main.py` - Single application entry point
-- `src/cli/mcp_server.py` - Unified MCP server implementation
-- `src/cli/auth_manager.py` - Authentication component module
-- `src/cli/resource_manager.py` - Resource management module
-- `src/cli/api/client.py` - API integration layer
-- `infrastructure/docker-compose.yml` - Single service deployment configuration
-- `infrastructure/kubernetes/deployment.yaml` - Monolithic deployment manifest
-- `infrastructure/terraform/main.tf` - Single ECS service infrastructure
-
-## 6.2 DATABASE DESIGN
-
-### 6.2.1 Zero-Persistence Architecture Overview
-
-The LabArchives MCP Server implements a **Zero-Persistence Architecture** that fundamentally challenges traditional database design paradigms. This architectural decision represents a strategic choice to eliminate persistent data storage in favor of real-time, on-demand data retrieval from the LabArchives API.
-
-#### 6.2.1.1 Database Design Philosophy
-
-**No Traditional Database Implementation**: The system operates without conventional database storage for research data, implementing instead a stateless architecture where all research information is retrieved in real-time from the LabArchives platform.
-
-**Architectural Rationale**:
-- **Security Risk Minimization**: Eliminates local data storage vulnerabilities and reduces attack surface
-- **GDPR Compliance Simplification**: No personal data persistence eliminates complex data governance requirements
-- **Data Accuracy Guarantee**: Real-time retrieval ensures data freshness and eliminates synchronization issues
-- **Operational Simplicity**: Removes database maintenance, backup, and recovery complexities
-
-#### 6.2.1.2 Storage Components Architecture
-
-```mermaid
-graph TB
-    subgraph "Zero-Persistence Architecture"
-        subgraph "Stateless Application Layer"
-            APP[MCP Server Application]
-            CACHE[In-Memory Session Cache]
-            CONFIG[Configuration Cache]
-        end
-        
-        subgraph "Persistent Storage Components"
-            LOGS[Application Logs]
-            AUDIT[Audit Logs]
-            APPCONFIG[Configuration Files]
-        end
-        
-        subgraph "Optional Enterprise Database"
-            RDS[PostgreSQL RDS]
-            AUDIT_DB[Audit Database]
-            META_DB[Metadata Storage]
-        end
-        
-        subgraph "External Data Sources"
-            LABARCH[LabArchives API]
-            REGIONAL[Regional Endpoints]
-        end
-    end
-    
-    APP --> CACHE
-    APP --> CONFIG
-    APP --> LOGS
-    APP --> AUDIT
-    APP --> APPCONFIG
-    APP --> RDS
-    RDS --> AUDIT_DB
-    RDS --> META_DB
-    APP <--> LABARCH
-    APP <--> REGIONAL
-```
-
-### 6.2.2 Schema Design
-
-#### 6.2.2.1 Application Data Schema
-
-**Research Data**: No persistent schema exists for research data as all information is retrieved on-demand from LabArchives APIs.
-
-**Session Data Schema** (In-Memory Only):
-```mermaid
-erDiagram
-    SESSION {
-        string session_id PK
-        string user_id
-        string auth_token
-        datetime created_at
-        datetime expires_at
-        string api_endpoint
-        json capabilities
-    }
-    
-    CONFIGURATION {
-        string config_key PK
-        string config_value
-        string config_source
-        datetime last_updated
-        boolean is_encrypted
-    }
-    
-    CACHE_ENTRY {
-        string cache_key PK
-        json cache_data
-        datetime created_at
-        datetime expires_at
-        string cache_type
-    }
-    
-    SESSION ||--o{ CACHE_ENTRY : contains
-    CONFIGURATION ||--o{ SESSION : configures
-```
-
-#### 6.2.2.2 Audit Log Schema
-
-<span style="background-color: rgba(91, 57, 243, 0.2)">The audit log schema captures comprehensive security and operational events for compliance tracking and system monitoring. ALL credential values (access-keys, passwords, tokens) are sanitised and replaced with the literal string "[REDACTED]" before the record is persisted.</span>
-
-**Audit Log Structure** (File-Based JSON Records):
-
-| Field | Type | Description | Index Strategy |
-|-------|------|-------------|----------------|
-| `timestamp` | ISO 8601 DateTime | Event occurrence time | Time-based partitioning |
-| `session_id` | String | User session identifier | Hash index |
-| `user_id` | String | LabArchives user identifier | Hash index |
-| `event_type` | Enum | Operation type (auth, resource, error) | Categorical index |
-| `resource_uri` | String | Accessed resource path | Prefix index |
-| `request_data` | JSON | **Sanitised JSON payload (no credential values retained)** | No index |
-| `response_status` | Integer | HTTP response code | Range index |
-| `execution_time` | Float | Operation duration (ms) | No index |
-| `error_details` | JSON | **Sanitised JSON payload (no credential values retained)** | No index |
-
-<span style="background-color: rgba(91, 57, 243, 0.2)">**Note**: Out-of-scope access attempts are logged with response_status = 403 and error_details.message = "ScopeViolation"; no additional schema fields are required.</span>
-
-#### 6.2.2.3 Optional Enterprise Database Schema
-
-**PostgreSQL Schema** (When RDS is Enabled):
-
-```mermaid
-erDiagram
-    AUDIT_RECORDS {
-        uuid audit_id PK
-        timestamp event_time
-        varchar session_id
-        varchar user_id
-        varchar event_type
-        text resource_uri
-        jsonb request_data
-        integer response_status
-        float execution_time
-        jsonb error_details
-        timestamp created_at
-    }
-    
-    USER_SESSIONS {
-        uuid session_id PK
-        varchar user_id
-        varchar auth_method
-        timestamp created_at
-        timestamp expires_at
-        varchar api_endpoint
-        jsonb session_metadata
-    }
-    
-    SYSTEM_METADATA {
-        varchar metadata_key PK
-        jsonb metadata_value
-        timestamp last_updated
-        varchar updated_by
-    }
-    
-    AUDIT_RECORDS ||--o{ USER_SESSIONS : belongs_to
-    SYSTEM_METADATA ||--o{ AUDIT_RECORDS : references
-```
-
-### 6.2.3 Data Management
-
-#### 6.2.3.1 Migration Procedures
-
-**Zero-Persistence Migration Strategy**:
-- **No Data Migration Required**: System operates without persistent research data
-- **Configuration Migration**: Environment variables and configuration files only
-- **Audit Log Migration**: Log rotation and archival procedures
-
-**Version Migration Process**:
-
-| Migration Type | Procedure | Rollback Strategy |
-|---------------|-----------|------------------|
-| **Application Updates** | Blue-green deployment with container replacement | Immediate container rollback |
-| **Configuration Changes** | Environment variable updates with validation | Configuration file restoration |
-| **Audit Schema Updates** | Log format versioning with backward compatibility | Log parser version rollback |
-
-#### 6.2.3.2 Versioning Strategy
-
-**Configuration Versioning**:
-- **Schema Version**: `config_version` field in all configuration objects
-- **Backward Compatibility**: 2-version compatibility window maintained
-- **Migration Path**: Automated configuration format upgrades
-
-**Audit Log Versioning**:
-- **Log Format Version**: `log_schema_version` field in each audit record
-- **Parser Support**: Multi-version log parsing capabilities
-- **Retention Policy**: Version-aware log retention and archival
-
-#### 6.2.3.3 Archival Policies
-
-**Log Retention Configuration**:
-
-| Log Type | Retention Period | Rotation Policy | Archive Strategy |
-|----------|------------------|-----------------|------------------|
-| **Application Logs** | 30 days | 10MB files, 5 backups | Local compression |
-| **Audit Logs** | 7 years | 50MB files, 10 backups | Cloud storage archive |
-| **Configuration Logs** | 1 year | Size-based rotation | Version-controlled archive |
-
-### 6.2.4 Compliance Considerations
-
-#### 6.2.4.1 Data Retention Rules
-
-**Zero-Persistence Compliance**:
-- **Research Data**: No retention required (zero persistence)
-- **Audit Records**: 7-year retention for regulatory compliance
-- **Session Data**: 1-hour maximum lifetime with automatic expiration
-- **Configuration Data**: Version-controlled retention with change tracking
-
-**Regional Compliance Matrix**:
-
-| Region | Regulation | Retention Requirement | Implementation |
-|--------|------------|----------------------|---------------|
-| **US** | FERPA/HIPAA | 7 years | Audit log retention |
-| **Australia** | Privacy Act | 5 years | Configurable retention |
-| **UK** | GDPR | 6 years | Automated data purging |
-| **EU** | GDPR | 6 years | Right to erasure support |
-
-#### 6.2.4.2 Privacy Controls
-
-**Data Minimization Implementation**:
-- **No Research Data Storage**: Eliminates primary privacy risks
-- **Session Data Encryption**: AES-256 encryption for temporary session storage
-- **Audit Data Sanitization**: PII removal from audit logs
-- **Configuration Security**: Encrypted credential storage
-
-#### 6.2.4.3 Access Controls
-
-**Authentication-Based Access**:
-- **Session-Based Access**: Temporary session tokens with expiration
-- **Role-Based Permissions**: LabArchives native permission inheritance
-- **Audit Trail**: Complete access logging for all operations
-- **Configuration Access**: Restricted file permissions and environment variable security
-
-### 6.2.5 Performance Optimization
-
-#### 6.2.5.1 Caching Strategy
-
-**In-Memory Caching Architecture**:
-
-```mermaid
-graph TB
-    subgraph "Cache Layers"
-        subgraph "L1 Cache (Application)"
-            SESSION_CACHE[Session Cache]
-            CONFIG_CACHE[Configuration Cache]
-            CONN_POOL[Connection Pool]
-        end
-        
-        subgraph "L2 Cache (Optional)"
-            REDIS[Redis Cache]
-            MEMORY_CACHE[Shared Memory Cache]
-        end
-        
-        subgraph "Data Sources"
-            LABARCH_API[LabArchives API]
-            CONFIG_FILES[Configuration Files]
-            ENV_VARS[Environment Variables]
-        end
-    end
-    
-    SESSION_CACHE --> REDIS
-    CONFIG_CACHE --> MEMORY_CACHE
-    CONN_POOL --> LABARCH_API
-    REDIS --> LABARCH_API
-    MEMORY_CACHE --> CONFIG_FILES
-    MEMORY_CACHE --> ENV_VARS
-```
-
-**Cache Configuration**:
-
-| Cache Type | TTL | Eviction Policy | Maximum Size |
-|------------|-----|----------------|--------------|
-| **Session Cache** | 3600 seconds | LRU | 1000 sessions |
-| **Configuration Cache** | Application lifetime | Manual invalidation | 10MB |
-| **Connection Pool** | 300 seconds | Idle timeout | 20 connections |
-
-#### 6.2.5.2 Connection Pooling
-
-**HTTP Connection Management**:
-- **Pool Size**: 20 concurrent connections to LabArchives API
-- **Connection Timeout**: 30 seconds with exponential backoff
-- **Retry Logic**: 3 attempts with circuit breaker pattern
-- **Keep-Alive**: 300-second connection reuse
-
-#### 6.2.5.3 Query Optimization Patterns
-
-**API Query Optimization**:
-- **Lazy Loading**: On-demand resource discovery
-- **Batch Operations**: Multiple resource requests in single API call
-- **Response Caching**: Temporary response caching for identical requests
-- **Pagination**: Efficient large dataset handling
-
-### 6.2.6 Optional Enterprise Database (RDS)
-
-#### 6.2.6.1 PostgreSQL Configuration
-
-**RDS Instance Specifications**:
-
-| Configuration | Production | Development | Disaster Recovery |
-|---------------|------------|-------------|------------------|
-| **Instance Type** | db.r5.large | db.t3.micro | db.r5.large |
-| **Storage** | 100GB GP2 | 20GB GP2 | 100GB GP2 |
-| **Multi-AZ** | Enabled | Disabled | Enabled |
-| **Backup Retention** | 7 days | 1 day | 7 days |
-| **Encryption** | AES-256 | AES-256 | AES-256 |
-
-#### 6.2.6.2 Replication Architecture
-
-**Multi-AZ Deployment**:
-
-```mermaid
-graph TB
-    subgraph "Primary Availability Zone"
-        PRIMARY[Primary RDS Instance]
-        APP_PRIMARY[Application Instances]
-    end
-    
-    subgraph "Secondary Availability Zone"
-        STANDBY[Standby RDS Instance]
-        APP_STANDBY[Standby Application]
-    end
-    
-    subgraph "Backup and Monitoring"
-        BACKUP[Automated Backups]
-        CLOUDWATCH[CloudWatch Monitoring]
-        SECRETS[AWS Secrets Manager]
-    end
-    
-    APP_PRIMARY --> PRIMARY
-    PRIMARY --> STANDBY
-    PRIMARY --> BACKUP
-    STANDBY --> APP_STANDBY
-    PRIMARY --> CLOUDWATCH
-    STANDBY --> CLOUDWATCH
-    SECRETS --> PRIMARY
-    SECRETS --> STANDBY
-```
-
-#### 6.2.6.3 Backup Architecture
-
-**Automated Backup Strategy**:
-- **Point-in-Time Recovery**: 5-minute RPO with automated backups
-- **Snapshot Schedule**: Daily snapshots with 7-day retention
-- **Cross-Region Replication**: Optional disaster recovery to secondary region
-- **Backup Encryption**: AES-256 encryption at rest
-
-### 6.2.7 Data Flow Architecture
-
-#### 6.2.7.1 System Data Flow
+#### 6.1.3.1 Horizontal Scaling Strategy
 
 ```mermaid
 flowchart TB
-    subgraph "MCP Client"
-        CLIENT[Claude Desktop]
+    subgraph "Load Balancing Layer"
+        LB[NGINX Ingress Controller] --> HPA[Horizontal Pod Autoscaler]
     end
     
-    subgraph "LabArchives MCP Server"
-        MCP_HANDLER[MCP Protocol Handler]
-        AUTH_MGR[Authentication Manager]
-        RESOURCE_MGR[Resource Manager]
-        API_CLIENT[API Client]
-        AUDIT_SYS[Audit System]
+    subgraph "Container Orchestration"
+        HPA --> I1[MCP Instance 1]
+        HPA --> I2[MCP Instance 2]
+        HPA --> I3[MCP Instance N]
+    end
+    
+    subgraph "Scaling Triggers"
+        CPU[CPU Utilization > 70%] --> HPA
+        MEM[Memory Usage > 80%] --> HPA
+        CONN[Connection Count > 100] --> HPA
+    end
+    
+    subgraph "External Dependencies"
+        I1 --> LA[LabArchives API]
+        I2 --> LA
+        I3 --> LA
         
-        subgraph "Temporary Storage"
-            SESSION_CACHE[Session Cache]
-            CONFIG_CACHE[Configuration Cache]
-        end
-        
-        subgraph "Persistent Storage"
-            LOGS[Log Files]
-            AUDIT_LOGS[Audit Logs]
-            RDS_DB[PostgreSQL RDS]
-        end
+        I1 --> MON[CloudWatch Metrics]
+        I2 --> MON
+        I3 --> MON
     end
     
-    subgraph "External Systems"
-        LABARCH[LabArchives API]
-        SECRETS[AWS Secrets Manager]
-    end
-    
-    CLIENT <--> MCP_HANDLER
-    MCP_HANDLER --> AUTH_MGR
-    MCP_HANDLER --> RESOURCE_MGR
-    AUTH_MGR --> SESSION_CACHE
-    AUTH_MGR --> CONFIG_CACHE
-    RESOURCE_MGR --> API_CLIENT
-    API_CLIENT <--> LABARCH
-    AUTH_MGR --> AUDIT_SYS
-    RESOURCE_MGR --> AUDIT_SYS
-    AUDIT_SYS --> LOGS
-    AUDIT_SYS --> AUDIT_LOGS
-    AUDIT_SYS --> RDS_DB
-    RDS_DB <--> SECRETS
+    style LB fill:#e1f5fe
+    style HPA fill:#e8f5e8
+    style LA fill:#fff3e0
 ```
 
-#### 6.2.7.2 Data Lifecycle Management
+#### 6.1.3.2 Scalability Configuration
 
-**Data Lifecycle Stages**:
+| Scaling Parameter | Configuration | Justification |
+|------------------|---------------|---------------|
+| **Minimum Replicas** | 2 instances | Ensures high availability during updates |
+| **Maximum Replicas** | 10 instances | Supports burst capacity for intensive analysis |
+| **CPU Threshold** | 70% utilization | Maintains responsive performance |
+| **Memory Threshold** | 80% utilization | Prevents memory pressure issues |
+| **Scale-up Cooldown** | 60 seconds | Prevents rapid scaling oscillations |
+| **Scale-down Cooldown** | 300 seconds | Allows traffic patterns to stabilize |
 
-| Stage | Duration | Storage Location | Security Level |
-|-------|----------|------------------|----------------|
-| **Request Processing** | <2 seconds | Memory | High |
-| **Session Management** | 3600 seconds | Memory cache | High |
-| **Audit Logging** | 7 years | File system / RDS | Very High |
-| **Configuration** | Application lifetime | Environment / Files | High |
+#### 6.1.3.3 Load Distribution Strategy
 
-### 6.2.8 Performance Monitoring
+The system implements **stateless load distribution** with the following characteristics:
 
-#### 6.2.8.1 Database Performance Metrics
+- **Round-robin Load Balancing**: Equal distribution across healthy instances
+- **Health Check Integration**: Automatic removal of unhealthy instances
+- **Session Affinity**: Not required due to stateless design
+- **Connection Draining**: Graceful shutdown with request completion
 
-**Key Performance Indicators**:
+### 6.1.4 Resilience Patterns Implementation
 
-| Metric | Target | Monitoring Method | Alert Threshold |
-|--------|--------|-------------------|----------------|
-| **Session Cache Hit Rate** | >95% | Application metrics | <90% |
-| **API Response Time** | <2 seconds P95 | Request timing | >5 seconds |
-| **Memory Usage** | <100MB | System monitoring | >150MB |
-| **Log Write Performance** | <10ms | File system metrics | >50ms |
+The monolithic architecture incorporates **enterprise-grade resilience patterns**:
 
-#### 6.2.8.2 Monitoring Architecture
+#### 6.1.4.1 Fault Tolerance Mechanisms
+
+The system implements comprehensive fault tolerance through multiple resilience patterns:
+
+• Circuit breaker pattern with automated failure detection and recovery
+• Exponential backoff retry logic for transient failures  
+• <span style="background-color: rgba(91, 57, 243, 0.2)">Session refresh on authentication expiration (401) prior to retry logic</span>
+• Graceful degradation with cached response fallbacks
+• Health check integration for proactive failure detection
 
 ```mermaid
-graph TB
-    subgraph "Application Metrics"
-        APP_METRICS[Application Metrics]
-        SESSION_METRICS[Session Metrics]
-        CACHE_METRICS[Cache Metrics]
+flowchart TD
+    subgraph "Error Detection"
+        E1[Authentication Failure] --> RT[Retry with Backoff]
+        E2[API Timeout] --> RT
+        E3[Network Error] --> RT
+        E4[Rate Limit] --> RT
+        E5["Session Expired - 401 Unauthorized"] --> SR[Session Refresh]
     end
     
-    subgraph "System Metrics"
-        CPU_METRICS[CPU Usage]
-        MEM_METRICS[Memory Usage]
-        DISK_METRICS[Disk I/O]
-        NET_METRICS[Network I/O]
+    subgraph "Session Management"
+        SR --> SR1{"Refresh Successful?"}
+        SR1 -->|Yes| RT
+        SR1 -->|No| CB
     end
     
-    subgraph "Database Metrics"
-        RDS_METRICS[RDS Performance]
-        CONN_METRICS[Connection Pool]
-        QUERY_METRICS[Query Performance]
+    subgraph "Circuit Breaker Logic"
+        RT --> CB{"Failure Rate > 50%?"}
+        CB -->|Yes| OPEN[Circuit Open]
+        CB -->|No| CLOSED[Circuit Closed]
+        
+        OPEN --> HALF[Half-Open State]
+        HALF --> TEST[Test Request]
+        TEST -->|Success| CLOSED
+        TEST -->|Failure| OPEN
+    end
+    
+    subgraph "Graceful Degradation"
+        OPEN --> CACHE[Return Cached Data]
+        CACHE --> PARTIAL[Partial Response]
+        PARTIAL --> NOTIFY[Notify Client]
+    end
+    
+    subgraph "Recovery Procedures"
+        CLOSED --> MONITOR[Monitor Health]
+        MONITOR --> ALERT[Alert if Degraded]
+        ALERT --> RECOVER[Automatic Recovery]
+    end
+    
+    style OPEN fill:#ffebee
+    style CLOSED fill:#e8f5e8
+    style HALF fill:#fff3e0
+    style E5 fill:#e6e0fc
+    style SR fill:#e6e0fc
+    style SR1 fill:#e6e0fc
+```
+
+<span style="background-color: rgba(91, 57, 243, 0.2)">When a 401 Unauthorized response is detected, the system performs an **automatic session refresh** to obtain a new authentication token and then retries the original request once. This aligns with the fail-secure objective by ensuring continued operation without exposing invalid credentials.</span>
+
+The session refresh mechanism integrates seamlessly with the existing retry logic, providing an additional layer of resilience specifically for authentication token expiration scenarios. This prevents unnecessary circuit breaker activation for authentication-related failures that can be resolved through token refresh.
+
+#### 6.1.4.2 Disaster Recovery Procedures
+
+The system implements **automated disaster recovery** with the following procedures:
+
+| Recovery Scenario | Procedure | RTO Target | RPO Target |
+|------------------|-----------|------------|------------|
+| **Container Failure** | Kubernetes restart with health checks | < 30 seconds | 0 (stateless) |
+| **Node Failure** | Pod rescheduling to healthy nodes | < 60 seconds | 0 (stateless) |
+| **API Outage** | Circuit breaker with graceful degradation | < 5 seconds | 0 (stateless) |
+| **Complete System Failure** | Multi-region failover | < 5 minutes | 0 (stateless) |
+
+#### 6.1.4.3 Health Management Framework
+
+```mermaid
+flowchart LR
+    subgraph "Health Checks"
+        L[Liveness Probe] --> H["/health/live"]
+        R[Readiness Probe] --> H2["/health/ready"]
+        S[Startup Probe] --> H3["/health/startup"]
+    end
+    
+    subgraph "Health Responses"
+        H --> L1{API Reachable?}
+        H2 --> R1{Ready to Serve?}
+        H3 --> S1{Initialization Complete?}
+    end
+    
+    subgraph "Kubernetes Actions"
+        L1 -->|No| RESTART[Restart Container]
+        R1 -->|No| REMOVE[Remove from Service]
+        S1 -->|No| WAIT[Wait for Startup]
+    end
+    
+    subgraph "Monitoring Integration"
+        RESTART --> ALERT[Alert Operations]
+        REMOVE --> SCALE[Trigger Scaling]
+        WAIT --> TIMEOUT[Startup Timeout]
+    end
+    
+    style L fill:#e8f5e8
+    style R fill:#e1f5fe
+    style S fill:#fff3e0
+```
+
+### 6.1.5 Performance Optimization Architecture
+
+#### 6.1.5.1 Resource Allocation Strategy
+
+The system implements **optimized resource allocation** for consistent performance:
+
+| Resource Type | Allocation Strategy | Optimization Technique |
+|---------------|-------------------|------------------------|
+| **CPU** | 0.5-2.0 cores per instance | Async I/O with connection pooling |
+| **Memory** | 512MB-2GB per instance | Efficient data structures and GC tuning |
+| **Network** | Connection pooling | HTTP/1.1 keep-alive with multiplexing |
+| **Storage** | Ephemeral volumes | Log rotation with external aggregation |
+
+#### 6.1.5.2 Performance Monitoring Integration
+
+```mermaid
+flowchart TB
+    subgraph "Metrics Collection"
+        M1[Request Latency] --> PROM[Prometheus]
+        M2[Error Rates] --> PROM
+        M3[Resource Usage] --> PROM
+        M4[API Response Times] --> PROM
     end
     
     subgraph "Monitoring Stack"
-        CLOUDWATCH[CloudWatch]
-        GRAFANA[Grafana Dashboard]
-        ALERTS[Alert Manager]
+        PROM --> GRAF[Grafana Dashboards]
+        PROM --> ALERT[AlertManager]
+        PROM --> CW[CloudWatch]
     end
     
-    APP_METRICS --> CLOUDWATCH
-    SESSION_METRICS --> CLOUDWATCH
-    CACHE_METRICS --> CLOUDWATCH
-    CPU_METRICS --> CLOUDWATCH
-    MEM_METRICS --> CLOUDWATCH
-    DISK_METRICS --> CLOUDWATCH
-    NET_METRICS --> CLOUDWATCH
-    RDS_METRICS --> CLOUDWATCH
-    CONN_METRICS --> CLOUDWATCH
-    QUERY_METRICS --> CLOUDWATCH
-    
-    CLOUDWATCH --> GRAFANA
-    CLOUDWATCH --> ALERTS
-```
-
-### 6.2.9 Disaster Recovery
-
-#### 6.2.9.1 Recovery Procedures
-
-**Zero-Persistence Recovery Advantages**:
-- **No Data Loss Risk**: No persistent research data to recover
-- **Rapid Recovery**: Application restart sufficient for most failures
-- **Configuration Recovery**: Environment variable and configuration file restoration
-- **Audit Log Recovery**: Backup restoration for compliance requirements
-
-**Recovery Time Objectives**:
-
-| Failure Type | RTO | RPO | Recovery Procedure |
-|-------------|-----|-----|-------------------|
-| **Application Crash** | <1 minute | 0 | Container restart |
-| **Configuration Corruption** | <5 minutes | 0 | Configuration file restoration |
-| **Audit Log Corruption** | <30 minutes | 5 minutes | Backup restoration |
-| **RDS Failure** | <15 minutes | 5 minutes | Multi-AZ failover |
-
-#### 6.2.9.2 Backup Verification
-
-**Backup Testing Schedule**:
-- **Daily**: Automated backup verification
-- **Weekly**: Configuration restoration testing
-- **Monthly**: Full disaster recovery simulation
-- **Quarterly**: Cross-region recovery testing
-
-### 6.2.10 Security Considerations
-
-#### 6.2.10.1 Data Security Architecture
-
-**Security Layers**:
-
-```mermaid
-graph TB
-    subgraph "Security Layers"
-        subgraph "Application Security"
-            AUTH[Authentication]
-            AUTHZ[Authorization]
-            VALIDATION[Input Validation]
-        end
-        
-        subgraph "Transport Security"
-            TLS[TLS 1.3]
-            HMAC[HMAC-SHA256]
-            ENCRYPTION[AES-256]
-        end
-        
-        subgraph "Storage Security"
-            ENCRYPTION_REST[Encryption at Rest]
-            ACCESS_CONTROL[Access Controls]
-            AUDIT_TRAIL[Audit Trail]
-            LOG_SCRUBBER[Log Scrubber]
-        end
-        
-        subgraph "Infrastructure Security"
-            VPC[VPC Isolation]
-            SECURITY_GROUPS[Security Groups]
-            WAF[Web Application Firewall]
-        end
+    subgraph "Alerting Rules"
+        ALERT --> CRIT[Critical: Response Time > 10s]
+        ALERT --> WARN[Warning: Error Rate > 5%]
+        ALERT --> INFO[Info: Memory Usage > 80%]
     end
     
-    AUTH --> TLS
-    AUTHZ --> HMAC
-    VALIDATION --> ENCRYPTION
-    TLS --> ENCRYPTION_REST
-    HMAC --> ACCESS_CONTROL
-    ENCRYPTION --> AUDIT_TRAIL
-    AUDIT_TRAIL --> LOG_SCRUBBER
-    LOG_SCRUBBER --> ENCRYPTION_REST
-    ENCRYPTION_REST --> VPC
-    ACCESS_CONTROL --> SECURITY_GROUPS
-    AUDIT_TRAIL --> WAF
-```
-
-**Security Architecture Components**:
-
-- **Authentication**: Multi-layered authentication with HMAC-SHA256 for API access and session-based user authentication
-- **Authorization**: Role-based access control with scope-limited permissions enforced through FolderPath validation
-- **Input Validation**: Comprehensive request validation and sanitization to prevent injection attacks
-- **Transport Security**: TLS 1.3 encryption for all external communications with certificate pinning
-- **Data Encryption**: AES-256 encryption for data at rest and in transit with proper key management
-- **Access Controls**: Fine-grained permission system with audit logging for all access attempts
-- **Audit Trail**: Comprehensive logging of all security events with structured data format
-- <span style="background-color: rgba(91, 57, 243, 0.2)">**Secret Redaction Pipeline**: All command-line arguments are scrubbed by utils.scrub_argv() before logger initialisation, guaranteeing that secrets never reach any logging handler or persistent storage</span>
-- **Infrastructure Security**: Network isolation through VPC, security groups, and web application firewall protection
-
-#### 6.2.10.2 Encryption Strategy
-
-**Encryption Implementation**:
-- **Data in Transit**: TLS 1.3 for all external communications
-- **Data at Rest**: AES-256 encryption for RDS and log files
-- **Session Data**: Memory-only storage with encrypted transport
-- **Configuration Data**: Environment variable encryption and secure file permissions
-
-<span style="background-color: rgba(91, 57, 243, 0.2)">In addition to encryption at rest, credential material is prevented from being written to disk altogether through the early secret-scrubbing mechanism.</span>
-
-#### 6.2.10.3 Authentication Security
-
-**Multi-Factor Authentication Architecture**:
-- **Primary Authentication**: HMAC-SHA256 based API key authentication with configurable key rotation
-- **Session Management**: Secure session tokens with 3600-second expiration and automatic renewal
-- **SSO Integration**: Support for LabArchives SSO with token-based authentication
-- **Credential Storage**: AWS Secrets Manager integration for secure credential management
-
-**Authentication Flow Security**:
-
-```mermaid
-graph TB
-    subgraph "Authentication Process"
-        CLIENT[MCP Client]
-        AUTH_MGR[Authentication Manager]
-        CRED_STORE[Credential Storage]
-        HMAC_VERIFY[HMAC Verification]
-        SESSION_CACHE[Session Cache]
-        LABARCH_API[LabArchives API]
+    subgraph "Response Actions"
+        CRIT --> SCALE[Auto-Scale Instances]
+        WARN --> LOG[Enhanced Logging]
+        INFO --> MONITOR[Increased Monitoring]
     end
     
-    CLIENT --> AUTH_MGR
-    AUTH_MGR --> CRED_STORE
-    AUTH_MGR --> HMAC_VERIFY
-    HMAC_VERIFY --> SESSION_CACHE
-    SESSION_CACHE --> LABARCH_API
-    LABARCH_API --> AUTH_MGR
+    style PROM fill:#e1f5fe
+    style GRAF fill:#e8f5e8
+    style ALERT fill:#fff3e0
 ```
 
-#### 6.2.10.4 Data Protection Measures
+### 6.1.6 Security and Compliance Architecture
 
-**Zero-Persistence Security Model**:
-- **No Research Data Storage**: Eliminates primary attack vectors by storing no research data locally
-- **Temporary Session Data**: Maximum 3600-second lifetime for all session information
-- **Memory-Only Caching**: Session tokens and configuration data stored only in memory
-- **Automatic Data Expiration**: Scheduled cleanup of temporary data with secure overwriting
+#### 6.1.6.1 Security Patterns
 
-**Data Classification and Handling**:
+The monolithic architecture implements **comprehensive security patterns**:
 
-| Data Type | Classification | Storage Location | Retention Period | Encryption Level |
-|-----------|---------------|------------------|------------------|------------------|
-| **Research Data** | Confidential | None (Zero-Persistence) | 0 seconds | N/A |
-| **Session Tokens** | Restricted | Memory Cache | 3600 seconds | AES-256 |
-| **Configuration** | Internal | Environment Variables | Application Lifetime | Variable-level encryption |
-| **Audit Logs** | Restricted | Persistent Storage | 7 years | AES-256 + Field-level redaction |
+- **Authentication**: HMAC-SHA256 signed requests with session management
+- **Authorization**: Role-based access control with scope enforcement
+- **Encryption**: TLS 1.3 for all external communications
+- **Audit Logging**: Comprehensive request/response tracking with integrity protection <span style="background-color: rgba(91, 57, 243, 0.2)">and automatic redaction of sensitive parameters</span>
+- **Container Security**: Non-root execution with minimal attack surface
+- <span style="background-color: rgba(91, 57, 243, 0.2)">**Fail-Secure Scope Enforcement**: Access to resources outside the configured notebook/folder scope is denied by default</span>
+- <span style="background-color: rgba(91, 57, 243, 0.2)">**Session Refresh Mechanism**: Automatic re-authentication when tokens expire, maintaining stateless design while preventing session fixation</span>
+- <span style="background-color: rgba(91, 57, 243, 0.2)">**Sensitive Data Redaction in Logs**: URL parameter sanitization masks tokens, passwords, and secrets before any debug or audit log entry</span>
 
-#### 6.2.10.5 Network Security
+#### 6.1.6.2 Compliance Integration
 
-**Network Isolation Architecture**:
-- **VPC Implementation**: Isolated network segments with strict ingress/egress controls
-- **Security Groups**: Least-privilege network access with application-specific rule sets
-- **Web Application Firewall**: Layer 7 protection with custom rule sets for MCP traffic
-- **TLS Certificate Management**: Automated certificate provisioning and renewal
+| Compliance Standard | Implementation | Verification |
+|--------------------|----------------|--------------|
+| **SOC 2 Type II** | Audit logging with retention | Annual compliance audit |
+| **ISO 27001** | Information security management | Quarterly security reviews |
+| **HIPAA** | Data encryption and access controls | Regular compliance assessments |
+| **GDPR** | Data protection and privacy controls | Privacy impact assessments |
 
-**Network Security Controls**:
+### 6.1.7 Deployment Architecture Summary
 
-```mermaid
-graph TB
-    subgraph "Network Security Layers"
-        subgraph "Perimeter Security"
-            INTERNET[Internet]
-            WAF[Web Application Firewall]
-            LOAD_BALANCER[Load Balancer]
-        end
-        
-        subgraph "Application Network"
-            VPC[VPC Network]
-            SECURITY_GROUPS[Security Groups]
-            NACL[Network ACLs]
-        end
-        
-        subgraph "Application Layer"
-            MCP_SERVER[MCP Server]
-            RDS[RDS Database]
-            SECRETS[Secrets Manager]
-        end
-    end
-    
-    INTERNET --> WAF
-    WAF --> LOAD_BALANCER
-    LOAD_BALANCER --> VPC
-    VPC --> SECURITY_GROUPS
-    SECURITY_GROUPS --> NACL
-    NACL --> MCP_SERVER
-    MCP_SERVER --> RDS
-    MCP_SERVER --> SECRETS
-```
+The LabArchives MCP Server's **monolithic architecture** provides:
 
-#### 6.2.10.6 Compliance and Audit Security
+#### 6.1.7.1 Architecture Benefits
 
-**Regulatory Compliance Framework**:
-- **SOC2 Type II**: Service Organization Control 2 compliance for security and availability
-- **HIPAA**: Health Insurance Portability and Accountability Act compliance for healthcare data
-- **GDPR**: General Data Protection Regulation compliance with right to erasure
-- **FERPA**: Family Educational Rights and Privacy Act compliance for educational records
+- **Simplified Operations**: Single deployment unit reduces operational complexity
+- **Consistent Performance**: Optimized in-process communication
+- **Unified Monitoring**: Single application monitoring without distributed complexity
+- **Cost Efficiency**: Lower infrastructure overhead compared to microservices
+- **Development Velocity**: Faster development cycles with simplified testing
 
-**Audit Trail Security**:
-- **Immutable Audit Logs**: Write-once audit logging with cryptographic integrity verification
-- **Structured Logging**: JSON-formatted audit records with consistent schema
-- **Log Aggregation**: Centralized log collection with real-time monitoring
-- **Compliance Reporting**: Automated generation of compliance reports and evidence
+#### 6.1.7.2 Scalability Achievement
 
-#### 6.2.10.7 Incident Response Security
+Despite being monolithic, the system achieves **enterprise-grade scalability** through:
 
-**Security Incident Response**:
-- **Automated Threat Detection**: Real-time monitoring with anomaly detection algorithms
-- **Incident Classification**: Severity-based incident categorization with automated escalation
-- **Response Procedures**: Documented incident response playbooks with defined roles
-- **Forensic Capabilities**: Comprehensive audit trails for security investigation
+- **Horizontal Scaling**: Container replication with load balancing
+- **Auto-scaling**: Kubernetes HPA with custom metrics
+- **Regional Deployment**: Multi-region support for global availability
+- **Performance Optimization**: Efficient resource utilization and caching
 
-**Security Monitoring Dashboard**:
+#### 6.1.7.3 Future Considerations
 
-```mermaid
-graph TB
-    subgraph "Security Monitoring"
-        subgraph "Detection Sources"
-            APP_LOGS[Application Logs]
-            AUDIT_LOGS[Audit Logs]
-            SYSTEM_METRICS[System Metrics]
-            NETWORK_LOGS[Network Logs]
-        end
-        
-        subgraph "Analysis Engine"
-            SIEM[SIEM System]
-            ANOMALY_DETECT[Anomaly Detection]
-            THREAT_INTEL[Threat Intelligence]
-        end
-        
-        subgraph "Response Actions"
-            ALERTS[Alert System]
-            AUTOMATION[Automated Response]
-            ESCALATION[Incident Escalation]
-        end
-    end
-    
-    APP_LOGS --> SIEM
-    AUDIT_LOGS --> SIEM
-    SYSTEM_METRICS --> ANOMALY_DETECT
-    NETWORK_LOGS --> THREAT_INTEL
-    SIEM --> ALERTS
-    ANOMALY_DETECT --> AUTOMATION
-    THREAT_INTEL --> ESCALATION
-```
+The monolithic architecture provides **evolutionary flexibility**:
 
-#### 6.2.10.8 Container Security
+- **Modular Design**: Clean component boundaries enable future extraction
+- **Technology Upgrades**: Unified technology stack simplifies upgrades
+- **Feature Extension**: Plugin architecture for additional capabilities
+- **Migration Path**: Clear path to microservices if business requirements change
 
-**Container Security Architecture**:
-- **Non-root Container Execution**: All containers run with non-privileged user accounts
-- **Image Scanning**: Automated vulnerability scanning with Trivy and Snyk integration
-- **Runtime Security**: Container runtime monitoring with behavioral analysis
-- **Secrets Management**: Kubernetes secrets with automatic rotation and secure mounting
+### 6.1.8 Conclusion
 
-**Container Security Controls**:
+The LabArchives MCP Server's **monolithic architecture** is the optimal choice for this system, providing:
 
-| Security Control | Implementation | Monitoring Method | Enforcement Level |
-|------------------|---------------|------------------|------------------|
-| **Base Image Security** | Distroless base images | Automated scanning | Build-time |
-| **Vulnerability Scanning** | Trivy + Snyk integration | CI/CD pipeline | Pre-deployment |
-| **Runtime Protection** | Falco behavioral monitoring | Real-time alerts | Runtime |
-| **Resource Limits** | Kubernetes resource quotas | Cluster monitoring | Cluster-level |
+1. **Appropriate Scale**: Matches system requirements without over-engineering
+2. **Operational Simplicity**: Reduces complexity while maintaining enterprise capabilities
+3. **Cost Effectiveness**: Lower operational overhead with sufficient scalability
+4. **Performance Optimization**: Optimized communication patterns and resource usage
+5. **Future Flexibility**: Architectural foundation that supports evolution
 
-#### 6.2.10.9 API Security
-
-**API Security Implementation**:
-- **Rate Limiting**: Configurable rate limits with burst protection and client identification
-- **Request Validation**: Comprehensive input validation with schema enforcement
-- **Response Filtering**: Scope-based response filtering to prevent data leakage
-- **Error Handling**: Structured error responses with security information disclosure prevention
-
-**API Security Flow**:
-
-```mermaid
-graph TB
-    subgraph "API Security Pipeline"
-        REQUEST[Incoming Request]
-        RATE_LIMIT[Rate Limiting]
-        AUTH_CHECK[Authentication Check]
-        SCOPE_VALIDATION[Scope Validation]
-        INPUT_VALIDATION[Input Validation]
-        BUSINESS_LOGIC[Business Logic]
-        RESPONSE_FILTER[Response Filtering]
-        AUDIT_LOG[Audit Logging]
-        RESPONSE[Response]
-    end
-    
-    REQUEST --> RATE_LIMIT
-    RATE_LIMIT --> AUTH_CHECK
-    AUTH_CHECK --> SCOPE_VALIDATION
-    SCOPE_VALIDATION --> INPUT_VALIDATION
-    INPUT_VALIDATION --> BUSINESS_LOGIC
-    BUSINESS_LOGIC --> RESPONSE_FILTER
-    RESPONSE_FILTER --> AUDIT_LOG
-    AUDIT_LOG --> RESPONSE
-```
-
-#### 6.2.10.10 Security Testing and Validation
-
-**Security Testing Framework**:
-- **Static Analysis**: Bandit and Semgrep for code security analysis
-- **Dynamic Testing**: Automated penetration testing with OWASP ZAP
-- **Dependency Scanning**: Safety and Snyk for vulnerability detection
-- **Compliance Testing**: Automated compliance validation with custom test suites
-
-**Security Validation Process**:
-
-| Testing Phase | Tools Used | Coverage Area | Frequency |
-|---------------|------------|---------------|-----------|
-| **Development** | Bandit, mypy, Semgrep | Static code analysis | Every commit |
-| **CI/CD Pipeline** | Trivy, Safety, OWASP ZAP | Container and dependency scanning | Every build |
-| **Pre-deployment** | Custom compliance tests | End-to-end security validation | Every deployment |
-| **Production** | Continuous monitoring | Runtime security monitoring | Continuous |
-
-### 6.2.11 Conclusion
-
-The LabArchives MCP Server's database design represents a paradigm shift from traditional data persistence to a zero-persistence architecture. This design choice eliminates the complexity of traditional database management while providing the necessary operational storage for audit, configuration, and session management.
-
-The optional enterprise RDS database provides scalable audit storage and metadata management for organizations requiring enhanced compliance and monitoring capabilities, while maintaining the core zero-persistence philosophy for research data.
-
-This architecture achieves the optimal balance between operational simplicity, security, performance, and compliance requirements while supporting the system's primary objective of providing secure, real-time access to LabArchives data through the Model Context Protocol.
+The system successfully demonstrates that **monolithic architectures** can deliver enterprise-grade performance, scalability, and reliability when properly designed and implemented.
 
 #### References
 
-**Technical Specification Sections Referenced**:
-- `3.5 DATABASES & STORAGE` - Zero-persistence architecture and storage components
-- `5.1 HIGH-LEVEL ARCHITECTURE` - System architecture and data flow patterns
-- `6.1 CORE SERVICES ARCHITECTURE` - Monolithic architecture rationale
-- `1.2 SYSTEM OVERVIEW` - System capabilities and technical approach
+**Technical Specification Sections Retrieved:**
+- `5.1 HIGH-LEVEL ARCHITECTURE` - System overview and layered architecture patterns
+- `5.2 COMPONENT DETAILS` - Component responsibilities and interaction patterns
+- `4.4 DEPLOYMENT AND OPERATIONAL WORKFLOWS` - Deployment architecture and operational procedures
+- `4.5 PERFORMANCE AND SLA REQUIREMENTS` - Performance targets and scaling considerations
+- `3.7 INTEGRATION ARCHITECTURE` - Technology stack and integration patterns
+- `5.4 CROSS-CUTTING CONCERNS` - Monitoring, logging, and error handling patterns
 
-**Repository Analysis Evidence**:
-- `infrastructure/terraform/main.tf` - Conditional RDS database provisioning
-- `infrastructure/terraform/variables.tf` - Database configuration variables
-- `src/` - Source code analysis confirming zero-persistence implementation
-- `infrastructure/` - Infrastructure configuration showing optional database components
+**Repository Analysis:**
+- `src/cli/` - Complete CLI application implementation and component structure
+- `infrastructure/kubernetes/` - Container orchestration manifests and scaling configurations
+- `infrastructure/terraform/` - AWS infrastructure provisioning and resource management
+- `src/cli/Dockerfile` - Container build configuration and deployment settings
+- `src/cli/requirements.txt` - Production dependencies and version constraints
+- `src/cli/pyproject.toml` - Package configuration and development tooling
+
+## 6.2 DATABASE DESIGN
+
+### 6.2.1 SYSTEM ARCHITECTURE ANALYSIS
+
+#### 6.2.1.1 Stateless Design Rationale
+
+The LabArchives MCP Server implements a **stateless client-server architecture** that deliberately avoids persistent storage requirements. This architectural decision provides several key advantages:
+
+- **Simplified Deployment**: No database setup, migration, or maintenance overhead
+- **Horizontal Scalability**: Instances can be replicated without data consistency concerns
+- **Reduced Operational Complexity**: Eliminates database backup, recovery, and monitoring requirements
+- **Enhanced Reliability**: Removes database as a potential single point of failure
+- **Cost Efficiency**: Reduces infrastructure requirements and operational costs
+
+#### 6.2.1.2 Primary Data Source Architecture
+
+The system's data architecture centers on **external data source integration** rather than internal data persistence:
+
+```mermaid
+flowchart TB
+    subgraph "LabArchives MCP Server"
+        A[MCP Protocol Handler] --> B[Authentication Manager]
+        A --> C[Resource Manager]
+        C --> D[LabArchives API Client]
+        B --> D
+        
+        E[In-Memory Cache] --> C
+        F[Session Storage] --> B
+    end
+    
+    subgraph "External Data Sources"
+        G[LabArchives US API<br/>labarchives.com]
+        H[LabArchives AU API<br/>au.labarchives.com]
+        I[LabArchives UK API<br/>uk.labarchives.com]
+    end
+    
+    subgraph "Data Flow"
+        D --> G
+        D --> H
+        D --> I
+        
+        G --> J[Research Data]
+        H --> J
+        I --> J
+        
+        J --> K[MCP-Formatted Response]
+        K --> L[AI Application]
+    end
+    
+    style A fill:#e1f5fe
+    style G fill:#e8f5e8
+    style H fill:#e8f5e8
+    style I fill:#e8f5e8
+    style J fill:#fff3e0
+```
+
+#### 6.2.1.3 Data Persistence Strategy
+
+The system employs **on-demand data retrieval** with temporary storage patterns:
+
+| Data Type | Storage Method | Retention Period | Justification |
+|-----------|---------------|------------------|---------------|
+| **Authentication Sessions** | In-memory objects | 3600 seconds | Security best practice for temporary access |
+| **API Response Cache** | Python dictionaries with TTL | 300 seconds | Performance optimization without consistency issues |
+| **Audit Logs** | CloudWatch Logs | 7-90 days configurable | Compliance requirements with external storage |
+| **Configuration Data** | Environment variables | Application lifetime | Stateless configuration management |
+
+### 6.2.2 ALTERNATIVE STORAGE ANALYSIS
+
+#### 6.2.2.1 Optional Database Infrastructure
+
+While the system operates without database requirements, optional PostgreSQL infrastructure exists for potential future enhancements:
+
+```mermaid
+flowchart TB
+    subgraph "Current Implementation"
+        A[MCP Server] --> B[LabArchives API]
+        A --> C[In-Memory Cache]
+        A --> D[CloudWatch Logs]
+    end
+    
+    subgraph "Optional Database Infrastructure"
+        E[PostgreSQL 15.4<br/>AWS RDS]
+        F[Metadata Cache Tables]
+        G[Audit Log Tables]
+        H[Session Storage Tables]
+        
+        E --> F
+        E --> G
+        E --> H
+    end
+    
+    subgraph "Infrastructure Status"
+        I[Terraform Module Available]
+        J[Database Not Connected]
+        K[Tables Not Defined]
+        L[Migration Scripts Not Present]
+        
+        I --> J
+        J --> K
+        K --> L
+    end
+    
+    style A fill:#e8f5e8
+    style E fill:#ffebee
+    style I fill:#fff3e0
+```
+
+#### 6.2.2.2 Optional Database Specifications
+
+The provisioned but unused PostgreSQL infrastructure includes:
+
+| Configuration Parameter | Development | Production | Justification |
+|------------------------|-------------|------------|---------------|
+| **Engine Version** | PostgreSQL 15.4 | PostgreSQL 15.4 | Modern feature set with performance improvements |
+| **Instance Class** | db.t3.micro | db.r5.large | Cost-optimized for dev, performance-optimized for prod |
+| **Storage** | 20GB gp3 SSD | 100GB gp3 SSD | Sufficient for metadata and audit logs |
+| **Multi-AZ** | Disabled | Enabled | High availability for production environments |
+| **Backup Retention** | 7 days | 30 days | Compliance requirements and operational needs |
+| **Encryption** | AWS KMS | AWS KMS | Data protection requirements |
+
+#### 6.2.2.3 Hypothetical Schema Design
+
+If database integration were implemented, the schema would support the following conceptual structure:
+
+```mermaid
+erDiagram
+    USERS {
+        uuid user_id PK
+        string email
+        string region
+        timestamp created_at
+        timestamp last_accessed
+    }
+    
+    SESSIONS {
+        uuid session_id PK
+        uuid user_id FK
+        string token_hash
+        timestamp created_at
+        timestamp expires_at
+        string ip_address
+    }
+    
+    AUDIT_LOGS {
+        uuid log_id PK
+        uuid user_id FK
+        string resource_uri
+        string action_type
+        json request_data
+        json response_data
+        timestamp created_at
+    }
+    
+    METADATA_CACHE {
+        uuid cache_id PK
+        string resource_uri
+        json metadata
+        timestamp created_at
+        timestamp expires_at
+    }
+    
+    USERS ||--o{ SESSIONS : has
+    USERS ||--o{ AUDIT_LOGS : generates
+    SESSIONS ||--o{ AUDIT_LOGS : associated_with
+```
+
+### 6.2.3 DATA FLOW ARCHITECTURE
+
+#### 6.2.3.1 Request Processing Flow
+
+The system processes data requests through a stateless pipeline without persistent storage:
+
+```mermaid
+sequenceDiagram
+    participant Client as MCP Client
+    participant Server as MCP Server
+    participant Auth as Auth Manager
+    participant Cache as Memory Cache
+    participant API as LabArchives API
+    participant Log as CloudWatch
+    
+    Client->>Server: Resource Request
+    Server->>Auth: Validate Session
+    Auth->>Cache: Check Session Cache
+    Cache-->>Auth: Session Valid/Invalid
+    
+    alt Session Valid
+        Server->>Cache: Check Resource Cache
+        Cache-->>Server: Cache Hit/Miss
+        
+        alt Cache Miss
+            Server->>API: Fetch Resource Data
+            API-->>Server: Resource Response
+            Server->>Cache: Store in Cache (TTL)
+        end
+        
+        Server->>Log: Log Access Event
+        Server-->>Client: Return Resource
+    else Session Invalid
+        Server->>Log: Log Authentication Failure
+        Server-->>Client: Authentication Error
+    end
+```
+
+#### 6.2.3.2 Memory Management Strategy
+
+The system implements efficient memory management without persistent storage:
+
+| Memory Component | Allocation Strategy | Cleanup Mechanism | Maximum Size |
+|------------------|-------------------|-------------------|--------------|
+| **Session Cache** | LRU with TTL | 3600-second expiration | 1000 sessions |
+| **Resource Cache** | TTL-based | 300-second expiration | 50MB per instance |
+| **Request Context** | Request-scoped | Garbage collection | 10MB per request |
+| **Audit Buffer** | Ring buffer | CloudWatch flush | 1MB buffer |
+
+#### 6.2.3.3 Caching Architecture
+
+The system implements **multi-level caching** without persistent storage:
+
+```mermaid
+flowchart TB
+    subgraph "Caching Layers"
+        A[Request Context Cache] --> B[Session Cache]
+        B --> C[Resource Metadata Cache]
+        C --> D[API Response Cache]
+    end
+    
+    subgraph "Cache Policies"
+        E[LRU Eviction] --> A
+        F[TTL-Based Expiration] --> B
+        F --> C
+        F --> D
+    end
+    
+    subgraph "Cache Invalidation"
+        G[Session Timeout] --> B
+        H[Resource Update] --> C
+        I[API Rate Limit] --> D
+    end
+    
+    subgraph "Fallback Strategy"
+        J[Cache Miss] --> K[Direct API Call]
+        K --> L[Cache Update]
+        L --> M[Response Return]
+    end
+    
+    style A fill:#e1f5fe
+    style B fill:#e8f5e8
+    style C fill:#fff3e0
+    style D fill:#ffebee
+```
+
+### 6.2.4 COMPLIANCE AND AUDIT ARCHITECTURE
+
+#### 6.2.4.1 Audit Trail Management (updated)
+
+The system implements comprehensive audit logging without database storage, <span style="background-color: rgba(91, 57, 243, 0.2)">with mandatory security sanitization to protect sensitive data in all log outputs</span>:
+
+```mermaid
+flowchart TB
+    subgraph "Audit Event Sources"
+        A[Authentication Events] --> D[Audit Logger]
+        B[Resource Access Events] --> D
+        C[Error Events] --> D
+    end
+    
+    subgraph "Audit Processing"
+        D --> E[Event Enrichment]
+        E --> US[URL Parameter Sanitization]
+        US --> F[JSON Formatting]
+        F --> G[Correlation ID Assignment]
+    end
+    
+    subgraph "Audit Storage"
+        G --> H[CloudWatch Logs]
+        G --> I[Local Log Files]
+        H --> J[Log Aggregation]
+        I --> K[Container Logging]
+    end
+    
+    subgraph "Compliance Reporting"
+        J --> L[Compliance Queries]
+        J --> M[Access Reports]
+        J --> N[Security Monitoring]
+    end
+    
+    style D fill:#e1f5fe
+    style US fill:#e6e0fc
+    style H fill:#e8f5e8
+    style L fill:#fff3e0
+```
+
+<span style="background-color: rgba(91, 57, 243, 0.2)">The **URL Parameter Sanitization** process automatically scrubs sensitive query parameters before they reach persistent log stores. The sanitizer, implemented by `src/cli/security/sanitizers.py`, masks values of parameters such as `token`, `password`, and `secret` with `[REDACTED]` placeholders. This mandatory transformation ensures that credentials and authentication secrets never appear in system logs, debug outputs, or audit trails, maintaining security compliance across all logging destinations.</span>
+
+The audit processing pipeline ensures complete event traceability while protecting sensitive information through automated redaction. All audit events flow through the sanitization layer, which operates with minimal performance impact by processing parameters during the enrichment phase before JSON serialization occurs.
+
+#### 6.2.4.2 Data Retention Policies
+
+The system implements data retention without persistent database storage:
+
+| Data Category | Retention Period | Storage Location | Compliance Standard |
+|---------------|------------------|------------------|-------------------|
+| **Authentication Logs** | 90 days | CloudWatch Logs | SOC 2 Type II |
+| **Access Logs** | 365 days | CloudWatch Logs | ISO 27001 |
+| **Error Logs** | 30 days | CloudWatch Logs | Operational requirement |
+| **Performance Metrics** | 30 days | CloudWatch Metrics | SLA monitoring |
+| **Security Events** | 2 years | CloudWatch Logs | HIPAA compliance |
+
+#### 6.2.4.3 Privacy Protection Framework (updated)
+
+<span style="background-color: rgba(91, 57, 243, 0.2)">The system implements privacy controls without persistent storage, featuring enhanced URL and parameter sanitization to protect sensitive data in all operational contexts</span>:
+
+```mermaid
+flowchart TB
+    subgraph "Privacy Controls"
+        A[PII Detection] --> B[Data Masking]
+        B --> C[URL & Parameter Sanitization]
+        C --> D[Audit Trail Protection]
+    end
+    
+    subgraph "Data Minimization"
+        E[Required Data Only] --> F[Temporary Storage]
+        F --> G[Automatic Cleanup]
+        G --> H[Memory Purging]
+    end
+    
+    subgraph "Access Controls"
+        I[Role-Based Access] --> J[Scope Enforcement]
+        J --> K[Permission Validation]
+        K --> L[Audit Logging]
+    end
+    
+    subgraph "Compliance Integration"
+        D --> M[GDPR Compliance]
+        H --> N[Right to Deletion]
+        L --> O[Access Transparency]
+    end
+    
+    style A fill:#e1f5fe
+    style C fill:#e6e0fc
+    style E fill:#e8f5e8
+    style I fill:#fff3e0
+    style M fill:#ffebee
+```
+
+<span style="background-color: rgba(91, 57, 243, 0.2)">The **URL & Parameter Sanitization** component specifically handles the transformation of sensitive URL query parameters and request data before any logging or audit processing occurs. This transformation is performed entirely in-memory using the security sanitizers module, ensuring that sensitive parameters like authentication tokens, passwords, and API secrets are masked with `[REDACTED]` placeholders. The sanitization process does not create additional storage artifacts and maintains the stateless database design by operating exclusively on transient data structures during request processing.</span>
+
+The privacy framework operates without persistent data storage, relying on in-memory processing and external log aggregation services. All data transformations occur during the request lifecycle, ensuring that sensitive information is protected while maintaining full audit compliance for regulatory requirements.
+
+#### 6.2.4.4 Compliance Monitoring Integration
+
+The system provides comprehensive compliance monitoring through CloudWatch integration:
+
+```mermaid
+flowchart LR
+    subgraph "Compliance Events"
+        CE1[Access Violations] --> CM[Compliance Monitor]
+        CE2[Authentication Failures] --> CM
+        CE3[Scope Breaches] --> CM
+        CE4[Data Access Patterns] --> CM
+    end
+    
+    subgraph "Real-time Analysis"
+        CM --> RA1[Anomaly Detection]
+        CM --> RA2[Threshold Monitoring]
+        CM --> RA3[Pattern Analysis]
+    end
+    
+    subgraph "Alerting System"
+        RA1 --> AL1[Security Alerts]
+        RA2 --> AL2[Compliance Warnings]
+        RA3 --> AL3[Operational Notifications]
+    end
+    
+    subgraph "Reporting Dashboard"
+        AL1 --> RD[CloudWatch Dashboard]
+        AL2 --> RD
+        AL3 --> RD
+        RD --> CR[Compliance Reports]
+    end
+    
+    style CM fill:#e1f5fe
+    style RD fill:#e8f5e8
+    style CR fill:#fff3e0
+```
+
+The compliance monitoring system operates without database dependencies, utilizing CloudWatch metrics and logs for real-time analysis and historical reporting. Automated alerting ensures immediate notification of compliance violations or security incidents, supporting proactive security management and regulatory compliance maintenance.
+
+### 6.2.5 PERFORMANCE WITHOUT PERSISTENCE
+
+#### 6.2.5.1 Stateless Performance Optimization
+
+The system achieves high performance through stateless design patterns:
+
+| Optimization Technique | Implementation | Performance Benefit |
+|----------------------|----------------|-------------------|
+| **Connection Pooling** | HTTP/1.1 keep-alive | 50% reduction in connection overhead |
+| **Response Caching** | In-memory TTL cache | 80% reduction in API calls |
+| **Parallel Processing** | Async/await patterns | 3x improvement in concurrent requests |
+| **Memory Efficiency** | Garbage collection tuning | 40% reduction in memory usage |
+
+#### 6.2.5.2 Resource Utilization Patterns
+
+The system optimizes resource usage without persistent storage:
+
+```mermaid
+flowchart TB
+    subgraph "Resource Allocation"
+        A[Request Arrival] --> B[Memory Allocation]
+        B --> C[Processing Context]
+        C --> D[Response Generation]
+    end
+    
+    subgraph "Resource Cleanup"
+        D --> E[Context Cleanup]
+        E --> F[Memory Deallocation]
+        F --> G[Cache Maintenance]
+        G --> H[Garbage Collection]
+    end
+    
+    subgraph "Performance Monitoring"
+        I[Memory Usage] --> J[Performance Metrics]
+        K[Response Times] --> J
+        L[Error Rates] --> J
+        J --> M[Auto-scaling Triggers]
+    end
+    
+    subgraph "Optimization Feedback"
+        M --> N[Instance Scaling]
+        N --> O[Load Distribution]
+        O --> P[Performance Improvement]
+    end
+    
+    style A fill:#e1f5fe
+    style I fill:#e8f5e8
+    style M fill:#fff3e0
+    style N fill:#ffebee
+```
+
+#### 6.2.5.3 Scalability Architecture
+
+The system achieves horizontal scalability without database constraints:
+
+| Scalability Factor | Implementation | Scalability Benefit |
+|-------------------|----------------|-------------------|
+| **Stateless Design** | No shared state | Linear scaling capability |
+| **Container Orchestration** | Kubernetes HPA | Automatic scaling based on demand |
+| **Load Balancing** | Round-robin distribution | Even load distribution |
+| **Health Checks** | Kubernetes probes | Automatic failure recovery |
+
+### 6.2.6 FUTURE CONSIDERATIONS
+
+#### 6.2.6.1 Database Integration Readiness
+
+Should future requirements necessitate database integration, the system architecture supports:
+
+- **Infrastructure**: PostgreSQL RDS module ready for activation
+- **Configuration**: Environment-based database connection settings
+- **Migration Path**: Clear separation of concerns enables database layer addition
+- **Backward Compatibility**: Existing stateless operations remain unchanged
+
+#### 6.2.6.2 Potential Database Use Cases
+
+Future database integration could support:
+
+| Use Case | Implementation Priority | Business Value |
+|----------|------------------------|---------------|
+| **Persistent Caching** | Medium | Improved performance across restarts |
+| **Audit History** | High | Enhanced compliance and reporting |
+| **User Analytics** | Low | Usage pattern analysis |
+| **Session Persistence** | Medium | Improved user experience |
+
+#### 6.2.6.3 Migration Strategy
+
+If database integration becomes necessary:
+
+```mermaid
+flowchart TB
+    subgraph "Phase 1: Infrastructure"
+        A[Enable RDS Module] --> B[Configure Networking]
+        B --> C[Set up Security Groups]
+        C --> D[Configure Monitoring]
+    end
+    
+    subgraph "Phase 2: Application"
+        E[Add Database Libraries] --> F[Create Data Models]
+        F --> G[Implement DAOs]
+        G --> H[Add Migration Scripts]
+    end
+    
+    subgraph "Phase 3: Integration"
+        I[Modify Business Logic] --> J[Update Caching Layer]
+        J --> K[Add Database Tests]
+        K --> L[Performance Testing]
+    end
+    
+    subgraph "Phase 4: Deployment"
+        M[Blue-Green Deployment] --> N[Data Migration]
+        N --> O[Monitoring Setup]
+        O --> P[Rollback Strategy]
+    end
+    
+    style A fill:#e1f5fe
+    style E fill:#e8f5e8
+    style I fill:#fff3e0
+    style M fill:#ffebee
+```
+
+### 6.2.7 CONCLUSION
+
+The LabArchives MCP Server's **stateless architecture** eliminates traditional database design requirements while maintaining enterprise-grade performance, scalability, and compliance. This approach provides:
+
+#### 6.2.7.1 Architecture Benefits
+
+- **Operational Simplicity**: No database management overhead
+- **Cost Efficiency**: Reduced infrastructure and operational costs
+- **Scalability**: Linear scaling without database bottlenecks
+- **Reliability**: Elimination of database as single point of failure
+- **Flexibility**: Optional database infrastructure ready for future needs
+
+#### 6.2.7.2 Design Validation
+
+The stateless approach successfully addresses all system requirements:
+
+- **Data Access**: On-demand retrieval from LabArchives API
+- **Performance**: In-memory caching with TTL management
+- **Compliance**: Comprehensive audit logging without persistence
+- **Security**: Session management with appropriate timeouts
+- **Scalability**: Horizontal scaling through container orchestration
+
+#### 6.2.7.3 Strategic Alignment
+
+The database-free design aligns with the system's core mission of providing a **lightweight, efficient bridge** between AI applications and LabArchives research data without introducing unnecessary complexity or operational overhead.
+
+#### References
+
+**Technical Specification Sections Retrieved:**
+- `3.5 DATABASES & STORAGE` - Storage strategy and optional database specifications
+- `5.1 HIGH-LEVEL ARCHITECTURE` - Stateless architecture design and data flow patterns
+- `4.1 SYSTEM WORKFLOWS` - Request processing without persistent storage
+- `6.1 CORE SERVICES ARCHITECTURE` - Monolithic stateless design principles
+
+**Repository Analysis:**
+- `src/cli/auth_manager.py` - In-memory session management implementation
+- `infrastructure/terraform/modules/rds/` - Optional PostgreSQL infrastructure configuration
+- `infrastructure/terraform/main.tf` - Database module conditional enablement
+- `src/cli/models/` - Configuration models without database entities
+
+**Architecture Validation:**
+- No database connection code found in application
+- No ORM libraries or database models present
+- No migration scripts or schema definitions
+- Confirmed stateless operation with in-memory caching only
 
 ## 6.3 INTEGRATION ARCHITECTURE
 
 ### 6.3.1 API DESIGN
 
-#### 6.3.1.1 Protocol Specifications (updated)
+#### 6.3.1.1 Protocol Specifications
 
-**Primary Communication Protocol:**
-The system implements a dual-protocol architecture optimized for different integration scenarios:
+The LabArchives MCP Server implements a **dual-protocol architecture** supporting both inbound MCP client communication and outbound LabArchives API integration:
 
-| Protocol | Implementation | Use Case | Transport |
-|----------|---------------|----------|-----------|
-| **JSON-RPC 2.0** | MCP Protocol Handler | AI client communication | stdin/stdout |
-| **REST API** | LabArchives API Client | External data access | HTTPS |
-| **WebSocket** | Future expansion | Real-time notifications | WSS |
+##### 6.3.1.1.1 Model Context Protocol (MCP) Implementation
 
-**MCP Protocol Implementation:**
-- **Specification Version**: MCP 2024-11-05
-- **Message Format**: JSON-RPC 2.0 with structured resource URIs
-- **Capability Negotiation**: Dynamic feature discovery and enablement
-- **Resource Identification**: Custom `labarchives://` URI scheme
-
-<span style="background-color: rgba(91, 57, 243, 0.2)">**MCP Error Response Codes:**
-The system implements comprehensive error handling with standardized MCP error codes:</span>
-
-| Error Code | Error Message | Description | Resolution |
-|------------|---------------|-------------|------------|
-| 401 | Unauthorized | Authentication failed or expired | Verify credentials and re-authenticate |
-| 403 | ScopeViolation | Attempt to access a resource outside the configured folder scope | Ensure resource path is within configured folder boundaries |
-| 404 | ResourceNotFound | Requested resource does not exist | Verify resource URI and accessibility |
-| 429 | RateLimited | Request rate exceeded throttling limits | Implement exponential backoff and retry |
-| 500 | InternalError | Server-side processing failure | Review server logs and contact support |
-
-```mermaid
-graph TD
-    subgraph "Protocol Stack"
-        APP[AI Application] --> MCP[MCP Protocol Layer]
-        MCP --> JSONRPC[JSON-RPC 2.0 Handler]
-        JSONRPC --> TRANSPORT[Transport Layer]
-        TRANSPORT --> STDIO[stdin/stdout]
-    end
-    
-    subgraph "API Integration"
-        JSONRPC --> API[LabArchives API Client]
-        API --> REST[REST API Layer]
-        REST --> HTTPS[HTTPS Transport]
-        HTTPS --> REGIONAL[Regional Endpoints]
-    end
-    
-    subgraph "Regional Endpoints"
-        REGIONAL --> US[US: api.labarchives.com]
-        REGIONAL --> AU[AU: auapi.labarchives.com]
-        REGIONAL --> UK[UK: ukapi.labarchives.com]
-    end
-```
-
-#### 6.3.1.2 Authentication Methods (updated)
-
-**Dual-Mode Authentication Architecture:**
-The system supports both permanent and temporary authentication modes to accommodate different enterprise deployment scenarios:
-
-| Authentication Mode | Implementation | Session Duration | Use Case |
-|---------------------|----------------|------------------|----------|
-| **Permanent API Keys** | HMAC-SHA256 cryptographic signing | Indefinite | Service accounts |
-| **SSO Tokens** | Bearer token authentication | 3600 seconds | User sessions |
-| **Session Renewal** | Automatic token refresh | Near expiration | Continuous operation |
-
-<span style="background-color: rgba(91, 57, 243, 0.2)">**CLI Authentication Configuration:**
-The authentication system supports harmonized CLI flag usage for improved usability:</span>
-
-- **Primary Flag**: `-k/--access-key` for access key specification
-- **Legacy Support**: `--access-key-id` remains supported as an alias
-- **Consistent Interface**: All subcommands inherit the harmonized flag structure
-
-**Authentication Flow:**
+The primary protocol interface follows **MCP specification version 2024-11-05** over JSON-RPC 2.0:
 
 ```mermaid
 sequenceDiagram
-    participant CLIENT as MCP Client
-    participant AUTH as Authentication Manager
-    participant LABAPI as LabArchives API
-    participant AUDIT as Audit System
+    participant Client as MCP Client
+    participant Server as MCP Server
+    participant Handler as Protocol Handler
+    participant API as LabArchives API
     
-    CLIENT->>AUTH: Initialize Connection
-    AUTH->>AUTH: Select Authentication Mode
-    
-    alt Permanent API Key
-        AUTH->>LABAPI: HMAC-SHA256 Signed Request
-        LABAPI->>AUTH: API Key Validation
-    else SSO Token
-        AUTH->>LABAPI: Bearer Token Request
-        LABAPI->>AUTH: Token Validation (3600s)
-    end
-    
-    AUTH->>AUDIT: Log Authentication Event
-    AUTH->>CLIENT: Session Established
-    
-    loop Every Request
-        CLIENT->>AUTH: Validate Session
-        AUTH->>AUTH: Check Token Expiry
-        alt Token Valid
-            AUTH->>CLIENT: Proceed
-        else Token Expired
-            AUTH->>LABAPI: Refresh Token
-            LABAPI->>AUTH: New Session Token
-            AUTH->>CLIENT: Proceed
-        end
-    end
+    Client->>Server: initialize
+    Server->>Client: initialized (capabilities)
+    Client->>Server: resources/list
+    Server->>Handler: route request
+    Handler->>API: authenticate & fetch
+    API->>Handler: resource data
+    Handler->>Server: MCP resources
+    Server->>Client: resource list
+    Client->>Server: resources/read
+    Server->>Handler: parse URI
+    Handler->>API: fetch content
+    API->>Handler: content data
+    Handler->>Server: structured JSON
+    Server->>Client: content response
 ```
 
-#### 6.3.1.3 Authorization Framework (updated)
+**MCP Protocol Characteristics:**
+- **Transport**: stdin/stdout for direct AI client integration
+- **Message Format**: JSON-RPC 2.0 with id, method, params, result/error structure
+- **Communication Pattern**: Stateless request-response with no persistent connections
+- **Error Handling**: Standard JSON-RPC error codes with contextual information
 
-<span style="background-color: rgba(91, 57, 243, 0.2)">**FolderPath-Based Access Control:**
-The authorization framework implements strict folder-scoped access control using the FolderPath value object for exact hierarchical path comparison:</span>
+##### 6.3.1.1.2 LabArchives REST API Integration
 
-<span style="background-color: rgba(91, 57, 243, 0.2)">**FolderPath Value Object:**
-- **Path Normalization**: Parses folder paths into normalized component tuples (e.g., "Projects/AI/" → ("Projects", "AI"))
-- **Exact Comparison**: Implements `is_parent_of()` method using tuple prefix matching instead of string operations
-- **Edge Case Handling**: Manages trailing slashes, empty components, and root paths consistently
-- **Immutable Design**: Ensures thread-safe, consistent comparison operations
+The external API integration utilizes **LabArchives REST API** with multi-region support:
 
-**Scope Configuration:**
-- **Notebook Level**: Access to specific notebooks only
-- **Page Level**: Granular page-level restrictions
-- **Entry Level**: Individual entry access control
-- **Global Scope**: Full account access (administrative)
+| API Region | Base Endpoint | Protocol | Format |
+|------------|---------------|----------|---------|
+| **United States** | `https://api.labarchives.com/api` | HTTPS/1.1 | JSON/XML |
+| **Australia** | `https://auapi.labarchives.com/api` | HTTPS/1.1 | JSON/XML |
+| **United Kingdom** | `https://ukapi.labarchives.com/api` | HTTPS/1.1 | JSON/XML |
 
-<span style="background-color: rgba(91, 57, 243, 0.2)">**Two-Phase Resource Filtering:**
-The ResourceManager implements a two-phase approach to ensure strict scope enforcement:</span>
+**Key API Endpoints:**
+- `/users/user_info` - User authentication and profile information
+- `/notebooks/list` - Notebook discovery and metadata
+- `/pages/list` - Page enumeration within notebooks
+- `/entries/get` - Content retrieval for specific entries
 
-<span style="background-color: rgba(91, 57, 243, 0.2)">1. **Notebook Filtering**: First filter notebooks to those containing in-scope pages
-2. **Page Filtering**: Then filter pages by exact FolderPath hierarchical matching
-3. **Scope Validation**: All read_resource() calls validate path containment before processing
-4. **Error Response**: Out-of-scope access attempts return MCP error 403 "ScopeViolation"</span>
+#### 6.3.1.2 Authentication Methods
 
-**Permission Validation:**
-- **Real-time Validation**: Permission checks on every resource access
-- <span style="background-color: rgba(91, 57, 243, 0.2)">**Exact Hierarchical Enforcement**: FolderPath.is_parent_of() validates parent-child relationships</span>
-- **Audit Trail**: Complete access logging for compliance
+##### 6.3.1.2.1 HMAC-SHA256 Request Signing
 
-<span style="background-color: rgba(91, 57, 243, 0.2)">**Security Enhancement:**
-The system eliminates all substring-based path matching vulnerabilities. Only exact hierarchical comparisons using FolderPath tuple operations are permitted, ensuring that access patterns like "../" or similar path traversal attempts are impossible.</span>
+The system implements **HMAC-SHA256 authentication** for all LabArchives API interactions:
+
+```mermaid
+flowchart TD
+    subgraph "Authentication Flow"
+        A[Client Credentials] --> B{Credential Type}
+        B -->|API Keys| C[Permanent Access]
+        B -->|SSO Token| D[Temporary Access]
+        
+        C --> E[HMAC-SHA256 Signing]
+        D --> E
+        
+        E --> F[Request Headers]
+        F --> G[API Call]
+        G --> H{Response}
+        
+        H -->|200 OK| I[Session Created]
+        H -->|401 Unauthorized| J[Auth Failure]
+        H -->|429 Rate Limited| K[Retry with Backoff]
+        
+        I --> L[3600s Session Timeout]
+        J --> M[Re-authenticate]
+        K --> N[Exponential Backoff]
+    end
+    
+    style E fill:#e8f5e8
+    style I fill:#e1f5fe
+    style J fill:#ffebee
+```
+
+**Authentication Parameters:**
+- **Permanent Keys**: `access_key_id` and <span style="background-color: rgba(91, 57, 243, 0.2)">`access_password`</span> for long-term access
+- **Temporary Tokens**: `username` and `token` for SSO-based authentication
+- **Session Management**: <span style="background-color: rgba(91, 57, 243, 0.2)">3600-second expiration with automatic renewal - the Auth Manager now stores token expiration timestamps and automatically re-authenticates when a 401 response is received, retrying the original request after refresh</span>
+- **Security Headers**: Timestamp, signature, and request validation
+
+##### 6.3.1.2.2 MCP Protocol Security
+
+The MCP protocol layer implements **initialization handshake security**:
+
+| Security Feature | Implementation | Purpose |
+|------------------|----------------|---------|
+| **Capability Negotiation** | Server declares supported features | Prevents unsupported operations |
+| **Server Identification** | MCP_SERVER_NAME and MCP_SERVER_VERSION | Client validation and compatibility |
+| **Request Validation** | JSON schema validation on all requests | Prevents malformed operations |
+
+#### 6.3.1.3 Authorization Framework
+
+##### 6.3.1.3.1 Scope-based Access Control (updated)
+
+The system implements **hierarchical scope enforcement** with three scope types and <span style="background-color: rgba(91, 57, 243, 0.2)">immediate fail-secure validation</span>:
 
 ```mermaid
 graph TD
-    subgraph "Authorization Flow"
-        REQUEST[Resource Request] --> FOLDERPATH[FolderPath Validation]
-        FOLDERPATH --> PARENT["is_parent_of() Check"]
-        PARENT --> DECISION{Within Scope?}
-        DECISION -->|Yes| NOTEBOOK[Notebook Filtering]
-        DECISION -->|No| ERROR[403 ScopeViolation]
-        NOTEBOOK --> PAGE[Page Filtering]
-        PAGE --> RESOURCE[Resource Access]
+    subgraph "Scope Types"
+        A[notebook_id] --> D[Direct Notebook Access]
+        B[notebook_name] --> E[Name-based Resolution]
+        C[folder_path] --> F[Hierarchical Access]
     end
     
-    subgraph "FolderPath Components"
-        FOLDERPATH --> NORMALIZE[Path Normalization]
-        NORMALIZE --> TUPLE[Component Tuples]
-        TUPLE --> COMPARE[Prefix Matching]
+    subgraph "Resource Validation"
+        D --> G[Notebook Validation]
+        E --> G
+        F --> G
+        
+        G --> H[Page Access Check]
+        H --> I[Entry Permission Check]
+        I --> J[URI Format Validation]
     end
     
-    style FOLDERPATH fill:#5b39f3,fill-opacity:0.2
-    style PARENT fill:#5b39f3,fill-opacity:0.2
-    style ERROR fill:#5b39f3,fill-opacity:0.2
+    subgraph "Access Control"
+        J --> K{Within Scope?}
+        K -->|Yes| L[Access Granted]
+        K -->|No| M[Access Denied]
+    end
+    
+    style G fill:#e8f5e8
+    style L fill:#e1f5fe
+    style M fill:#ffebee
 ```
+
+**Resource URI Format**: `labarchives://notebook/{id}/page/{id}/entry/{id}`
+
+<span style="background-color: rgba(91, 57, 243, 0.2)">**Immediate Scope Validation**: Scope validation is now performed immediately during URI parsing with a fail-secure approach. Access outside the configured notebook/folder scope is denied by default. Direct notebook reads are denied when only a folder scope is configured and the notebook contains no pages within that folder.</span>
+
+**Scope Configuration Details**:
+- **notebook_id**: Direct access to specific notebook by ID
+- **notebook_name**: Name-based notebook resolution with validation
+- **folder_path**: <span style="background-color: rgba(91, 57, 243, 0.2)">Hierarchical folder access - when folder_path is empty ("" or "/"), root-level pages are explicitly included in listings</span>
+
+##### 6.3.1.3.2 Runtime Permission Enforcement (updated)
+
+The authorization framework validates permissions at multiple levels with <span style="background-color: rgba(91, 57, 243, 0.2)">specific error taxonomy</span>:
+
+| Validation Level | Check Type | Implementation | Error Type |
+|------------------|------------|----------------|------------|
+| **Notebook Access** | Scope boundary validation | Configuration-based filtering | <span style="background-color: rgba(91, 57, 243, 0.2)">**NotebookOutsideFolderScopeError**</span> |
+| **Page Access** | Hierarchical permission check | Parent-child relationship validation | <span style="background-color: rgba(91, 57, 243, 0.2)">**PageOutsideNotebookScopeError**</span> |
+| **Entry Access** | Content-level authorization | Individual entry permission validation | <span style="background-color: rgba(91, 57, 243, 0.2)">**EntryOutsideNotebookScopeError**</span> |
 
 #### 6.3.1.4 Rate Limiting Strategy
 
-**Multi-Layer Rate Limiting:**
-The system implements comprehensive rate limiting at multiple architectural layers:
+##### 6.3.1.4.1 External API Rate Limiting
 
-| Layer | Implementation | Limits | Recovery |
-|-------|---------------|--------|----------|
-| **Client-Side** | Exponential backoff | 3 retries, 2s backoff | Automatic retry |
-| **API Gateway** | Nginx Ingress | 10 req/s, 5 concurrent | Queue management |
-| **Application** | Circuit breaker | Failure threshold | Graceful degradation |
-
-**Rate Limiting Implementation:**
+The system implements **adaptive rate limiting** for LabArchives API interactions:
 
 ```mermaid
-graph TD
-    subgraph "Rate Limiting Layers"
-        CLIENT[Client Request] --> NGINX[Nginx Ingress]
-        NGINX --> |10 req/s| APP[Application Layer]
-        APP --> |Circuit Breaker| LABAPI[LabArchives API]
+flowchart LR
+    subgraph "Rate Limiting Logic"
+        A[API Request] --> B{Rate Limit Check}
+        B -->|Within Limit| C[Execute Request]
+        B -->|Rate Limited| D[HTTP 429 Response]
+        
+        C --> E{Success?}
+        E -->|Yes| F[Reset Counter]
+        E -->|No| G[Error Handling]
+        
+        D --> H[Exponential Backoff]
+        H --> I[Retry Queue]
+        I --> J[Delayed Retry]
+        J --> B
     end
     
-    subgraph "Recovery Mechanisms"
-        NGINX --> |Queue Full| BACKOFF[Exponential Backoff]
-        APP --> |Failure Threshold| CIRCUIT[Circuit Breaker]
-        LABAPI --> |429 Error| RETRY[Retry Logic]
-    end
-    
-    BACKOFF --> DELAY[Delay & Retry]
-    CIRCUIT --> FALLBACK[Fallback Response]
-    RETRY --> EXPONENTIAL[Exponential Backoff]
+    style C fill:#e8f5e8
+    style D fill:#fff3e0
+    style H fill:#ffebee
 ```
+
+**Rate Limiting Configuration:**
+- **Default Limit**: Configurable via `RATE_LIMIT_PER_MINUTE` environment variable
+- **Retry Strategy**: 3 attempts with 2-second base backoff
+- **Backoff Algorithm**: Exponential backoff with jitter
+- **Connection Pooling**: HTTP connection reuse for efficiency
+
+##### 6.3.1.4.2 Internal Request Management
+
+The server implements **request throttling** to prevent resource exhaustion:
+
+| Parameter | Default Value | Configuration |
+|-----------|---------------|---------------|
+| **Max Concurrent Requests** | 10 | Environment variable |
+| **Request Timeout** | 30 seconds | Configurable per endpoint |
+| **Circuit Breaker Threshold** | 50% failure rate | Automatic failure detection |
 
 #### 6.3.1.5 Versioning Approach
 
-**Protocol Versioning Strategy:**
-- **MCP Protocol**: Version 2024-11-05 with forward compatibility
-- **API Compatibility**: Backward compatible with LabArchives API evolution
-- **Semantic Versioning**: SemVer for server releases with clear upgrade paths
+##### 6.3.1.5.1 Protocol Versioning
 
-#### 6.3.1.6 Documentation Standards (updated)
+The system maintains **strict version compatibility** across multiple layers:
 
-**API Documentation:**
-- **Inline Documentation**: Comprehensive docstrings and type hints
-- **Protocol Specification**: Complete MCP protocol implementation guide
-- **Integration Examples**: Sample code and configuration templates
-- **Error Reference**: Detailed error codes and resolution procedures
-
-<span style="background-color: rgba(91, 57, 243, 0.2)">**CLI Documentation Standards:**
-All CLI examples and references use the standardized flag format:</span>
-
-- **Primary Usage**: `-k/--access-key` for all access key specifications
-- **Legacy Support**: `--access-key-id` documented as supported alias
-- **Consistent Examples**: All code samples and tutorials use the `-k` short form
-- **Help Documentation**: Command help text prioritizes the shorter, more intuitive flag format
-
-**Documentation Structure:**
-- **Getting Started Guide**: Step-by-step installation and configuration
-- **API Reference**: Complete endpoint documentation with examples
-- **Security Guide**: Authentication, authorization, and security best practices
-- **Troubleshooting**: Common issues and resolution procedures
-- **Migration Guide**: Version upgrade and configuration migration procedures
-
-**Example CLI Usage:**
-```bash
-# Primary authentication flag usage
-mcp-server -k "your-access-key-here" --folder "Projects/AI"
-
-#### Legacy support maintained
-mcp-server --access-key-id "your-access-key-here" --folder "Projects/AI"
+```mermaid
+graph TB
+    subgraph "Version Management"
+        A[MCP Protocol 2024-11-05] --> B[Server Version 0.1.0]
+        B --> C[API Client Version]
+        C --> D[LabArchives API Version]
+        
+        E[Version Compatibility Matrix] --> F[Backward Compatibility]
+        F --> G[Forward Compatibility]
+        
+        H[Client Negotiation] --> I[Feature Detection]
+        I --> J[Graceful Degradation]
+    end
+    
+    style A fill:#e1f5fe
+    style B fill:#e8f5e8
+    style E fill:#fff3e0
 ```
+
+**Versioning Strategy:**
+- **Semantic Versioning**: Server follows SemVer (0.1.0) with breaking change indicators
+- **Protocol Compliance**: Strict adherence to MCP specification version
+- **API Compatibility**: Endpoint versioning through URL structure
+- **Client Negotiation**: Feature detection and capability-based operation
+
+##### 6.3.1.5.2 Migration and Compatibility
+
+The system provides **version migration support** with the following capabilities:
+
+| Migration Type | Support Level | Implementation |
+|----------------|---------------|----------------|
+| **Protocol Updates** | Full backward compatibility | Feature detection and adaptation |
+| **API Changes** | Automatic endpoint detection | Dynamic endpoint resolution |
+| **Client Compatibility** | Graceful degradation | Feature-based operation selection |
+
+#### 6.3.1.6 Documentation Standards
+
+##### 6.3.1.6.1 API Documentation Structure
+
+The system maintains **comprehensive API documentation** with structured schemas:
+
+```mermaid
+graph TD
+    subgraph "Documentation Structure"
+        A[Pydantic Models] --> B[JSON Schema Generation]
+        B --> C[OpenAPI Specification]
+        C --> D[Interactive Documentation]
+        
+        E[Request Examples] --> F[Response Schemas]
+        F --> G[Error Documentation]
+        G --> H[Integration Guides]
+    end
+    
+    style B fill:#e8f5e8
+    style C fill:#e1f5fe
+    style G fill:#fff3e0
+```
+
+**Documentation Components:**
+- **Schema Validation**: Pydantic models with type safety and validation
+- **Response Formats**: Structured JSON with comprehensive metadata
+- **Error Handling**: Detailed error codes and resolution guidance
+- **Integration Examples**: Complete client integration patterns
 
 ### 6.3.2 MESSAGE PROCESSING
 
-#### 6.3.2.1 Event Processing Patterns (updated)
+#### 6.3.2.1 Event Processing Patterns
 
-**Synchronous Processing Model:**
-The system implements a synchronous request-response pattern optimized for real-time AI interaction:
+##### 6.3.2.1.1 MCP Message Flow Architecture (updated)
 
-**Core Processing Architecture:**
-- **Real-time Processing**: Immediate response to MCP protocol requests
-- **Stateless Design**: No persistent state between requests
-- **Connection Pooling**: Efficient HTTP connection management
-- **Resource Optimization**: Minimal memory footprint and CPU usage
-
-<span style="background-color: rgba(91, 57, 243, 0.2)">**Exact FolderPath Scope Enforcement:**
-The system implements strict hierarchical path validation using the FolderPath value object to ensure precise scope boundaries:</span>
-
-- **Path Normalization**: Converts folder paths into normalized component tuples for accurate comparison
-- **Exact Hierarchical Matching**: Uses FolderPath.is_parent_of() method with tuple prefix matching instead of vulnerable string operations
-- **Two-Phase Listing Algorithm**: First filters notebooks containing in-scope pages, then applies exact FolderPath validation to individual pages
-- **Immediate Scope Violation Response**: Out-of-scope requests trigger immediate 403 "ScopeViolation" response without downstream processing
+The system implements **stateless message processing** with a structured request-response pattern including <span style="background-color: rgba(91, 57, 243, 0.2)">early scope validation to prevent unauthorized API access</span>:
 
 ```mermaid
-graph TD
-    subgraph "Event Processing Flow"
-        REQUEST[MCP Request] --> VALIDATE[Request Validation]
-        VALIDATE --> FOLDERPATH[Exact FolderPath Scope Enforcement]
-        FOLDERPATH --> DECISION{Within Scope?}
-        DECISION -->|Yes| TRANSFORM[Data Transformation]
-        DECISION -->|No| SCOPE_ERROR[403 ScopeViolation]
-        TRANSFORM --> RESPONSE[MCP Response]
-    end
+sequenceDiagram
+    participant Client as MCP Client
+    participant Protocol as Protocol Handler
+    participant ScopeValidator as Scope Validator
+    participant Router as Method Router
+    participant Handler as Request Handler
+    participant API as LabArchives API
     
-    subgraph "Processing Types"
-        VALIDATE --> SYNC[Synchronous Processing]
-        FOLDERPATH --> ASYNC[Asynchronous Logging]
-        TRANSFORM --> BATCH[Batch Operations]
+    Client->>Protocol: JSON-RPC Request
+    Protocol->>Protocol: Parse JSON-RPC
+    Protocol->>ScopeValidator: Validate Resource Scope
+    alt Resource in Scope
+        ScopeValidator->>Router: Route to Handler
+        Router->>Handler: Execute Method
+        Handler->>API: External API Call
+        API->>Handler: API Response
+        Handler->>Router: Processed Data
+        Router->>Protocol: Handler Result
+        Protocol->>Protocol: Serialize JSON-RPC
+        Protocol->>Client: JSON-RPC Response
+    else Resource out of Scope
+        ScopeValidator->>Protocol: Scope Error
+        Protocol->>Protocol: Serialize Error Response
+        Protocol->>Client: JSON-RPC Error (-32010)
     end
-    
-    subgraph "Event Outputs"
-        SYNC --> RESPONSE
-        ASYNC --> AUDIT[Audit Logs]
-        BATCH --> METRICS[Performance Metrics]
-        SCOPE_ERROR --> VIOLATION_LOG[Violation Audit Log]
-    end
-    
-    style FOLDERPATH fill:#5b39f3,fill-opacity:0.2
-    style DECISION fill:#5b39f3,fill-opacity:0.2
-    style SCOPE_ERROR fill:#5b39f3,fill-opacity:0.2
-    style VIOLATION_LOG fill:#5b39f3,fill-opacity:0.2
 ```
 
-<span style="background-color: rgba(91, 57, 243, 0.2)">**Two-Phase Resource Filtering Process:**
-The ResourceManager implements a comprehensive two-phase approach to ensure absolute scope compliance:</span>
+**Processing Characteristics:**
+- **Stateless Operations**: No persistent state between requests
+- **Atomic Processing**: Each request processed independently
+- <span style="background-color: rgba(91, 57, 243, 0.2)">**Early Scope Validation**: Resource scope checked before external API calls to prevent unauthorized access</span>
+- **Error Propagation**: Structured error handling through MCPProtocolError hierarchy
+- **Response Serialization**: JSON-RPC 2.0 compliant response formatting
 
-<span style="background-color: rgba(91, 57, 243, 0.2)">**Phase 1 - Notebook Filtering:**
-- **Initial Scope Assessment**: Identify all notebooks containing pages within the configured folder scope
-- **Hierarchical Validation**: Use FolderPath.is_parent_of() to validate parent-child relationships
-- **Notebook Exclusion**: Remove notebooks with no in-scope pages from the processing pipeline
+##### 6.3.2.1.2 Request Processing Pipeline (updated)
 
-<span style="background-color: rgba(91, 57, 243, 0.2)">**Phase 2 - Page-Level Enforcement:**
-- **Exact Path Matching**: Apply FolderPath tuple comparison for precise hierarchical validation
-- **Component-Level Validation**: Validate each path component against the normalized scope tuple
-- **Security Enhancement**: Eliminate substring-based matching vulnerabilities through exact tuple operations
+The message processing pipeline implements **structured request handling** with <span style="background-color: rgba(91, 57, 243, 0.2)">mandatory scope validation</span>:
+
+| Stage | Process | Responsibility |
+|-------|---------|----------------|
+| **Input Validation** | JSON-RPC parsing and schema validation | Protocol compliance |
+| <span style="background-color: rgba(91, 57, 243, 0.2)">**Scope Validation**</span> | <span style="background-color: rgba(91, 57, 243, 0.2)">Resource URI scope boundary verification</span> | <span style="background-color: rgba(91, 57, 243, 0.2)">Authorization enforcement</span> |
+| **Method Routing** | Request dispatch to appropriate handler | Operation selection |
+| **Handler Execution** | Business logic processing | Core functionality |
+| **Response Building** | Result serialization and formatting | Output preparation |
 
 #### 6.3.2.2 Message Queue Architecture
 
-**Queue-less Architecture:**
-The system implements a direct processing model without traditional message queuing infrastructure:
+##### 6.3.2.2.1 Synchronous Processing Model
 
-**Design Rationale:**
-- **Low Latency**: Direct processing for real-time AI interaction
-- **Simplicity**: Reduced complexity for maintenance and deployment
-- **Scalability**: Horizontal scaling through stateless design
-- **Reliability**: Direct error handling without queue persistence
+The system implements **direct synchronous processing** without traditional message queuing:
+
+```mermaid
+flowchart TD
+    subgraph "Processing Model"
+        A[Client Request] --> B[stdin Buffer]
+        B --> C[JSON-RPC Parser]
+        C --> D[Method Dispatcher]
+        D --> E[Handler Execution]
+        E --> F[Response Builder]
+        F --> G[stdout Buffer]
+        G --> H[Client Response]
+    end
+    
+    subgraph "Flow Control"
+        I[Single Thread] --> J[Sequential Processing]
+        J --> K[Blocking I/O]
+        K --> L[Response Completion]
+    end
+    
+    style D fill:#e8f5e8
+    style E fill:#e1f5fe
+    style I fill:#fff3e0
+```
+
+**Processing Characteristics:**
+- **Single-threaded Model**: Sequential message processing without concurrency
+- **Blocking Operations**: Synchronous I/O for request completion
+- **No Queuing**: Direct request-response without intermediate storage
+- **Signal Handling**: Graceful shutdown on SIGINT/SIGTERM
+
+##### 6.3.2.2.2 Communication Channel Management
+
+The system manages **stdio-based communication** with structured buffering:
+
+| Channel Type | Purpose | Buffer Management |
+|-------------|---------|------------------|
+| **stdin** | Incoming JSON-RPC requests | Line-based buffering |
+| **stdout** | Outgoing JSON-RPC responses | Atomic message writes |
+| **stderr** | Diagnostic and error logging | Unbuffered output |
 
 #### 6.3.2.3 Stream Processing Design
 
-**Event Stream Processing:**
-While not implementing traditional stream processing, the system handles continuous event flows:
+##### 6.3.2.3.1 Line-based JSON Processing
 
-**Stream Processing Patterns:**
-- **Event Correlation**: Linking related authentication and resource events
-- **Real-time Metrics**: Continuous performance monitoring
-- **Audit Streaming**: Continuous compliance log generation
-- **Error Stream**: Real-time error detection and alerting
+The system implements **line-delimited JSON processing** for efficient message handling:
+
+```mermaid
+graph TD
+    subgraph "Stream Processing"
+        A[Raw Input Stream] --> B[Line Buffer]
+        B --> C[JSON Parser]
+        C --> D{Valid JSON?}
+        D -->|Yes| E[Message Handler]
+        D -->|No| F[Parse Error]
+        
+        E --> G[Process Request]
+        F --> H[Error Response]
+        
+        G --> I[Serialize Response]
+        H --> I
+        I --> J[Output Stream]
+    end
+    
+    style C fill:#e8f5e8
+    style E fill:#e1f5fe
+    style F fill:#ffebee
+```
+
+**Stream Processing Features:**
+- **Line-based Parsing**: Efficient message boundary detection
+- **Buffered I/O**: Optimized for stdin/stdout communication
+- **Error Recovery**: Graceful handling of malformed messages
+- **Atomic Operations**: Complete message processing per request
+
+##### 6.3.2.3.2 No Traditional Streaming
+
+The system **does not implement streaming data processing** for the following reasons:
+
+| Requirement | System Design | Rationale |
+|-------------|---------------|-----------|
+| **Data Volume** | Atomic request-response | Laboratory data accessed on-demand |
+| **Processing Pattern** | Synchronous operations | MCP protocol requirements |
+| **Client Expectations** | Complete responses | AI client compatibility |
 
 #### 6.3.2.4 Batch Processing Flows
 
-**Scheduled Batch Operations:**
-The system implements minimal batch processing for operational tasks:
+##### 6.3.2.4.1 Sequential Request Processing
 
-| Operation | Schedule | Purpose | Implementation |
-|-----------|----------|---------|---------------|
-| **Log Rotation** | 100MB or 24 hours | Disk space management | Automated log archival |
-| **Session Cleanup** | Every 30 minutes | Memory optimization | Expired session removal |
-| **Metrics Aggregation** | Every 5 minutes | Performance monitoring | Statistical compilation |
-| **Compliance Reporting** | Daily/Weekly/Monthly | Regulatory requirements | Audit report generation |
+The system processes **multiple requests sequentially** without native batching:
 
-#### 6.3.2.5 Error Handling Strategy (updated)
+```mermaid
+flowchart LR
+    subgraph "Sequential Processing"
+        A[Request 1] --> B[Process 1]
+        B --> C[Response 1]
+        C --> D[Request 2]
+        D --> E[Process 2]
+        E --> F[Response 2]
+        F --> G[Request N]
+        G --> H[Process N]
+        H --> I[Response N]
+    end
+    
+    style B fill:#e8f5e8
+    style E fill:#e8f5e8
+    style H fill:#e8f5e8
+```
 
-**Comprehensive Error Processing:**
-The system implements a multi-tier error handling architecture with explicit scope violation handling:
+**Batch Processing Characteristics:**
+- **No Native Batching**: Each request processed individually
+- **Client-side Optimization**: Clients may batch requests for efficiency
+- **Resource Management**: Memory and connection pooling for multiple requests
+- **Error Isolation**: Individual request failures don't affect others
 
-<span style="background-color: rgba(91, 57, 243, 0.2)">**Scope Error Handling:**
-The system provides explicit error mapping and recovery procedures for scope violations:</span>
+##### 6.3.2.4.2 Recommended Batch Patterns
 
-- **SCOPE_ERROR → 403 "ScopeViolation"**: Direct mapping of scope validation failures to standardized MCP error responses
-- **No Retry Logic**: Scope violations are permanent errors that bypass retry mechanisms
-- **Immediate Audit Logging**: All scope violations are logged immediately with complete request context
-- **Processing Termination**: Scope violations abort all downstream processing to prevent data leakage
+For optimal performance, the system supports **client-side batching patterns**:
+
+| Pattern | Implementation | Use Case |
+|---------|----------------|----------|
+| **Resource Enumeration** | Sequential resources/list calls | Large notebook discovery |
+| **Content Retrieval** | Parallel resources/read requests | Multiple entry analysis |
+| **Pagination** | Offset-based request batching | Large dataset processing |
+
+#### 6.3.2.5 Error Handling Strategy
+
+##### 6.3.2.5.1 Hierarchical Exception Model (updated)
+
+The system implements **structured error handling** with a comprehensive exception hierarchy including <span style="background-color: rgba(91, 57, 243, 0.2)">specific scope violation errors</span>:
 
 ```mermaid
 graph TD
-    subgraph "Error Categories"
-        API_ERROR[API Errors] --> HTTP_STATUS[HTTP Status Codes]
-        PROTOCOL_ERROR[Protocol Errors] --> JSON_RPC[JSON-RPC Errors]
-        AUTH_ERROR[Authentication Errors] --> SESSION_ERROR[Session Errors]
-        RESOURCE_ERROR[Resource Errors] --> SCOPE_ERROR[Scope Violations]
+    subgraph "Exception Hierarchy"
+        A[LabArchivesMCPException] --> B[LabArchivesAPIException]
+        A --> C[MCPError]
+        A --> D[ConfigurationError]
+        A --> E[EntryOutsideNotebookScopeError]
+        A --> F[NotebookOutsideFolderScopeError]
+        
+        B --> G[AuthenticationError]
+        B --> H[RateLimitError]
+        B --> I[APITimeoutError]
+        
+        C --> J[ProtocolError]
+        C --> K[InvalidRequestError]
+        C --> L[MethodNotFoundError]
     end
     
-    subgraph "Error Handling"
-        HTTP_STATUS --> RETRY[Retry Logic]
-        JSON_RPC --> RESPONSE[Error Response]
-        SESSION_ERROR --> RENEWAL[Token Renewal]
-        SCOPE_ERROR --> VIOLATION_403[403 ScopeViolation]
-    end
-    
-    subgraph "Recovery Mechanisms"
-        RETRY --> BACKOFF[Exponential Backoff]
-        RESPONSE --> CLIENT[Client Error]
-        RENEWAL --> REAUTH[Reauthentication]
-        VIOLATION_403 --> AUDIT_LOG[Audit Log Entry]
-    end
-    
-    subgraph "Scope Violation Processing"
-        AUDIT_LOG --> NO_RETRY[No Retry Attempt]
-        NO_RETRY --> TERMINATE[Terminate Processing]
-        TERMINATE --> SECURITY_ALERT[Security Alert]
-    end
-    
-    style SCOPE_ERROR fill:#5b39f3,fill-opacity:0.2
-    style VIOLATION_403 fill:#5b39f3,fill-opacity:0.2
-    style AUDIT_LOG fill:#5b39f3,fill-opacity:0.2
-    style NO_RETRY fill:#5b39f3,fill-opacity:0.2
-    style TERMINATE fill:#5b39f3,fill-opacity:0.2
+    style A fill:#ffebee
+    style B fill:#fff3e0
+    style C fill:#e8f5e8
+    style E fill:#5b39f3
+    style F fill:#5b39f3
 ```
 
-<span style="background-color: rgba(91, 57, 243, 0.2)">**Scope Violation Recovery Protocol:**
-The system implements a specialized recovery protocol for scope violations that prioritizes security and compliance:</span>
+**Error Categories:**
+- **API Errors**: External service failures and rate limiting
+- **Protocol Errors**: MCP specification violations
+- **Configuration Errors**: Setup and authentication issues
+- <span style="background-color: rgba(91, 57, 243, 0.2)">**Scope Errors**: Resource access violations with specific error types for entries and notebooks</span>
+- **System Errors**: Infrastructure and resource problems
 
-<span style="background-color: rgba(91, 57, 243, 0.2)">**Recovery Actions:**
-1. **Immediate Termination**: Stop all request processing upon scope violation detection
-2. **Audit Trail Generation**: Create detailed audit log entry with request context and violation details
-3. **Security Notification**: Generate security alert for monitoring systems
-4. **Client Error Response**: Return standardized 403 "ScopeViolation" MCP error to client
-5. **No Retry Mechanism**: Permanent error classification prevents automatic retry attempts</span>
+##### 6.3.2.5.2 JSON-RPC Error Mapping (updated)
 
-**Standard Error Processing Matrix:**
+The system maps **internal exceptions to JSON-RPC error codes** with <span style="background-color: rgba(91, 57, 243, 0.2)">custom scope error handling</span>:
 
-| Error Type | HTTP Code | MCP Error | Recovery Action | Retry Policy |
-|------------|-----------|-----------|-----------------|--------------|
-| **API Errors** | 5xx | InternalError | Exponential backoff | 3 attempts |
-| **Protocol Errors** | 4xx | Various | Client error response | No retry |
-| **Authentication Errors** | 401 | Unauthorized | Token renewal | 1 attempt |
-| **<span style="background-color: rgba(91, 57, 243, 0.2)">Scope Violations</span>** | **<span style="background-color: rgba(91, 57, 243, 0.2)">403</span>** | **<span style="background-color: rgba(91, 57, 243, 0.2)">ScopeViolation</span>** | **<span style="background-color: rgba(91, 57, 243, 0.2)">Audit & terminate</span>** | **<span style="background-color: rgba(91, 57, 243, 0.2)">No retry</span>** |
+| Error Code | Error Type | Description |
+|------------|------------|-------------|
+| **-32700** | Parse Error | Invalid JSON received |
+| **-32600** | Invalid Request | JSON-RPC format violation |
+| **-32601** | Method Not Found | Unsupported operation |
+| **-32602** | Invalid Params | Parameter validation failure |
+| **-32603** | Internal Error | Server-side processing error |
+| <span style="background-color: rgba(91, 57, 243, 0.2)">**-32010**</span> | <span style="background-color: rgba(91, 57, 243, 0.2)">**Scope Error**</span> | <span style="background-color: rgba(91, 57, 243, 0.2)">**Requested resource is outside configured scope**</span> |
 
-**Error Response Format:**
-```json
-{
-  "jsonrpc": "2.0",
-  "id": "request-id",
-  "error": {
-    "code": 403,
-    "message": "ScopeViolation",
-    "data": {
-      "description": "Attempt to access resource outside configured folder scope",
-      "resource_uri": "labarchives://notebook/page/entry",
-      "configured_scope": "Projects/AI/",
-      "violation_type": "path_traversal"
-    }
-  }
-}
+##### 6.3.2.5.3 Error Recovery Mechanisms (updated)
+
+The system implements **comprehensive error recovery** with <span style="background-color: rgba(91, 57, 243, 0.2)">secure logging practices</span>:
+
+```mermaid
+flowchart TD
+    subgraph "Error Recovery"
+        A[Error Detection] --> B{Error Type}
+        B -->|Transient| C[Retry Logic]
+        B -->|Permanent| D[Graceful Failure]
+        
+        C --> E[Exponential Backoff]
+        E --> F[Retry Attempt]
+        F --> G{Success?}
+        G -->|Yes| H[Resume Normal]
+        G -->|No| I[Max Retries?]
+        I -->|Yes| D
+        I -->|No| E
+        
+        D --> J[Error Response]
+        J --> K[Client Notification]
+    end
+    
+    style C fill:#e8f5e8
+    style D fill:#ffebee
+    style H fill:#e1f5fe
 ```
 
-**Monitoring and Alerting:**
-<span style="background-color: rgba(91, 57, 243, 0.2)">The system implements comprehensive monitoring for scope violations with immediate alerting capabilities:</span>
-
-- **Real-time Alerts**: Immediate notification of scope violation attempts
-- **Trend Analysis**: Pattern detection for repeated violation attempts
-- **Compliance Reporting**: Integration with audit systems for regulatory reporting
-- **Security Dashboard**: Visual monitoring of scope violation metrics and patterns
+**Recovery Strategies:**
+- **Retry with Backoff**: Exponential backoff for transient failures
+- **Circuit Breaker**: Automatic failure detection and recovery
+- **Graceful Degradation**: Partial functionality during service degradation
+- **Comprehensive Logging**: Detailed error context for debugging
+- <span style="background-color: rgba(91, 57, 243, 0.2)">**Secure Logging**: Before logging request/response data, URL parameters containing sensitive values are sanitized using the new security.sanitizers module to replace values with "[REDACTED]"</span>
 
 ### 6.3.3 EXTERNAL SYSTEMS
 
-#### 6.3.3.1 Third-Party Integration Patterns
+#### 6.3.3.1 Third-party Integration Patterns
 
-**LabArchives Platform Integration:**
-The primary external system integration follows enterprise-grade patterns:
+##### 6.3.3.1.1 LabArchives API Integration
 
-**Integration Architecture:**
-- **Regional Endpoints**: Multi-region support for global deployment
-- **Connection Pooling**: Efficient HTTP connection management
-- **Circuit Breaker**: Failure detection and recovery
-- **Retry Logic**: Exponential backoff for transient failures
-
-**Integration Flow:**
+The primary external integration implements **comprehensive LabArchives API client** with multi-region support:
 
 ```mermaid
-sequenceDiagram
-    participant MCP as MCP Server
-    participant POOL as Connection Pool
-    participant CIRCUIT as Circuit Breaker
-    participant LABAPI as LabArchives API
-    
-    MCP->>POOL: Request Connection
-    POOL->>CIRCUIT: Check Circuit State
-    
-    alt Circuit Closed
-        CIRCUIT->>LABAPI: API Request
-        LABAPI->>CIRCUIT: API Response
-        CIRCUIT->>POOL: Success Response
-    else Circuit Open
-        CIRCUIT->>CIRCUIT: Failure Count Check
-        CIRCUIT->>POOL: Cached/Fallback Response
+graph TB
+    subgraph "LabArchives Integration"
+        A[API Client] --> B[Region Detection]
+        B --> C[Endpoint Resolution]
+        C --> D[Authentication Handler]
+        D --> E[Request Signing]
+        E --> F[HTTP Client]
+        F --> G[Response Parser]
+        G --> H[Data Transformation]
+        H --> I[MCP Resource Format]
     end
     
-    POOL->>MCP: Final Response
+    subgraph "Error Handling"
+        F --> J[Error Detection]
+        J --> K[Retry Logic]
+        K --> L[Circuit Breaker]
+        L --> M[Fallback Strategy]
+    end
     
-    Note over CIRCUIT: Circuit opens after 5 consecutive failures
-    Note over CIRCUIT: Circuit half-opens after 60 seconds
+    style D fill:#e8f5e8
+    style F fill:#e1f5fe
+    style J fill:#fff3e0
 ```
+
+**Integration Features:**
+- **Multi-region Support**: Automatic endpoint selection for US, AU, UK regions
+- **Session Management**: Persistent authentication with automatic renewal
+- **Connection Pooling**: HTTP connection reuse for efficiency
+- **Response Validation**: Comprehensive data validation and error handling
+
+##### 6.3.3.1.2 AWS Services Integration
+
+The system integrates with **AWS cloud services** for enterprise deployment:
+
+| Service | Integration Type | Purpose |
+|---------|------------------|---------|
+| **ECS/Fargate** | Container orchestration | Scalable container deployment |
+| **RDS PostgreSQL** | Database connection | Optional metadata storage |
+| **CloudWatch** | Monitoring integration | Logs and metrics collection |
+| **Secrets Manager** | Credential storage | Secure credential management |
+| **SNS** | Notification service | Alert and notification delivery |
+| **KMS** | Encryption service | Data encryption key management |
+
+##### 6.3.3.1.3 Monitoring and Observability
+
+The system implements **comprehensive monitoring integration**:
+
+```mermaid
+flowchart TD
+    subgraph "Monitoring Stack"
+        A[Application Metrics] --> B[Prometheus]
+        B --> C[Grafana Dashboards]
+        B --> D[AlertManager]
+        
+        E[Application Logs] --> F[CloudWatch Logs]
+        F --> G[ELK Stack]
+        G --> H[Log Analysis]
+        
+        I[Health Checks] --> J[Kubernetes Probes]
+        J --> K[Service Mesh]
+        K --> L[Load Balancer]
+    end
+    
+    style B fill:#e8f5e8
+    style F fill:#e1f5fe
+    style J fill:#fff3e0
+```
+
+**Monitoring Components:**
+- **Prometheus Metrics**: `/metrics` endpoint for metrics collection
+- **ServiceMonitor**: Kubernetes-native monitoring configuration
+- **CloudWatch Integration**: AWS-native logging and monitoring
+- **Health Endpoints**: `/health/live`, `/health/ready`, `/health/startup`
 
 #### 6.3.3.2 Legacy System Interfaces
 
-**Modern API Integration:**
-The system exclusively integrates with modern REST API interfaces:
+##### 6.3.3.2.1 Backward Compatibility
 
-**Interface Characteristics:**
-- **RESTful Architecture**: Standard HTTP methods and status codes
-- **JSON/XML Support**: Flexible response format handling
-- **Regional Deployment**: Multi-region endpoint support
-- **API Evolution**: Backward compatibility maintenance
+The system maintains **compatibility with legacy authentication methods**:
 
-#### 6.3.3.3 API Gateway Configuration
+| Authentication Type | Support Level | Implementation |
+|---------------------|---------------|----------------|
+| **Permanent API Keys** | Full support | HMAC-SHA256 signing |
+| **Temporary SSO Tokens** | Full support | Session-based authentication |
+| **Legacy XML Responses** | Parsing support | Automatic format detection |
 
-**Kubernetes Ingress Configuration:**
-The system deploys behind a sophisticated API gateway infrastructure:
+##### 6.3.3.2.2 API Version Compatibility
 
-**Gateway Features:**
-- **TLS Termination**: Automated certificate management with cert-manager
-- **Security Headers**: Comprehensive security header injection
-- **Rate Limiting**: Request throttling and connection control
-- **Health Checks**: Automated health monitoring and failover
-
-**Gateway Configuration:**
-
-```mermaid
-graph TD
-    subgraph "API Gateway Layer"
-        INGRESS[Nginx Ingress Controller]
-        CERT[cert-manager]
-        RATE[Rate Limiting]
-        SECURITY[Security Headers]
-    end
-    
-    subgraph "Backend Services"
-        MCP[MCP Server Pods]
-        HEALTH[Health Check]
-        METRICS[Metrics Endpoint]
-    end
-    
-    subgraph "External Access"
-        CLIENT[External Clients]
-        MONITOR[Monitoring Systems]
-        AUDIT[Audit Systems]
-    end
-    
-    CLIENT --> INGRESS
-    INGRESS --> CERT
-    INGRESS --> RATE
-    INGRESS --> SECURITY
-    SECURITY --> MCP
-    SECURITY --> HEALTH
-    SECURITY --> METRICS
-    
-    MONITOR --> METRICS
-    AUDIT --> HEALTH
-```
-
-#### 6.3.3.4 External Service Contracts
-
-**Service Level Agreements:**
-The system operates under strict service level agreements with external systems:
-
-| Service | Availability | Response Time | Error Rate |
-|---------|-------------|---------------|------------|
-| **LabArchives API** | 99.9% | <2s P95 | <0.1% |
-| **Container Registry** | 99.95% | <5s | <0.05% |
-| **Monitoring Systems** | 99.99% | <1s | <0.01% |
-
-**Contract Monitoring:**
-- **Health Checks**: Continuous availability monitoring
-- **Performance Metrics**: SLA compliance tracking
-- **Error Reporting**: Automated alerting for SLA violations
-- **Escalation Procedures**: Defined response protocols
-
-### 6.3.4 INTEGRATION FLOW DIAGRAMS
-
-#### 6.3.4.1 Complete Integration Architecture
-
-```mermaid
-graph TB
-    subgraph "AI Client Layer"
-        CLAUDE[Claude Desktop]
-        FUTURE[Future MCP Clients]
-    end
-    
-    subgraph "MCP Server Core"
-        MCP_HANDLER[MCP Protocol Handler]
-        AUTH_MGR[Authentication Manager]
-        RESOURCE_MGR["Resource Manager<br/>FolderPath Scope Check (exact)"]
-        API_CLIENT[API Integration Layer]
-    end
-    
-    subgraph "External Systems"
-        LABARCH_US[LabArchives US]
-        LABARCH_AU[LabArchives AU]
-        LABARCH_UK[LabArchives UK]
-    end
-    
-    subgraph "Infrastructure Layer"
-        INGRESS[API Gateway]
-        MONITORING[Monitoring Stack]
-        AUDIT[Audit System]
-    end
-    
-    subgraph "Container Platform"
-        KUBERNETES[Kubernetes Cluster]
-        DOCKER[Docker Registry]
-        SECRETS[Secrets Manager]
-    end
-    
-    CLAUDE <-->|JSON-RPC 2.0| MCP_HANDLER
-    FUTURE <-->|JSON-RPC 2.0| MCP_HANDLER
-    
-    MCP_HANDLER --> AUTH_MGR
-    MCP_HANDLER --> RESOURCE_MGR
-    RESOURCE_MGR --> API_CLIENT
-    RESOURCE_MGR -->|403 ScopeViolation| MCP_HANDLER
-    
-    API_CLIENT <-->|HTTPS/REST| LABARCH_US
-    API_CLIENT <-->|HTTPS/REST| LABARCH_AU
-    API_CLIENT <-->|HTTPS/REST| LABARCH_UK
-    
-    MCP_HANDLER --> INGRESS
-    AUTH_MGR --> MONITORING
-    RESOURCE_MGR --> AUDIT
-    
-    INGRESS --> KUBERNETES
-    MONITORING --> KUBERNETES
-    AUDIT --> KUBERNETES
-    
-    KUBERNETES --> DOCKER
-    KUBERNETES --> SECRETS
-```
-
-#### 6.3.4.2 Message Flow Architecture
-
-```mermaid
-sequenceDiagram
-    participant CLIENT as MCP Client
-    participant GATEWAY as API Gateway
-    participant SERVER as MCP Server
-    participant AUTH as Auth Manager
-    participant RESOURCE as Resource Manager
-    participant LABAPI as LabArchives API
-    participant AUDIT as Audit System
-    
-    CLIENT->>GATEWAY: JSON-RPC Request
-    GATEWAY->>GATEWAY: Rate Limiting Check
-    GATEWAY->>SERVER: Forwarded Request
-    
-    SERVER->>AUTH: Validate Session
-    AUTH->>AUTH: Check Token Expiry
-    
-    alt Token Valid
-        AUTH->>SERVER: Authentication Success
-    else Token Expired
-        AUTH->>LABAPI: Refresh Token
-        LABAPI->>AUTH: New Token
-        AUTH->>SERVER: Authentication Success
-    end
-    
-    SERVER->>RESOURCE: Process Request
-    RESOURCE->>RESOURCE: <span style="background-color: rgba(91, 57, 243, 0.2)">Exact FolderPath Check</span>
-    
-    alt <span style="background-color: rgba(91, 57, 243, 0.2)">Scope Check Passes</span>
-        RESOURCE->>LABAPI: Data Request
-        alt Success
-            LABAPI->>RESOURCE: Data Response
-            RESOURCE->>RESOURCE: Transform Data
-            RESOURCE->>SERVER: Processed Data
-        else Error
-            LABAPI->>RESOURCE: Error Response
-            RESOURCE->>RESOURCE: Apply Retry Logic
-            RESOURCE->>SERVER: Error/Retry
-        end
-    else <span style="background-color: rgba(91, 57, 243, 0.2)">Scope Check Fails</span>
-        RESOURCE->>AUDIT: <span style="background-color: rgba(91, 57, 243, 0.2)">Log Scope Violation</span>
-        RESOURCE->>SERVER: <span style="background-color: rgba(91, 57, 243, 0.2)">403 ScopeViolation</span>
-        SERVER->>GATEWAY: <span style="background-color: rgba(91, 57, 243, 0.2)">403 Error Response</span>
-        GATEWAY->>CLIENT: <span style="background-color: rgba(91, 57, 243, 0.2)">403 ScopeViolation</span>
-    end
-    
-    alt Normal Processing
-        SERVER->>AUDIT: Log Transaction
-        SERVER->>GATEWAY: Response
-        GATEWAY->>CLIENT: JSON-RPC Response
-    end
-    
-    Note over AUDIT: Continuous audit logging
-    Note over GATEWAY: Security header injection
-    Note over LABAPI: Regional endpoint selection
-    Note over RESOURCE: <span style="background-color: rgba(91, 57, 243, 0.2)">Substring matches (e.g., "Chem" vs "Chemistry") are explicitly rejected</span>
-```
-
-#### 6.3.4.3 Error Handling Flow
-
-```mermaid
-graph TD
-    subgraph "Error Detection"
-        API_ERROR[API Error] --> ERROR_CLASSIFIER[Error Classifier]
-        PROTOCOL_ERROR[Protocol Error] --> ERROR_CLASSIFIER
-        AUTH_ERROR[Auth Error] --> ERROR_CLASSIFIER
-        RESOURCE_ERROR[Resource Error] --> ERROR_CLASSIFIER
-        SCOPE_ERROR[Scope Violation Error] --> ERROR_CLASSIFIER
-    end
-    
-    subgraph "Error Processing"
-        ERROR_CLASSIFIER --> RETRY_LOGIC{Retryable?}
-        RETRY_LOGIC -->|Yes| BACKOFF[Exponential Backoff]
-        RETRY_LOGIC -->|No| IMMEDIATE[Immediate Response]
-        RETRY_LOGIC -->|Scope Violation| SCOPE_IMMEDIATE[403 ScopeViolation]
-    end
-    
-    subgraph "Recovery Actions"
-        BACKOFF --> CIRCUIT_BREAKER[Circuit Breaker]
-        CIRCUIT_BREAKER --> RETRY_ATTEMPT[Retry Attempt]
-        RETRY_ATTEMPT --> SUCCESS_CHECK{Success?}
-        SUCCESS_CHECK -->|Yes| NORMAL_FLOW[Normal Flow]
-        SUCCESS_CHECK -->|No| FAILURE_COUNT[Increment Failure Count]
-        FAILURE_COUNT --> CIRCUIT_OPEN[Circuit Open]
-    end
-    
-    subgraph "Error Response"
-        IMMEDIATE --> ERROR_RESPONSE[Error Response]
-        CIRCUIT_OPEN --> FALLBACK[Fallback Response]
-        NORMAL_FLOW --> SUCCESS_RESPONSE[Success Response]
-        SCOPE_IMMEDIATE --> SCOPE_RESPONSE[403 ScopeViolation Response]
-    end
-    
-    subgraph "Audit and Monitoring"
-        ERROR_RESPONSE --> AUDIT_LOG[Audit Log]
-        FALLBACK --> AUDIT_LOG
-        SUCCESS_RESPONSE --> METRICS[Performance Metrics]
-        SCOPE_RESPONSE --> VIOLATION_AUDIT[Violation Audit Log]
-        AUDIT_LOG --> ALERT[Alert System]
-        VIOLATION_AUDIT --> SECURITY_ALERT[Security Alert]
-    end
-```
-
-### 6.3.5 DEPLOYMENT INTEGRATION
-
-#### 6.3.5.1 Container Integration
-
-**Docker Container Architecture:**
-- **Multi-stage Builds**: Optimized image size and security
-- **Security Scanning**: Automated vulnerability assessment
-- **Registry Integration**: Docker Hub and AWS ECR support
-
-#### 6.3.5.2 Kubernetes Integration
-
-**Orchestration Components:**
-- **Deployment Manifests**: Production-ready Kubernetes configurations
-- **Service Discovery**: Automated service registration
-- **Auto-scaling**: Horizontal and vertical scaling policies
-- **Health Checks**: Liveness and readiness probes
-
-#### 6.3.5.3 Monitoring Integration
-
-**Observability Stack:**
-- **Metrics**: Prometheus integration for performance monitoring
-- **Logging**: ELK stack for centralized log management
-- **Tracing**: Distributed tracing for request flow analysis
-- **Alerting**: Automated incident response and escalation
-
-#### References
-
-**Technical Specification Sections:**
-- `1.2 SYSTEM OVERVIEW` - Architecture and technical approach
-- `3.4 THIRD-PARTY SERVICES` - External service integration details
-- `3.8 INTEGRATION REQUIREMENTS` - Integration patterns and requirements
-- `4.1 SYSTEM WORKFLOWS` - Comprehensive workflow documentation
-- `5.2 COMPONENT DETAILS` - Detailed component specifications
-
-**Repository Files:**
-- `src/cli/api/client.py` - LabArchives API client implementation with retry logic
-- `infrastructure/kubernetes/ingress.yaml` - API gateway configuration
-- `src/cli/mcp/` - MCP protocol implementation
-- `infrastructure/` - Deployment configurations and manifests
-- `pyproject.toml` - Dependency management and configuration
-
-**Infrastructure Components:**
-- `kubernetes/` - Kubernetes deployment manifests
-- `docker-compose.prod.yml` - Production deployment configuration
-- `.github/workflows/` - CI/CD pipeline configuration
-- `terraform/` - Infrastructure as Code definitions
-
-## 6.4 SECURITY ARCHITECTURE
-
-### 6.4.1 AUTHENTICATION FRAMEWORK
-
-#### 6.4.1.1 Identity Management
-
-The LabArchives MCP Server implements a sophisticated dual-mode authentication framework designed to support both permanent service accounts and temporary user sessions with comprehensive security controls.
-
-**Authentication Architecture:**
-
-| Authentication Mode | Implementation | Use Case | Security Features |
-|-------------------|---------------|----------|------------------|
-| **API Key Authentication** | HMAC-SHA256 signed requests | Service accounts, automation | Cryptographic signing with access_key_id/access_secret pairs |
-| **User Token Authentication** | Token-based with username parameter | SSO users, temporary access | Session-based authentication with automatic expiration |
-| **Regional Endpoint Support** | Multi-region API routing | Global deployments | US, AU, UK endpoints with automatic region detection |
-
-The authentication system maintains strict security boundaries while providing flexible access patterns suitable for both automated workflows and human users through SSO integration.
-
-#### 6.4.1.2 Multi-Factor Authentication
-
-While the system does not implement traditional multi-factor authentication, it provides equivalent security through:
-
-- **Cryptographic Authentication**: HMAC-SHA256 signatures provide cryptographic proof of identity
-- **Time-based Session Tokens**: Temporary tokens with strict expiration enforce time-based access control
-- **Regional Endpoint Validation**: Geographic authentication boundaries provide additional security layers
-- **Scope-based Access Control**: Secondary authorization layer acts as additional authentication factor
-
-#### 6.4.1.3 Session Management
-
-The authentication manager (`src/cli/auth_manager.py`) implements comprehensive session lifecycle management:
-
-```mermaid
-graph TD
-    AUTH_START[Authentication Request] --> VALIDATE{Credential Validation}
-    VALIDATE -->|Valid| CREATE_SESSION[Create Session]
-    VALIDATE -->|Invalid| AUTH_ERROR[Authentication Error]
-    
-    CREATE_SESSION --> STORE[In-Memory Session Store]
-    STORE --> LIFECYCLE[3600s Session Lifetime]
-    
-    LIFECYCLE --> ACTIVE[Active Session]
-    ACTIVE --> CHECK{Session Valid?}
-    CHECK -->|Yes| CONTINUE[Continue Operations]
-    CHECK -->|No| RENEWAL{Auto-Renewal?}
-    
-    RENEWAL -->|Success| CREATE_SESSION
-    RENEWAL -->|Failure| RE_AUTH[Re-authenticate Required]
-    
-    CONTINUE --> AUDIT[Audit Log Entry]
-    AUTH_ERROR --> SECURITY_ALERT[Security Alert]
-    RE_AUTH --> AUTH_START
-```
-
-**Session Management Features:**
-- **Fixed Lifetime**: 3600-second (1 hour) session duration
-- **Automatic Renewal**: Seamless token refresh on expiration
-- **In-Memory Storage**: No persistent session data
-- **Expiration Checking**: UTC-based timestamp validation via `is_token_expired()`
-
-#### 6.4.1.4 Token Handling
-
-The system implements secure token lifecycle management with comprehensive validation:
-
-| Token Component | Security Implementation | Validation |
-|----------------|----------------------|------------|
-| **Session Tokens** | In-memory storage only | Real-time expiration checking |
-| **API Credentials** | Environment variable storage | Length validation (1-1024 characters) |
-| **Access Key IDs** | Alphanumeric format enforcement | 1-256 character length validation |
-| **HMAC Signatures** | Derived from API secrets | SHA256 cryptographic validation |
-
-#### 6.4.1.5 Password Policies
-
-The system enforces comprehensive credential validation policies:
-
-- **API Secret Requirements**: 1-1024 character length with no character restrictions
-- **Access Key Format**: Alphanumeric validation with 1-256 character limits
-- **Username Validation**: Valid email address format when using token authentication
-- **Credential Sanitization**: Complete redaction via `sanitize_credentials()` function
-- **HTTPS Enforcement**: TLS encryption required for all credential transmission
-
-### 6.4.2 AUTHORIZATION SYSTEM
-
-#### 6.4.2.1 Role-Based Access Control
-
-The authorization system implements scope-based access control that provides granular permission management while maintaining simplicity and security.
-
-**Authorization Architecture:**
+The system provides **version-agnostic API integration**:
 
 ```mermaid
 graph LR
-    USER[User/Service] --> AUTHENTICATE[Authentication]
-    AUTHENTICATE --> SCOPE_EVAL[Scope Evaluation]
-    
-    SCOPE_EVAL --> NO_SCOPE[No Scope: Full Access]
-    SCOPE_EVAL --> NOTEBOOK_ID[Notebook ID Scope]
-    SCOPE_EVAL --> NOTEBOOK_NAME[Notebook Name Scope]
-    SCOPE_EVAL --> FOLDER_PATH[Folder Path Scope]
-    
-    NO_SCOPE --> RESOURCE_ACCESS[Resource Access]
-    NOTEBOOK_ID --> VALIDATE_ID[Validate Notebook ID]
-    NOTEBOOK_NAME --> VALIDATE_NAME[Validate Notebook Name]
-    FOLDER_PATH --> VALIDATE_PATH["Exact FolderPath Hierarchy Match"]
-    
-    VALIDATE_ID --> RESOURCE_ACCESS
-    VALIDATE_NAME --> RESOURCE_ACCESS
-    VALIDATE_PATH --> RESOURCE_ACCESS
-    
-    RESOURCE_ACCESS --> LIST_FILTER[List Filtering]
-    RESOURCE_ACCESS --> READ_VERIFY[Read Verification]
-    
-    LIST_FILTER --> AUDIT_LOG[Audit Logging]
-    READ_VERIFY --> AUDIT_LOG
-```
-
-<span style="background-color: rgba(91, 57, 243, 0.2)">Folder path comparison is performed via FolderPath.is_parent_of() method, which implements exact hierarchical validation without substring matching vulnerabilities.</span>
-
-#### 6.4.2.2 Permission Management
-
-The system implements a three-tier permission model:
-
-| Permission Tier | Implementation | Scope |
-|----------------|----------------|-------|
-| **System Access** | Authentication validation | Global system access |
-| **Scope Limitations** | Resource URI validation | Configurable access boundaries |
-| **Resource Permissions** | LabArchives API permissions | Individual resource access |
-
-**Scope Configuration Options:**
-
-| Scope Type | Validation Rules | Enforcement |
-|-----------|------------------|-------------|
-| **notebook_id** | Alphanumeric ID matching | Exact notebook identification |
-| **notebook_name** | String matching, no control characters | Case-sensitive name validation |
-| **folder_path** | <span style="background-color: rgba(91, 57, 243, 0.2)">Exact hierarchical comparison via FolderPath value object (no substring evaluation)</span> | <span style="background-color: rgba(91, 57, 243, 0.2)">FolderPath.is_parent_of() check; violations raise 403 ScopeViolation</span> |
-| **No Scope** | Full user permissions | Complete accessible resource set |
-
-#### 6.4.2.3 Resource Authorization
-
-The resource manager (`src/cli/resource_manager.py`) implements comprehensive authorization enforcement:
-
-```python
-from models.scoping import FolderPath, ScopeViolation
-
-def is_resource_in_scope(resource_uri: str, scope_config: Dict[str, Any]) -> bool:
-    parsed = parse_resource_uri(resource_uri)
-
-    if scope_config.get("notebook_id"):
-        return parsed["notebook_id"] == scope_config["notebook_id"]
-    elif scope_config.get("notebook_name"):
-        return parsed["notebook_name"] == scope_config["notebook_name"]
-    elif scope_config.get("folder_path"):
-        scope = FolderPath.from_raw(scope_config["folder_path"])
-        target = FolderPath.from_raw(parsed["path"])
-        return scope.is_parent_of(target)
-    return True
-```
-
-<span style="background-color: rgba(91, 57, 243, 0.2)">When scope validation fails, the system raises a 403 ScopeViolation error to ensure consistent security enforcement:</span>
-
-```python
-def read_resource(resource_uri: str, scope_config: Dict[str, Any]) -> Dict[str, Any]:
-    if not is_resource_in_scope(resource_uri, scope_config):
-        raise ScopeViolation(
-            f"Resource {resource_uri} is outside configured scope boundaries",
-            http_code=403
-        )
-    return fetch_resource_content(resource_uri)
-```
-
-#### 6.4.2.4 Policy Enforcement Points
-
-The system implements authorization enforcement at multiple strategic points:
-
-- **Configuration Validation**: Scope validation during system initialization
-- **Resource Discovery**: Filtering during list operations via `resources/list`
-- **Content Retrieval**: Permission verification during `resources/read`
-- **CLI Interface**: Input validation at command entry points
-- **API Gateway**: Network-level access control through Kubernetes policies
-
-#### 6.4.2.5 Audit Logging
-
-Comprehensive audit logging captures all authorization decisions:
-
-| Event Type | Log Level | Content | Retention |
-|-----------|-----------|---------|-----------|
-| **Authentication Events** | INFO/ERROR | User context, timestamp, result | 50MB x 10 files |
-| **Authorization Decisions** | INFO | Resource URI, scope, decision | 50MB x 10 files |
-| **Scope Violations** | WARNING | Attempted access, denial reason; <span style="background-color: rgba(91, 57, 243, 0.2)">HTTP code 403 (ScopeViolation) returned; credential values are never logged due to early argv scrubbing (see 6.4.3.3)</span> | 50MB x 10 files |
-| **Resource Access** | INFO | Resource details, user context | 50MB x 10 files |
-
-### 6.4.3 DATA PROTECTION
-
-#### 6.4.3.1 Encryption Standards
-
-The system implements comprehensive encryption across all data transmission and processing layers:
-
-```mermaid
-graph TB
-    subgraph "Data Protection Architecture"
-        DATA_LAYER[Data Layer] --> TRANSIT[Data in Transit]
-        DATA_LAYER --> PROCESSING[Data in Processing]
-        DATA_LAYER --> STORAGE[Data at Rest]
-        
-        TRANSIT --> TLS[TLS 1.2+ Encryption]
-        TRANSIT --> HTTPS[HTTPS Enforcement]
-        TRANSIT --> HMAC[HMAC-SHA256 Signatures]
-        
-        PROCESSING --> MEMORY[In-Memory Processing]
-        PROCESSING --> ZERO_PERSIST[Zero Persistence]
-        PROCESSING --> SANITIZE[Credential Sanitization]
-        
-        STORAGE --> NO_STORAGE[No Local Storage]
-        STORAGE --> ENV_VAR[Environment Variables]
-        STORAGE --> RUNTIME_CLEAR[Runtime Clearing]
+    subgraph "Version Compatibility"
+        A[Client Request] --> B[API Version Detection]
+        B --> C[Endpoint Adaptation]
+        C --> D[Format Negotiation]
+        D --> E[Response Parsing]
+        E --> F[Format Normalization]
+        F --> G[Client Response]
     end
     
-    TLS --> COMPLIANCE[Compliance Standards]
-    HTTPS --> COMPLIANCE
-    HMAC --> COMPLIANCE
-    ZERO_PERSIST --> COMPLIANCE
-    NO_STORAGE --> COMPLIANCE
+    style B fill:#e8f5e8
+    style C fill:#e1f5fe
+    style F fill:#fff3e0
 ```
 
-**Encryption Implementation:**
+#### 6.3.3.3 API Gateway Configuration
 
-| Layer | Standard | Implementation | Validation |
-|-------|----------|---------------|------------|
-| **Transport** | TLS 1.2+ | HTTPS mandatory | Certificate validation |
-| **API Authentication** | HMAC-SHA256 | Request signing | Signature verification |
-| **Certificate Management** | Let's Encrypt | cert-manager automation | Automatic renewal |
-| **Internal Communication** | Kubernetes ClusterIP | Network isolation | NetworkPolicy enforcement |
+##### 6.3.3.3.1 Kubernetes Ingress Setup
 
-#### 6.4.3.2 Key Management
+The system implements **enterprise-grade API gateway** with Kubernetes Ingress:
 
-The system implements a zero-persistence key management strategy:
-
-| Key Type | Storage | Lifecycle | Security Controls |
-|----------|---------|-----------|------------------|
-| **API Credentials** | Environment variables | Process lifetime | Never written to disk |
-| **Session Tokens** | In-memory only | 3600-second expiration | Automatic clearing |
-| **HMAC Keys** | Derived from API secrets | Per-request generation | No persistent storage |
-| **TLS Certificates** | cert-manager | 90-day automatic renewal | Kubernetes Secret management |
-
-#### 6.4.3.3 Data Masking Rules
-
-The system implements a comprehensive dual-layer approach to credential sanitization that ensures complete secret redaction across all logging paths. <span style="background-color: rgba(91, 57, 243, 0.2)">The first layer occurs during application startup through early argv scrubbing, while the second layer handles structured credential objects during runtime operations.</span>
-
-<span style="background-color: rgba(91, 57, 243, 0.2)">**Early Argv Scrubbing**: The `scrub_argv(argv)` function is invoked by `logging_setup.setup_logging()` before any handlers are configured, ensuring that command-line arguments containing secrets are sanitized at the earliest possible point in the application lifecycle:</span>
-
-```python
-def scrub_argv(argv: List[str]) -> List[str]:
-    REDACTION_FLAGS = {"-k", "--access-key", "--access-key-id", "-p", "--password"}
-    scrubbed = argv.copy()
-    for i, item in enumerate(scrubbed):
-        if item in REDACTION_FLAGS and i + 1 < len(scrubbed):
-            scrubbed[i+1] = "[REDACTED]"
-    return scrubbed
+```yaml
+# Example Ingress Configuration
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: labarchives-mcp-ingress
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  tls:
+    - hosts:
+        - api.labarchives-mcp.example.com
+      secretName: labarchives-mcp-tls
+  rules:
+    - host: api.labarchives-mcp.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: labarchives-mcp-service
+                port:
+                  number: 8080
 ```
 
-<span style="background-color: rgba(91, 57, 243, 0.2)">**Runtime Credential Sanitization**: For structured objects processed during normal operations, the system provides comprehensive field-level redaction that covers all sensitive data types:</span>
+##### 6.3.3.3.2 Security and Access Control
 
-```python
-SENSITIVE_FIELDS = {
-    'access_key_id', 'access_secret', 'token', 'password', 'secret', 
-    'api_key', 'auth_token', 'session_token', 'access_token', 'refresh_token'
-}
+The API gateway implements **comprehensive security controls**:
 
-def sanitize_credentials(credentials: dict) -> dict:
-    """Redacts sensitive fields for secure logging"""
-    sanitized = credentials.copy()
-    for key in sanitized:
-        if key.lower() in SENSITIVE_FIELDS:
-            sanitized[key] = '[REDACTED]'
-    return sanitized
+```mermaid
+flowchart TD
+    subgraph "Security Layers"
+        A[Client Request] --> B[TLS Termination]
+        B --> C[Rate Limiting]
+        C --> D[Authentication]
+        D --> E[Authorization]
+        E --> F[Request Validation]
+        F --> G[Backend Service]
+    end
+    
+    subgraph "Security Features"
+        H[cert-manager] --> B
+        I[NGINX Rate Limiting] --> C
+        J[OAuth2 Proxy] --> D
+        K[RBAC] --> E
+        L[JSON Schema] --> F
+    end
+    
+    style B fill:#e8f5e8
+    style C fill:#e1f5fe
+    style D fill:#fff3e0
 ```
 
-<span style="background-color: rgba(91, 57, 243, 0.2)">**Complete Logging Protection**: These mechanisms work together to ensure that all logging paths, including startup argument echoes, API request logging, error handling, and audit trails, are subject to secret redaction. This dual-layer approach fully satisfies the requirement that grep searches of logs show no literal secret or token strings.</span>
+**Security Features:**
+- **TLS 1.3 Termination**: Certificate management via cert-manager
+- **Rate Limiting**: Configurable request throttling
+- **Security Headers**: HSTS, CSP, and other security headers
+- **Path-based Routing**: Intelligent request routing
 
-The comprehensive redaction system covers:
-- <span style="background-color: rgba(91, 57, 243, 0.2)">`scrub_argv` (argv secret scrubbing, logger-level protection)</span>
-- `sanitize_credentials` (credential sanitization for structured objects)
-- `is_token_expired` (session token validation without exposure)
-- `validate_credentials` (credential format validation with secure error handling)
+#### 6.3.3.4 External Service Contracts
 
-#### 6.4.3.4 Secure Communication
+##### 6.3.3.4.1 Service Level Agreements
 
-All external communication enforces strict security protocols:
+The system defines **clear service contracts** with external dependencies:
 
-| Protocol | Implementation | Configuration | Monitoring |
-|----------|---------------|---------------|------------|
-| **External APIs** | HTTPS with HMAC-SHA256 | TLS 1.2+ required | Certificate monitoring |
-| **Internal Services** | Kubernetes ClusterIP | Network isolation | Traffic analysis |
-| **Client Communication** | JSON-RPC over stdio | Process isolation | Request logging |
-| **Monitoring** | Prometheus HTTPS | Optional mTLS | Metrics collection |
+| Service | SLA Requirement | Error Handling |
+|---------|-----------------|----------------|
+| **LabArchives API** | 99.9% uptime | Circuit breaker with fallback |
+| **AWS Services** | 99.95% availability | Multi-region failover |
+| **Prometheus** | 99% availability | Local metric buffering |
+| **Container Registry** | 99.9% uptime | Image caching strategy |
 
-#### 6.4.3.5 Compliance Controls
+##### 6.3.3.4.2 Integration Monitoring
 
-The system implements comprehensive compliance controls:
+The system implements **proactive integration monitoring**:
 
-| Standard | Implementation | Evidence | Validation |
-|----------|---------------|----------|------------|
-| **SOC2 Type II** | Audit logging, access controls | Automated audit trails | Annual assessment |
-| **ISO 27001** | Information security management | Security documentation | Continuous monitoring |
-| **HIPAA** | PHI protection, encryption | Compliance headers | Regular audits |
-| **GDPR** | Data minimization, zero persistence | Privacy by design | Data protection assessment |
+```mermaid
+flowchart LR
+    subgraph "Integration Health"
+        A[Health Checks] --> B[Endpoint Monitoring]
+        B --> C[Response Validation]
+        C --> D[Performance Metrics]
+        D --> E[Alert Generation]
+        E --> F[Incident Response]
+    end
+    
+    subgraph "Monitoring Targets"
+        G[LabArchives API] --> A
+        H[AWS Services] --> A
+        I[Kubernetes] --> A
+        J[Prometheus] --> A
+    end
+    
+    style B fill:#e8f5e8
+    style D fill:#e1f5fe
+    style E fill:#fff3e0
+```
 
-### 6.4.4 REQUIRED DIAGRAMS
+**Monitoring Capabilities:**
+- **Endpoint Health**: Continuous availability monitoring
+- **Response Time Tracking**: Performance baseline maintenance
+- **Error Rate Monitoring**: Integration failure detection
+- **Automated Alerting**: Incident response integration
 
-#### 6.4.4.1 Authentication Flow Diagram
+### 6.3.4 INTEGRATION FLOW DIAGRAMS
+
+#### 6.3.4.1 Complete Authentication Flow
 
 ```mermaid
 sequenceDiagram
-    participant User as User/Service
-    participant CLI as CLI Interface
-    participant AuthMgr as Authentication Manager
+    participant Client as MCP Client
+    participant Server as MCP Server
+    participant Auth as Auth Manager
     participant API as LabArchives API
-    participant Audit as Audit System
     
-    User->>CLI: labarchives-mcp start
-    CLI->>AuthMgr: initialize_with_credentials()
-    AuthMgr->>AuthMgr: validate_configuration()
+    Client->>Server: initialize
+    Server->>Auth: validate credentials
+    Auth->>Auth: detect region
+    Auth->>API: HMAC-SHA256 request
+    API->>Auth: authentication response
+    Auth->>Auth: create session (3600s)
+    Auth->>Server: session context
+    Server->>Client: initialized with capabilities
     
-    alt API Key Authentication
-        AuthMgr->>API: POST /users/user_info
-        Note over API: HMAC-SHA256 signature validation
-        API-->>AuthMgr: User context response
-    else Token Authentication
-        AuthMgr->>API: POST /users/user_info (with username)
-        Note over API: Token + username validation
-        API-->>AuthMgr: User context response
-    end
+    Note over Client,API: Session active for 3600 seconds
     
-    AuthMgr->>AuthMgr: create_session(3600s)
-    AuthMgr->>Audit: log_authentication_success()
-    AuthMgr-->>CLI: Authentication successful
+    Client->>Server: resources/list
+    Server->>Auth: validate session
+    Auth->>Auth: check expiry
+    Auth->>API: authenticated request
+    API->>Auth: resource data
+    Auth->>Server: validated response
+    Server->>Client: resource list
     
-    loop Every Request
-        CLI->>AuthMgr: get_current_session()
-        AuthMgr->>AuthMgr: check_token_expiration()
-        
-        alt Session Valid
-            AuthMgr-->>CLI: Return active session
-        else Session Expired
-            AuthMgr->>API: Re-authenticate
-            API-->>AuthMgr: New session token
-            AuthMgr->>Audit: log_session_renewal()
-            AuthMgr-->>CLI: Return renewed session
-        end
-    end
+    Note over Auth,API: Auto-renewal on expiry
+    
+    Auth->>Auth: session expired
+    Auth->>API: re-authenticate
+    API->>Auth: new session
+    Auth->>Auth: update session context
 ```
 
-#### 6.4.4.2 Authorization Flow Diagram
-
-```mermaid
-graph TB
-    subgraph "Authorization Flow"
-        REQUEST[Resource Request] --> PARSE[Parse Resource URI]
-        PARSE --> EXTRACT[Extract Components]
-        
-        EXTRACT --> SCOPE_CHECK{Scope Configured?}
-        SCOPE_CHECK -->|No Scope| ALLOW[Allow Full Access]
-        SCOPE_CHECK -->|Scope Configured| VALIDATE[Validate Against Scope]
-        
-        VALIDATE --> NOTEBOOK_SCOPE{Notebook ID Scope?}
-        VALIDATE --> NAME_SCOPE{Notebook Name Scope?}
-        VALIDATE --> FOLDER_SCOPE{Folder Path Scope?}
-        
-        NOTEBOOK_SCOPE -->|Match| ALLOW
-        NOTEBOOK_SCOPE -->|No Match| DENY[Deny Access]
-        
-        NAME_SCOPE -->|Match| ALLOW
-        NAME_SCOPE -->|No Match| DENY
-        
-        FOLDER_SCOPE -->|Path Match| ALLOW
-        FOLDER_SCOPE -->|No Path Match| DENY
-        
-        ALLOW --> RESOURCE_ACCESS[Grant Resource Access]
-        DENY --> SECURITY_LOG[Log Security Violation]
-        
-        RESOURCE_ACCESS --> SUCCESS_AUDIT[Audit Success]
-        SECURITY_LOG --> EXCEPTION[Raise LabArchivesAPIException]
-        
-        SUCCESS_AUDIT --> RESPONSE[Return Resource]
-        EXCEPTION --> ERROR_RESPONSE[Return Error]
-    end
-```
-
-#### 6.4.4.3 Security Zone Diagram
-
-```mermaid
-graph TB
-    subgraph "Internet Zone"
-        CLIENT[MCP Client Applications]
-        LABARCHIVES[LabArchives API Servers]
-        LETSENCRYPT[Let's Encrypt CA]
-    end
-    
-    subgraph "DMZ - Ingress Security Layer"
-        INGRESS[NGINX Ingress Controller]
-        WAF[Web Application Firewall]
-        CERT[cert-manager]
-        RATECALC[Rate Limiting]
-    end
-    
-    subgraph "Application Security Zone"
-        MCP_SERVER[MCP Server Pod]
-        AUTH_MGR[Authentication Manager]
-        RESOURCE_MGR[Resource Manager]
-        AUDIT_SYS[Audit System]
-    end
-    
-    subgraph "Kubernetes Security Controls"
-        RBAC[Role-Based Access Control]
-        NETPOL[Network Policies]
-        SECRETS[Kubernetes Secrets]
-        SECCTX[Security Context]
-    end
-    
-    subgraph "Monitoring & Compliance Zone"
-        AUDIT_LOGS[Audit Log Storage]
-        PROMETHEUS[Prometheus Metrics]
-        ALERTMGR[Alert Manager]
-        COMPLIANCE[Compliance Monitoring]
-    end
-    
-    CLIENT -.->|HTTPS/TLS 1.2+| INGRESS
-    INGRESS -->|TLS Termination| MCP_SERVER
-    MCP_SERVER -->|In-Memory Processing| AUTH_MGR
-    AUTH_MGR -->|Session Management| RESOURCE_MGR
-    RESOURCE_MGR -->|HTTPS + HMAC-SHA256| LABARCHIVES
-    
-    CERT -->|TLS Certificates| INGRESS
-    LETSENCRYPT -->|Certificate Issuance| CERT
-    RATECALC -->|Request Limiting| INGRESS
-    WAF -->|Attack Prevention| INGRESS
-    
-    RBAC -->|Access Control| MCP_SERVER
-    NETPOL -->|Network Isolation| MCP_SERVER
-    SECRETS -->|Credential Management| AUTH_MGR
-    SECCTX -->|Container Security| MCP_SERVER
-    
-    AUTH_MGR -->|Structured Audit Events| AUDIT_SYS
-    RESOURCE_MGR -->|Access Events| AUDIT_SYS
-    AUDIT_SYS -->|Log Rotation| AUDIT_LOGS
-    
-    MCP_SERVER -->|Metrics Collection| PROMETHEUS
-    PROMETHEUS -->|Alert Generation| ALERTMGR
-    AUDIT_LOGS -->|Compliance Reporting| COMPLIANCE
-    
-    classDef internetZone fill:#ffe6e6,stroke:#d63384,stroke-width:2px
-    classDef dmzZone fill:#fff3cd,stroke:#f57c00,stroke-width:2px
-    classDef appZone fill:#d1ecf1,stroke:#0c5460,stroke-width:2px
-    classDef securityZone fill:#d4edda,stroke:#155724,stroke-width:2px
-    classDef monitoringZone fill:#e2e3e5,stroke:#383d41,stroke-width:2px
-    
-    class CLIENT,LABARCHIVES,LETSENCRYPT internetZone
-    class INGRESS,WAF,CERT,RATECALC dmzZone
-    class MCP_SERVER,AUTH_MGR,RESOURCE_MGR,AUDIT_SYS appZone
-    class RBAC,NETPOL,SECRETS,SECCTX securityZone
-    class AUDIT_LOGS,PROMETHEUS,ALERTMGR,COMPLIANCE monitoringZone
-```
-
-### 6.4.5 SECURITY CONTROL MATRICES
-
-#### 6.4.5.1 Authentication Security Controls
-
-| Control Category | Implementation | Monitoring | Incident Response |
-|------------------|---------------|------------|------------------|
-| **Credential Validation** | Regex patterns, length checks | Validation failure metrics | Automatic rejection + logging |
-| **Session Management** | 3600s expiration, auto-renewal | Session lifecycle tracking | Forced re-authentication |
-| **Failed Authentication** | Comprehensive logging | Real-time alerting | Investigation workflow |
-| **Brute Force Protection** | Rate limiting integration | Attack pattern detection | IP blocking procedures |
-
-#### 6.4.5.2 Authorization Security Controls
-
-| Control Category | Implementation | Validation | Audit Trail |
-|------------------|---------------|------------|-------------|
-| **Scope Enforcement** | <span style="background-color: rgba(91, 57, 243, 0.2)">Exact FolderPath parent-child comparison (value object), 403 on violation</span> | <span style="background-color: rgba(91, 57, 243, 0.2)">FolderPath.is_parent_of(), test suite in tests/test_scoping.py</span> | Complete access logging |
-| **Resource Access** | Permission verification | API-level validation | Resource-specific audit |
-| **Privilege Escalation** | Scope boundary enforcement | Continuous monitoring | Immediate alerting |
-| **Access Pattern Analysis** | Behavioral monitoring | Anomaly detection | Forensic logging |
-
-#### 6.4.5.3 Data Protection Security Controls
-
-| Control Category | Implementation | Compliance Standard | Evidence |
-|------------------|---------------|-------------------|----------|
-| **Encryption in Transit** | TLS 1.2+ mandatory | SOC2, HIPAA, ISO 27001 | Certificate monitoring |
-| **Data at Rest** | Zero persistence architecture | GDPR, HIPAA | Configuration validation |
-| **Credential Protection** | <span style="background-color: rgba(91, 57, 243, 0.2)">Environment variables, `sanitize_credentials()`, and early argv redaction via `scrub_argv()`</span> | All standards | Audit log analysis |
-| **Network Security** | Kubernetes NetworkPolicy | ISO 27001 | Traffic monitoring |
-
-#### 6.4.5.4 Compliance Security Controls
-
-| Compliance Standard | Required Controls | Implementation | Validation Method |
-|-------------------|------------------|---------------|------------------|
-| **SOC2 Type II** | Access controls, audit logging | RBAC + comprehensive logging | Annual security audit |
-| **ISO 27001** | Information security management | Security policy enforcement | Continuous monitoring |
-| **HIPAA** | PHI protection, encryption | Zero persistence + TLS | Compliance assessment |
-| **GDPR** | Data minimization, privacy | No data storage, consent management | Privacy impact assessment |
-
-### 6.4.6 SECURITY MONITORING AND INCIDENT RESPONSE
-
-#### 6.4.6.1 Security Event Monitoring
-
-The system implements comprehensive security event monitoring through the audit system (`src/cli/logging_setup.py`):
-
-| Event Type | Monitoring Method | Alert Threshold | Response Action |
-|-----------|------------------|-----------------|----------------|
-| **Authentication Failures** | Real-time log analysis | 5 failures/10 minutes | Security team notification |
-| **Authorization Violations** | Scope violation detection | Any violation | Immediate investigation |
-| **Unusual Access Patterns** | Behavioral analysis | Statistical deviation | Automated response |
-| **System Anomalies** | Performance monitoring | SLA breach | Escalation procedures |
-
-#### 6.4.6.2 Incident Response Procedures
+#### 6.3.4.2 Resource Discovery Architecture
 
 ```mermaid
 graph TD
-    INCIDENT[Security Incident Detected] --> CLASSIFY{Incident Classification}
+    subgraph "Resource Discovery Flow"
+        A[MCP Client Request] --> B[Scope Validation]
+        B --> C[Region Detection]
+        C --> D[API Authentication]
+        D --> E[Notebook Enumeration]
+        E --> F[Page Discovery]
+        F --> G[Entry Cataloging]
+        G --> H[Permission Filtering]
+        H --> I[MCP Transformation]
+        I --> J[Response Serialization]
+    end
     
-    CLASSIFY -->|Low| STANDARD[Standard Response]
-    CLASSIFY -->|Medium| ELEVATED[Elevated Response]
-    CLASSIFY -->|High| CRITICAL[Critical Response]
-    CLASSIFY -->|Critical| EMERGENCY[Emergency Response]
+    subgraph "Data Transformation"
+        K[LabArchives Format] --> L[JSON Normalization]
+        L --> M[URI Generation]
+        M --> N[Metadata Enrichment]
+        N --> O[MCP Resource Format]
+    end
     
-    STANDARD --> AUTO_REMEDIATE[Automatic Remediation]
-    ELEVATED --> MANUAL_REVIEW[Manual Review]
-    CRITICAL --> IMMEDIATE_ACTION[Immediate Action]
-    EMERGENCY --> FULL_LOCKDOWN[Full System Lockdown]
+    subgraph "Error Handling"
+        P[Scope Violation] --> Q[Access Denied]
+        R[API Timeout] --> S[Retry Logic]
+        T[Authentication Failure] --> U[Re-auth Flow]
+    end
     
-    AUTO_REMEDIATE --> DOCUMENT[Document Resolution]
-    MANUAL_REVIEW --> INVESTIGATE[Investigation]
-    IMMEDIATE_ACTION --> CONTAINMENT[Threat Containment]
-    FULL_LOCKDOWN --> FORENSICS[Forensic Analysis]
+    E --> K
+    F --> K
+    G --> K
     
-    DOCUMENT --> MONITOR[Continued Monitoring]
-    INVESTIGATE --> REMEDIATE[Remediation Actions]
-    CONTAINMENT --> RECOVERY[System Recovery]
-    FORENSICS --> REBUILD[System Rebuild]
+    B --> P
+    D --> R
+    D --> T
+    
+    style B fill:#e8f5e8
+    style D fill:#e1f5fe
+    style H fill:#fff3e0
 ```
 
-#### References
+#### 6.3.4.3 Message Flow Architecture
 
-**Files Examined:**
-- `src/cli/auth_manager.py` - Authentication implementation with HMAC-SHA256 and session management
-- `src/cli/logging_setup.py` - Audit logging configuration and structured event formatting
-- `src/cli/validators.py` - Input validation and security control implementations
-- `src/cli/api/client.py` - API client with cryptographic signature generation
-- `src/cli/resource_manager.py` - Resource authorization and scope enforcement
-- `infrastructure/kubernetes/ingress.yaml` - TLS configuration and security headers
-- `infrastructure/kubernetes/secret.yaml` - Kubernetes RBAC and credential management
-- `infrastructure/kubernetes/service.yaml` - Network policies and service security
+```mermaid
+flowchart TD
+    subgraph "Inbound Processing"
+        A[stdin] --> B[Line Buffer]
+        B --> C[JSON Parser]
+        C --> D[Method Router]
+        D --> E[Handler Dispatch]
+    end
+    
+    subgraph "Handler Processing"
+        E --> F[Request Validation]
+        F --> G[Authentication Check]
+        G --> H[Business Logic]
+        H --> I[External API Call]
+        I --> J[Response Building]
+    end
+    
+    subgraph "Outbound Processing"
+        J --> K[JSON Serialization]
+        K --> L[Response Validation]
+        L --> M[stdout Buffer]
+        M --> N[Client Response]
+    end
+    
+    subgraph "Error Handling"
+        O[Parse Error] --> P[Error Response]
+        Q[Handler Error] --> P
+        R[API Error] --> P
+        P --> K
+    end
+    
+    C --> O
+    H --> Q
+    I --> R
+    
+    style D fill:#e8f5e8
+    style G fill:#e1f5fe
+    style I fill:#fff3e0
+    style P fill:#ffebee
+```
 
-**Folders Explored:**
-- `src/cli/` - CLI security module implementations
-- `infrastructure/kubernetes/` - Kubernetes security manifest configurations
-- `src/cli/api/` - API client security implementations
-- `src/cli/mcp/` - MCP protocol security features
+### 6.3.5 PERFORMANCE OPTIMIZATION
 
-**Technical Specification Sections:**
-- `2.1 FEATURE CATALOG` - F-005 Authentication and Security Management details
-- `3.7 SECURITY & COMPLIANCE TOOLS` - Security scanning and compliance frameworks
-- `5.4 CROSS-CUTTING CONCERNS` - Authentication framework and audit logging
-- `1.2 SYSTEM OVERVIEW` - High-level security architecture context
+#### 6.3.5.1 Connection Management
+
+The system implements **efficient connection pooling** for external API interactions:
+
+| Parameter | Configuration | Impact |
+|-----------|---------------|---------|
+| **Max Connections** | 10 per region | Prevents resource exhaustion |
+| **Connection Timeout** | 30 seconds | Prevents hanging requests |
+| **Keep-alive** | 60 seconds | Reduces connection overhead |
+| **Retry Pool** | 3 connections | Dedicated retry handling |
+
+#### 6.3.5.2 Caching Strategy
+
+The system employs **strategic caching** for performance optimization:
+
+```mermaid
+graph TD
+    subgraph "Caching Layers"
+        A[Session Cache] --> B[3600s TTL]
+        C[Region Cache] --> D[86400s TTL]
+        E[Schema Cache] --> F[No expiry]
+        G[Connection Pool] --> H[60s idle timeout]
+    end
+    
+    subgraph "Cache Invalidation"
+        I[Authentication Change] --> A
+        J[Region Change] --> C
+        K[Schema Update] --> E
+        L[Connection Error] --> G
+    end
+    
+    style A fill:#e8f5e8
+    style C fill:#e1f5fe
+    style E fill:#fff3e0
+```
+
+### 6.3.6 REFERENCES
+
+#### Files Examined
+- `src/cli/api/__init__.py` - API package initialization and exports
+- `src/cli/api/client.py` - LabArchives REST client implementation
+- `src/cli/api/models.py` - Pydantic data models for API entities
+- `src/cli/api/response_parser.py` - API response parsing and validation
+- `src/cli/api/errors.py` - API-specific exception hierarchy
+- `src/cli/mcp/__init__.py` - MCP protocol package initialization
+- `src/cli/mcp/protocol.py` - JSON-RPC message handling
+- `src/cli/mcp/handlers.py` - MCP protocol request handlers
+- `src/cli/mcp/resources.py` - Resource management and transformation
+- `src/cli/mcp/models.py` - MCP protocol data models
+- `src/cli/mcp/errors.py` - MCP error handling and codes
+- `src/cli/auth_manager.py` - Authentication workflow management
+- `src/cli/labarchives_api.py` - High-level API interface
+- `src/cli/resource_manager.py` - Resource discovery and scoping
+- `src/cli/constants.py` - API endpoints and configuration constants
+- `src/cli/config.py` - Configuration management system
+- `src/cli/models.py` - Configuration data models
+- <span style="background-color: rgba(91, 57, 243, 0.2)">`src/cli/exceptions.py` - Centralized exception classes including scope-violation exceptions</span>
+- <span style="background-color: rgba(91, 57, 243, 0.2)">`src/cli/security/__init__.py` - Security module namespace</span>
+- <span style="background-color: rgba(91, 57, 243, 0.2)">`src/cli/security/sanitizers.py` - URL and parameter sanitization utilities</span>
+- <span style="background-color: rgba(91, 57, 243, 0.2)">`src/cli/security/validators.py` - Scope validation helpers</span>
+- `src/cli/commands/start.py` - Server startup integration
+- `src/cli/commands/authenticate.py` - Authentication command
+- `infrastructure/kubernetes/ingress.yaml` - API gateway configuration
+- `infrastructure/kubernetes/service.yaml` - Service networking setup
+- `infrastructure/kubernetes/deployment.yaml` - Container deployment
+- `infrastructure/docker-compose.prod.yml` - Production orchestration
+- `infrastructure/terraform/main.tf` - AWS infrastructure setup
+
+#### Technical Specification Sections Referenced
+- `1.2 SYSTEM OVERVIEW` - Project context and system architecture
+- `5.1 HIGH-LEVEL ARCHITECTURE` - System design and component structure
+- `6.1 CORE SERVICES ARCHITECTURE` - Service architecture patterns
+- `3.7 INTEGRATION ARCHITECTURE` - Technology stack and integration overview
+
+## 6.4 SECURITY ARCHITECTURE
+
+### 6.4.1 SECURITY OVERVIEW
+
+The LabArchives MCP Server implements a comprehensive multi-layered security architecture designed to ensure secure AI-data integration while maintaining compliance with enterprise security standards. The security framework addresses authentication, authorization, data protection, and audit requirements across all system components.
+
+#### 6.4.1.1 Security Architecture Principles
+
+The security architecture follows **defense-in-depth** principles with multiple security layers:
+
+- **Protocol Security**: MCP/JSON-RPC 2.0 with request validation and error handling
+- **Transport Security**: TLS 1.3 encryption for all external communications
+- **Authentication Security**: HMAC-SHA256 signature validation with session management
+- **Authorization Security**: <span style="background-color: rgba(91, 57, 243, 0.2)">fail-secure, immediate scope-based access control with hierarchical permissions (deny-by-default enforced in `is_resource_in_scope`)</span>
+- **Infrastructure Security**: Container isolation with non-root execution
+- **Data Security**: Encryption at rest and in transit with key management
+- **Audit Security**: Comprehensive logging with compliance formatting <span style="background-color: rgba(91, 57, 243, 0.2)">with sensitive-parameter redaction (URL/query-string sanitization) in all debug and audit logs</span>
+
+#### 6.4.1.2 Compliance Framework
+
+The system maintains compliance with multiple security standards:
+
+| Standard | Scope | Implementation |
+|----------|-------|----------------|
+| **SOC2 Type II** | Data security controls | Audit logging, access controls, encryption |
+| **ISO 27001** | Information security management | Security policies, risk management |
+| **HIPAA** | Healthcare data protection | Encryption, access controls, audit trails |
+| **GDPR** | Data privacy protection | Data minimization, consent management |
+
+### 6.4.2 AUTHENTICATION FRAMEWORK
+
+#### 6.4.2.1 Identity Management
+
+The authentication system supports **dual authentication modes** for flexible enterprise integration:
+
+##### 6.4.2.1.1 Permanent API Key Authentication
+
+**Implementation**: `src/cli/auth_manager.py` - `AuthenticationManager` class
+- **Access Key ID**: Permanent identifier for API access
+- **<span style="background-color: rgba(91, 57, 243, 0.2)">Access Password</span>**: HMAC-SHA256 signing key for request authentication
+- **Session Duration**: 3600 seconds (1 hour) with automatic renewal
+- **<span style="background-color: rgba(91, 57, 243, 0.2)">Session Refresh</span>**: <span style="background-color: rgba(91, 57, 243, 0.2)">automatic token re-authentication when `expires_at` is reached</span>
+- **Multi-region Support**: Automatic endpoint resolution for US, AU, UK regions
+
+##### 6.4.2.1.2 Temporary Token Authentication
+
+**Implementation**: `src/cli/auth_manager.py` - `AuthenticationSession` class
+- **Username**: SSO user identifier for temporary access
+- **Token**: Time-limited authentication token
+- **Session Management**: In-memory session storage with expiration tracking
+- **Auto-renewal**: Automatic token refresh on expiration
+
+#### 6.4.2.2 HMAC-SHA256 Request Signing
+
+The system implements **cryptographic request signing** for all API interactions:
+
+**Implementation**: `src/cli/api/client.py` (lines 201-232)
+
+```mermaid
+flowchart TD
+    subgraph "HMAC-SHA256 Authentication Flow"
+        A[Request Parameters] --> B[Sort Parameters]
+        B --> C[Create Canonical String]
+        C --> D[METHOD + ENDPOINT + PARAMS]
+        D --> E[Add Timestamp]
+        E --> F[HMAC-SHA256 Signature]
+        F --> G[Request Headers]
+        G --> H[API Call]
+        H --> I{Response}
+        I -->|200 OK| J[Authentication Success]
+        I -->|401 Unauthorized| K[Authentication Failure]
+        I -->|429 Rate Limited| L[Retry with Backoff]
+    end
+    
+    style F fill:#e8f5e8
+    style J fill:#e1f5fe
+    style K fill:#ffebee
+```
+
+**Signature Generation Process**:
+1. **Canonical String**: `{HTTP_METHOD}{API_ENDPOINT}{sorted_query_parameters}`
+2. **HMAC Generation**: <span style="background-color: rgba(91, 57, 243, 0.2)">Uses `access_password` as the signing key</span>
+3. **Timestamp Inclusion**: Prevents replay attacks
+4. **Header Authentication**: Signature transmitted in request headers
+
+#### 6.4.2.3 Session Management
+
+The authentication system implements **secure session management** with automatic lifecycle management. <span style="background-color: rgba(91, 57, 243, 0.2)">The session context now stores `expires_at` and proactively refreshes the session before expiry to ensure uninterrupted access.</span>
+
+**Session Context Structure**:
+- **user_id**: Authenticated user identifier
+- **access_key_id**: API key identifier
+- **authenticated_at**: Session creation timestamp
+- **expires_at**: Session expiration time
+- **<span style="background-color: rgba(91, 57, 243, 0.2)">expires_at (UTC epoch)</span>**: <span style="background-color: rgba(91, 57, 243, 0.2)">Session expiration timestamp for proactive refresh</span>
+- **region**: LabArchives regional endpoint
+
+**Session Security Features**:
+- **In-memory Storage**: No persistent session storage
+- **Automatic Expiration**: 3600-second session lifetime
+- **Credential Sanitization**: `sanitize_credentials()` function redacts sensitive data
+- **Session Validation**: Continuous expiry checking with re-authentication
+
+#### 6.4.2.4 Multi-Factor Authentication
+
+The system supports **enterprise MFA integration** through external authentication providers:
+
+| MFA Type | Implementation | Integration |
+|----------|----------------|-------------|
+| **SSO Integration** | External identity provider tokens | SAML/OIDC providers |
+| **API Key + Token** | Dual credential validation | Enterprise security systems |
+| **Time-based Tokens** | Temporary token expiration | Automated token refresh |
+
+### 6.4.3 AUTHORIZATION SYSTEM
+
+#### 6.4.3.1 Role-Based Access Control
+
+The system implements **Kubernetes RBAC** for container orchestration security:
+
+**Implementation**: `infrastructure/kubernetes/secret.yaml` and `service.yaml`
+
+```yaml
+# ServiceAccount with least-privilege access
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: labarchives-mcp-server
+  namespace: default
+
+---
+# Role with minimal required permissions
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: labarchives-mcp-role
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services"]
+  verbs: ["get", "list"]
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get"]
+```
+
+#### 6.4.3.2 Scope-Based Access Control
+
+The authorization framework implements **hierarchical scope enforcement** with three scope types:
+
+**Implementation**: `src/cli/validators.py` and `src/cli/resource_manager.py`. <span style="background-color: rgba(91, 57, 243, 0.2)">The `is_resource_in_scope` function now performs immediate validation and denies by default when scope is ambiguous or notebook-folder mismatch occurs, ensuring fail-secure behavior for all resource access attempts.</span>
+
+##### 6.4.3.2.1 Scope Types
+
+| Scope Type | Description | Implementation | Use Case |
+|------------|-------------|----------------|----------|
+| **notebook_id** | Direct notebook access by ID | Exact notebook identifier matching, <span style="background-color: rgba(91, 57, 243, 0.2)">`src/cli/security/validators.py`</span> | Single notebook research |
+| **notebook_name** | Pattern-based notebook access | Name pattern matching with wildcards, <span style="background-color: rgba(91, 57, 243, 0.2)">`src/cli/security/validators.py`</span> | Named notebook collections |
+| **folder_path** | Hierarchical folder access | Path-based access control, <span style="background-color: rgba(91, 57, 243, 0.2)">`src/cli/security/validators.py`</span> | Organizational structure access |
+
+##### 6.4.3.2.2 Scope Enforcement Architecture
+
+<span style="background-color: rgba(91, 57, 243, 0.2)">Validation logic is centralised in `src/cli/security/validators.py`, invoked synchronously from `ResourceManager.read_resource` before any data access.</span>
+
+```mermaid
+flowchart TD
+    subgraph "Authorization Flow"
+        A[MCP Resource Request] --> B[Scope Validation]
+        B --> C{Scope Type}
+        C -->|notebook_id| D[Notebook ID Check]
+        C -->|notebook_name| E[Name Pattern Match]
+        C -->|folder_path| F[Hierarchical Path Check]
+        
+        D --> G[Resource Validation]
+        E --> G
+        F --> G
+        
+        G --> H{Within Scope?}
+        H -->|Yes| I[Access Granted]
+        H -->|No| J[Access Denied]
+        
+        I --> K[Resource Returned]
+        J --> L[Permission Error]
+    end
+    
+    style G fill:#e8f5e8
+    style I fill:#e1f5fe
+    style J fill:#ffebee
+```
+
+**Folder Path Scope Behavior**: <span style="background-color: rgba(91, 57, 243, 0.2)">When folder scope is configured as an empty string or "/", the system explicitly includes root-level pages that have null or empty folder paths, ensuring comprehensive page discovery for root-level content.</span>
+
+#### 6.4.3.3 Permission Management
+
+The system implements **multi-layer permission enforcement** across the application stack:
+
+##### 6.4.3.3.1 Permission Enforcement Points
+
+| Layer | Implementation | Responsibility |
+|-------|----------------|----------------|
+| **CLI Validation** | `src/cli/validators.py` | Pre-execution parameter validation |
+| **API Client** | `src/cli/api/client.py` | HTTP 403 error handling |
+| **Resource Manager** | `src/cli/resource_manager.py` | `is_resource_in_scope()` validation |
+| **MCP Protocol** | `src/cli/mcp/handlers.py` | Request-level authorization |
+
+##### 6.4.3.3.2 Resource Authorization Matrix
+
+| Resource Type | Read Access | Metadata Access | Scope Validation |
+|---------------|-------------|----------------|------------------|
+| **Notebooks** | Scope-based | Always allowed | Name/ID/Path matching |
+| **Pages** | Parent notebook scope | Hierarchical inheritance | Notebook scope validation |
+| **Entries** | Page-level scope | Content-level filtering | Multi-level validation |
+
+**Error Specificity**: <span style="background-color: rgba(91, 57, 243, 0.2)">The permission system replaces generic "ScopeViolation" errors with descriptive error types such as "EntryOutsideNotebookScopeError" defined in `src/cli/exceptions.py`, providing clear diagnostic information for debugging and audit purposes.</span>
+
+#### 6.4.3.4 Audit Logging
+
+The system implements **comprehensive audit logging** for all security events:
+
+**Implementation**: `src/cli/logging_setup.py`
+
+##### 6.4.3.4.1 Audit Event Categories
+
+```mermaid
+flowchart LR
+    subgraph "Audit Event Types"
+        A[Authentication Events]
+        B[Authorization Events]
+        C[Resource Access Events]
+        D[Configuration Changes]
+        E[Error Events]
+        F[System Events]
+    end
+    
+    subgraph "Audit Processing"
+        G[Event Collection]
+        H[Structured Logging]
+        I[JSON Formatting]
+        J[Compliance Enrichment]
+    end
+    
+    subgraph "Audit Storage"
+        K[Local Logs - 10MB rotation]
+        L[Audit Logs - 50MB rotation]
+        M[Centralized Storage]
+    end
+    
+    A --> G
+    B --> G
+    C --> G
+    D --> G
+    E --> G
+    F --> G
+    
+    G --> H
+    H --> I
+    I --> J
+    J --> K
+    J --> L
+    J --> M
+```
+
+##### 6.4.3.4.2 Audit Configuration
+
+| Logger Type | Rotation Size | Backup Count | Format |
+|-------------|---------------|--------------|---------|
+| **Main Logger** | 10MB | 5 backups | JSON/key-value |
+| **Audit Logger** | 50MB | 10 backups | Structured JSON |
+| **Security Logger** | 25MB | 15 backups | Compliance format |
+
+### 6.4.4 DATA PROTECTION
+
+#### 6.4.4.1 Encryption Standards
+
+The system implements **comprehensive encryption** for data protection at rest and in transit:
+
+##### 6.4.4.1.1 Encryption in Transit
+
+| Protocol | Implementation | Certificate Management |
+|----------|----------------|----------------------|
+| **TLS 1.3** | All external communications | cert-manager with Let's Encrypt |
+| **HTTPS** | Ingress controller enforcement | Automatic certificate renewal |
+| **Mutual TLS** | Service mesh communication | Istio/Linkerd integration |
+
+##### 6.4.4.1.2 Encryption at Rest
+
+**Implementation**: `infrastructure/terraform/main.tf`
+
+```mermaid
+flowchart TD
+    subgraph "Encryption at Rest"
+        A[Application Data] --> B[AWS KMS Encryption]
+        B --> C[Customer-Managed Keys]
+        C --> D[Automatic Key Rotation]
+        
+        E[CloudWatch Logs] --> F[KMS Log Encryption]
+        F --> G[Centralized Key Management]
+        
+        H[RDS Database] --> I[KMS Database Encryption]
+        I --> J[Encrypted Storage Volumes]
+        
+        K[Container Storage] --> L[Encrypted EBS Volumes]
+        L --> M[Pod Security Context]
+    end
+    
+    style B fill:#e8f5e8
+    style F fill:#e1f5fe
+    style I fill:#fff3e0
+```
+
+#### 6.4.4.2 Key Management
+
+The system implements **AWS KMS-based key management** for comprehensive encryption key lifecycle:
+
+##### 6.4.4.2.1 Key Management Architecture
+
+| Key Type | Usage | Rotation Policy | Access Control |
+|----------|-------|----------------|----------------|
+| **Customer-Managed Keys** | RDS encryption | Annual automatic rotation | IAM policy-based |
+| **Service Keys** | CloudWatch encryption | AWS-managed rotation | Service-specific access |
+| **Application Keys** | Runtime encryption | Manual rotation | Application role-based |
+
+##### 6.4.4.2.2 AWS Secrets Manager Integration
+
+**Implementation**: `infrastructure/terraform/main.tf`
+- **Credential Storage**: LABARCHIVES_AKID and LABARCHIVES_SECRET
+- **Automatic Rotation**: Configurable rotation schedules
+- **Fine-grained Access**: IAM-based secret access control
+- **Audit Trail**: CloudTrail logging for secret access
+
+#### 6.4.4.3 Container Security
+
+The system implements **comprehensive container security** with multiple security layers:
+
+**Implementation**: `src/cli/Dockerfile` and Kubernetes manifests
+
+##### 6.4.4.3.1 Container Security Context
+
+```yaml
+# Pod Security Context
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  readOnlyRootFilesystem: true
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  seccompProfile:
+    type: RuntimeDefault
+```
+
+##### 6.4.4.3.2 Container Security Features
+
+| Security Feature | Implementation | Purpose |
+|------------------|----------------|---------|
+| **Non-root Execution** | UID 1000 enforcement | Privilege escalation prevention |
+| **Read-only Filesystem** | Root filesystem protection | Runtime modification prevention |
+| **Capability Dropping** | ALL capabilities removed | Minimal privilege principle |
+| **Resource Limits** | CPU and memory constraints | Resource exhaustion prevention |
+
+#### 6.4.4.4 Secure Communication
+
+The system implements **end-to-end secure communication** across all network layers:
+
+##### 6.4.4.4.1 Network Security Architecture
+
+```mermaid
+flowchart TD
+    subgraph "Network Security Layers"
+        A[Client Request] --> B[TLS Termination]
+        B --> C[Ingress Controller]
+        C --> D[Service Mesh]
+        D --> E[Pod Network]
+        E --> F[External API]
+    end
+    
+    subgraph "Security Controls"
+        G[Certificate Management] --> B
+        H[Security Headers] --> C
+        I[mTLS] --> D
+        J[NetworkPolicy] --> E
+        K[TLS Client Auth] --> F
+    end
+    
+    style B fill:#e8f5e8
+    style D fill:#e1f5fe
+    style E fill:#fff3e0
+```
+
+##### 6.4.4.4.2 Security Headers Implementation
+
+**Implementation**: `infrastructure/kubernetes/ingress.yaml`
+
+| Header | Value | Purpose |
+|--------|-------|---------|
+| **Strict-Transport-Security** | `max-age=31536000; includeSubDomains` | HTTPS enforcement |
+| **X-Frame-Options** | `DENY` | Clickjacking prevention |
+| **X-Content-Type-Options** | `nosniff` | MIME type sniffing prevention |
+| **X-XSS-Protection** | `1; mode=block` | XSS attack prevention |
+| **Content-Security-Policy** | `default-src 'self'` | Content injection prevention |
+
+### 6.4.5 SECURITY ZONE ARCHITECTURE
+
+#### 6.4.5.1 Network Segmentation
+
+The system implements **network segmentation** using Kubernetes NetworkPolicies for traffic isolation:
+
+```mermaid
+flowchart TB
+    subgraph "Public Zone"
+        A[Internet]
+        B[Load Balancer]
+        C[Ingress Controller]
+    end
+    
+    subgraph "DMZ Zone"
+        D[API Gateway]
+        E[Rate Limiting]
+        F[Authentication Proxy]
+    end
+    
+    subgraph "Application Zone"
+        G[MCP Server Pods]
+        H[Service Mesh]
+        I[Internal Services]
+    end
+    
+    subgraph "Data Zone"
+        J[Configuration Secrets]
+        K[Audit Logs]
+        L[Monitoring Data]
+    end
+    
+    subgraph "External Zone"
+        M[LabArchives API]
+        N[AWS Services]
+        O[Monitoring Services]
+    end
+    
+    A --> B
+    B --> C
+    C --> D
+    D --> E
+    E --> F
+    F --> G
+    G --> H
+    H --> I
+    I --> J
+    I --> K
+    I --> L
+    G --> M
+    I --> N
+    K --> O
+    
+    style A fill:#ffebee
+    style D fill:#fff3e0
+    style G fill:#e8f5e8
+    style J fill:#e1f5fe
+    style M fill:#f3e5f5
+```
+
+#### 6.4.5.2 Security Zone Configuration
+
+| Zone | Access Control | Traffic Flow | Security Requirements |
+|------|----------------|--------------|----------------------|
+| **Public Zone** | Rate limiting, DDoS protection | Inbound only | TLS termination |
+| **DMZ Zone** | Authentication, authorization | Bi-directional | Request validation |
+| **Application Zone** | Service mesh, RBAC | Internal only | mTLS, network policies |
+| **Data Zone** | Encryption, access logs | Outbound only | Data protection |
+| **External Zone** | API authentication | Outbound only | Certificate validation |
+
+### 6.4.6 SECURITY MONITORING AND ALERTING
+
+#### 6.4.6.1 Security Monitoring Architecture
+
+The system implements **comprehensive security monitoring** with multiple data sources:
+
+```mermaid
+flowchart TD
+    subgraph "Security Data Sources"
+        A[Authentication Logs]
+        B[Authorization Events]
+        C[Network Traffic]
+        D[System Events]
+        E[Error Logs]
+    end
+    
+    subgraph "Monitoring Stack"
+        F[Prometheus Metrics]
+        G[ELK Stack]
+        H[CloudWatch]
+        I[Security Analytics]
+    end
+    
+    subgraph "Alerting"
+        J[Security Alerts]
+        K[Incident Response]
+        L[Compliance Reports]
+    end
+    
+    A --> F
+    B --> F
+    C --> G
+    D --> H
+    E --> I
+    
+    F --> J
+    G --> J
+    H --> J
+    I --> J
+    
+    J --> K
+    K --> L
+    
+    style F fill:#e8f5e8
+    style J fill:#e1f5fe
+    style K fill:#ffebee
+```
+
+#### 6.4.6.2 Security Metrics and KPIs
+
+| Metric Category | Key Indicators | Alerting Thresholds |
+|-----------------|----------------|-------------------|
+| **Authentication** | Failed login attempts, session timeouts | >5 failures/minute |
+| **Authorization** | Access denied events, privilege escalation | >10 denials/minute |
+| **Network Security** | Suspicious traffic patterns, DDoS attempts | >1000 requests/minute |
+| **Data Protection** | Encryption failures, key rotation events | Any encryption failure |
+| **Compliance** | Audit log completeness, regulatory violations | Missing audit events |
+
+### 6.4.7 SECURITY VALIDATION WORKFLOW
+
+#### 6.4.7.1 Request Security Validation
+
+The system implements **comprehensive request validation** with multiple security checkpoints:
+
+```mermaid
+flowchart TD
+    Start([Request Received]) --> A{Valid JSON-RPC?}
+    A -->|No| B[Protocol Error]
+    A -->|Yes| C{Valid Method?}
+    
+    C -->|No| D[Method Not Found]
+    C -->|Yes| E{Auth Required?}
+    
+    E -->|Yes| F{Valid Session?}
+    E -->|No| G[Rate Limit Check]
+    
+    F -->|No| SR[Session Refresh]
+    F -->|Yes| I{Scope Check?}
+    
+    SR -->|Success| I{Scope Check?}
+    SR -->|Failure| H[Auth Error]
+    
+    I -->|Fail| J[Access Denied]
+    I -->|Pass| G
+    
+    G -->|Exceeded| K[Rate Limit Error]
+    G -->|OK| L[Parameter Validation]
+    
+    L -->|Invalid| M[Validation Error]
+    L -->|Valid| N[Execute Request]
+    
+    N --> O{Success?}
+    O -->|No| P[Operation Error]
+    O -->|Yes| Q[Success Response]
+    
+    B --> R[Audit Log]
+    D --> R
+    H --> R
+    J --> R
+    K --> R
+    M --> R
+    P --> R
+    Q --> R
+    
+    R --> S[Client Response]
+    
+    style F fill:#e8f5e8
+    style I fill:#e1f5fe
+    style N fill:#fff3e0
+    style R fill:#f3e5f5
+    style SR fill:#e8f5e8
+```
+
+#### 6.4.7.2 Security Validation Checkpoints
+
+| Checkpoint | Validation Type | Implementation | Error Response |
+|------------|-----------------|----------------|----------------|
+| **Protocol Validation** | JSON-RPC 2.0 format | `src/cli/mcp/protocol.py` | -32700 Parse Error |
+| **Method Validation** | Supported method check | `src/cli/mcp/handlers.py` | -32601 Method Not Found |
+| **Authentication** | Session validity | `src/cli/auth_manager.py` | -32603 Auth Error |
+| **Authorization** | Scope enforcement | `src/cli/validators.py` | <span style="background-color: rgba(91, 57, 243, 0.2)">-32603 EntryOutsideNotebookScopeError / FolderScopeViolationError</span> |
+| **Rate Limiting** | Request throttling | Ingress controller | -32603 Rate Limit Error |
+| **Parameter Validation** | Schema validation | Pydantic models | -32602 Invalid Params |
+
+#### 6.4.7.3 Session Refresh Mechanism (updated)
+
+The <span style="background-color: rgba(91, 57, 243, 0.2)">Session Refresh</span> step implements **automatic session renewal** to ensure uninterrupted access:
+
+**Implementation**: `src/cli/auth_manager.py` - `AuthenticationManager.refresh_session()`
+
+- **Expiration Detection**: Proactive session validation using stored `expires_at` timestamp
+- **Automatic Re-authentication**: Seamless credential refresh without user intervention  
+- **Request Retry Logic**: Failed requests are automatically retried with refreshed session
+- **Error Recovery**: Session refresh failures trigger standard authentication error handling
+
+The session refresh mechanism ensures continuous system availability while maintaining security compliance through regular credential validation.
+
+#### 6.4.7.4 Audit Trail and Security Logging (updated)
+
+The **Audit Log** step provides comprehensive security event tracking with enhanced data protection:
+
+**Implementation**: `src/cli/logging_setup.py`
+
+##### 6.4.7.4.1 Audit Event Processing
+
+All audit log entries undergo **security sanitization** to protect sensitive information:
+
+- **Parameter Sanitization**: <span style="background-color: rgba(91, 57, 243, 0.2)">Log entries are processed through `sanitize_url_params()` function to automatically redact sensitive query parameters (tokens, passwords, secrets) before storage</span>
+- **Structured Logging**: JSON-formatted audit entries with correlation IDs
+- **Compliance Formatting**: SOC2, ISO 27001, HIPAA, and GDPR-compliant log structure
+- **Retention Policies**: Automated log rotation with 50MB file limits and 10 backup copies
+
+##### 6.4.7.4.2 Security Event Categories
+
+The audit system captures the following security-relevant events:
+
+| Event Type | Log Level | Retention Period | Sanitization Applied |
+|------------|-----------|------------------|---------------------|
+| **Authentication Success** | INFO | 365 days | Credential masking |
+| **Authentication Failure** | WARN | 2555 days | Full parameter redaction |
+| **Authorization Denial** | WARN | 2555 days | Scope information preserved |
+| **Session Refresh** | INFO | 90 days | Token parameter redaction |
+| **Rate Limit Exceeded** | WARN | 180 days | Client identifier preserved |
+| **Parameter Validation Error** | ERROR | 180 days | Sensitive value masking |
+
+The comprehensive audit framework ensures complete security event visibility while maintaining data protection standards required for enterprise compliance.
+
+### 6.4.8 REFERENCES
+
+#### Technical Implementation Files
+- `src/cli/auth_manager.py` - Authentication and session management implementation <span style="background-color: rgba(91, 57, 243, 0.2)">with parameter rename to `access_password` and session refresh logic</span>
+- `src/cli/api/client.py` - HMAC-SHA256 request signing and API security
+- `src/cli/validators.py` - Security validation rules and scope enforcement
+- `src/cli/logging_setup.py` - Audit logging configuration and security events <span style="background-color: rgba(91, 57, 243, 0.2)">with URL parameter redaction</span>
+- `src/cli/resource_manager.py` - Resource access control and permission validation
+- `src/cli/mcp/handlers.py` - Protocol-level security validation
+- <span style="background-color: rgba(91, 57, 243, 0.2)">`src/cli/security/sanitizers.py` – URL and parameter sanitization utilities</span>
+- <span style="background-color: rgba(91, 57, 243, 0.2)">`src/cli/security/validators.py` – Centralised scope validation helpers</span>
+- `src/cli/Dockerfile` - Container security configuration
+- `infrastructure/kubernetes/secret.yaml` - Kubernetes RBAC and security contexts
+- `infrastructure/kubernetes/ingress.yaml` - Network security and TLS configuration
+- `infrastructure/terraform/main.tf` - AWS security services integration
+
+#### Technical Specification Cross-References
+- `1.2 SYSTEM OVERVIEW` - Security compliance requirements (SOC2, ISO 27001, HIPAA, GDPR)
+- `4.6 COMPLIANCE AND AUDIT WORKFLOWS` - Audit trail implementation and validation checkpoints
+- `5.1 HIGH-LEVEL ARCHITECTURE` - Security-first design principles and layered architecture
+- `6.3 INTEGRATION ARCHITECTURE` - External system security integration and API authentication
+
+#### Security Standards and Compliance
+- Model Context Protocol (MCP) security specifications
+- JSON-RPC 2.0 security considerations
+- HMAC-SHA256 cryptographic authentication standards
+- TLS 1.3 transport layer security
+- Kubernetes security best practices
+- AWS security services integration
+- Container security hardening guidelines
 
 ## 6.5 MONITORING AND OBSERVABILITY
 
 ### 6.5.1 MONITORING INFRASTRUCTURE
 
-#### 6.5.1.1 Metrics Collection Architecture
+#### 6.5.1.1 Metrics Collection
 
-The LabArchives MCP Server implements a comprehensive multi-layered metrics collection system designed to provide complete operational visibility across application, system, and business domains.
+The LabArchives MCP Server implements a comprehensive metrics collection system built on industry-standard monitoring platforms. The system exposes metrics through a dedicated `/metrics` endpoint configured for Prometheus scraping, enabling real-time performance monitoring and resource utilization tracking.
 
-**Primary Metrics Collection Systems:**
-
-| System | Endpoint | Collection Interval | Scope |
-|--------|----------|-------------------|--------|
-| **Prometheus** | `/metrics` | 30 seconds | Application metrics, custom metrics |
-| **CloudWatch** | Native integration | 60 seconds | System metrics, AWS infrastructure |
-| **Container Insights** | ECS integration | 60 seconds | Container-level performance |
-| **Performance Insights** | RDS integration | 60 seconds | Database performance metrics |
-
-**Metrics Architecture:**
+**Core Metrics Collection Architecture:**
 
 ```mermaid
-graph TB
+flowchart TB
     subgraph "Application Layer"
-        APP[MCP Server Application]
-        METRICS_ENDPOINT["/metrics Endpoint"]
-        HEALTH_ENDPOINT["/health Endpoint"]
+        A[MCP Server] --> B[Metrics Endpoint /metrics]
+        A --> C[Health Endpoints]
+        A --> D[Structured Logging]
     end
     
     subgraph "Collection Layer"
-        PROMETHEUS[Prometheus ServiceMonitor]
-        CLOUDWATCH[CloudWatch Agent]
-        CONTAINER_INSIGHTS[Container Insights]
-        RDS_INSIGHTS[Performance Insights]
+        E[Prometheus Server] --> F[ServiceMonitor]
+        G[CloudWatch Agent] --> H[ECS Container Insights]
+        I[Log Aggregation] --> J[CloudWatch Logs]
+    end
+    
+    subgraph "Storage & Processing"
+        K[Prometheus TSDB]
+        L[CloudWatch Metrics]
+        M[Long-term Storage]
+    end
+    
+    B --> E
+    C --> E
+    D --> I
+    F --> B
+    H --> G
+    J --> I
+    
+    E --> K
+    G --> L
+    I --> M
+    
+    style A fill:#e1f5fe
+    style E fill:#fff3e0
+    style K fill:#f3e5f5
+```
+
+**Metrics Collection Configuration:**
+
+| Metric Category | Collection Method | Interval | Retention |
+|-----------------|------------------|----------|-----------|
+| Application Performance | Prometheus `/metrics` | 30 seconds | 90 days |
+| System Resources | CloudWatch Container Insights | 1 minute | 1 year |
+| Request Latency | Built-in timing instrumentation | Per request | 30 days |
+| Error Rates | Exception tracking with counters | Real-time | 90 days |
+
+#### 6.5.1.2 Log Aggregation (updated)
+
+The system implements structured logging with comprehensive audit capabilities through a custom `StructuredFormatter` class that supports both JSON and key-value output formats. <span style="background-color: rgba(91, 57, 243, 0.2)">The logging pipeline includes a URL Parameter Sanitizer that automatically masks sensitive query parameters (such as token, password, and secret) before logs are persisted or forwarded to external systems.</span> This approach enables efficient log parsing, automated analysis, and compliance reporting while maintaining data security.
+
+**Log Aggregation Architecture:**
+
+```mermaid
+flowchart LR
+    subgraph "Log Sources"
+        A[Application Logs]
+        B[Audit Logs]
+        C[System Logs]
+        D[Container Logs]
+    end
+    
+    subgraph "Log Processing"
+        E[Structured Formatter]
+        F[Log Rotation Service]
+        G[Scrub & URL Sanitizer]
     end
     
     subgraph "Aggregation Layer"
-        CLOUDWATCH_METRICS[CloudWatch Metrics]
-        PROMETHEUS_TSDB[Prometheus TSDB]
-        CUSTOM_METRICS[Custom Metrics]
+        H[Local Storage]
+        I[CloudWatch Logs]
+        J[Centralized Logging]
+    end
+    
+    A --> E
+    B --> E
+    C --> F
+    D --> F
+    
+    E --> G
+    F --> G
+    
+    G --> H
+    G --> I
+    I --> J
+    
+    style E fill:#e8f5e8
+    style G fill:#fff3e0
+    style J fill:#f3e5f5
+```
+
+**URL Parameter Sanitization Process:**
+
+<span style="background-color: rgba(91, 57, 243, 0.2)">The URL Parameter Sanitizer operates post-formatting with negligible overhead, ensuring no material performance degradation to the logging system. The sanitizer automatically detects and redacts sensitive parameters including:</span>
+
+- <span style="background-color: rgba(91, 57, 243, 0.2)">**Token Parameters**: Authentication tokens, access tokens, bearer tokens</span>
+- <span style="background-color: rgba(91, 57, 243, 0.2)">**Password Parameters**: User passwords, API passwords, service credentials</span>
+- <span style="background-color: rgba(91, 57, 243, 0.2)">**Secret Parameters**: API secrets, signing secrets, encryption keys</span>
+- <span style="background-color: rgba(91, 57, 243, 0.2)">**Custom Sensitive Fields**: Configurable pattern-based parameter redaction</span>
+
+**Log Rotation and Retention Policy:**
+
+| Log Type | Rotation Size | Backup Files | Retention Period | Storage Location |
+|----------|---------------|--------------|------------------|------------------|
+| Application Logs | 10MB | 5 backups | 30 days | `/var/log/mcp-server/` |
+| Audit Logs | 50MB | 10 backups | 7 years | `/var/log/mcp-server/audit/` |
+| System Logs | 5MB | 3 backups | 14 days | `/var/log/system/` |
+| Container Logs | Managed by orchestrator | N/A | 30 days | CloudWatch Logs |
+
+#### 6.5.1.3 Distributed Tracing
+
+The system implements distributed tracing capabilities to enable end-to-end request tracking across all system components. This facilitates performance optimization, troubleshooting, and understanding of complex request flows through the LabArchives integration.
+
+**Tracing Implementation:**
+- **Request ID Propagation:** Unique request identifiers are generated and propagated through all system components
+- **Span Creation:** Each major operation creates a span with timing and metadata
+- **Context Preservation:** Request context is maintained across authentication, resource management, and API calls
+- **Performance Insights:** Detailed timing analysis for each component in the request path
+
+#### 6.5.1.4 Alert Management
+
+The system implements multi-tiered alert management through CloudWatch alarms and SNS integration, providing comprehensive monitoring coverage for both infrastructure and application-level issues.
+
+**CloudWatch Alarm Configuration:**
+
+| Alert Type | Threshold | Evaluation Period | Actions |
+|------------|-----------|------------------|---------|
+| ECS CPU Utilization | > 80% | 5 minutes | SNS notification, Auto-scaling |
+| ECS Memory Utilization | > 85% | 5 minutes | SNS notification, Memory analysis |
+| RDS CPU Utilization | > 80% | 10 minutes | SNS notification, Performance review |
+| RDS Database Connections | > 50 connections | 5 minutes | SNS notification, Connection audit |
+| RDS Free Storage | < 2GB | 15 minutes | SNS notification, Storage expansion |
+
+#### 6.5.1.5 Dashboard Design
+
+The monitoring infrastructure includes comprehensive dashboard design supporting both operational and business intelligence requirements. Dashboards are implemented using Prometheus metrics and CloudWatch visualizations.
+
+**Dashboard Architecture:**
+
+```mermaid
+flowchart TD
+    subgraph "Dashboard Categories"
+        A[Operational Dashboard]
+        B[Performance Dashboard]
+        C[Security Dashboard]
+        D[Compliance Dashboard]
+    end
+    
+    subgraph "Data Sources"
+        E[Prometheus Metrics]
+        F[CloudWatch Metrics]
+        G[Audit Logs]
+        H[Application Logs]
     end
     
     subgraph "Visualization Layer"
-        GRAFANA[Grafana Dashboards]
-        CLOUDWATCH_DASHBOARDS[CloudWatch Dashboards]
-        ALERTMANAGER[Alert Manager]
+        I[Grafana Panels]
+        J[CloudWatch Widgets]
+        K[Custom Dashboards]
     end
     
-    APP --> METRICS_ENDPOINT
-    APP --> HEALTH_ENDPOINT
+    A --> E
+    B --> E
+    C --> G
+    D --> G
     
-    METRICS_ENDPOINT --> PROMETHEUS
-    HEALTH_ENDPOINT --> CLOUDWATCH
-    APP --> CONTAINER_INSIGHTS
-    APP --> RDS_INSIGHTS
+    A --> F
+    B --> F
+    C --> H
+    D --> H
     
-    PROMETHEUS --> PROMETHEUS_TSDB
-    CLOUDWATCH --> CLOUDWATCH_METRICS
-    CONTAINER_INSIGHTS --> CLOUDWATCH_METRICS
-    RDS_INSIGHTS --> CLOUDWATCH_METRICS
+    E --> I
+    F --> J
+    G --> I
+    H --> K
     
-    PROMETHEUS_TSDB --> GRAFANA
-    CLOUDWATCH_METRICS --> CLOUDWATCH_DASHBOARDS
-    PROMETHEUS_TSDB --> ALERTMANAGER
-    CLOUDWATCH_METRICS --> ALERTMANAGER
+    style A fill:#e1f5fe
+    style E fill:#fff3e0
+    style I fill:#f3e5f5
 ```
 
-#### 6.5.1.2 Log Aggregation Strategy
+### 6.5.2 OBSERVABILITY PATTERNS
 
-The system implements a sophisticated dual logging architecture with structured JSON formatting, comprehensive retention policies, and <span style="background-color: rgba(91, 57, 243, 0.2)">mandatory secret-redaction layer ensuring complete credential sanitization</span>.
+#### 6.5.2.1 Health Checks
 
-**Secret Scrubbing Implementation:**
+The system implements comprehensive health check patterns supporting both Kubernetes orchestration and Docker container management. Health checks are exposed through dedicated endpoints with configurable parameters.
 
-<span style="background-color: rgba(91, 57, 243, 0.2)">The system implements a comprehensive secret scrubbing mechanism through the `utils.scrub_argv()` function, which sanitizes CLI arguments before any logger is configured. This function intercepts `sys.argv` at application startup, automatically redacting credentials, access keys, passwords, and other sensitive information from all subsequent log entries. The scrubbing process occurs within `logging_setup.setup_logging()` and covers every log path throughout the application lifecycle.</span>
+**Health Check Endpoints:**
 
-**Log Stream Architecture:**
+| Endpoint | Purpose | Response Format | Timeout | Retry Policy |
+|----------|---------|-----------------|---------|--------------|
+| `/health/live` | Liveness probe | JSON status | 10 seconds | 3 retries |
+| `/health/ready` | Readiness probe | JSON status | 10 seconds | 3 retries |
+| `/health/startup` | Startup probe | JSON status | 30 seconds | 10 retries |
 
-| Log Stream | Purpose | Rotation Policy | Retention | Format | <span style="background-color: rgba(91, 57, 243, 0.2)">Secret Scrubbing</span> |
-|-----------|---------|----------------|-----------|---------|-------------|
-| **Application Logs** | Operational events | 10MB, 5 backups | 50MB total | JSON structured | <span style="background-color: rgba(91, 57, 243, 0.2)">Pre-Logging Secret Scrub</span> |
-| **Audit Logs** | Compliance tracking | 50MB, 10 backups | 500MB total | JSON structured | <span style="background-color: rgba(91, 57, 243, 0.2)">Pre-Logging Secret Scrub</span> |
-| **Performance Logs** | Metrics and timing | 5MB, 3 backups | 15MB total | JSON structured | <span style="background-color: rgba(91, 57, 243, 0.2)">Pre-Logging Secret Scrub</span> |
-| **Security Logs** | Authentication events | 20MB, 7 backups | 140MB total | JSON structured | <span style="background-color: rgba(91, 57, 243, 0.2)">Pre-Logging Secret Scrub</span> |
-
-**Log Aggregation Flow:**
+**Health Check Implementation:**
 
 ```mermaid
-graph LR
-    subgraph "Log Sources"
-        APP_LOGS[Application Logs]
-        AUDIT_LOGS[Audit Logs]
-        PERF_LOGS[Performance Logs]
-        SEC_LOGS[Security Logs]
-    end
+flowchart TD
+    A[Health Check Request] --> B{Endpoint Type?}
     
-    subgraph "Pre-Processing"
-        SCRUB_SECRETS[Secret Scrubbing Layer]
-    end
+    B -->|Live| C[Check Process Status]
+    B -->|Ready| D[Check Dependencies]
+    B -->|Startup| E[Check Initialization]
     
-    subgraph "Local Processing"
-        ROTATION[Log Rotation]
-        COMPRESSION[Compression]
-        BUFFERING[Buffering]
-    end
+    C --> F{Process Running?}
+    F -->|Yes| G[Return 200 OK]
+    F -->|No| H[Return 503 Service Unavailable]
     
-    subgraph "Aggregation Services"
-        CLOUDWATCH_LOGS[CloudWatch Logs]
-        ELK_STACK[ELK Stack]
-        FLUENTD[Fluentd/Fluent Bit]
-    end
+    D --> I[Check LabArchives API]
+    I --> J[Check Authentication]
+    J --> K[Check Resource Access]
+    K --> L{All Dependencies OK?}
+    L -->|Yes| G
+    L -->|No| H
     
-    subgraph "Storage & Analysis"
-        S3_ARCHIVE[S3 Archive]
-        ELASTICSEARCH[Elasticsearch]
-        KIBANA[Kibana Dashboards]
-    end
+    E --> M[Check Configuration]
+    M --> N[Check Logging Setup]
+    N --> O[Check Auth Manager]
+    O --> P{Initialization Complete?}
+    P -->|Yes| G
+    P -->|No| Q[Return 503 Starting]
     
-    APP_LOGS --> SCRUB_SECRETS
-    AUDIT_LOGS --> SCRUB_SECRETS
-    PERF_LOGS --> SCRUB_SECRETS
-    SEC_LOGS --> SCRUB_SECRETS
+    G --> R[Log Success]
+    H --> S[Log Failure]
+    Q --> S
     
-    SCRUB_SECRETS --> ROTATION
-    ROTATION --> COMPRESSION
-    COMPRESSION --> BUFFERING
-    
-    BUFFERING --> CLOUDWATCH_LOGS
-    BUFFERING --> ELK_STACK
-    BUFFERING --> FLUENTD
-    
-    CLOUDWATCH_LOGS --> S3_ARCHIVE
-    ELK_STACK --> ELASTICSEARCH
-    FLUENTD --> ELASTICSEARCH
-    
-    ELASTICSEARCH --> KIBANA
+    style G fill:#c8e6c9
+    style H fill:#ffcdd2
+    style Q fill:#fff3e0
 ```
 
-**Security Compliance Guarantees:**
+#### 6.5.2.2 Performance Metrics
 
-<span style="background-color: rgba(91, 57, 243, 0.2)">All log streams (Application, Audit, Performance, and Security logs) are guaranteed to be secret-free through the mandatory pre-logging secret scrubbing process. This implementation ensures compliance with security requirements by preventing any literal secret, token, or credential strings from appearing in log files, audit trails, or monitoring outputs.</span>
+The system tracks comprehensive performance metrics aligned with the SLA requirements defined in section 4.5. Performance monitoring covers all major system operations with detailed timing analysis.
 
-#### 6.5.1.3 Distributed Tracing Implementation
+**Performance SLA Monitoring:**
 
-The system implements comprehensive request tracing across the complete request lifecycle with integrated performance monitoring.
+| Operation | Target SLA | Warning Threshold | Critical Threshold | Measurement Method |
+|-----------|------------|-------------------|-------------------|--------------------|
+| Protocol Initialization | < 500ms | 400ms | 800ms | Handshake timing |
+| Authentication | < 1s | 800ms | 2s | Token validation timing |
+| Resource Listing | < 2s | 1.5s | 4s | API response timing |
+| Content Retrieval | < 5s | 4s | 8s | End-to-end fetch timing |
+| Error Response | < 100ms | 80ms | 200ms | Exception handling timing |
 
-**Tracing Components:**
+#### 6.5.2.3 Business Metrics
 
-- **Request Tracing**: Complete MCP request/response cycle tracking
-- **API Call Tracing**: LabArchives API interaction monitoring  
-- **Authentication Tracing**: Security event tracking
-- **Error Tracing**: Exception and error propagation analysis
+The system implements business-focused metrics to track research productivity and system adoption. These metrics provide insights into system utilization and research impact.
 
-**Tracing Architecture:**
+**Business Metrics Collection:**
+
+| Metric Category | Measurement | Aggregation | Business Value |
+|-----------------|-------------|-------------|---------------|
+| Research Session Count | Active sessions per hour | Daily/Weekly/Monthly | Usage trends |
+| Data Access Patterns | Resources accessed per session | By notebook/page type | Content popularity |
+| AI Integration Success | Successful AI interactions | Success rate percentage | System effectiveness |
+| Compliance Audit Events | Security/access violations | Event count and severity | Risk management |
+
+#### 6.5.2.4 SLA Monitoring
+
+The system implements automated SLA monitoring with threshold-based alerting and trend analysis. SLA monitoring covers both technical performance and business continuity requirements.
+
+**SLA Monitoring Framework:**
 
 ```mermaid
-sequenceDiagram
-    participant CLIENT as MCP Client
-    participant SERVER as MCP Server
-    participant AUTH as Auth Manager
-    participant RESOURCE as Resource Manager
-    participant API as LabArchives API
-    participant AUDIT as Audit System
+flowchart TB
+    subgraph "SLA Measurement"
+        A[Request Timer] --> B[Response Time Calculation]
+        B --> C[SLA Threshold Comparison]
+        C --> D[Violation Detection]
+    end
     
-    CLIENT->>SERVER: Request with Trace ID
-    SERVER->>AUTH: Validate Session [Trace ID]
-    AUTH->>AUDIT: Log Auth Event [Trace ID]
-    AUTH->>SERVER: Session Valid [Trace ID]
+    subgraph "Alert Generation"
+        D --> E{Violation Severity?}
+        E -->|Warning| F[Log Warning]
+        E -->|Critical| G[Generate Alert]
+        E -->|Severe| H[Escalate Immediately]
+    end
     
-    SERVER->>RESOURCE: Process Request [Trace ID]
-    RESOURCE->>API: External API Call [Trace ID]
-    API->>RESOURCE: API Response [Trace ID]
-    RESOURCE->>AUDIT: Log Resource Access [Trace ID]
-    RESOURCE->>SERVER: Response Data [Trace ID]
+    subgraph "Trend Analysis"
+        I[Historical Data] --> J[Trend Calculation]
+        J --> K[Predictive Analysis]
+        K --> L[Capacity Planning]
+    end
     
-    SERVER->>CLIENT: Final Response [Trace ID]
-    SERVER->>AUDIT: Log Request Complete [Trace ID]
+    B --> I
+    F --> M[Update Dashboard]
+    G --> N[SNS Notification]
+    H --> O[On-call Escalation]
+    
+    style D fill:#fff3e0
+    style G fill:#ffcdd2
+    style H fill:#f44336
 ```
 
-#### 6.5.1.4 Alert Management System
+#### 6.5.2.5 Capacity Tracking
 
-The system implements a comprehensive alert management framework with multi-channel notification and intelligent routing.
+The system implements comprehensive capacity tracking to ensure scalability and performance under varying load conditions. Capacity monitoring covers both infrastructure resources and application-level constraints.
 
-**Alert Configuration:**
+**Capacity Monitoring Dimensions:**
 
-| Alert Type | Threshold | Evaluation Period | Notification Channel |
-|-----------|-----------|-------------------|-------------------|
-| **CPU Utilization** | >80% | 5 minutes | SNS Topic |
-| **Memory Usage** | >85% | 5 minutes | SNS Topic |
-| **Database Connections** | >50 connections | 2 minutes | SNS Topic |
-| **Free Storage** | <2GB | 1 minute | SNS Topic |
+| Resource Type | Monitoring Method | Threshold | Scaling Action |
+|---------------|-------------------|-----------|----------------|
+| CPU Utilization | Container metrics | 80% | Horizontal scaling |
+| Memory Usage | Container metrics | 85% | Memory optimization |
+| Database Connections | RDS monitoring | 50 connections | Connection pooling |
+| API Rate Limits | Request tracking | 80% of limit | Rate limiting |
+| Storage Capacity | Log file monitoring | 80% full | Log rotation |
+
+### 6.5.3 INCIDENT RESPONSE
+
+#### 6.5.3.1 Alert Routing
+
+The system implements sophisticated alert routing based on severity levels, component ownership, and escalation policies. Alert routing ensures appropriate response teams are notified based on the nature and impact of incidents.
 
 **Alert Routing Architecture:**
 
 ```mermaid
-graph TB
-    subgraph "Alert Sources"
-        CLOUDWATCH_ALARMS[CloudWatch Alarms]
-        PROMETHEUS_ALERTS[Prometheus Alerts]
-        CUSTOM_ALERTS[Custom Application Alerts]
-        HEALTH_CHECK_ALERTS[Health Check Failures]
-    end
-    
-    subgraph "Alert Processing"
-        ALERT_MANAGER[Alert Manager]
-        SEVERITY_ROUTING[Severity-based Routing]
-        DEDUPLICATION[Alert Deduplication]
-        ESCALATION[Escalation Logic]
-    end
-    
-    subgraph "Notification Channels"
-        SNS_TOPIC[AWS SNS Topic]
-        EMAIL[Email Notifications]
-        SLACK[Slack Integration]
-        PAGERDUTY[PagerDuty Integration]
-    end
-    
-    CLOUDWATCH_ALARMS --> ALERT_MANAGER
-    PROMETHEUS_ALERTS --> ALERT_MANAGER
-    CUSTOM_ALERTS --> ALERT_MANAGER
-    HEALTH_CHECK_ALERTS --> ALERT_MANAGER
-    
-    ALERT_MANAGER --> SEVERITY_ROUTING
-    SEVERITY_ROUTING --> DEDUPLICATION
-    DEDUPLICATION --> ESCALATION
-    
-    ESCALATION --> SNS_TOPIC
-    SNS_TOPIC --> EMAIL
-    SNS_TOPIC --> SLACK
-    SNS_TOPIC --> PAGERDUTY
-```
-
-#### 6.5.1.5 Dashboard Design Framework
-
-The system provides comprehensive dashboard visualization through multiple integrated platforms.
-
-**Dashboard Architecture:**
-
-| Dashboard Type | Platform | Refresh Rate | Scope |
-|---------------|----------|-------------|--------|
-| **Application Dashboards** | Grafana | 30 seconds | Application metrics, custom KPIs |
-| **Infrastructure Dashboards** | CloudWatch | 60 seconds | System metrics, AWS resources |
-| **Business Intelligence** | Grafana | 5 minutes | Business metrics, usage analytics |
-| **Security Dashboards** | Grafana | 60 seconds | Security events, audit trails |
-
-### 6.5.2 OBSERVABILITY PATTERNS
-
-#### 6.5.2.1 Health Check Implementation
-
-The system implements comprehensive health checks at multiple architectural layers with intelligent probing and automatic recovery.
-
-**Health Check Endpoints:**
-
-| Endpoint | Purpose | Timeout | Retry Count | Check Interval |
-|----------|---------|---------|-------------|----------------|
-| **`/health`** | General health status | 5 seconds | 3 retries | 30 seconds |
-| **`/health/live`** | Liveness probe | 5 seconds | 3 retries | 30 seconds |
-| **`/health/ready`** | Readiness probe | 5 seconds | 3 retries | 30 seconds |
-
-**Health Check Architecture:**
-
-```mermaid
-graph TB
-    subgraph "Health Check Types"
-        LIVENESS[Liveness Probe]
-        READINESS[Readiness Probe]
-        STARTUP[Startup Probe]
-        CUSTOM[Custom Health Checks]
-    end
-    
-    subgraph "Health Validation"
-        AUTH_HEALTH[Authentication Health]
-        API_HEALTH[LabArchives API Health]
-        RESOURCE_HEALTH[Resource Manager Health]
-        SYSTEM_HEALTH[System Resource Health]
-    end
-    
-    subgraph "Health Response"
-        HEALTHY[Healthy Response]
-        DEGRADED[Degraded Response]
-        UNHEALTHY[Unhealthy Response]
-    end
-    
-    subgraph "Actions"
-        CONTINUE[Continue Operation]
-        RESTART[Container Restart]
-        ALERT[Generate Alert]
-        FAILOVER[Failover to Backup]
-    end
-    
-    LIVENESS --> AUTH_HEALTH
-    READINESS --> API_HEALTH
-    STARTUP --> RESOURCE_HEALTH
-    CUSTOM --> SYSTEM_HEALTH
-    
-    AUTH_HEALTH --> HEALTHY
-    API_HEALTH --> DEGRADED
-    RESOURCE_HEALTH --> UNHEALTHY
-    
-    HEALTHY --> CONTINUE
-    DEGRADED --> ALERT
-    UNHEALTHY --> RESTART
-    UNHEALTHY --> FAILOVER
-```
-
-#### 6.5.2.2 Performance Metrics Collection
-
-The system implements comprehensive performance monitoring across all operational dimensions.
-
-**Performance Metrics Categories:**
-
-| Category | Metrics | Collection Method | Alerting Threshold |
-|----------|---------|-------------------|-------------------|
-| **Application** | Request/response times, error rates, throughput | Prometheus + CloudWatch | P95 > 2000ms |
-| **System** | CPU usage, memory consumption, connection counts | Container Insights | CPU > 80% |
-| **Network** | Request latency, bandwidth utilization | CloudWatch | Latency > 5000ms |
-| **Database** | Query performance, connection pool usage | Performance Insights | Connections > 50 |
-
-#### 6.5.2.3 Business Metrics Tracking
-
-The system tracks critical business metrics to ensure operational effectiveness and user satisfaction.
-
-**Business Metrics Framework:**
-
-| Metric Type | Key Indicators | Measurement Frequency | Business Impact |
-|------------|---------------|----------------------|----------------|
-| **Authentication** | Success rates, failure patterns | Real-time | User access reliability |
-| **Resource Access** | Access patterns, permission violations | Real-time | Data availability |
-| **API Usage** | Request patterns, throttling events | Real-time | System utilization |
-| **Security Events** | Failed attempts, scope violations | Real-time | Security posture |
-
-#### 6.5.2.4 SLA Monitoring and Compliance
-
-The system implements comprehensive SLA monitoring with automated compliance reporting.
-
-**SLA Targets and Monitoring:**
-
-| SLA Metric | Target Value | Current Performance | Monitoring Method |
-|-----------|-------------|-------------------|------------------|
-| **Response Time** | <2s P95 latency | Continuously monitored | Real-time monitoring |
-| **Memory Usage** | <100MB footprint | Continuously monitored | Continuous tracking |
-| **Availability** | 99.9% uptime | Continuously monitored | 24/7 monitoring |
-| **Throughput** | 100 req/min | Continuously monitored | Load testing |
-
-**SLA Compliance Architecture:**
-
-```mermaid
-graph TB
-    subgraph "SLA Metrics"
-        RESPONSE_TIME[Response Time < 2s]
-        MEMORY_USAGE[Memory < 100MB]
-        AVAILABILITY[Availability > 99.9%]
-        THROUGHPUT[Throughput > 100/min]
-    end
-    
-    subgraph "Monitoring Systems"
-        REAL_TIME[Real-time Monitoring]
-        CONTINUOUS[Continuous Tracking]
-        LOAD_TESTING[Load Testing]
-        ALERTING[24/7 Alerting]
-    end
-    
-    subgraph "Compliance Actions"
-        SLA_BREACH[SLA Breach Detection]
-        AUTO_SCALING[Automatic Scaling]
-        REMEDIATION[Automatic Remediation]
-        REPORTING[Compliance Reporting]
-    end
-    
-    RESPONSE_TIME --> REAL_TIME
-    MEMORY_USAGE --> CONTINUOUS
-    AVAILABILITY --> ALERTING
-    THROUGHPUT --> LOAD_TESTING
-    
-    REAL_TIME --> SLA_BREACH
-    CONTINUOUS --> SLA_BREACH
-    ALERTING --> SLA_BREACH
-    LOAD_TESTING --> SLA_BREACH
-    
-    SLA_BREACH --> AUTO_SCALING
-    SLA_BREACH --> REMEDIATION
-    SLA_BREACH --> REPORTING
-```
-
-#### 6.5.2.5 Capacity Tracking and Planning
-
-The system implements proactive capacity monitoring and planning to ensure optimal resource utilization.
-
-**Capacity Metrics:**
-
-| Resource Type | Current Usage | Growth Rate | Projected Capacity | Action Threshold |
-|--------------|---------------|-------------|-------------------|------------------|
-| **CPU** | Monitored continuously | Tracked weekly | Predicted monthly | 70% sustained |
-| **Memory** | Monitored continuously | Tracked weekly | Predicted monthly | 80% sustained |
-| **Network** | Monitored continuously | Tracked daily | Predicted weekly | 75% sustained |
-| **Storage** | Monitored continuously | Tracked daily | Predicted weekly | 85% sustained |
-
-### 6.5.3 INCIDENT RESPONSE
-
-#### 6.5.3.1 Alert Routing and Prioritization
-
-The system implements a sophisticated alert routing system with intelligent prioritization and escalation logic.
-
-**Alert Severity Matrix:**
-
-| Severity | Response Time | Escalation | Notification Method | Example Triggers |
-|----------|---------------|------------|-------------------|------------------|
-| **Critical** | <1 minute | Immediate | Phone, SMS, Email | System unavailable |
-| **High** | <15 minutes | 30 minutes | Email, Slack | Major functionality impaired |
-| **Medium** | <4 hours | 8 hours | Email | Minor functionality affected |
-| **Low** | <24 hours | 72 hours | Email | Informational tracking |
-
-**Alert Routing Flow:**
-
-```mermaid
 flowchart TD
-    ALERT_GENERATED[Alert Generated] --> SEVERITY_EVAL{Evaluate Severity}
+    A[Alert Generation] --> B[Severity Classification]
     
-    SEVERITY_EVAL -->|Critical| CRITICAL_FLOW[Critical Alert Flow]
-    SEVERITY_EVAL -->|High| HIGH_FLOW[High Priority Flow]
-    SEVERITY_EVAL -->|Medium| MEDIUM_FLOW[Medium Priority Flow]
-    SEVERITY_EVAL -->|Low| LOW_FLOW[Low Priority Flow]
+    B --> C{Severity Level?}
+    C -->|Info| D[Log Only]
+    C -->|Warning| E[Dashboard Update]
+    C -->|Critical| F[On-call Notification]
+    C -->|Emergency| G[Immediate Escalation]
     
-    CRITICAL_FLOW --> IMMEDIATE_NOTIFY[Immediate Notification]
-    CRITICAL_FLOW --> AUTO_RESPONSE[Automatic Response]
-    CRITICAL_FLOW --> ESCALATION_TIMER[Start Escalation Timer]
+    D --> H[Metrics Collection]
+    E --> I[Team Notification]
+    F --> J[Primary On-call]
+    G --> K[All Stakeholders]
     
-    HIGH_FLOW --> PRIORITY_NOTIFY[Priority Notification]
-    HIGH_FLOW --> ASSIGN_OWNER[Assign Owner]
-    HIGH_FLOW --> ESCALATION_TIMER
+    I --> L[Slack Channel]
+    J --> M[SMS + Email]
+    K --> N[Phone Call]
     
-    MEDIUM_FLOW --> STANDARD_NOTIFY[Standard Notification]
-    MEDIUM_FLOW --> QUEUE_ASSIGNMENT[Queue Assignment]
+    L --> O[Acknowledgment Required]
+    M --> P[Response SLA: 15 min]
+    N --> Q[Response SLA: 5 min]
     
-    LOW_FLOW --> TRACKING_NOTIFY[Tracking Notification]
-    LOW_FLOW --> TREND_ANALYSIS[Trend Analysis]
+    O --> R{Acknowledged?}
+    P --> S{Resolved?}
+    Q --> T{Critical Response?}
     
-    ESCALATION_TIMER --> ESCALATION_CHECK{Response Received?}
-    ESCALATION_CHECK -->|No| ESCALATE[Escalate to Next Level]
-    ESCALATION_CHECK -->|Yes| RESPONSE_TRACKING[Track Response]
+    R -->|No| U[Escalate to Warning]
+    S -->|No| V[Escalate to Emergency]
+    T -->|No| W[Executive Notification]
     
-    ESCALATE --> SEVERITY_EVAL
-    RESPONSE_TRACKING --> RESOLUTION[Resolution Tracking]
+    style G fill:#f44336
+    style N fill:#ff9800
+    style W fill:#9c27b0
 ```
 
 #### 6.5.3.2 Escalation Procedures
 
-The system implements comprehensive escalation procedures with clear ownership and accountability.
+The system defines clear escalation procedures based on incident severity, response time, and resolution progress. Escalation procedures ensure incidents receive appropriate attention and resources.
 
-**Escalation Hierarchy:**
+**Escalation Matrix:**
 
-| Level | Role | Response Time | Escalation Trigger | Contact Method |
-|-------|------|---------------|-------------------|---------------|
-| **L1** | Operations Team | <1 minute | Immediate | Automated |
-| **L2** | Engineering Team | <15 minutes | L1 timeout | Phone/SMS |
-| **L3** | Senior Engineering | <30 minutes | L2 timeout | Phone/SMS |
-| **L4** | Management | <1 hour | L3 timeout | Phone/SMS |
+| Severity Level | Initial Response | Escalation Trigger | Escalation Target | Response SLA |
+|----------------|------------------|-------------------|-------------------|--------------|
+| Info | Automated logging | Trend threshold | Team lead | 24 hours |
+| Warning | Team notification | No acknowledgment (30 min) | Senior engineer | 4 hours |
+| Critical | On-call engineer | No response (15 min) | Engineering manager | 1 hour |
+| Emergency | All stakeholders | Immediate | Executive team | 15 minutes |
 
-#### 6.5.3.3 Runbook Documentation
+#### 6.5.3.3 Runbooks
 
-The system maintains comprehensive runbook documentation for all operational procedures.
+The system maintains comprehensive runbooks for common incident scenarios, enabling consistent and efficient incident response. Runbooks are integrated with the monitoring system for automated diagnosis and resolution guidance.
 
 **Runbook Categories:**
 
-| Category | Procedures | Automation Level | Update Frequency |
-|----------|------------|------------------|------------------|
-| **Deployment** | Service deployment, rollback | Fully automated | Weekly |
-| **Monitoring** | Alert response, metric analysis | Semi-automated | Monthly |
-| **Security** | Incident response, access control | Manual | Quarterly |
-| **Maintenance** | System updates, capacity planning | Semi-automated | Monthly |
+| Incident Type | Runbook Title | Automation Level | Resolution Time |
+|---------------|---------------|------------------|-----------------|
+| Performance Degradation | High Response Time Investigation | Semi-automated | 30 minutes |
+| Authentication Failures | LabArchives API Connection Issues | Manual | 15 minutes |
+| Resource Exhaustion | Container Memory/CPU Limits | Automated | 10 minutes |
+| Security Violations | Unauthorized Access Attempts | Manual | 5 minutes |
 
-#### 6.5.3.4 Post-Mortem Process
+#### 6.5.3.4 Post-mortem Processes
 
-The system implements comprehensive post-mortem procedures to ensure continuous improvement.
+The system implements structured post-mortem processes for all significant incidents, focusing on root cause analysis, preventive measures, and continuous improvement. Post-mortems are documented and tracked through the audit system.
 
-**Post-Mortem Framework:**
+**Post-mortem Framework:**
 
 ```mermaid
-graph TB
-    INCIDENT_RESOLVED[Incident Resolved] --> POSTMORTEM_TRIGGER[Trigger Post-Mortem]
-    POSTMORTEM_TRIGGER --> TIMELINE_ANALYSIS[Timeline Analysis]
-    TIMELINE_ANALYSIS --> ROOT_CAUSE[Root Cause Analysis]
-    ROOT_CAUSE --> IMPACT_ASSESSMENT[Impact Assessment]
-    IMPACT_ASSESSMENT --> IMPROVEMENT_ACTIONS[Improvement Actions]
-    IMPROVEMENT_ACTIONS --> PREVENTION_MEASURES[Prevention Measures]
-    PREVENTION_MEASURES --> DOCUMENTATION[Documentation Update]
-    DOCUMENTATION --> KNOWLEDGE_SHARING[Knowledge Sharing]
-    KNOWLEDGE_SHARING --> PROCESS_IMPROVEMENT[Process Improvement]
+flowchart TD
+    A[Incident Resolution] --> B[Post-mortem Trigger]
+    
+    B --> C{Incident Impact?}
+    C -->|Low| D[Brief Review]
+    C -->|Medium| E[Standard Post-mortem]
+    C -->|High| F[Comprehensive Analysis]
+    
+    D --> G[Document Lessons]
+    E --> H[Root Cause Analysis]
+    F --> I[Executive Review]
+    
+    G --> J[Update Runbooks]
+    H --> K[Preventive Measures]
+    I --> L[Strategic Changes]
+    
+    J --> M[Knowledge Base]
+    K --> N[Implementation Plan]
+    L --> O[Architecture Review]
+    
+    M --> P[Team Training]
+    N --> Q[Process Improvement]
+    O --> R[System Enhancement]
+    
+    P --> S[Continuous Improvement]
+    Q --> S
+    R --> S
+    
+    style F fill:#fff3e0
+    style I fill:#f3e5f5
+    style S fill:#c8e6c9
 ```
 
 #### 6.5.3.5 Improvement Tracking
 
-The system implements comprehensive improvement tracking to ensure operational excellence.
+The system implements systematic improvement tracking to ensure continuous enhancement of system reliability and performance. Improvement tracking covers both technical and operational aspects.
 
-**Improvement Metrics:**
+**Improvement Tracking Metrics:**
 
-| Metric | Measurement | Target | Current Performance |
-|--------|-------------|---------|-------------------|
-| **Mean Time to Detection** | Incident detection time | <5 minutes | Monitored |
-| **Mean Time to Resolution** | Incident resolution time | <30 minutes | Monitored |
-| **Escalation Rate** | Percentage of escalated alerts | <10% | Monitored |
-| **False Positive Rate** | Percentage of false alerts | <5% | Monitored |
+| Improvement Category | Tracking Method | Success Criteria | Review Frequency |
+|---------------------|-----------------|------------------|------------------|
+| MTTR Reduction | Incident timing analysis | 20% improvement quarterly | Monthly |
+| Alert Accuracy | False positive rate | < 5% false positives | Weekly |
+| System Reliability | Uptime percentage | > 99.9% uptime | Daily |
+| Performance Optimization | SLA compliance | 95% SLA adherence | Daily |
 
-### 6.5.4 MONITORING DASHBOARDS
-
-#### 6.5.4.1 Application Performance Dashboard
-
-The system provides comprehensive application performance visualization through Grafana dashboards.
-
-**Dashboard Layout:**
+### 6.5.4 MONITORING ARCHITECTURE DIAGRAM
 
 ```mermaid
-graph TB
-    subgraph "Application Performance Dashboard"
-        subgraph "Request Metrics"
-            REQUEST_RATE[Request Rate]
-            RESPONSE_TIME[Response Time P95]
-            ERROR_RATE[Error Rate]
-        end
-        
-        subgraph "System Metrics"
-            CPU_USAGE[CPU Usage %]
-            MEMORY_USAGE[Memory Usage MB]
-            ACTIVE_CONNECTIONS[Active Connections]
-        end
-        
-        subgraph "Business Metrics"
-            AUTH_SUCCESS[Auth Success Rate]
-            API_CALLS[API Calls/min]
-            RESOURCE_ACCESS[Resource Access Count]
-        end
-        
-        subgraph "Alerts Panel"
-            ACTIVE_ALERTS[Active Alerts]
-            ALERT_HISTORY[Alert History]
-            SLA_STATUS[SLA Status]
-        end
+flowchart TB
+    subgraph "Application Layer"
+        A[MCP Server] --> B[Health Endpoints]
+        A --> C[Metrics Endpoint]
+        A --> D[Structured Logging]
+        A --> E[Audit Logger]
     end
+    
+    subgraph "Collection Layer"
+        F[Prometheus] --> G[ServiceMonitor]
+        H[CloudWatch Agent] --> I[Container Insights]
+        J[Log Aggregator] --> K[Log Rotation]
+    end
+    
+    subgraph "Storage Layer"
+        L[Prometheus TSDB]
+        M[CloudWatch Metrics]
+        N[CloudWatch Logs]
+        O[Long-term Storage]
+    end
+    
+    subgraph "Alerting Layer"
+        P[CloudWatch Alarms]
+        Q[SNS Topics]
+        R[Alert Manager]
+    end
+    
+    subgraph "Visualization Layer"
+        S[Grafana Dashboards]
+        T[CloudWatch Dashboards]
+        U[Custom Dashboards]
+    end
+    
+    B --> F
+    C --> F
+    D --> J
+    E --> J
+    
+    G --> C
+    I --> H
+    K --> J
+    
+    F --> L
+    H --> M
+    J --> N
+    N --> O
+    
+    M --> P
+    P --> Q
+    L --> R
+    
+    L --> S
+    M --> T
+    O --> U
+    
+    Q --> V[On-call Teams]
+    R --> V
+    
+    style A fill:#e1f5fe
+    style F fill:#fff3e0
+    style P fill:#ffcdd2
+    style S fill:#f3e5f5
 ```
 
-#### 6.5.4.2 Infrastructure Monitoring Dashboard
+### 6.5.5 ALERT FLOW DIAGRAM
 
-The system provides comprehensive infrastructure monitoring through CloudWatch dashboards.
+```mermaid
+flowchart TD
+    A[System Event] --> B[Metric Collection]
+    B --> C[Threshold Evaluation]
+    
+    C --> D{Threshold Exceeded?}
+    D -->|No| E[Continue Monitoring]
+    D -->|Yes| F[Generate Alert]
+    
+    F --> G[Alert Classification]
+    G --> H{Severity Level?}
+    
+    H -->|Info| I[Log to Dashboard]
+    H -->|Warning| J[Team Notification]
+    H -->|Critical| K[On-call Engineer]
+    H -->|Emergency| L[Immediate Escalation]
+    
+    I --> M[Trend Analysis]
+    J --> N[Slack Notification]
+    K --> O[SMS + Email]
+    L --> P[Phone Call]
+    
+    N --> Q[Acknowledgment Timer]
+    O --> R[Response Timer]
+    P --> S[Executive Notification]
+    
+    Q --> T{Acknowledged?}
+    R --> U{Resolved?}
+    S --> V{Critical Response?}
+    
+    T -->|No| W[Escalate to Warning]
+    U -->|No| X[Escalate to Emergency]
+    V -->|No| Y[Board Notification]
+    
+    T -->|Yes| Z[Incident Response]
+    U -->|Yes| AA[Resolution Documentation]
+    V -->|Yes| BB[Crisis Management]
+    
+    W --> J
+    X --> L
+    Y --> CC[Crisis Team]
+    
+    Z --> DD[Root Cause Analysis]
+    AA --> EE[Post-mortem Process]
+    BB --> FF[Strategic Review]
+    
+    style L fill:#f44336
+    style P fill:#ff9800
+    style Y fill:#9c27b0
+```
 
-**Infrastructure Dashboard Components:**
+### 6.5.6 COMPLIANCE AND AUDIT MONITORING
 
-| Component | Visualization | Refresh Rate | Alert Integration |
-|-----------|---------------|-------------|-------------------|
-| **ECS Metrics** | Time series charts | 1 minute | CloudWatch Alarms |
-| **RDS Metrics** | Performance graphs | 1 minute | CloudWatch Alarms |
-| **Network Metrics** | Bandwidth charts | 1 minute | CloudWatch Alarms |
-| **Cost Analysis** | Cost breakdown | 1 hour | Budget alerts |
+The system implements comprehensive compliance monitoring to support SOC2, ISO27001, HIPAA, and GDPR requirements. Compliance monitoring covers access controls, data handling, and audit trail maintenance through a multi-layered approach that ensures regulatory adherence while maintaining operational efficiency.
+
+#### 6.5.6.1 Data Minimization and Sanitization Compliance (updated)
+
+<span style="background-color: rgba(91, 57, 243, 0.2)">The audit subsystem now guarantees redaction of sensitive URL parameters prior to storage, ensuring continued compliance with SOC2, HIPAA, and GDPR data-minimization requirements.</span> This implementation provides automatic protection against accidental logging of sensitive authentication credentials, tokens, and personally identifiable information.
+
+**Sanitization Implementation Framework:**
+
+The URL parameter sanitization process operates through the structured logging pipeline defined in section 6.5.1.2, ensuring comprehensive data protection across all audit and compliance logging activities. <span style="background-color: rgba(91, 57, 243, 0.2)">Sensitive parameters including authentication tokens, API passwords, and security secrets are automatically detected and redacted before any log persistence or forwarding to external compliance systems.</span>
+
+**Compliance Integration Architecture:**
+
+```mermaid
+flowchart TD
+    subgraph "Compliance Event Sources"
+        A[Authentication Events] --> B[Parameter Sanitization]
+        C[Resource Access Events] --> B
+        D[Security Violations] --> B
+        E[Configuration Changes] --> B
+    end
+    
+    subgraph "Sanitization Processing"
+        B --> F[URL Parameter Scanner]
+        F --> G[Sensitive Data Detection]
+        G --> H[Automatic Redaction]
+        H --> I[Compliance Formatting]
+    end
+    
+    subgraph "Compliance Storage"
+        I --> J[SOC2 Audit Logs]
+        I --> K[HIPAA Audit Trails]
+        I --> L[GDPR Data Processing Logs]
+        I --> M[ISO27001 Security Events]
+    end
+    
+    subgraph "Compliance Reporting"
+        J --> N[External Auditor Reports]
+        K --> O[Healthcare Compliance]
+        L --> P[Privacy Impact Assessments]
+        M --> Q[Security Management Reviews]
+    end
+    
+    style B fill:#e1f5fe
+    style H fill:#e8f5e8
+    style I fill:#fff3e0
+```
+
+#### 6.5.6.2 Compliance Monitoring Framework (updated)
+
+The compliance monitoring framework integrates real-time security event detection with comprehensive audit trail maintenance. <span style="background-color: rgba(91, 57, 243, 0.2)">New scoped-access exceptions (including EntryScopeViolation and NotebookScopeViolation) are captured under the "Security/access violations" metric category for real-time auditing,</span> providing enhanced granularity for security incident analysis and compliance reporting.
+
+**Enhanced Compliance Monitoring Matrix:**
+
+| Compliance Standard | Monitoring Requirement | Implementation | Audit Frequency |
+|-------------------|------------------------|----------------|-----------------|
+| SOC2 Type II | Access control monitoring | Audit log analysis with parameter sanitization | Continuous |
+| ISO27001 | Information security controls | Security event monitoring with exception categorization | Daily |
+| HIPAA | PHI access tracking | Detailed audit logging with data minimization | Real-time |
+| GDPR | Data access and retention | Privacy compliance monitoring with automatic redaction | Continuous |
+
+**Exception-Based Compliance Tracking:**
+
+<span style="background-color: rgba(91, 57, 243, 0.2)">These new exception classes are automatically logged through the sanitized logging pipeline described in section 6.5.1.2, preventing accidental leakage of notebook IDs or tokens while still providing sufficient diagnostic context to auditors.</span> The enhanced exception tracking provides audit teams with precise categorization of security violations while maintaining strict data protection standards.
+
+| Exception Category | Compliance Impact | Audit Significance | Data Protection |
+|-------------------|------------------|-------------------|-----------------|
+| **EntryScopeViolation** | SOC2 access control compliance | High - Direct resource access attempt | Full parameter redaction |
+| **NotebookScopeViolation** | HIPAA/GDPR data access monitoring | Critical - PHI/PII access boundary violation | Sensitive ID masking |
+| **FolderScopeViolation** | ISO27001 information security | Medium - Organizational boundary violation | Path sanitization |
+| **Authentication Failures** | All standards - access control | High - Security boundary enforcement | Credential redaction |
+
+#### 6.5.6.3 Real-time Compliance Monitoring
+
+The system implements continuous compliance monitoring through integration with the broader observability infrastructure. Compliance events are processed through multiple monitoring channels to ensure comprehensive coverage and rapid response to potential violations.
+
+**Real-time Monitoring Integration:**
+
+```mermaid
+flowchart LR
+    subgraph "Event Detection"
+        A[Security Events] --> B[Compliance Filter]
+        C[Access Violations] --> B
+        D[Authentication Events] --> B
+        E[Data Access Events] --> B
+    end
+    
+    subgraph "Compliance Processing"
+        B --> F[Standard Classification]
+        F --> G[SOC2 Processing]
+        F --> H[HIPAA Processing]
+        F --> I[GDPR Processing]
+        F --> J[ISO27001 Processing]
+    end
+    
+    subgraph "Alert Generation"
+        G --> K[SOC2 Alerts]
+        H --> L[HIPAA Alerts]
+        I --> M[GDPR Alerts]
+        J --> N[ISO27001 Alerts]
+    end
+    
+    subgraph "Compliance Response"
+        K --> O[Security Team]
+        L --> P[Compliance Officer]
+        M --> Q[Privacy Team]
+        N --> R[Risk Management]
+    end
+    
+    style B fill:#e1f5fe
+    style F fill:#fff3e0
+    style O fill:#f3e5f5
+```
+
+**Compliance Metric Categories:**
+
+| Metric Category | Real-time Tracking | Threshold Alerts | Compliance Standard |
+|-----------------|-------------------|-----------------|-------------------|
+| **Authentication Violations** | Failed login attempts, session anomalies | >3 failures/minute | SOC2, ISO27001 |
+| **Access Control Violations** | Scope violations, unauthorized access | Any violation | HIPAA, GDPR |
+| **Data Handling Events** | PHI access, PII processing | All data access | HIPAA, GDPR |
+| **Security Configuration** | Permission changes, system modifications | Any configuration change | SOC2, ISO27001 |
+
+#### 6.5.6.4 Audit Trail Integrity and Compliance
+
+The audit trail system ensures complete compliance with regulatory requirements through comprehensive event capture, tamper-evident storage, and automated compliance reporting. Integration with the sanitized logging pipeline guarantees that all audit entries maintain data protection standards while providing sufficient detail for regulatory review.
+
+**Audit Trail Architecture:**
+
+| Audit Component | Compliance Function | Data Protection | Retention Period |
+|-----------------|-------------------|-----------------|------------------|
+| **Authentication Audit** | SOC2 access control evidence | Full credential sanitization | 7 years |
+| **Authorization Audit** | RBAC compliance documentation | Scope boundary logging | 7 years |
+| **Data Access Audit** | HIPAA/GDPR access tracking | PHI/PII parameter redaction | 7 years |
+| **Security Event Audit** | ISO27001 security incident evidence | Threat intelligence sanitization | 7 years |
+
+**Regulatory Reporting Integration:**
+
+The compliance monitoring system generates automated reports aligned with regulatory requirements, ensuring consistent audit preparation and ongoing compliance verification. Reports are generated through the sanitized audit data pipeline, maintaining data protection standards throughout the compliance process.
+
+#### 6.5.6.5 Compliance Dashboard and Metrics
+
+The system provides dedicated compliance dashboards that aggregate monitoring data across all regulatory frameworks. These dashboards enable compliance teams to maintain continuous oversight of regulatory adherence and rapidly identify potential compliance gaps.
+
+**Compliance Dashboard Architecture:**
+
+```mermaid
+flowchart TB
+    subgraph "Data Sources"
+        A[Audit Logs] --> B[Compliance Aggregator]
+        C[Security Events] --> B
+        D[Access Control Logs] --> B
+        E[Configuration Changes] --> B
+    end
+    
+    subgraph "Compliance Processing"
+        B --> F[SOC2 Metrics]
+        B --> G[HIPAA Metrics]
+        B --> H[GDPR Metrics]
+        B --> I[ISO27001 Metrics]
+    end
+    
+    subgraph "Dashboard Visualization"
+        F --> J[SOC2 Dashboard]
+        G --> K[HIPAA Dashboard]
+        H --> L[GDPR Dashboard]
+        I --> M[ISO27001 Dashboard]
+    end
+    
+    subgraph "Compliance Reporting"
+        J --> N[Executive Reports]
+        K --> N
+        L --> N
+        M --> N
+        N --> O[Regulatory Submissions]
+    end
+    
+    style B fill:#e1f5fe
+    style N fill:#f3e5f5
+    style O fill:#e8f5e8
+```
+
+**Key Compliance Indicators:**
+
+| KPI Category | Measurement Method | Target Threshold | Business Impact |
+|--------------|-------------------|------------------|-----------------|
+| **Audit Completeness** | Event capture ratio | 99.9% capture rate | Regulatory readiness |
+| **Data Protection Compliance** | Sanitization effectiveness | 100% sensitive data redaction | Privacy compliance |
+| **Access Control Adherence** | Scope violation rate | <0.1% violation rate | Security compliance |
+| **Response Time Compliance** | Alert response timing | <15 minutes for critical alerts | Incident management |
 
 #### References
 
-**Files Analyzed:**
-- `infrastructure/terraform/modules/ecs/main.tf` - ECS monitoring configuration with Container Insights and CloudWatch alarms
-- `infrastructure/terraform/modules/rds/main.tf` - RDS monitoring with Performance Insights and alarms
-- `infrastructure/kubernetes/service.yaml` - ServiceMonitor and metrics endpoint configuration
-- `infrastructure/kubernetes/deployment.yaml` - Health check probe configuration
-- `src/cli/logging_setup.py` - Dual logging architecture implementation
-- `src/cli/auth_manager.py` - Authentication monitoring and audit logging
-- `src/cli/resource_manager.py` - Resource access audit logging
-- `src/cli/mcp_server.py` - Server monitoring integration
-- `src/cli/Dockerfile` - HEALTHCHECK instruction and configuration
-- `infrastructure/docker-compose.prod.yml` - Production monitoring service configuration
+**Files Examined:**
+- `infrastructure/kubernetes/service.yaml` - ServiceMonitor and monitoring endpoints configuration
+- `infrastructure/kubernetes/deployment.yaml` - Health check probe configurations and container monitoring
+- `infrastructure/terraform/modules/ecs/main.tf` - CloudWatch alarms for ECS monitoring and auto-scaling
+- `infrastructure/terraform/modules/rds/main.tf` - CloudWatch alarms for RDS monitoring and performance tracking
+- `src/cli/logging_setup.py` - Structured logging implementation and comprehensive audit system
+- `infrastructure/docker-compose.prod.yml` - Prometheus container configuration and health check setup
+- `infrastructure/kubernetes/namespace.yaml` - Monitoring namespace configuration and network policies
+- `infrastructure/terraform/modules/cloudwatch/main.tf` - Centralized CloudWatch configuration and log management
+- `src/cli/auth/manager.py` - Authentication monitoring and security event logging
+- `src/cli/mcp/server.py` - MCP protocol monitoring and performance metrics
+- `src/cli/resource/manager.py` - Resource access monitoring and performance tracking
+- `infrastructure/terraform/modules/sns/main.tf` - SNS topic configuration for alert notifications
+- `infrastructure/terraform/modules/vpc/main.tf` - Network monitoring and security group configurations
+- `src/cli/commands/` - Command execution monitoring and audit logging
+- `infrastructure/kubernetes/configmap.yaml` - Configuration monitoring and change tracking
+- `src/cli/api/client.py` - API client monitoring and error tracking
+- `infrastructure/terraform/modules/iam/main.tf` - IAM monitoring and access control auditing
+- `src/cli/utils/` - Utility function monitoring and performance tracking
+- `infrastructure/terraform/modules/s3/main.tf` - Storage monitoring and access auditing
+- `infrastructure/kubernetes/secret.yaml` - Secret management monitoring and security auditing
+- `src/cli/exceptions.py` - Exception monitoring and error classification
 
-**Technical Specification Sections Referenced:**
-- `5.4 CROSS-CUTTING CONCERNS` - Comprehensive monitoring strategy and SLA requirements
-- `6.1 CORE SERVICES ARCHITECTURE` - Monolithic architecture monitoring considerations
-- `3.6 DEVELOPMENT & DEPLOYMENT` - CloudWatch integration and monitoring stack
-- `3.7 SECURITY & COMPLIANCE TOOLS` - Security monitoring and alerting systems  
-- `4.3 TECHNICAL IMPLEMENTATION` - Error handling and recovery procedures
+**Technical Specification Sections Retrieved:**
+- `5.4 CROSS-CUTTING CONCERNS` - Comprehensive monitoring and observability approach
+- `4.5 PERFORMANCE AND SLA REQUIREMENTS` - Performance targets and error recovery strategies
+- `4.4 DEPLOYMENT AND OPERATIONAL WORKFLOWS` - System architecture and monitoring integration
+- `1.2 SYSTEM OVERVIEW` - Business context and system capabilities for monitoring requirements
+- `6.5.1.2 LOG AGGREGATION` - URL parameter sanitization and structured logging implementation
+- `6.4 SECURITY ARCHITECTURE` - Comprehensive security framework and audit logging requirements
+- `4.6 COMPLIANCE AND AUDIT WORKFLOWS` - Audit trail implementation and security validation checkpoints
 
 ## 6.6 TESTING STRATEGY
 
 ### 6.6.1 TESTING APPROACH
 
-#### 6.6.1.1 Unit Testing
+#### 6.6.1.1 Testing Philosophy
 
-##### 6.6.1.1.1 Testing Framework Architecture
+The LabArchives MCP Server implements a comprehensive testing strategy aligned with its **monolithic, stateless architecture** and **enterprise-grade reliability requirements**. The testing approach emphasizes automated testing across all system layers, from unit-level component validation to end-to-end integration scenarios, ensuring robust operation across all supported environments (Windows, macOS, Linux) and Python versions (3.11, 3.12).
 
-The LabArchives MCP Server implements a comprehensive unit testing framework built on the pytest ecosystem with specialized extensions for asynchronous testing and comprehensive coverage analysis.
+**Testing Principles:**
 
-**Core Testing Framework Stack:**
+| Principle | Implementation | Rationale |
+|-----------|----------------|-----------|
+| **Test Pyramid Structure** | 70% Unit, 20% Integration, 10% E2E | Optimal feedback speed and maintenance cost |
+| **Fail-Fast Strategy** | Early validation in CI pipeline | Rapid feedback for development teams |
+| **Environment Parity** | Consistent testing across all deployment targets | Ensures production reliability |
+| **Continuous Integration** | Automated testing on every commit | Maintains code quality and prevents regressions |
 
-| Component | Version | Purpose | Integration |
-|-----------|---------|---------|-------------|
-| **pytest** | >=7.0.0 | Primary testing framework | Core test execution, fixture management |
-| **pytest-asyncio** | >=0.21.0 | Async testing support | MCP protocol testing, API integration |
-| **pytest-cov** | >=4.0.0 | Coverage analysis | Real-time coverage reporting |
-| **pytest-mock** | >=3.12.0 | Mock object creation | Component isolation, dependency mocking |
+#### 6.6.1.2 Unit Testing
 
-**Test Organization Structure:**
+##### 6.6.1.2.1 Testing Framework Configuration
 
-```mermaid
-graph TB
-    subgraph "Test Suite Organization"
-        subgraph "Core Tests"
-            TEST_AUTH[test_auth_manager.py]
-            TEST_CLI[test_cli_parser.py]
-            TEST_CONFIG[test_config.py]
-            TEST_MAIN[test_main.py]
-            TEST_SCOPING[test_scoping.py]
-        end
-        
-        subgraph "Integration Tests"
-            TEST_API[test_labarchives_api.py]
-            TEST_MCP[test_mcp_server.py]
-            TEST_RESOURCE[test_resource_manager.py]
-        end
-        
-        subgraph "Utility Tests"
-            TEST_UTILS[test_utils.py]
-            TEST_FIXTURES[fixtures/]
-            TEST_LOGGING[test_logging.py]
-        end
-        
-        subgraph "Test Data"
-            CONFIG_SAMPLES[config_samples.py]
-            API_RESPONSES[api_responses.py]
-            CONSTANTS[Common Constants]
-        end
-    end
-    
-    TEST_AUTH --> CONFIG_SAMPLES
-    TEST_CLI --> CONFIG_SAMPLES
-    TEST_CONFIG --> CONFIG_SAMPLES
-    TEST_SCOPING --> CONFIG_SAMPLES
-    TEST_API --> API_RESPONSES
-    TEST_MCP --> API_RESPONSES
-    TEST_RESOURCE --> API_RESPONSES
-    TEST_UTILS --> CONSTANTS
-    TEST_LOGGING --> CONSTANTS
-```
-
-**Core Test Module Coverage:**
-
-- **test_auth_manager.py**: Authentication manager component testing
-- **test_cli_parser.py**: <span style="background-color: rgba(91, 57, 243, 0.2)">CLI command parsing and alias-parsing coverage</span>
-- **test_config.py**: Configuration management testing
-- **test_main.py**: Main application entry point testing
-- **<span style="background-color: rgba(91, 57, 243, 0.2)">test_scoping.py</span>**: <span style="background-color: rgba(91, 57, 243, 0.2)">FolderPath unit tests</span>
-
-**Utility Test Module Coverage:**
-
-- **test_utils.py**: Utility function testing
-- **<span style="background-color: rgba(91, 57, 243, 0.2)">test_logging.py</span>**: <span style="background-color: rgba(91, 57, 243, 0.2)">Secret scrubbing tests</span>
-- **fixtures/**: Test fixture and helper management
-
-##### 6.6.1.1.2 Test Execution Strategy
-
-**Test Categorization System:**
-
-| Test Marker | Purpose | Execution Environment | Performance Requirement |
-|-------------|---------|----------------------|------------------------|
-| **unit** | Component isolation testing | Local, CI/CD | <100ms per test |
-| **integration** | Service integration testing | Local, CI/CD | <5s per test |
-| **e2e** | End-to-end workflow testing | CI/CD only | <30s per test |
-| **slow** | Performance-intensive tests | CI/CD only | <2min per test |
-| **network** | External API dependent tests | CI/CD only | <10s per test |
-
-**Test Execution Flow:**
+The system utilizes **pytest >= 7.0** as the primary testing framework, configured through `src/cli/pyproject.toml` with comprehensive test discovery and execution settings:
 
 ```mermaid
 flowchart TD
-    TEST_TRIGGER[Test Execution Trigger] --> ENVIRONMENT_SETUP[Environment Setup]
-    ENVIRONMENT_SETUP --> DEPENDENCY_VALIDATION[Dependency Validation]
-    DEPENDENCY_VALIDATION --> FIXTURE_PREPARATION[Fixture Preparation]
+    A[Test Discovery] --> B[pytest.ini Configuration]
+    B --> C[Test Collection]
+    C --> D[Fixture Loading]
+    D --> E[Test Execution]
+    E --> F[Coverage Analysis]
+    F --> G[Report Generation]
     
-    FIXTURE_PREPARATION --> UNIT_TESTS[Unit Tests]
-    FIXTURE_PREPARATION --> INTEGRATION_TESTS[Integration Tests]
-    FIXTURE_PREPARATION --> E2E_TESTS[End-to-End Tests]
-    
-    UNIT_TESTS --> COVERAGE_ANALYSIS[Coverage Analysis]
-    INTEGRATION_TESTS --> COVERAGE_ANALYSIS
-    E2E_TESTS --> COVERAGE_ANALYSIS
-    
-    COVERAGE_ANALYSIS --> QUALITY_GATES[Quality Gates]
-    QUALITY_GATES --> COVERAGE_THRESHOLD{Coverage >= 92%?}
-    COVERAGE_THRESHOLD -->|Yes| TEST_SUCCESS[Test Success]
-    COVERAGE_THRESHOLD -->|No| TEST_FAILURE[Test Failure]
-    
-    TEST_SUCCESS --> ARTIFACT_GENERATION[Artifact Generation]
-    TEST_FAILURE --> FAILURE_ANALYSIS[Failure Analysis]
-```
-
-##### 6.6.1.1.3 Mock Strategy Implementation
-
-**Mocking Architecture:**
-
-| Component | Mock Strategy | Tools | Isolation Level |
-|-----------|---------------|-------|-----------------|
-| **LabArchives API** | HTTP response mocking | responses>=0.25.0 | External service isolation |
-| **Authentication** | Session state mocking | pytest-mock | Authentication layer isolation |
-| **Configuration** | Environment variable mocking | pytest-mock | Configuration isolation |
-| **File System** | Temporary file mocking | pytest tmp_path | File system isolation |
-
-**Mock Implementation Pattern:**
-
-```mermaid
-graph TB
-    subgraph "Mock Strategy"
-        subgraph "External Dependencies"
-            LABARCHIVES_API[LabArchives API Mock]
-            AUTH_SERVICE[Authentication Service Mock]
-            CONFIG_SERVICE[Configuration Service Mock]
-        end
-        
-        subgraph "Internal Dependencies"
-            RESOURCE_MANAGER[Resource Manager Mock]
-            FILE_SYSTEM[File System Mock]
-            LOGGING_SYSTEM[Logging System Mock]
-        end
-        
-        subgraph "Test Environment"
-            UNIT_TESTS[Unit Tests]
-            INTEGRATION_TESTS[Integration Tests]
-            MOCK_FACTORY[Mock Factory]
-        end
+    subgraph "Test Organization"
+        H[Unit Tests] --> I[src/cli/tests/]
+        I --> J[Component Tests]
+        J --> K[Integration Tests]
+        K --> L[Fixtures]
     end
     
-    MOCK_FACTORY --> LABARCHIVES_API
-    MOCK_FACTORY --> AUTH_SERVICE
-    MOCK_FACTORY --> CONFIG_SERVICE
-    MOCK_FACTORY --> RESOURCE_MANAGER
-    MOCK_FACTORY --> FILE_SYSTEM
-    MOCK_FACTORY --> LOGGING_SYSTEM
-    
-    UNIT_TESTS --> MOCK_FACTORY
-    INTEGRATION_TESTS --> MOCK_FACTORY
-```
-
-##### 6.6.1.1.4 Code Coverage Requirements
-
-**Coverage Analysis Configuration:**
-
-| Coverage Type | Target Threshold | Enforcement Level | Reporting Format |
-|---------------|------------------|-------------------|------------------|
-| **Line Coverage** | <span style="background-color: rgba(91, 57, 243, 0.2)">92%</span> | CI/CD blocking | XML, HTML, Terminal |
-| **Branch Coverage** | 80% | CI/CD blocking | XML, HTML, Terminal |
-| **Function Coverage** | 90% | CI/CD blocking | XML, HTML, Terminal |
-| **Class Coverage** | 85% | CI/CD blocking | XML, HTML, Terminal |
-
-<span style="background-color: rgba(91, 57, 243, 0.2)">**Note**: Line coverage target of ≥92% satisfies the new testing mandate requirements.</span>
-
-**Coverage Exclusions:**
-
-- Test files and fixtures
-- Third-party library integrations
-- Configuration file parsing
-- Debug and development utilities
-- Platform-specific code branches
-
-##### 6.6.1.1.5 Test Data Management
-
-**Test Data Architecture:**
-
-| Data Category | Management Strategy | Storage Location | Lifecycle |
-|---------------|-------------------|------------------|-----------|
-| **Configuration Samples** | Static fixtures | `fixtures/config_samples.py` | Version controlled |
-| **API Response Mocks** | Dynamic generation | `fixtures/api_responses.py` | Version controlled |
-| **Test Constants** | Shared constants | `fixtures/constants.py` | Version controlled |
-| **Temporary Data** | pytest tmp_path | Temporary directories | Test-scoped cleanup |
-
-#### 6.6.1.2 Integration Testing
-
-##### 6.6.1.2.1 Service Integration Testing
-
-**Integration Testing Strategy:**
-
-| Integration Layer | Testing Approach | Mock Strategy | Performance Target |
-|------------------|------------------|---------------|-------------------|
-| **MCP Protocol** | Full protocol compliance testing | External client mocking | <2s response time |
-| **LabArchives API** | HTTP integration testing | Staged environment testing | <5s API call timeout |
-| **Authentication** | HMAC-SHA256 validation | Test credential isolation | <1s authentication |
-| **Configuration** | Multi-source configuration | Environment isolation | <500ms configuration load |
-
-**Integration Test Architecture:**
-
-```mermaid
-graph TB
-    subgraph "Integration Testing Layers"
-        subgraph "Protocol Layer"
-            MCP_PROTOCOL[MCP Protocol Integration]
-            JSON_RPC[JSON-RPC Message Handling]
-            CAPABILITY_NEGOTIATION[Capability Negotiation]
-        end
-        
-        subgraph "API Layer"
-            LABARCHIVES_API[LabArchives API Integration]
-            AUTH_INTEGRATION[Authentication Integration]
-            RESOURCE_ACCESS[Resource Access Integration]
-        end
-        
-        subgraph "System Layer"
-            CONFIG_INTEGRATION[Configuration Integration]
-            LOGGING_INTEGRATION[Logging Integration]
-            HEALTH_CHECK[Health Check Integration]
-        end
+    subgraph "Coverage Tracking"
+        M[pytest-cov] --> N[Line Coverage]
+        N --> O[Branch Coverage]
+        O --> P[HTML Reports]
+        P --> Q[XML Reports]
     end
     
-    MCP_PROTOCOL --> LABARCHIVES_API
-    JSON_RPC --> AUTH_INTEGRATION
-    CAPABILITY_NEGOTIATION --> RESOURCE_ACCESS
+    C --> H
+    F --> M
     
-    LABARCHIVES_API --> CONFIG_INTEGRATION
-    AUTH_INTEGRATION --> LOGGING_INTEGRATION
-    RESOURCE_ACCESS --> HEALTH_CHECK
+    style A fill:#e1f5fe
+    style H fill:#fff3e0
+    style M fill:#f3e5f5
 ```
 
-##### 6.6.1.2.2 API Testing Strategy
+**Framework Dependencies:**
 
-**API Testing Framework:**
+| Framework | Version | Purpose | Integration |
+|-----------|---------|---------|-------------|
+| **pytest** | >= 7.0 | Core testing framework | Test discovery and execution |
+| **pytest-asyncio** | >= 0.21.0 | Async test support | MCP protocol testing |
+| **pytest-cov** | >= 4.0.0 | Coverage measurement | Code quality metrics |
+| **pytest-mock** | >= 3.10.0 | Mocking utilities | Dependency isolation |
 
-| Test Category | Testing Tool | Validation Scope | Execution Environment |
-|---------------|-------------|------------------|----------------------|
-| **Request Validation** | pytest + requests | Request structure, authentication | Local + CI/CD |
-| **Response Validation** | pydantic models | Response parsing, type validation | Local + CI/CD |
-| **Error Handling** | pytest-mock | Exception handling, retry logic | Local + CI/CD |
-| **Performance Testing** | pytest-benchmark | Response time, throughput | CI/CD only |
+##### 6.6.1.2.2 Test Organization Structure
 
-**API Test Execution Flow:**
+The test suite follows a hierarchical organization mirroring the application structure in `src/cli/tests/`:
 
 ```mermaid
-sequenceDiagram
-    participant TEST as Integration Test
-    participant AUTH as Auth Manager
-    participant API as LabArchives API
-    participant MOCK as Mock Service
-    participant VALIDATION as Response Validator
+flowchart TB
+    A[src/cli/tests/] --> B[Unit Tests]
+    A --> C[Integration Tests]
+    A --> D[Fixtures]
+    A --> E[Test Utilities]
     
-    TEST->>AUTH: Initialize Test Authentication
-    AUTH->>TEST: Return Test Session
+    B --> F[test_auth_manager.py]
+    B --> G[test_resource_manager.py]
+    B --> H[test_mcp_server.py]
+    B --> I[test_api_client.py]
     
-    TEST->>API: Execute API Request
-    API->>MOCK: External API Call (if mocked)
-    MOCK->>API: Mock Response
-    API->>TEST: API Response
+    C --> J[test_end_to_end.py]
+    C --> K[test_integration_flows.py]
     
-    TEST->>VALIDATION: Validate Response Structure
-    VALIDATION->>TEST: Validation Result
+    D --> L[conftest.py]
+    D --> M[fixtures/]
     
-    TEST->>TEST: Assert Test Conditions
-    TEST->>TEST: Generate Test Report
+    E --> N[test_helpers.py]
+    E --> O[mock_generators.py]
+    
+    style A fill:#e1f5fe
+    style B fill:#fff3e0
+    style C fill:#f3e5f5
+    style D fill:#e8f5e8
 ```
 
-##### 6.6.1.2.3 Database Integration Testing
+**Test Module Organization:**
 
-**Database Testing Strategy:**
+| Test Module | Coverage Area | Test Count | Purpose |
+|-------------|---------------|------------|---------|
+| `test_auth_manager.py` | Authentication Layer | 25+ tests | HMAC-SHA256 validation, session management |
+| `test_resource_manager.py` | Business Logic Layer | 30+ tests | Resource discovery, MCP transformation, <span style="background-color: rgba(91, 57, 243, 0.2)">scope validation edge-cases (notebook & folder), root-level page inclusion logic</span> |
+| `test_mcp_server.py` | Protocol Layer | 20+ tests | JSON-RPC 2.0 communication, client handling |
+| `test_api_client.py` | Integration Layer | 25+ tests | LabArchives API interaction, error handling, <span style="background-color: rgba(91, 57, 243, 0.2)">URL parameter sanitization & sensitive-data masking</span> |
+| `test_cli_commands.py` | Command Layer | 15+ tests | CLI interface, argument parsing |
+| `test_config_manager.py` | Configuration Layer | 20+ tests | Settings validation, environment parsing |
+| `test_logging_setup.py` | Infrastructure Layer | 15+ tests | Structured logging, audit trails |
+| `test_utils.py` | Utility Layer | 10+ tests | Helper functions, data transformation |
+| `test_exceptions.py` | Error Handling | 12+ tests | Exception classification, error responses |
+| `test_validation.py` | Data Validation | 18+ tests | Pydantic model validation, input sanitization |
 
-Since the LabArchives MCP Server implements a zero-persistence architecture, database integration testing focuses on external data source validation and caching mechanisms.
+##### 6.6.1.2.3 Mocking Strategy
 
-| Component | Testing Approach | Mock Strategy | Validation Scope |
-|-----------|------------------|---------------|------------------|
-| **LabArchives Data** | API response validation | HTTP response mocking | Data structure integrity |
-| **Session Management** | In-memory session testing | Session state mocking | Session lifecycle management |
-| **Cache Validation** | Cache consistency testing | Cache mock objects | Cache invalidation logic |
-| **Configuration Storage** | Configuration persistence testing | File system mocking | Configuration integrity |
+The system implements comprehensive mocking to isolate unit tests from external dependencies while maintaining realistic test scenarios:
 
-##### 6.6.1.2.4 External Service Mocking
+**Mock Implementation Patterns:**
+
+| Mock Type | Implementation | Use Cases | Benefits |
+|-----------|----------------|-----------|---------|
+| **External APIs** | `responses` library | LabArchives API calls | Predictable test data, offline testing |
+| **Authentication** | `unittest.mock` | Credential validation | Security testing without real credentials |
+| **File System** | `pytest-mock` | Configuration loading | Isolated file operations |
+| **Time-based Operations** | `freezegun` | Session timeouts | Deterministic time-based testing |
+
+<span style="background-color: rgba(91, 57, 243, 0.2)">Mock objects now include sanitized URL fixtures to support comprehensive testing of URL parameter sanitization and sensitive data masking functionality across the authentication and API integration layers.</span>
+
+##### 6.6.1.2.4 Code Coverage Requirements
+
+The system enforces strict code coverage requirements to ensure comprehensive testing:
+
+**Coverage Targets:**
+
+| Coverage Type | Minimum Threshold | CI Threshold | Enforcement |
+|---------------|-------------------|--------------|-------------|
+| **Line Coverage** | 80% | 85% | Automated CI checks |
+| **Branch Coverage** | 75% | 80% | Pull request validation |
+| **Function Coverage** | 90% | 95% | Code review requirements |
+| **Critical Path Coverage** | 100% | 100% | Security and authentication paths |
+
+##### 6.6.1.2.5 Test Naming Conventions
+
+The system follows consistent naming conventions for maintainability and clarity:
+
+**Naming Patterns:**
+
+| Pattern | Format | Example | Purpose |
+|---------|--------|---------|---------|
+| **Test Functions** | `test_<component>_<action>_<condition>` | `test_auth_manager_validate_credentials_success` | Clear test intent |
+| **Test Classes** | `Test<Component><Function>` | `TestAuthManagerValidation` | Logical grouping |
+| **Fixtures** | `<component>_<type>` | `auth_manager_mock` | Reusable test data |
+| **Mock Objects** | `mock_<component>` | `mock_labarchives_api` | Clear mock identification |
+
+##### 6.6.1.2.6 Test Data Management
+
+The system implements structured test data management through fixtures and factories:
+
+```mermaid
+flowchart LR
+    A[Test Data Sources] --> B[Static Fixtures]
+    A --> C[Dynamic Factories]
+    A --> D[Mock Generators]
+    
+    B --> E[conftest.py]
+    B --> F[fixtures/]
+    
+    C --> G[Factory Classes]
+    C --> H[Data Builders]
+    
+    D --> I[Response Mocks]
+    D --> J[API Simulators]
+    
+    E --> K[Shared Test Data]
+    F --> L[Component-specific Data]
+    
+    style A fill:#e1f5fe
+    style B fill:#fff3e0
+    style C fill:#f3e5f5
+    style D fill:#e8f5e8
+```
+
+#### 6.6.1.3 Integration Testing
+
+##### 6.6.1.3.1 Service Integration Test Approach
+
+The system implements comprehensive integration testing to validate component interactions and data flows across the five architectural layers:
+
+**Integration Test Categories:**
+
+| Integration Type | Test Scope | Validation Focus | Test Environment |
+|------------------|------------|------------------|------------------|
+| **Layer Integration** | Protocol → Auth → Business → Integration | Data flow validation | Isolated test containers |
+| **API Integration** | LabArchives API communication | Real API responses | Staging environment |
+| **Configuration Integration** | Environment-specific settings | Multi-environment validation | Docker containers |
+| **Error Integration** | Error propagation and handling | Failure scenarios | Fault injection framework |
+
+##### 6.6.1.3.2 API Testing Strategy
+
+The system implements comprehensive API testing covering both internal component APIs and external LabArchives API integration:
+
+```mermaid
+flowchart TB
+    subgraph "API Testing Layers"
+        A[MCP Protocol Testing] --> B[Authentication Testing]
+        B --> C[Resource Management Testing]
+        C --> D[LabArchives API Testing]
+    end
+    
+    subgraph "Test Scenarios"
+        E[Happy Path Testing] --> F[Error Condition Testing]
+        F --> G[Rate Limiting Testing]
+        G --> H[Security Testing]
+    end
+    
+    subgraph "Test Data Management"
+        I[Mock API Responses] --> J[Realistic Test Data]
+        J --> K[Edge Case Scenarios]
+        K --> L[Performance Test Data]
+    end
+    
+    A --> E
+    B --> F
+    C --> G
+    D --> H
+    
+    E --> I
+    F --> J
+    G --> K
+    H --> L
+    
+    style A fill:#e1f5fe
+    style E fill:#fff3e0
+    style I fill:#f3e5f5
+```
+
+**API Test Implementation:**
+
+| API Layer | Test Framework | Mock Strategy | Validation |
+|-----------|----------------|---------------|------------|
+| **MCP Protocol** | pytest-asyncio | In-memory transport | JSON-RPC 2.0 compliance |
+| **Authentication** | responses library | HMAC-SHA256 mocks | Security validation |
+| **Resource Management** | unittest.mock | Hierarchical data mocks | Data transformation |
+| **LabArchives API** | requests-mock | Full API simulation | Regional endpoint testing |
+
+##### 6.6.1.3.3 Database Integration Testing
+
+**Database Integration Testing is not applicable for this system** as the LabArchives MCP Server implements a **stateless architecture** with no persistent database requirements. The system retrieves all data on-demand from the LabArchives API without local storage or caching.
+
+**Storage Testing Coverage:**
+
+| Storage Type | Testing Approach | Purpose | Implementation |
+|--------------|------------------|---------|----------------|
+| **Session Storage** | In-memory testing | Authentication state | Timeout validation |
+| **Configuration Storage** | File system mocks | Settings persistence | Environment validation |
+| **Log Storage** | Temporary directories | Audit trail testing | Rotation testing |
+| **Cache Storage** | N/A - No caching | N/A | N/A |
+
+##### 6.6.1.3.4 External Service Mocking
+
+The system implements comprehensive external service mocking to enable reliable integration testing:
 
 **Mock Service Architecture:**
 
-| External Service | Mock Implementation | Response Simulation | Error Simulation |
-|------------------|-------------------|-------------------|------------------|
-| **LabArchives API** | responses library | JSON response mocking | HTTP error simulation |
-| **Authentication Service** | pytest-mock | HMAC validation mocking | Authentication failure simulation |
-| **Configuration Service** | Environment variable mocking | Configuration state simulation | Configuration error simulation |
-| **Health Check Services** | HTTP endpoint mocking | Health status simulation | Service unavailability simulation |
-
-**Mock Service Configuration:**
-
 ```mermaid
-graph TB
-    subgraph "Mock Service Configuration"
-        subgraph "HTTP Mocking"
-            RESPONSES_MOCK[Responses Library]
-            API_ENDPOINTS[API Endpoint Mocking]
-            ERROR_SIMULATION[Error Response Simulation]
-        end
-        
-        subgraph "State Mocking"
-            SESSION_MOCK[Session State Mocking]
-            CONFIG_MOCK[Configuration Mocking]
-            CACHE_MOCK[Cache State Mocking]
-        end
-        
-        subgraph "Service Mocking"
-            AUTH_MOCK[Authentication Mocking]
-            HEALTH_MOCK[Health Check Mocking]
-            LOGGING_MOCK[Logging Service Mocking]
-        end
+flowchart TD
+    A[Integration Tests] --> B[Mock Service Layer]
+    
+    B --> C[LabArchives API Mock]
+    B --> D[Authentication Service Mock]
+    B --> E[Monitoring Service Mock]
+    
+    C --> F[US Region Mock]
+    C --> G[AU Region Mock]
+    C --> H[UK Region Mock]
+    
+    D --> I[HMAC Validation Mock]
+    D --> J[Session Management Mock]
+    
+    E --> K[CloudWatch Mock]
+    E --> L[Prometheus Mock]
+    
+    subgraph "Mock Data Sources"
+        M[Realistic API Responses]
+        N[Error Scenarios]
+        O[Rate Limit Scenarios]
+        P[Regional Variations]
     end
     
-    RESPONSES_MOCK --> API_ENDPOINTS
-    API_ENDPOINTS --> ERROR_SIMULATION
-    SESSION_MOCK --> CONFIG_MOCK
-    CONFIG_MOCK --> CACHE_MOCK
-    AUTH_MOCK --> HEALTH_MOCK
-    HEALTH_MOCK --> LOGGING_MOCK
+    F --> M
+    G --> N
+    H --> O
+    I --> P
+    
+    style B fill:#e1f5fe
+    style C fill:#fff3e0
+    style D fill:#f3e5f5
+    style E fill:#e8f5e8
 ```
 
-##### 6.6.1.2.5 Test Environment Management
+##### 6.6.1.3.5 Test Environment Management
+
+The system implements automated test environment management through containerization and infrastructure as code:
 
 **Environment Configuration:**
 
-| Environment | Purpose | Configuration Source | Isolation Level |
-|-------------|---------|---------------------|-----------------|
-| **Local Development** | Developer testing | `.env.dev` | Process isolation |
-| **CI/CD Testing** | Automated testing | Environment variables | Container isolation |
-| **Integration Testing** | Service integration | Test configuration | Service isolation |
-| **Performance Testing** | Load testing | Performance configuration | Resource isolation |
+| Environment | Purpose | Infrastructure | Data Sources |
+|-------------|---------|----------------|--------------|
+| **Unit Test** | Isolated component testing | Local Python environment | Mock data only |
+| **Integration Test** | Component interaction testing | Docker containers | Staging API endpoints |
+| **System Test** | Full system validation | Kubernetes namespace | Production-like data |
+| **Performance Test** | Load and stress testing | AWS ECS cluster | High-volume test data |
 
-#### 6.6.1.3 End-to-End Testing
+#### 6.6.1.4 End-to-End Testing
 
-##### 6.6.1.3.1 E2E Test Scenarios
+##### 6.6.1.4.1 E2E Test Scenarios
 
-**End-to-End Testing Strategy:**
+The system implements comprehensive end-to-end testing covering complete user workflows from MCP client connection to data retrieval:
 
-| Test Scenario | Scope | Execution Environment | Success Criteria |
-|---------------|-------|----------------------|------------------|
-| **MCP Client Integration** | Full protocol compliance | CI/CD environment | Complete request/response cycle |
-| **Authentication Workflow** | Authentication lifecycle | Isolated test environment | Successful authentication and session management |
-| **Resource Access Workflow** | Resource discovery and access | Staged environment | Successful resource retrieval and rendering |
-| **Error Handling Workflow** | Error propagation and recovery | Fault injection environment | Graceful error handling and recovery |
+**E2E Test Scenarios:**
 
-**E2E Test Architecture:**
+| Scenario | Test Flow | Validation Points | Expected Outcome |
+|----------|-----------|------------------|------------------|
+| **Research Data Discovery** | Client → Auth → Resource List → Content | Authentication, resource parsing, content delivery | Successful data retrieval |
+| **Multi-region Access** | Client → Regional Auth → Regional Resources | Region-specific authentication, data access | Cross-region functionality |
+| **Error Recovery** | Client → Failed Auth → Retry → Success | Error handling, retry logic, recovery | Graceful error handling |
+| **Session Management** | Client → Auth → Timeout → Re-auth | Session expiration, automatic renewal | Seamless session handling |
+
+##### 6.6.1.4.2 UI Automation Approach
+
+**UI Automation is not applicable for this system** as the LabArchives MCP Server implements a **command-line interface** without a graphical user interface. The system integrates with AI applications through the MCP protocol over stdin/stdout communication.
+
+**CLI Testing Coverage:**
+
+| CLI Component | Testing Method | Validation | Tool |
+|---------------|----------------|------------|------|
+| **Command Parsing** | Argument injection | CLI behavior | pytest with subprocess |
+| **Interactive Mode** | Input simulation | User interaction | pexpect library |
+| **Output Formatting** | Capture validation | Display formatting | Custom test harness |
+| **Error Display** | Error injection | Error messaging | pytest with mock |
+
+##### 6.6.1.4.3 Test Data Setup/Teardown
+
+The system implements automated test data lifecycle management for reproducible testing:
 
 ```mermaid
-graph TB
-    subgraph "End-to-End Testing Framework"
-        subgraph "Test Scenarios"
-            MCP_CLIENT[MCP Client Integration]
-            AUTH_WORKFLOW[Authentication Workflow]
-            RESOURCE_WORKFLOW[Resource Access Workflow]
-            ERROR_WORKFLOW[Error Handling Workflow]
-        end
-        
-        subgraph "Test Environment"
-            CONTAINERIZED_ENV[Containerized Environment]
-            MOCK_SERVICES[Mock Services]
-            TEST_DATA[Test Data Management]
-        end
-        
-        subgraph "Validation Framework"
-            PROTOCOL_VALIDATION[Protocol Validation]
-            RESPONSE_VALIDATION[Response Validation]
-            PERFORMANCE_VALIDATION[Performance Validation]
-        end
+flowchart TD
+    A[Test Suite Start] --> B[Environment Setup]
+    B --> C[Test Data Generation]
+    C --> D[Service Initialization]
+    D --> E[Test Execution]
+    E --> F[Data Cleanup]
+    F --> G[Environment Teardown]
+    
+    subgraph "Setup Phase"
+        H[Mock API Responses] --> I[Test Configuration]
+        I --> J[Authentication Setup]
+        J --> K[Resource Preparation]
     end
     
-    MCP_CLIENT --> CONTAINERIZED_ENV
-    AUTH_WORKFLOW --> MOCK_SERVICES
-    RESOURCE_WORKFLOW --> TEST_DATA
-    ERROR_WORKFLOW --> PROTOCOL_VALIDATION
-    
-    CONTAINERIZED_ENV --> RESPONSE_VALIDATION
-    MOCK_SERVICES --> PERFORMANCE_VALIDATION
-```
-
-##### 6.6.1.3.2 UI Automation Approach
-
-**Note:** The LabArchives MCP Server is a command-line interface and protocol server without a graphical user interface. UI automation testing focuses on CLI interaction patterns and terminal output validation.
-
-**CLI Testing Strategy:**
-
-| Test Category | Testing Tool | Validation Scope | Execution Method |
-|---------------|-------------|------------------|------------------|
-| **Command Execution** | click.testing | CLI command parsing | Automated CLI invocation |
-| **Output Validation** | pytest assertions | Terminal output validation | Output parsing and validation |
-| **Error Handling** | click.testing | Error message validation | Error scenario simulation |
-| **Help Documentation** | click.testing | Help text validation | Documentation completeness |
-
-##### 6.6.1.3.3 Test Data Setup and Teardown
-
-**Test Data Management Strategy:**
-
-| Data Type | Setup Strategy | Teardown Strategy | Persistence Level |
-|-----------|---------------|-------------------|-------------------|
-| **Configuration Files** | Temporary file creation | Automatic cleanup | Test-scoped |
-| **Mock API Responses** | Dynamic generation | In-memory cleanup | Test-scoped |
-| **Session Data** | Mock session creation | Session invalidation | Test-scoped |
-| **Log Files** | Temporary log creation | Log file cleanup | Test-scoped |
-
-**Test Data Lifecycle:**
-
-```mermaid
-sequenceDiagram
-    participant SETUP as Test Setup
-    participant DATA as Test Data
-    participant TEST as Test Execution
-    participant CLEANUP as Test Cleanup
-    
-    SETUP->>DATA: Initialize Test Data
-    DATA->>SETUP: Data Ready
-    
-    SETUP->>TEST: Execute Test Case
-    TEST->>DATA: Access Test Data
-    DATA->>TEST: Provide Data
-    
-    TEST->>CLEANUP: Test Complete
-    CLEANUP->>DATA: Cleanup Test Data
-    DATA->>CLEANUP: Cleanup Complete
-```
-
-##### 6.6.1.3.4 Performance Testing Requirements
-
-**Performance Testing Framework:**
-
-| Performance Metric | Target Value | Measurement Tool | Test Environment |
-|-------------------|-------------|------------------|------------------|
-| **Response Time** | <2s P95 latency | pytest-benchmark | CI/CD performance testing |
-| **Memory Usage** | <100MB footprint | memory_profiler | Memory testing environment |
-| **Throughput** | 100 req/min | load testing scripts | Load testing environment |
-| **Concurrent Users** | 10 concurrent sessions | async testing framework | Concurrency testing |
-
-**Performance Test Architecture:**
-
-```mermaid
-graph TB
-    subgraph "Performance Testing Framework"
-        subgraph "Performance Metrics"
-            RESPONSE_TIME[Response Time Testing]
-            MEMORY_USAGE[Memory Usage Testing]
-            THROUGHPUT[Throughput Testing]
-            CONCURRENCY[Concurrency Testing]
-        end
-        
-        subgraph "Testing Tools"
-            PYTEST_BENCHMARK[pytest-benchmark]
-            MEMORY_PROFILER[memory_profiler]
-            LOAD_TESTING[Load Testing Scripts]
-            ASYNC_TESTING[Async Testing Framework]
-        end
-        
-        subgraph "Test Environment"
-            PERFORMANCE_ENV[Performance Environment]
-            MONITORING[Performance Monitoring]
-            METRICS_COLLECTION[Metrics Collection]
-        end
+    subgraph "Teardown Phase"
+        L[Session Cleanup] --> M[Log Collection]
+        M --> N[Metric Reporting]
+        N --> O[Resource Deallocation]
     end
     
-    RESPONSE_TIME --> PYTEST_BENCHMARK
-    MEMORY_USAGE --> MEMORY_PROFILER
-    THROUGHPUT --> LOAD_TESTING
-    CONCURRENCY --> ASYNC_TESTING
+    B --> H
+    F --> L
     
-    PYTEST_BENCHMARK --> PERFORMANCE_ENV
-    MEMORY_PROFILER --> MONITORING
-    LOAD_TESTING --> METRICS_COLLECTION
-    ASYNC_TESTING --> PERFORMANCE_ENV
+    style A fill:#e1f5fe
+    style H fill:#fff3e0
+    style L fill:#f3e5f5
 ```
 
-##### 6.6.1.3.5 Cross-Platform Testing Strategy
+##### 6.6.1.4.4 Performance Testing Requirements
+
+The system implements comprehensive performance testing aligned with SLA requirements defined in the monitoring strategy:
+
+**Performance Test Types:**
+
+| Test Type | Target SLA | Test Duration | Load Pattern | Validation |
+|-----------|------------|---------------|--------------|------------|
+| **Load Testing** | Authentication < 1s | 30 minutes | Steady state | Response time compliance |
+| **Stress Testing** | Resource listing < 2s | 60 minutes | Gradual increase | Breaking point identification |
+| **Volume Testing** | Content retrieval < 5s | 120 minutes | High data volume | Throughput validation |
+| **Spike Testing** | Error response < 100ms | 15 minutes | Sudden load spikes | Recovery time measurement |
+
+##### 6.6.1.4.5 Cross-Platform Testing Strategy
+
+The system implements comprehensive cross-platform testing to ensure compatibility across all supported environments:
 
 **Platform Testing Matrix:**
 
-| Platform | Python Version | Test Environment | Execution Frequency |
-|----------|---------------|------------------|-------------------|
-| **Ubuntu Latest** | 3.11, 3.12 | GitHub Actions | Every commit |
-| **Windows Latest** | 3.11, 3.12 | GitHub Actions | Every commit |
-| **macOS Latest** | 3.11, 3.12 | GitHub Actions | Every commit |
-| **Container Environment** | 3.11 | Docker | Every release |
+| Platform | Python Version | Test Environment | CI Integration |
+|----------|----------------|------------------|----------------|
+| **Ubuntu 22.04** | 3.11, 3.12 | GitHub Actions | Full test suite |
+| **Windows Server 2022** | 3.11, 3.12 | GitHub Actions | Full test suite |
+| **macOS 13** | 3.11, 3.12 | GitHub Actions | Full test suite |
+| **Container (Alpine)** | 3.11, 3.12 | Docker | Integration tests |
 
 ### 6.6.2 TEST AUTOMATION
 
 #### 6.6.2.1 CI/CD Integration
 
-##### 6.6.2.1.1 GitHub Actions Workflow
-
-**CI/CD Pipeline Architecture:**
+The system implements comprehensive CI/CD integration through GitHub Actions with multi-stage testing pipelines:
 
 ```mermaid
-graph TB
-    subgraph "CI/CD Pipeline"
-        subgraph "Trigger Events"
-            PUSH[Push to Main]
-            PR[Pull Request]
-            RELEASE[Release Tag]
-            SCHEDULE[Scheduled Run]
-        end
-        
-        subgraph "Matrix Testing"
-            PYTHON_311[Python 3.11]
-            PYTHON_312[Python 3.12]
-            UBUNTU[Ubuntu Latest]
-            WINDOWS[Windows Latest]
-            MACOS[macOS Latest]
-        end
-        
-        subgraph "Test Stages"
-            UNIT_TESTS[Unit Tests]
-            INTEGRATION_TESTS[Integration Tests]
-            SECURITY_TESTS[Security Tests]
-            PERFORMANCE_TESTS[Performance Tests]
-        end
-        
-        subgraph "Quality Gates"
-            COVERAGE_CHECK[Coverage ≥ 92%]
-            SECURITY_SCAN[Security Scan Pass]
-            CODE_QUALITY[Code Quality Pass]
-            PERFORMANCE_CHECK[Performance Check Pass]
-        end
+flowchart LR
+    A[Code Push] --> B[CI Pipeline Trigger]
+    B --> C[Environment Matrix Setup]
+    C --> D[Dependency Installation]
+    D --> E[Static Analysis]
+    E --> F[Unit Tests]
+    F --> G[Integration Tests]
+    G --> H[E2E Tests]
+    H --> I[Coverage Analysis]
+    I --> J[Security Scanning]
+    J --> K[Performance Testing]
+    K --> L[Deployment Validation]
+    
+    subgraph "Parallel Execution"
+        M[Ubuntu Tests] --> N[Windows Tests]
+        N --> O[macOS Tests]
+        O --> P[Container Tests]
     end
     
-    PUSH --> PYTHON_311
-    PR --> PYTHON_312
-    RELEASE --> UBUNTU
-    SCHEDULE --> WINDOWS
-    
-    PYTHON_311 --> UNIT_TESTS
-    PYTHON_312 --> INTEGRATION_TESTS
-    UBUNTU --> SECURITY_TESTS
-    WINDOWS --> PERFORMANCE_TESTS
-    
-    UNIT_TESTS --> COVERAGE_CHECK
-    INTEGRATION_TESTS --> SECURITY_SCAN
-    SECURITY_TESTS --> CODE_QUALITY
-    PERFORMANCE_TESTS --> PERFORMANCE_CHECK
-```
-
-##### 6.6.2.1.2 Automated Test Triggers
-
-**Test Trigger Configuration:**
-
-| Trigger Type | Trigger Condition | Test Scope | Execution Environment |
-|-------------|------------------|------------|----------------------|
-| **Push Triggers** | Main branch commits | Full test suite | Matrix testing |
-| **Pull Request Triggers** | PR creation/update | Full test suite | Matrix testing |
-| **Release Triggers** | Release tag creation | Full test suite + deployment | Production-like environment |
-| **Scheduled Triggers** | Daily at 02:00 UTC | Full test suite + security scan | Latest dependencies |
-
-##### 6.6.2.1.3 Parallel Test Execution
-
-**Test Parallelization Strategy:**
-
-| Parallelization Level | Configuration | Performance Gain | Resource Usage |
-|---------------------|---------------|------------------|----------------|
-| **Process-Level** | pytest-xdist | 3x faster execution | Multi-core CPU usage |
-| **Test-Level** | pytest-asyncio | 2x faster async tests | Memory-efficient |
-| **Matrix-Level** | GitHub Actions matrix | 5x faster CI/CD | Multiple runners |
-| **Service-Level** | Docker compose | Independent service testing | Container isolation |
-
-**Parallel Execution Architecture:**
-
-```mermaid
-graph TB
-    subgraph "Parallel Test Execution"
-        subgraph "Matrix Parallelization"
-            MATRIX_PYTHON[Python Version Matrix]
-            MATRIX_OS[Operating System Matrix]
-            MATRIX_DEPS[Dependency Matrix]
-        end
-        
-        subgraph "Process Parallelization"
-            PYTEST_XDIST[pytest-xdist]
-            WORKER_1[Worker Process 1]
-            WORKER_2[Worker Process 2]
-            WORKER_N[Worker Process N]
-        end
-        
-        subgraph "Test Parallelization"
-            ASYNC_TESTS[Async Test Execution]
-            CONCURRENT_TESTS[Concurrent Test Cases]
-            ISOLATED_TESTS[Isolated Test Environment]
-        end
+    subgraph "Quality Gates"
+        Q[Coverage Threshold] --> R[Test Success Rate]
+        R --> S[Security Scan Pass]
+        S --> T[Performance SLA]
     end
     
-    MATRIX_PYTHON --> PYTEST_XDIST
-    MATRIX_OS --> WORKER_1
-    MATRIX_DEPS --> WORKER_2
+    C --> M
+    I --> Q
     
-    PYTEST_XDIST --> ASYNC_TESTS
-    WORKER_1 --> CONCURRENT_TESTS
-    WORKER_2 --> ISOLATED_TESTS
+    style A fill:#e1f5fe
+    style M fill:#fff3e0
+    style Q fill:#f3e5f5
 ```
 
-##### 6.6.2.1.4 Test Reporting Requirements
+**CI/CD Configuration:**
 
-**Test Reporting Framework:**
+| Pipeline Stage | Tool | Success Criteria | Failure Action |
+|----------------|------|------------------|----------------|
+| **Code Quality** | flake8, black, mypy | Zero violations | Block merge |
+| **Security Scanning** | bandit, safety, semgrep | No high-severity issues | Block merge |
+| **Unit Testing** | pytest | 100% pass rate, 85% coverage | Block merge |
+| **Integration Testing** | pytest | 95% pass rate | Block merge |
+| **Performance Testing** | custom harness | SLA compliance | Alert team |
 
-| Report Type | Format | Audience | Update Frequency |
-|-------------|--------|----------|------------------|
-| **Coverage Reports** | HTML, XML, JSON | Developers, QA | Every test run |
-| **Test Results** | JUnit XML, JSON | CI/CD systems | Every test run |
-| **Performance Reports** | JSON, CSV | Performance engineers | Performance test runs |
-| **Security Reports** | JSON, SARIF | Security team | Security scan runs |
+#### 6.6.2.2 Automated Test Triggers
 
-**Test Reporting Architecture:**
+The system implements intelligent test triggering based on code changes and dependencies:
 
-```mermaid
-graph TB
-    subgraph "Test Reporting System"
-        subgraph "Report Generation"
-            COVERAGE_REPORT[Coverage Report Generation]
-            TEST_RESULTS[Test Results Generation]
-            PERFORMANCE_REPORT[Performance Report Generation]
-            SECURITY_REPORT[Security Report Generation]
-        end
-        
-        subgraph "Report Formats"
-            HTML_FORMAT[HTML Reports]
-            XML_FORMAT[XML Reports]
-            JSON_FORMAT[JSON Reports]
-            CSV_FORMAT[CSV Reports]
-        end
-        
-        subgraph "Report Distribution"
-            ARTIFACT_STORAGE[Artifact Storage]
-            EMAIL_NOTIFICATION[Email Notification]
-            DASHBOARD_INTEGRATION[Dashboard Integration]
-            SLACK_INTEGRATION[Slack Integration]
-        end
-    end
-    
-    COVERAGE_REPORT --> HTML_FORMAT
-    TEST_RESULTS --> XML_FORMAT
-    PERFORMANCE_REPORT --> JSON_FORMAT
-    SECURITY_REPORT --> CSV_FORMAT
-    
-    HTML_FORMAT --> ARTIFACT_STORAGE
-    XML_FORMAT --> EMAIL_NOTIFICATION
-    JSON_FORMAT --> DASHBOARD_INTEGRATION
-    CSV_FORMAT --> SLACK_INTEGRATION
-```
+**Trigger Configuration:**
 
-##### 6.6.2.1.5 Failed Test Handling
+| Trigger Type | Conditions | Test Suite | Execution Context |
+|--------------|------------|------------|-------------------|
+| **Push Trigger** | Any commit to main/develop | Full test suite | All platforms |
+| **PR Trigger** | Pull request creation/update | Full test suite | All platforms |
+| **Dependency Update** | Requirements.txt changes | Full test suite + security | All platforms |
+| **Scheduled Trigger** | Daily at 2 AM UTC | Full test suite + performance | Production-like environment |
 
-**Test Failure Management:**
+#### 6.6.2.3 Parallel Test Execution
 
-| Failure Type | Detection Method | Resolution Strategy | Escalation Process |
-|-------------|------------------|-------------------|-------------------|
-| **Unit Test Failures** | pytest exit codes | Automatic retry (1x) | Developer notification |
-| **Integration Test Failures** | API response validation | Environment reset + retry | Team notification |
-| **Security Test Failures** | Security scan results | Immediate blocking | Security team escalation |
-| **Performance Test Failures** | Performance threshold breach | Performance analysis | Performance team escalation |
+The system implements parallel test execution to minimize CI/CD pipeline duration:
 
-**Test Failure Handling Flow:**
+**Parallelization Strategy:**
+
+| Parallelization Level | Implementation | Speed Improvement | Resource Usage |
+|----------------------|----------------|-------------------|----------------|
+| **Platform Parallel** | GitHub Actions matrix | 3x faster | 4 concurrent runners |
+| **Test Module Parallel** | pytest-xdist | 2x faster | CPU core utilization |
+| **Test Function Parallel** | pytest-xdist workers | 1.5x faster | Memory optimization |
+| **Integration Parallel** | Docker containers | 2.5x faster | Container orchestration |
+
+#### 6.6.2.4 Test Reporting Requirements
+
+The system implements comprehensive test reporting for visibility and quality tracking:
 
 ```mermaid
 flowchart TD
-    TEST_EXECUTION[Test Execution] --> FAILURE_DETECTION{Test Failure Detected?}
-    FAILURE_DETECTION -->|No| TEST_SUCCESS[Test Success]
-    FAILURE_DETECTION -->|Yes| FAILURE_ANALYSIS[Failure Analysis]
+    A[Test Execution] --> B[Result Collection]
+    B --> C[Report Generation]
     
-    FAILURE_ANALYSIS --> FAILURE_TYPE{Failure Type}
-    FAILURE_TYPE -->|Unit Test| UNIT_RETRY[Automatic Retry]
-    FAILURE_TYPE -->|Integration Test| INTEGRATION_RETRY[Environment Reset + Retry]
-    FAILURE_TYPE -->|Security Test| SECURITY_BLOCK[Immediate Blocking]
-    FAILURE_TYPE -->|Performance Test| PERFORMANCE_ANALYSIS[Performance Analysis]
+    C --> D[JUnit XML]
+    C --> E[Coverage HTML]
+    C --> F[Performance Metrics]
+    C --> G[Security Reports]
     
-    UNIT_RETRY --> RETRY_SUCCESS{Retry Successful?}
-    INTEGRATION_RETRY --> RETRY_SUCCESS
-    RETRY_SUCCESS -->|Yes| TEST_SUCCESS
-    RETRY_SUCCESS -->|No| NOTIFICATION[Failure Notification]
+    D --> H[GitHub Actions UI]
+    E --> I[Codecov Integration]
+    F --> J[Performance Dashboard]
+    G --> K[Security Dashboard]
     
-    SECURITY_BLOCK --> SECURITY_ESCALATION[Security Team Escalation]
-    PERFORMANCE_ANALYSIS --> PERFORMANCE_ESCALATION[Performance Team Escalation]
-    NOTIFICATION --> DEVELOPER_NOTIFICATION[Developer Notification]
+    H --> L[PR Comments]
+    I --> M[Coverage Badges]
+    J --> N[SLA Monitoring]
+    K --> O[Security Alerts]
+    
+    style A fill:#e1f5fe
+    style C fill:#fff3e0
+    style H fill:#f3e5f5
+    style L fill:#e8f5e8
 ```
 
-##### 6.6.2.1.6 Flaky Test Management
+**Report Types:**
 
-**Flaky Test Detection and Management:**
+| Report Type | Format | Audience | Delivery Method |
+|-------------|--------|----------|----------------|
+| **Test Results** | JUnit XML | Development team | GitHub Actions UI |
+| **Coverage Report** | HTML/XML | Development team | Codecov integration |
+| **Performance Report** | JSON/HTML | Operations team | Performance dashboard |
+| **Security Report** | SARIF/JSON | Security team | GitHub Security tab |
 
-| Detection Method | Threshold | Management Strategy | Prevention Measures |
-|------------------|-----------|-------------------|-------------------|
-| **Test History Analysis** | 3 failures in 10 runs | Quarantine and investigation | Test stability improvement |
-| **Timing-based Flakiness** | Inconsistent execution time | Timeout adjustment | Deterministic test design |
-| **Environment-based Flakiness** | Environment-specific failures | Environment standardization | Container-based testing |
-| **Dependency-based Flakiness** | External service failures | Enhanced mocking | Dependency isolation |
+#### 6.6.2.5 Failed Test Handling
 
-**Flaky Test Management Process:**
+The system implements systematic failed test handling with automated diagnosis and remediation:
 
-```mermaid
-graph TB
-    subgraph "Flaky Test Management"
-        subgraph "Detection"
-            HISTORY_ANALYSIS[Test History Analysis]
-            TIMING_ANALYSIS[Timing Analysis]
-            ENVIRONMENT_ANALYSIS[Environment Analysis]
-            DEPENDENCY_ANALYSIS[Dependency Analysis]
-        end
-        
-        subgraph "Management"
-            QUARANTINE[Test Quarantine]
-            INVESTIGATION[Root Cause Investigation]
-            STABILIZATION[Test Stabilization]
-            MONITORING[Ongoing Monitoring]
-        end
-        
-        subgraph "Prevention"
-            DETERMINISTIC_DESIGN[Deterministic Test Design]
-            ENHANCED_MOCKING[Enhanced Mocking]
-            CONTAINER_ISOLATION[Container Isolation]
-            DEPENDENCY_ISOLATION[Dependency Isolation]
-        end
-    end
-    
-    HISTORY_ANALYSIS --> QUARANTINE
-    TIMING_ANALYSIS --> INVESTIGATION
-    ENVIRONMENT_ANALYSIS --> STABILIZATION
-    DEPENDENCY_ANALYSIS --> MONITORING
-    
-    QUARANTINE --> DETERMINISTIC_DESIGN
-    INVESTIGATION --> ENHANCED_MOCKING
-    STABILIZATION --> CONTAINER_ISOLATION
-    MONITORING --> DEPENDENCY_ISOLATION
-```
+**Failure Handling Process:**
+
+| Failure Type | Detection Method | Response Action | Escalation |
+|--------------|------------------|-----------------|------------|
+| **Flaky Test** | Multiple runs analysis | Automatic retry (3x) | Mark as flaky |
+| **Environment Issue** | Infrastructure failure | Environment rebuild | Operations team |
+| **Code Regression** | Consistent failure | Block merge | Development team |
+| **Performance Degradation** | SLA violation | Performance alert | Engineering manager |
+
+#### 6.6.2.6 Flaky Test Management
+
+The system implements comprehensive flaky test management to maintain test suite reliability:
+
+**Flaky Test Detection:**
+
+| Detection Method | Threshold | Action | Monitoring |
+|------------------|-----------|--------|------------|
+| **Success Rate Tracking** | < 95% pass rate | Mark as flaky | Weekly review |
+| **Retry Pattern Analysis** | > 2 retries average | Investigate root cause | Automated alerts |
+| **Environment Correlation** | Platform-specific failures | Environment-specific fixes | Cross-platform analysis |
+| **Time-based Analysis** | Time-dependent failures | Timing adjustments | Performance monitoring |
 
 ### 6.6.3 QUALITY METRICS
 
 #### 6.6.3.1 Code Coverage Targets
 
-##### 6.6.3.1.1 Coverage Requirements
+The system enforces comprehensive code coverage targets aligned with enterprise quality standards:
 
-**Coverage Threshold Configuration:**
+**Coverage Requirements:**
 
-| Coverage Type | Minimum Threshold | Target Threshold | Enforcement Level |
-|---------------|------------------|------------------|-------------------|
-| **Line Coverage** | <span style="background-color: rgba(91, 57, 243, 0.2)">92%</span> | <span style="background-color: rgba(91, 57, 243, 0.2)">92%</span> | CI/CD blocking |
-| **Branch Coverage** | 80% | 85% | CI/CD blocking |
-| **Function Coverage** | 90% | 95% | CI/CD blocking |
-| **Class Coverage** | 85% | 90% | CI/CD blocking |
-
-**Coverage Analysis Framework:**
-
-```mermaid
-graph TB
-    subgraph "Coverage Analysis Framework"
-        subgraph "Coverage Collection"
-            LINE_COVERAGE[Line Coverage Collection]
-            BRANCH_COVERAGE[Branch Coverage Collection]
-            FUNCTION_COVERAGE[Function Coverage Collection]
-            CLASS_COVERAGE[Class Coverage Collection]
-        end
-        
-        subgraph "Coverage Analysis"
-            COVERAGE_CALCULATION[Coverage Calculation]
-            THRESHOLD_VALIDATION[Threshold Validation]
-            TREND_ANALYSIS[Trend Analysis]
-            REPORT_GENERATION[Report Generation]
-        end
-        
-        subgraph "Coverage Enforcement"
-            QUALITY_GATE[Quality Gate Enforcement]
-            CI_BLOCKING[CI/CD Blocking]
-            NOTIFICATION[Coverage Notification]
-            IMPROVEMENT_TRACKING[Improvement Tracking]
-        end
-    end
-    
-    LINE_COVERAGE --> COVERAGE_CALCULATION
-    BRANCH_COVERAGE --> THRESHOLD_VALIDATION
-    FUNCTION_COVERAGE --> TREND_ANALYSIS
-    CLASS_COVERAGE --> REPORT_GENERATION
-    
-    COVERAGE_CALCULATION --> QUALITY_GATE
-    THRESHOLD_VALIDATION --> CI_BLOCKING
-    TREND_ANALYSIS --> NOTIFICATION
-    REPORT_GENERATION --> IMPROVEMENT_TRACKING
-```
-
-##### 6.6.3.1.2 Coverage Exclusions
-
-**Exclusion Configuration:**
-
-| Exclusion Category | Rationale | Implementation | Review Frequency |
-|-------------------|-----------|----------------|------------------|
-| **Test Files** | Testing infrastructure | `.coveragerc` configuration | Never |
-| **Third-party Integration** | External library wrappers | `# pragma: no cover` | Quarterly |
-| **Configuration Parsing** | Static configuration code | `.coveragerc` configuration | Semi-annually |
-| **Debug Utilities** | Development-only code | `# pragma: no cover` | Quarterly |
+| Coverage Type | Target | Minimum | Critical Components | Enforcement |
+|---------------|--------|---------|-------------------|-------------|
+| **Line Coverage** | 90% | 85% | Authentication: 100% | CI/CD blocking |
+| **Branch Coverage** | 85% | 80% | Security: 100% | PR review requirement |
+| **Function Coverage** | 95% | 90% | Core API: 100% | Automated validation |
+| **Statement Coverage** | 88% | 83% | Error handling: 100% | Quality gates |
 
 #### 6.6.3.2 Test Success Rate Requirements
 
-##### 6.6.3.2.1 Success Rate Targets
+The system maintains strict test success rate requirements across all test categories:
 
-**Test Success Rate Configuration:**
+**Success Rate Targets:**
 
-| Test Category | Target Success Rate | Measurement Period | Alert Threshold |
-|---------------|-------------------|-------------------|-----------------|
-| **Unit Tests** | 99.5% | Rolling 7 days | <98% |
-| **Integration Tests** | 98% | Rolling 7 days | <95% |
-| **End-to-End Tests** | 95% | Rolling 7 days | <90% |
-| **Performance Tests** | 90% | Rolling 30 days | <85% |
-
-**Success Rate Monitoring:**
-
-```mermaid
-graph TB
-    subgraph "Test Success Rate Monitoring"
-        subgraph "Success Rate Collection"
-            UNIT_SUCCESS[Unit Test Success Rate]
-            INTEGRATION_SUCCESS[Integration Test Success Rate]
-            E2E_SUCCESS[End-to-End Test Success Rate]
-            PERFORMANCE_SUCCESS[Performance Test Success Rate]
-        end
-        
-        subgraph "Success Rate Analysis"
-            TREND_ANALYSIS[Trend Analysis]
-            THRESHOLD_MONITORING[Threshold Monitoring]
-            FAILURE_ANALYSIS[Failure Analysis]
-            IMPROVEMENT_TRACKING[Improvement Tracking]
-        end
-        
-        subgraph "Success Rate Actions"
-            ALERT_GENERATION[Alert Generation]
-            INVESTIGATION[Investigation Trigger]
-            IMPROVEMENT_PLAN[Improvement Plan]
-            STAKEHOLDER_NOTIFICATION[Stakeholder Notification]
-        end
-    end
-    
-    UNIT_SUCCESS --> TREND_ANALYSIS
-    INTEGRATION_SUCCESS --> THRESHOLD_MONITORING
-    E2E_SUCCESS --> FAILURE_ANALYSIS
-    PERFORMANCE_SUCCESS --> IMPROVEMENT_TRACKING
-    
-    TREND_ANALYSIS --> ALERT_GENERATION
-    THRESHOLD_MONITORING --> INVESTIGATION
-    FAILURE_ANALYSIS --> IMPROVEMENT_PLAN
-    IMPROVEMENT_TRACKING --> STAKEHOLDER_NOTIFICATION
-```
+| Test Category | Target Success Rate | Minimum Threshold | Failure Action |
+|---------------|-------------------|-------------------|----------------|
+| **Unit Tests** | 100% | 98% | Block deployment |
+| **Integration Tests** | 98% | 95% | Investigation required |
+| **E2E Tests** | 95% | 90% | Environment validation |
+| **Performance Tests** | 90% | 85% | Performance review |
 
 #### 6.6.3.3 Performance Test Thresholds
 
-##### 6.6.3.3.1 Performance Requirements
+The system implements performance test thresholds aligned with SLA requirements:
 
-**Performance Threshold Configuration:**
+**Performance Thresholds:**
 
-| Performance Metric | Threshold Value | Measurement Method | Alert Condition |
-|-------------------|-----------------|-------------------|-----------------|
-| **Response Time** | P95 < 2000ms | pytest-benchmark | P95 > 2500ms |
-| **Memory Usage** | <100MB peak | memory_profiler | >120MB peak |
-| **Throughput** | >100 requests/min | Load testing | <80 requests/min |
-| **Concurrent Users** | 10 simultaneous | Concurrency testing | <8 simultaneous |
-
-**Performance Testing Architecture:**
-
-```mermaid
-graph TB
-    subgraph "Performance Testing Framework"
-        subgraph "Performance Metrics"
-            RESPONSE_TIME[Response Time Measurement]
-            MEMORY_USAGE[Memory Usage Monitoring]
-            THROUGHPUT[Throughput Measurement]
-            CONCURRENCY[Concurrency Testing]
-        end
-        
-        subgraph "Performance Tools"
-            PYTEST_BENCHMARK[pytest-benchmark]
-            MEMORY_PROFILER[memory_profiler]
-            LOAD_TESTER[Load Testing Framework]
-            ASYNC_TESTER[Async Testing Framework]
-        end
-        
-        subgraph "Performance Analysis"
-            THRESHOLD_VALIDATION[Threshold Validation]
-            TREND_ANALYSIS[Performance Trend Analysis]
-            BOTTLENECK_DETECTION[Bottleneck Detection]
-            OPTIMIZATION_RECOMMENDATIONS[Optimization Recommendations]
-        end
-    end
-    
-    RESPONSE_TIME --> PYTEST_BENCHMARK
-    MEMORY_USAGE --> MEMORY_PROFILER
-    THROUGHPUT --> LOAD_TESTER
-    CONCURRENCY --> ASYNC_TESTER
-    
-    PYTEST_BENCHMARK --> THRESHOLD_VALIDATION
-    MEMORY_PROFILER --> TREND_ANALYSIS
-    LOAD_TESTER --> BOTTLENECK_DETECTION
-    ASYNC_TESTER --> OPTIMIZATION_RECOMMENDATIONS
-```
+| Operation | Target SLA | Warning Threshold | Critical Threshold | Action |
+|-----------|------------|-------------------|-------------------|--------|
+| **Authentication** | < 1s | 800ms | 2s | Performance optimization |
+| **Resource Listing** | < 2s | 1.5s | 4s | Caching evaluation |
+| **Content Retrieval** | < 5s | 4s | 8s | API optimization |
+| **Error Response** | < 100ms | 80ms | 200ms | Error handling review |
 
 #### 6.6.3.4 Quality Gates
 
-##### 6.6.3.4.1 Quality Gate Configuration
-
-**Quality Gate Requirements:**
-
-| Quality Gate | Requirement | Measurement | Enforcement |
-|-------------|-------------|-------------|-------------|
-| **Code Coverage** | <span style="background-color: rgba(91, 57, 243, 0.2)">≥92% line coverage</span> | pytest-cov | CI/CD blocking |
-| **Test Success Rate** | ≥98% success rate | Test execution results | CI/CD blocking |
-| **Security Scan** | No high/critical vulnerabilities | Bandit, Semgrep, CodeQL | CI/CD blocking |
-| **Code Quality** | No quality violations | mypy, black, flake8 | CI/CD blocking |
-| **Performance** | Meet performance thresholds | Performance testing | CI/CD warning |
-
-**Quality Gate Enforcement Flow:**
+The system implements comprehensive quality gates to ensure code quality and system reliability:
 
 ```mermaid
 flowchart TD
-    CODE_COMMIT[Code Commit] --> QUALITY_GATES[Quality Gates Evaluation]
+    A[Code Commit] --> B[Quality Gate 1: Static Analysis]
+    B --> C{Pass?}
+    C -->|No| D[Block Merge]
+    C -->|Yes| E[Quality Gate 2: Unit Tests]
+    E --> F{Pass?}
+    F -->|No| D
+    F -->|Yes| G[Quality Gate 3: Integration Tests]
+    G --> H{Pass?}
+    H -->|No| D
+    H -->|Yes| I[Quality Gate 4: Security Scan]
+    I --> J{Pass?}
+    J -->|No| D
+    J -->|Yes| K[Quality Gate 5: Performance Tests]
+    K --> L{Pass?}
+    L -->|No| M[Performance Alert]
+    L -->|Yes| N[Approve Merge]
     
-    QUALITY_GATES --> COVERAGE_CHECK{Coverage ≥ 92%?}
-    QUALITY_GATES --> SUCCESS_CHECK{Success Rate ≥ 98%?}
-    QUALITY_GATES --> SECURITY_CHECK{Security Scan Pass?}
-    QUALITY_GATES --> QUALITY_CHECK{Code Quality Pass?}
-    QUALITY_GATES --> PERFORMANCE_CHECK{Performance Pass?}
-    
-    COVERAGE_CHECK -->|No| GATE_FAILURE[Quality Gate Failure]
-    SUCCESS_CHECK -->|No| GATE_FAILURE
-    SECURITY_CHECK -->|No| GATE_FAILURE
-    QUALITY_CHECK -->|No| GATE_FAILURE
-    PERFORMANCE_CHECK -->|No| GATE_WARNING[Quality Gate Warning]
-    
-    COVERAGE_CHECK -->|Yes| GATE_SUCCESS[Quality Gate Success]
-    SUCCESS_CHECK -->|Yes| GATE_SUCCESS
-    SECURITY_CHECK -->|Yes| GATE_SUCCESS
-    QUALITY_CHECK -->|Yes| GATE_SUCCESS
-    PERFORMANCE_CHECK -->|Yes| GATE_SUCCESS
-    
-    GATE_FAILURE --> DEPLOYMENT_BLOCKED[Deployment Blocked]
-    GATE_WARNING --> DEPLOYMENT_ALLOWED[Deployment Allowed with Warning]
-    GATE_SUCCESS --> DEPLOYMENT_APPROVED[Deployment Approved]
+    style D fill:#ffcdd2
+    style N fill:#c8e6c9
+    style M fill:#fff3e0
 ```
+
+**Quality Gate Configuration:**
+
+| Gate | Criteria | Blocking | Bypass Authority |
+|------|----------|----------|------------------|
+| **Static Analysis** | Zero critical issues | Yes | Lead engineer |
+| **Unit Tests** | 100% pass, 85% coverage | Yes | Engineering manager |
+| **Integration Tests** | 95% pass rate | Yes | Engineering manager |
+| **Security Scan** | No high-severity issues | Yes | Security team |
+| **Performance Tests** | SLA compliance | No | Performance team |
 
 #### 6.6.3.5 Documentation Requirements
 
-##### 6.6.3.5.1 Test Documentation Standards
+The system maintains comprehensive documentation requirements for test coverage and quality assurance:
 
-**Documentation Requirements:**
+**Documentation Standards:**
 
-| Documentation Type | Requirement | Format | Maintenance |
-|-------------------|-------------|---------|-------------|
-| **Test Plan Documentation** | Comprehensive test strategy | Markdown | Quarterly updates |
-| **Test Case Documentation** | Individual test case description | Docstrings | Continuous |
-| **Test Data Documentation** | Test data structure and usage | Markdown | Semi-annually |
-| **Test Environment Documentation** | Environment setup and configuration | Markdown | Quarterly |
+| Document Type | Coverage Requirement | Update Frequency | Review Process |
+|---------------|-------------------|------------------|----------------|
+| **Test Plans** | 100% feature coverage | Per release | Peer review |
+| **Test Cases** | All critical paths | Per feature | QA review |
+| **Runbooks** | All failure scenarios | Monthly | Operations review |
+| **Quality Reports** | All quality metrics | Weekly | Management review |
 
-**Documentation Architecture:**
-
-```mermaid
-graph TB
-    subgraph "Test Documentation Framework"
-        subgraph "Documentation Types"
-            TEST_PLAN[Test Plan Documentation]
-            TEST_CASE[Test Case Documentation]
-            TEST_DATA[Test Data Documentation]
-            TEST_ENV[Test Environment Documentation]
-        end
-        
-        subgraph "Documentation Tools"
-            MARKDOWN_DOCS[Markdown Documentation]
-            DOCSTRING_DOCS[Docstring Documentation]
-            SPHINX_DOCS[Sphinx Documentation]
-            README_DOCS[README Documentation]
-        end
-        
-        subgraph "Documentation Management"
-            VERSION_CONTROL[Version Control]
-            REVIEW_PROCESS[Review Process]
-            UPDATE_SCHEDULE[Update Schedule]
-            QUALITY_ASSURANCE[Quality Assurance]
-        end
-    end
-    
-    TEST_PLAN --> MARKDOWN_DOCS
-    TEST_CASE --> DOCSTRING_DOCS
-    TEST_DATA --> SPHINX_DOCS
-    TEST_ENV --> README_DOCS
-    
-    MARKDOWN_DOCS --> VERSION_CONTROL
-    DOCSTRING_DOCS --> REVIEW_PROCESS
-    SPHINX_DOCS --> UPDATE_SCHEDULE
-    README_DOCS --> QUALITY_ASSURANCE
-```
-
-### 6.6.4 SECURITY TESTING
-
-#### 6.6.4.1 Security Testing Framework
-
-##### 6.6.4.1.1 Static Analysis Security Testing
-
-**Security Testing Tools:**
-
-| Tool | Purpose | Scan Scope | Execution Frequency |
-|------|---------|-----------|-------------------|
-| **Bandit** | Python security linting | Source code | Every commit |
-| **Semgrep** | Advanced static analysis | Source code, configuration | Every commit |
-| **CodeQL** | Semantic code analysis | Source code, dependencies | Every commit |
-| **Safety** | Dependency vulnerability scanning | Dependencies | Daily |
-| **<span style="background-color: rgba(91, 57, 243, 0.2)">pytest + custom grep</span>** | <span style="background-color: rgba(91, 57, 243, 0.2)">Verify no literal secret/token strings appear in logs</span> | <span style="background-color: rgba(91, 57, 243, 0.2)">Log artifacts generated during test run</span> | <span style="background-color: rgba(91, 57, 243, 0.2)">Every commit</span> |
-
-**Security Testing Architecture:**
+### 6.6.4 TEST EXECUTION FLOW
 
 ```mermaid
-graph TB
-    subgraph "Security Testing Framework"
-        subgraph "Static Analysis"
-            BANDIT[Bandit Security Linting]
-            SEMGREP[Semgrep Analysis]
-            CODEQL[CodeQL Analysis]
-            SAFETY[Safety Dependency Scanning]
-        end
-        
-        subgraph "Dynamic Analysis"
-            RUNTIME_ANALYSIS[Runtime Security Analysis]
-            PENETRATION_TESTING[Penetration Testing]
-            VULNERABILITY_SCANNING[Vulnerability Scanning]
-            COMPLIANCE_TESTING[Compliance Testing]
-        end
-        
-        subgraph "Security Validation"
-            AUTHENTICATION_TESTING[Authentication Testing]
-            AUTHORIZATION_TESTING[Authorization Testing]
-            DATA_PROTECTION[Data Protection Testing]
-            AUDIT_LOGGING[Audit Logging Testing]
-            SECRET_REDACTION[Secret Redaction Verification]
-        end
-    end
+flowchart TB
+    A[Developer Commit] --> B[CI Pipeline Trigger]
+    B --> C[Environment Setup]
+    C --> D[Static Analysis]
+    D --> E{Quality Check Pass?}
+    E -->|No| F[Fail Build]
+    E -->|Yes| G[Unit Test Execution]
+    G --> H[Coverage Analysis]
+    H --> I{Coverage Target Met?}
+    I -->|No| F
+    I -->|Yes| J[Integration Test Setup]
+    J --> K[Integration Test Execution]
+    K --> L[E2E Test Execution]
+    L --> M[Performance Test Execution]
+    M --> N[Security Scan Execution]
+    N --> O[Test Report Generation]
+    O --> P[Quality Gate Evaluation]
+    P --> Q{All Gates Pass?}
+    Q -->|No| R[Block Merge]
+    Q -->|Yes| S[Approve Merge]
     
-    BANDIT --> RUNTIME_ANALYSIS
-    SEMGREP --> PENETRATION_TESTING
-    CODEQL --> VULNERABILITY_SCANNING
-    SAFETY --> COMPLIANCE_TESTING
+    F --> T[Notify Developer]
+    R --> T
+    S --> U[Deploy to Staging]
     
-    RUNTIME_ANALYSIS --> AUTHENTICATION_TESTING
-    PENETRATION_TESTING --> AUTHORIZATION_TESTING
-    VULNERABILITY_SCANNING --> DATA_PROTECTION
-    COMPLIANCE_TESTING --> AUDIT_LOGGING
-    
-    AUDIT_LOGGING --> SECRET_REDACTION
-```
-
-<span style="background-color: rgba(91, 57, 243, 0.2)">**Secret Redaction Verification**: The security testing framework includes comprehensive validation of the dual-layer secret redaction system through automated test cases implemented in `tests/test_logging.py`. This verification ensures that all logging paths, including early argv scrubbing and runtime credential sanitization, effectively prevent literal secret or token strings from appearing in log artifacts during test execution.</span>
-
-##### 6.6.4.1.2 Dependency Security Testing
-
-**Dependency Security Strategy:**
-
-| Security Aspect | Testing Tool | Scan Frequency | Remediation Process |
-|-----------------|-------------|---------------|-------------------|
-| **Known Vulnerabilities** | Safety | Daily | Immediate dependency updates |
-| **Container Vulnerabilities** | Trivy | Every build | Container image updates |
-| **License Compliance** | pip-licenses | Weekly | License compatibility review |
-| **Supply Chain Security** | SBOM generation | Every release | Supply chain validation |
-
-##### 6.6.4.1.3 Authentication Security Testing
-
-**Authentication Testing Framework:**
-
-| Test Category | Test Scope | Validation Method | Security Standard |
-|---------------|-----------|------------------|-------------------|
-| **HMAC-SHA256 Validation** | Cryptographic implementation | Unit testing | FIPS 140-2 |
-| **Session Management** | Session lifecycle | Integration testing | OWASP ASVS |
-| **Credential Protection** | Credential handling | Security testing | NIST SP 800-63 |
-| **Access Control** | Permission validation | Authorization testing | RBAC principles |
-
-#### 6.6.4.2 Compliance Testing
-
-##### 6.6.4.2.1 Regulatory Compliance Testing
-
-**Compliance Testing Framework:**
-
-| Compliance Standard | Testing Scope | Validation Method | Audit Frequency |
-|-------------------|---------------|------------------|-----------------|
-| **SOC2** | Security controls | Automated testing | Quarterly |
-| **ISO 27001** | Information security | Manual validation | Semi-annually |
-| **HIPAA** | Healthcare data protection | Compliance testing | Annually |
-| **GDPR** | Data protection | Privacy testing | Quarterly |
-
-**Compliance Testing Architecture:**
-
-```mermaid
-graph TB
-    subgraph "Compliance Testing Framework"
-        subgraph "Regulatory Standards"
-            SOC2[SOC2 Compliance]
-            ISO27001[ISO 27001 Compliance]
-            HIPAA[HIPAA Compliance]
-            GDPR[GDPR Compliance]
-        end
-        
-        subgraph "Testing Methods"
-            AUTOMATED_TESTING[Automated Testing]
-            MANUAL_VALIDATION[Manual Validation]
-            COMPLIANCE_TESTING[Compliance Testing]
-            PRIVACY_TESTING[Privacy Testing]
-        end
-        
-        subgraph "Validation Framework"
-            CONTROL_VALIDATION[Control Validation]
-            AUDIT_TRAIL[Audit Trail Validation]
-            DATA_PROTECTION[Data Protection Validation]
-            ACCESS_CONTROL[Access Control Validation]
-        end
-    end
-    
-    SOC2 --> AUTOMATED_TESTING
-    ISO27001 --> MANUAL_VALIDATION
-    HIPAA --> COMPLIANCE_TESTING
-    GDPR --> PRIVACY_TESTING
-    
-    AUTOMATED_TESTING --> CONTROL_VALIDATION
-    MANUAL_VALIDATION --> AUDIT_TRAIL
-    COMPLIANCE_TESTING --> DATA_PROTECTION
-    PRIVACY_TESTING --> ACCESS_CONTROL
+    style F fill:#ffcdd2
+    style R fill:#ffcdd2
+    style S fill:#c8e6c9
+    style U fill:#e8f5e8
 ```
 
 ### 6.6.5 TEST ENVIRONMENT ARCHITECTURE
 
-#### 6.6.5.1 Test Environment Management
-
-##### 6.6.5.1.1 Environment Configuration
-
-**Test Environment Types:**
-
-| Environment Type | Purpose | Configuration | Isolation Level |
-|------------------|---------|---------------|-----------------|
-| **Local Development** | Developer testing | Local configuration | Process isolation |
-| **CI/CD Environment** | Automated testing | GitHub Actions | Container isolation |
-| **Integration Environment** | Service integration | Docker compose | Service isolation |
-| **Performance Environment** | Performance testing | Dedicated resources | Resource isolation |
-
-**Environment Architecture:**
-
 ```mermaid
-graph TB
-    subgraph "Test Environment Architecture"
-        subgraph "Local Environment"
-            LOCAL_DEV[Local Development]
-            VIRTUAL_ENV[Virtual Environment]
-            LOCAL_CONFIG[Local Configuration]
-        end
-        
-        subgraph "CI/CD Environment"
-            GITHUB_ACTIONS[GitHub Actions]
-            MATRIX_TESTING[Matrix Testing]
-            CONTAINER_TESTING[Container Testing]
-        end
-        
-        subgraph "Integration Environment"
-            DOCKER_COMPOSE[Docker Compose]
-            SERVICE_ISOLATION[Service Isolation]
-            NETWORK_ISOLATION[Network Isolation]
-        end
-        
-        subgraph "Performance Environment"
-            DEDICATED_RESOURCES[Dedicated Resources]
-            PERFORMANCE_MONITORING[Performance Monitoring]
-            LOAD_GENERATION[Load Generation]
-        end
+flowchart TB
+    subgraph "Development Environment"
+        A[Local Development] --> B[Unit Tests]
+        B --> C[Integration Tests]
+        C --> D[Local Mock Services]
     end
     
-    LOCAL_DEV --> VIRTUAL_ENV
-    VIRTUAL_ENV --> LOCAL_CONFIG
-    GITHUB_ACTIONS --> MATRIX_TESTING
-    MATRIX_TESTING --> CONTAINER_TESTING
-    DOCKER_COMPOSE --> SERVICE_ISOLATION
-    SERVICE_ISOLATION --> NETWORK_ISOLATION
-    DEDICATED_RESOURCES --> PERFORMANCE_MONITORING
-    PERFORMANCE_MONITORING --> LOAD_GENERATION
-```
-
-##### 6.6.5.1.2 Environment Provisioning
-
-**Environment Provisioning Strategy:**
-
-| Provisioning Method | Environment Type | Automation Level | Provisioning Time |
-|-------------------|------------------|------------------|-------------------|
-| **Virtual Environment** | Local development | Semi-automated | <2 minutes |
-| **Container Provisioning** | CI/CD testing | Fully automated | <5 minutes |
-| **Docker Compose** | Integration testing | Fully automated | <3 minutes |
-| **Cloud Provisioning** | Performance testing | Fully automated | <10 minutes |
-
-#### 6.6.5.2 Test Data Management
-
-##### 6.6.5.2.1 Test Data Architecture
-
-**Test Data Management Strategy:**
-
-| Data Type | Management Method | Storage Location | Lifecycle Management |
-|-----------|------------------|------------------|-------------------|
-| **Static Test Data** | Version controlled | Repository fixtures | Manual updates |
-| **Dynamic Test Data** | Generated | Temporary storage | Automatic cleanup |
-| **Mock Data** | Programmatic generation | Memory | Test-scoped |
-| **Configuration Data** | Template-based | Configuration files | Environment-specific |
-
-**Test Data Flow:**
-
-```mermaid
-graph TB
-    subgraph "Test Data Management"
-        subgraph "Data Sources"
-            STATIC_DATA[Static Test Data]
-            DYNAMIC_DATA[Dynamic Test Data]
-            MOCK_DATA[Mock Data]
-            CONFIG_DATA[Configuration Data]
-        end
-        
-        subgraph "Data Processing"
-            DATA_GENERATION[Data Generation]
-            DATA_VALIDATION[Data Validation]
-            DATA_TRANSFORMATION[Data Transformation]
-            DATA_CLEANUP[Data Cleanup]
-        end
-        
-        subgraph "Data Storage"
-            REPOSITORY_STORAGE[Repository Storage]
-            TEMPORARY_STORAGE[Temporary Storage]
-            MEMORY_STORAGE[Memory Storage]
-            CONFIG_STORAGE[Configuration Storage]
-        end
+    subgraph "CI Environment"
+        E[GitHub Actions] --> F[Matrix Testing]
+        F --> G[Ubuntu Tests]
+        F --> H[Windows Tests]
+        F --> I[macOS Tests]
+        G --> J[Container Tests]
+        H --> J
+        I --> J
     end
     
-    STATIC_DATA --> DATA_GENERATION
-    DYNAMIC_DATA --> DATA_VALIDATION
-    MOCK_DATA --> DATA_TRANSFORMATION
-    CONFIG_DATA --> DATA_CLEANUP
-    
-    DATA_GENERATION --> REPOSITORY_STORAGE
-    DATA_VALIDATION --> TEMPORARY_STORAGE
-    DATA_TRANSFORMATION --> MEMORY_STORAGE
-    DATA_CLEANUP --> CONFIG_STORAGE
-```
-
-### 6.6.6 CONTINUOUS IMPROVEMENT
-
-#### 6.6.6.1 Testing Metrics and Analytics
-
-##### 6.6.6.1.1 Test Metrics Collection
-
-**Test Metrics Framework:**
-
-| Metric Category | Key Metrics | Collection Method | Analysis Frequency |
-|-----------------|------------|------------------|-------------------|
-| **Test Execution** | Success rate, execution time, flakiness | Automated collection | Daily |
-| **Test Coverage** | Line, branch, function coverage | Coverage analysis | Every test run |
-| **Test Quality** | Test effectiveness, defect detection | Quality analysis | Weekly |
-| **Test Efficiency** | Resource utilization, execution speed | Performance monitoring | Monthly |
-
-**Metrics Collection Architecture:**
-
-```mermaid
-graph TB
-    subgraph "Test Metrics Collection"
-        subgraph "Metrics Sources"
-            EXECUTION_METRICS[Test Execution Metrics]
-            COVERAGE_METRICS[Test Coverage Metrics]
-            QUALITY_METRICS[Test Quality Metrics]
-            EFFICIENCY_METRICS[Test Efficiency Metrics]
-        end
-        
-        subgraph "Collection Methods"
-            AUTOMATED_COLLECTION[Automated Collection]
-            COVERAGE_ANALYSIS[Coverage Analysis]
-            QUALITY_ANALYSIS[Quality Analysis]
-            PERFORMANCE_MONITORING[Performance Monitoring]
-        end
-        
-        subgraph "Analysis Framework"
-            DAILY_ANALYSIS[Daily Analysis]
-            CONTINUOUS_ANALYSIS[Continuous Analysis]
-            WEEKLY_ANALYSIS[Weekly Analysis]
-            MONTHLY_ANALYSIS[Monthly Analysis]
-        end
+    subgraph "Testing Infrastructure"
+        K[Mock API Services] --> L[LabArchives API Mock]
+        K --> M[Authentication Mock]
+        K --> N[Monitoring Mock]
+        L --> O[Multi-region Support]
+        M --> P[HMAC Validation]
+        N --> Q[Metrics Collection]
     end
     
-    EXECUTION_METRICS --> AUTOMATED_COLLECTION
-    COVERAGE_METRICS --> COVERAGE_ANALYSIS
-    QUALITY_METRICS --> QUALITY_ANALYSIS
-    EFFICIENCY_METRICS --> PERFORMANCE_MONITORING
-    
-    AUTOMATED_COLLECTION --> DAILY_ANALYSIS
-    COVERAGE_ANALYSIS --> CONTINUOUS_ANALYSIS
-    QUALITY_ANALYSIS --> WEEKLY_ANALYSIS
-    PERFORMANCE_MONITORING --> MONTHLY_ANALYSIS
-```
-
-#### 6.6.6.2 Test Strategy Evolution
-
-##### 6.6.6.2.1 Strategy Improvement Process
-
-**Improvement Process Framework:**
-
-| Improvement Area | Evaluation Method | Implementation Strategy | Review Frequency |
-|------------------|------------------|------------------------|------------------|
-| **Test Effectiveness** | Defect analysis | Process refinement | Monthly |
-| **Test Efficiency** | Performance analysis | Tool optimization | Quarterly |
-| **Test Coverage** | Coverage analysis | Coverage improvement | Continuous |
-| **Test Quality** | Quality metrics | Quality enhancement | Weekly |
-
-**Strategy Evolution Framework:**
-
-```mermaid
-graph TB
-    subgraph "Test Strategy Evolution"
-        subgraph "Evaluation Methods"
-            DEFECT_ANALYSIS[Defect Analysis]
-            PERFORMANCE_ANALYSIS[Performance Analysis]
-            COVERAGE_ANALYSIS[Coverage Analysis]
-            QUALITY_METRICS[Quality Metrics]
-        end
-        
-        subgraph "Implementation Strategies"
-            PROCESS_REFINEMENT[Process Refinement]
-            TOOL_OPTIMIZATION[Tool Optimization]
-            COVERAGE_IMPROVEMENT[Coverage Improvement]
-            QUALITY_ENHANCEMENT[Quality Enhancement]
-        end
-        
-        subgraph "Review Processes"
-            MONTHLY_REVIEW[Monthly Review]
-            QUARTERLY_REVIEW[Quarterly Review]
-            CONTINUOUS_REVIEW[Continuous Review]
-            WEEKLY_REVIEW[Weekly Review]
-        end
+    subgraph "Quality Assurance"
+        R[Code Coverage] --> S[Line Coverage]
+        R --> T[Branch Coverage]
+        R --> U[Function Coverage]
+        S --> V[Quality Reports]
+        T --> V
+        U --> V
     end
     
-    DEFECT_ANALYSIS --> PROCESS_REFINEMENT
-    PERFORMANCE_ANALYSIS --> TOOL_OPTIMIZATION
-    COVERAGE_ANALYSIS --> COVERAGE_IMPROVEMENT
-    QUALITY_METRICS --> QUALITY_ENHANCEMENT
+    A --> E
+    J --> K
+    V --> W[Quality Dashboard]
     
-    PROCESS_REFINEMENT --> MONTHLY_REVIEW
-    TOOL_OPTIMIZATION --> QUARTERLY_REVIEW
-    COVERAGE_IMPROVEMENT --> CONTINUOUS_REVIEW
-    QUALITY_ENHANCEMENT --> WEEKLY_REVIEW
+    style A fill:#e1f5fe
+    style E fill:#fff3e0
+    style K fill:#f3e5f5
+    style R fill:#e8f5e8
 ```
+
+### 6.6.6 TEST DATA FLOW
+
+```mermaid
+flowchart LR
+    A[Test Data Sources] --> B[Static Test Data]
+    A --> C[Dynamic Test Data]
+    A --> D[Mock Data Generators]
+    
+    B --> E[Fixtures Directory]
+    B --> F[Configuration Files]
+    
+    C --> G[Factory Functions]
+    C --> H[Data Builders]
+    
+    D --> I[API Response Mocks]
+    D --> J[Authentication Mocks]
+    
+    E --> K[Unit Tests]
+    F --> L[Integration Tests]
+    G --> M[Performance Tests]
+    H --> N[E2E Tests]
+    I --> O[API Tests]
+    J --> P[Security Tests]
+    
+    K --> Q[Test Execution]
+    L --> Q
+    M --> Q
+    N --> Q
+    O --> Q
+    P --> Q
+    
+    Q --> R[Test Results]
+    R --> S[Coverage Reports]
+    R --> T[Quality Metrics]
+    
+    style A fill:#e1f5fe
+    style Q fill:#fff3e0
+    style R fill:#f3e5f5
+```
+
+### 6.6.7 TESTING TOOLS AND FRAMEWORKS
+
+| Tool Category | Tool Name | Version | Purpose | Integration |
+|---------------|-----------|---------|---------|-------------|
+| **Core Testing** | pytest | >= 7.0 | Primary test framework | CI/CD pipeline |
+| **Async Testing** | pytest-asyncio | >= 0.21.0 | Async test support | MCP protocol testing |
+| **Coverage** | pytest-cov | >= 4.0.0 | Code coverage measurement | Quality gates |
+| **Mocking** | pytest-mock | >= 3.10.0 | Test isolation | Unit testing |
+| **API Mocking** | responses | >= 0.23.0 | HTTP API mocking | Integration testing |
+| **Performance** | pytest-benchmark | >= 4.0.0 | Performance measurement | SLA validation |
+| **Security** | bandit | >= 1.7.0 | Security vulnerability scanning | Security gates |
+| **Static Analysis** | mypy | >= 1.0.0 | Type checking | Code quality |
+| **Code Formatting** | black | >= 22.0.0 | Code formatting | Style enforcement |
+| **Linting** | flake8 | >= 6.0.0 | Code linting | Quality checks |
+
+### 6.6.8 SECURITY TESTING REQUIREMENTS
+
+### 6.6.8 Security Testing Requirements
+
+The system implements comprehensive security testing aligned with enterprise security standards:
+
+**Security Testing Categories:**
+
+| Security Test Type | Implementation | Validation | Frequency |
+|-------------------|----------------|------------|-----------|
+| **Authentication Testing** | HMAC-SHA256 validation | Credential security | Every build |
+| **Authorization Testing** | Scope enforcement | Access control | Every build |
+| **Input Validation** | Malicious input injection | Data sanitization | Every build |
+| **Session Management** | Session timeout testing | Session security | Every build |
+| **Logging Sanitization** | **URL parameter masking tests (`test_logging_setup.py`)** | **Confirm sensitive query parameters are redacted in all debug logs** | **Every build** |
+| **Vulnerability Scanning** | Dependency vulnerability checks | Known CVE detection | Daily |
+| **Penetration Testing** | Automated security scanning | Attack simulation | Weekly |
+
+### 6.6.9 RESOURCE REQUIREMENTS
+
+**Test Environment Resources:**
+
+| Resource Type | Requirement | Justification | Scaling |
+|---------------|-------------|---------------|---------|
+| **CPU** | 4 cores per test runner | Parallel test execution | Auto-scaling |
+| **Memory** | 8GB per test runner | Large test data sets | Memory optimization |
+| **Storage** | 20GB per environment | Test artifacts and logs | Log rotation |
+| **Network** | 1Gbps bandwidth | API testing and mocking | Load balancing |
 
 #### References
 
-**Files Analyzed:**
-- `src/cli/requirements-dev.txt` - Development and testing dependencies including pytest ecosystem
-- `src/cli/pyproject.toml` - Pytest configuration, coverage settings, and quality tools
-- `.github/workflows/ci.yml` - Comprehensive CI/CD testing pipeline with matrix testing
-- `.github/workflows/deploy.yml` - Deployment pipeline with testing integration
-- `src/cli/tests/` - Test suite organization and structure
-- `src/cli/tests/fixtures/` - Test data management and fixtures
-- `src/cli/scripts/run_tests.sh` - Test automation scripts
+**Files Examined:**
+- `.github/workflows/ci.yml` - CI/CD pipeline configuration with comprehensive testing matrix
+- `src/cli/pyproject.toml` - Test configuration and tool settings
+- `src/cli/scripts/run_tests.sh` - Main test execution script with coverage and reporting
+- `src/cli/tests/test_auth_manager.py` - Authentication testing implementation
+- `src/cli/tests/conftest.py` - Test fixtures and configuration
+- `src/cli/tests/fixtures/` - Test data and mock objects
+- `src/cli/logging_setup.py` - Structured logging for test monitoring
 
-**Technical Specification Sections Referenced:**
-- `3.2 FRAMEWORKS & LIBRARIES` - Testing framework architecture and integration
-- `3.6 DEVELOPMENT & DEPLOYMENT` - CI/CD pipeline and testing infrastructure
-- `3.7 SECURITY & COMPLIANCE TOOLS` - Security testing tools and compliance framework
-- `6.5 MONITORING AND OBSERVABILITY` - Test monitoring, health checks, and performance metrics
-
-**Search Results:**
-- Repository structure analysis for test organization
-- CI/CD pipeline configuration for automated testing
-- Security testing tool configuration and implementation
-- Performance monitoring and SLA requirements integration
+**Technical Specification Sections Retrieved:**
+- `5.1 HIGH-LEVEL ARCHITECTURE` - System architecture understanding for test strategy
+- `6.1 CORE SERVICES ARCHITECTURE` - Monolithic architecture implications for testing
+- `3.2 FRAMEWORKS & LIBRARIES` - Testing frameworks and dependencies
+- `6.5 MONITORING AND OBSERVABILITY` - Integration with monitoring for test quality
 
 # 7. USER INTERFACE DESIGN
 
-## 7.1 INTERFACE OVERVIEW
+## 7.1 Overview
 
-### 7.1.1 User Interface Architecture
+The LabArchives MCP Server implements a **Command-Line Interface (CLI)** as its primary user interface, designed specifically for integration with AI applications through the Model Context Protocol (MCP). The system provides no web UI or graphical components, instead focusing on terminal-based interaction and programmatic access via JSON-RPC 2.0 protocol communication.
 
-The LabArchives MCP Server implements a **Command-Line Interface (CLI)** as its primary user interface, operating as a headless server with no graphical components. The system follows a **terminal-based interaction model** designed for technical users, system administrators, and automated deployment environments.
+The UI design follows a **dual-interface architecture** that serves both human operators and AI clients through distinct but complementary interaction patterns:
 
-**Interface Design Philosophy:**
-- **Technical User Focus**: Optimized for developers, system administrators, and DevOps engineers
-- **Automation-Friendly**: Designed for CI/CD pipelines and automated deployment scenarios
-- **Enterprise-Ready**: Professional-grade interface with comprehensive error handling and audit capabilities
-- **Protocol-Centric**: Primary interface through MCP JSON-RPC 2.0 protocol for AI client integration
+- **Direct CLI Commands**: Human-readable commands for configuration, authentication, and server management
+- **MCP Protocol Interface**: Machine-readable JSON-RPC 2.0 communication for AI client integration
 
-**Core Interface Components:**
-- **CLI Command Interface**: Primary configuration and operational control (Feature F-006)
-- **MCP Protocol Interface**: JSON-RPC 2.0 communication for AI client integration
-- **Configuration Management**: Multi-layer configuration with clear precedence rules
-- **Audit and Logging Interface**: Structured logging for compliance and monitoring
+### 7.1.1 Core UI Technologies
 
-### 7.1.2 Interface Technology Stack
+#### 7.1.1.1 CLI Foundation Technologies
 
-```yaml
-Primary Interface Technologies:
-  CLI Framework: Python argparse (built-in)
-  Shell Compatibility: POSIX-compliant (bash/zsh/sh)
-  Protocol Transport: JSON-RPC 2.0 over stdin/stdout
-  Configuration Format: JSON with environment variable support
-  Output Formatting: Structured JSON, plain text, and colored terminal output
-  
-Runtime Environment:
-  Python Version: 3.11+ (cross-platform compatibility)
-  Container Support: Docker with Kubernetes orchestration
-  Terminal Requirements: Any terminal emulator with UTF-8 support
-  OS Compatibility: Windows, macOS, Linux
+The command-line interface is built on robust Python standard library components:
+
+| Technology | Version | Purpose | Implementation |
+|-----------|---------|----------|------------------|
+| **Python argparse** | 3.11+ | CLI argument parsing and command structure | Hierarchical subcommand organization |
+| **JSON-RPC 2.0** | Standard | MCP protocol communication | Bidirectional message exchange over stdin/stdout |
+| **ANSI Escape Codes** | Standard | Terminal output formatting | Color-coded log levels and status indicators |
+| **Shell Integration** | Bash/PowerShell | Script automation support | Process spawning and environment variable handling |
+
+#### 7.1.1.2 Protocol Communication Stack
+
+```mermaid
+graph TB
+    A[AI Client] -->|JSON-RPC 2.0| B[MCP Protocol Handler]
+    C[CLI User] -->|Command Arguments| D[CLI Parser]
+    E[Automation Scripts] -->|Process Spawning| D
+    
+    B --> F[Protocol Router]
+    D --> G[Command Dispatcher]
+    
+    F --> H[resources/list]
+    F --> I[resources/read]
+    F --> J[initialize]
+    
+    G --> K[start]
+    G --> L[authenticate]
+    G --> M[config]
+    
+    style A fill:#e1f5fe,stroke:#0277bd,stroke-width:2px
+    style C fill:#e8f5e8,stroke:#2e7d32,stroke-width:2px
+    style E fill:#fff3e0,stroke:#f57c00,stroke-width:2px
 ```
 
-## 7.2 COMMAND-LINE INTERFACE DESIGN
+## 7.2 UI Use Cases and Interaction Patterns
 
-### 7.2.1 CLI Architecture and Command Structure
+### 7.2.1 Primary Use Cases
 
-The CLI implements a **hierarchical command structure** with global options and subcommands, following industry-standard patterns for enterprise tools.
+The system serves three distinct user interaction patterns, each optimized for specific operational contexts:
 
+#### 7.2.1.1 Research Workflow Integration
+**Primary Actor**: Research scientists using AI assistants
+**Interaction Pattern**: AI client spawns MCP server process
+**Data Flow**: AI client ↔ MCP server ↔ LabArchives API
+
+#### 7.2.1.2 System Administration
+**Primary Actor**: IT administrators and DevOps engineers
+**Interaction Pattern**: Direct CLI command execution
+**Data Flow**: Terminal commands → CLI parser → System operations
+
+#### 7.2.1.3 Automation and Deployment
+**Primary Actor**: CI/CD systems and deployment scripts
+**Interaction Pattern**: Scripted process execution
+**Data Flow**: Script execution → Process spawning → Automated configuration
+
+### 7.2.2 User Journey Mapping
+
+```mermaid
+journey
+    title LabArchives MCP Server User Journey
+    section Initial Setup
+      Install dependencies: 3: Administrator
+      Configure credentials: 4: Administrator
+      Test authentication: 5: Administrator
+    section Daily Operations
+      Start MCP session: 5: AI Client
+      Discover resources: 5: AI Client
+      Access content: 5: AI Client
+      Process research data: 5: Researcher
+    section Maintenance
+      Update configuration: 4: Administrator
+      Monitor logs: 3: Administrator
+      Troubleshoot issues: 2: Administrator
+```
+
+## 7.3 UI/Backend Interaction Boundaries
+
+### 7.3.1 Architectural Layer Separation
+
+The UI architecture implements clear separation of concerns across multiple layers:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      USER INTERFACE LAYER                       │
+├─────────────────────────────────────────────────────────────────┤
+│  CLI Parser (cli_parser.py)                                     │
+│  • Global Options: --config-file, --log-file, --verbose        │
+│  • Subcommands: start, authenticate, config                     │
+│  • Argument Validation & Help Generation                        │
+│  • Exit Code Management (0, 1, 2, 3, 130)                     │
+├─────────────────────────────────────────────────────────────────┤
+│                    PROTOCOL INTERFACE LAYER                     │
+├─────────────────────────────────────────────────────────────────┤
+│  MCP Protocol Handler (mcp/protocol.py)                         │
+│  • JSON-RPC 2.0 Message Parsing                                │
+│  • Request Routing (initialize, resources/list, resources/read)│
+│  • Response Serialization & Error Handling                     │
+│  • Protocol Compliance Validation                              │
+├─────────────────────────────────────────────────────────────────┤
+│                     APPLICATION LOGIC LAYER                     │
+├─────────────────────────────────────────────────────────────────┤
+│  Authentication Manager | Resource Manager | Scope Enforcement  │
+│  • Session Management   | • Resource Discovery | • Access Control │
+│  • Credential Validation| • Content Transformation| • Audit Logging │
+├─────────────────────────────────────────────────────────────────┤
+│                    INTEGRATION LAYER                            │
+├─────────────────────────────────────────────────────────────────┤
+│  LabArchives API Client (labarchives/client.py)                │
+│  • Multi-Region Support (US, AU, UK)                           │
+│  • HMAC-SHA256 Authentication                                  │
+│  • HTTP Request/Response Handling                              │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 7.3.2 Interface Contracts
+
+#### 7.3.2.1 CLI Command Interface
 ```bash
-# Global command structure
-labarchives-mcp [GLOBAL_OPTIONS] COMMAND [COMMAND_OPTIONS] [ARGS]
-
-#### Command hierarchy
-labarchives-mcp
-├── start                 # Launch MCP server (primary operation)
-├── authenticate         # Validate credentials and test authentication
-└── config              # Configuration management operations
-    ├── show            # Display current configuration
-    ├── validate        # Validate configuration file
-    └── reload          # Reload configuration without restart
+#### Interface Contract: CLI to Application Logic
+INPUT: Command-line arguments + Environment variables
+OUTPUT: Exit codes + Formatted console output + Log files
+ERROR_HANDLING: Structured error messages + Help text
 ```
 
-**Global Options Schema:**
-```yaml
-Configuration Control:
+#### 7.3.2.2 MCP Protocol Interface
+```json
+// Interface Contract: MCP Client to Protocol Handler
+{
+  "jsonrpc": "2.0",
+  "method": "string",
+  "params": {},
+  "id": "string|number"
+}
+```
+
+## 7.4 UI Schemas and Data Structures
+
+### 7.4.1 CLI Command Schema
+
+#### 7.4.1.1 Global Options Schema
+```bash
+labarchives-mcp [GLOBAL_OPTIONS] <COMMAND> [COMMAND_OPTIONS]
+
+GLOBAL_OPTIONS:
   --config-file PATH      # JSON configuration file path
-  --log-file PATH        # Log output file location
-  
-Output Control:
-  --verbose              # Enable debug-level logging
-  --quiet               # Suppress non-error output
-  --format FORMAT       # Output format (json, text, table)
-  
-System Information:
-  --version             # Display version information
-  --help               # Show comprehensive help
+  --log-file PATH         # Log file output path  
+  --verbose              # Enable DEBUG logging
+  --quiet                # Suppress non-error output
+  --version              # Display version and exit
+  --help                 # Show help and exit
 ```
 
-### 7.2.2 Command Implementation Details
+#### 7.4.1.2 Subcommand Schemas
 
-#### 7.2.2.1 Start Command (Primary Operation)
-
+**Start Command Schema:**
 ```bash
 labarchives-mcp start [OPTIONS]
 
-#### Authentication options
-<span style="background-color: rgba(91, 57, 243, 0.2)">-k, --access-key, --access-key-id AKID</span>   # LabArchives API access key ID <span style="background-color: rgba(91, 57, 243, 0.2)">(primary flag is -k/--access-key; --access-key-id kept for compatibility)</span>
---access-secret SECRET         # LabArchives API access secret
---username USERNAME            # LabArchives username (SSO mode)
---api-base-url URL            # Regional API endpoint
-
-#### Scope limitation options
---notebook-id ID              # Restrict to specific notebook
---notebook-name NAME          # Restrict to specific notebook by name
---folder-path PATH            # Restrict to specific folder path
-
-#### Output formatting options
---json-ld                     # Enable JSON-LD semantic output
---structured-output           # Enable structured JSON output
-
-#### Operational options
---daemon                      # Run as daemon process
---pid-file PATH              # PID file location for daemon mode
+OPTIONS:
+  -k, --access-key ID         # LabArchives access key ID
+  -p, --secret KEY           # LabArchives secret key
+  <span style="background-color: rgba(91, 57, 243, 0.2)">-u, --username USERNAME    # LabArchives account username</span>
+  --api-base-url URL         # Custom API endpoint
+  --notebook-name NAME       # Restrict to specific notebook
+  --folder-name NAME         # Restrict to specific folder
+  --json-ld                  # Enable JSON-LD context
+  --no-json-ld              # Disable JSON-LD context
 ```
 
-<span style="background-color: rgba(91, 57, 243, 0.2)">**Note:** --access-key-id remains supported for backward compatibility (deprecated).</span>
-
-**Start Command Flow:**
-```mermaid
-stateDiagram-v2
-    [*] --> ParseArgs: CLI invocation
-    ParseArgs --> LoadConfig: Global options processed
-    LoadConfig --> ValidateConfig: Configuration merged
-    ValidateConfig --> InitAuth: Configuration validated
-    InitAuth --> TestConnection: Authentication manager initialized
-    TestConnection --> StartServer: LabArchives API connection verified
-    StartServer --> Ready: MCP server listening
-    Ready --> ProcessRequests: Await client connections
-    ProcessRequests --> ProcessRequests: Handle MCP requests
-    ProcessRequests --> Shutdown: SIGTERM/SIGINT received
-    Shutdown --> [*]: Graceful shutdown
-```
-
-#### 7.2.2.2 Authentication Command
-
+**Authenticate Command Schema:**
 ```bash
 labarchives-mcp authenticate [OPTIONS]
 
-#### Required authentication parameters
-<span style="background-color: rgba(91, 57, 243, 0.2)">-k, --access-key, --access-key-id AKID</span>   # API access key ID <span style="background-color: rgba(91, 57, 243, 0.2)">(primary flag is -k/--access-key; --access-key-id kept for compatibility)</span>
---access-secret SECRET         # API access secret
---api-base-url URL            # API endpoint (optional)
-
-#### Output options
---format json|text|table      # Output format selection
---verbose                     # Detailed authentication information
+OPTIONS:
+  -k, --access-key ID         # LabArchives access key ID
+  -p, --secret KEY           # LabArchives secret key
+  --api-base-url URL         # Custom API endpoint
+  <span style="background-color: rgba(91, 57, 243, 0.2)">-u, --username USERNAME    # LabArchives account username</span>
+  --test-permissions         # Test resource access permissions
 ```
 
-<span style="background-color: rgba(91, 57, 243, 0.2)">**Note:** --access-key-id remains supported for backward compatibility (deprecated).</span>
+**Config Command Schema:**
+```bash
+labarchives-mcp config <ACTION> [OPTIONS]
 
-**Authentication Test Output:**
-```json
-{
-  "status": "success",
-  "authentication": {
-    "method": "api_key",
-    "api_endpoint": "https://api.labarchives.com/api",
-    "user_id": "12345",
-    "account_type": "Premium",
-    "permissions": ["read", "write"],
-    "session_expires": "2024-07-16T11:30:45Z"
-  },
-  "test_results": {
-    "connection_time": "0.234s",
-    "first_request_time": "0.567s",
-    "total_notebooks": 15,
-    "accessible_notebooks": 12
-  }
-}
+ACTIONS:
+  show                       # Display current configuration
+  validate                   # Validate configuration file
+  reload                     # Reload configuration at runtime
+  set KEY VALUE             # Set configuration value
+  get KEY                   # Get configuration value
 ```
 
-#### 7.2.2.3 Configuration Management Commands
+#### 7.4.1.3 Command Usage Examples
+
+The CLI supports flexible credential specification through multiple authentication parameters. <span style="background-color: rgba(91, 57, 243, 0.2)">Both `--username` and `-u` options provide equivalent functionality for specifying the LabArchives account username</span>:
 
 ```bash
-labarchives-mcp config SUBCOMMAND [OPTIONS]
+# Start server with full credential set including username
+labarchives-mcp start -k "ACCESS_KEY_123" -p "SECRET_456" -u "researcher@university.edu"
 
-#### Configuration display
-config show [--format json|yaml|table] [--redact-secrets]
+#### Authenticate with short-form username alias
+labarchives-mcp authenticate --access-key "ACCESS_KEY_123" --secret "SECRET_456" -u "researcher@university.edu"
 
-#### Configuration validation
-config validate [--config-file PATH] [--strict]
-
-#### Configuration reload
-config reload [--config-file PATH] [--dry-run]
+#### Configuration with username parameter demonstration
+labarchives-mcp config set username "researcher@university.edu"
 ```
 
-### 7.2.3 Command Usage Examples
+#### 7.4.1.4 Parameter Validation Schema
 
-#### 7.2.3.1 Basic Server Startup
+The CLI command parser implements comprehensive parameter validation with specific constraints for each option type:
 
-```bash
-# Start with direct credential parameters
-<span style="background-color: rgba(91, 57, 243, 0.2)">labarchives-mcp start -k $KEY --access-secret $SECRET</span>
+| Parameter | Type | Validation Rules | Default Value |
+|-----------|------|------------------|---------------|
+| `--access-key` / `-k` | String | Non-empty, alphanumeric with underscores | Required |
+| `--secret` / `-p` | String | Non-empty, base64 compatible | Required |
+| <span style="background-color: rgba(91, 57, 243, 0.2)">`--username` / `-u`</span> | <span style="background-color: rgba(91, 57, 243, 0.2)">String</span> | <span style="background-color: rgba(91, 57, 243, 0.2)">Valid email format or username string</span> | <span style="background-color: rgba(91, 57, 243, 0.2)">Optional</span> |
+| `--api-base-url` | URL | Valid HTTP/HTTPS URL format | Region-specific default |
+| `--notebook-name` | String | Non-empty, URL-safe characters | None (all notebooks) |
+| `--folder-name` | String | Valid folder path format | None (all folders) |
 
-#### Start with configuration file
-labarchives-mcp start --config-file /etc/labarchives/config.json
+### 7.4.2 MCP Protocol Schema
 
-#### Start with environment variables and scope restrictions
-<span style="background-color: rgba(91, 57, 243, 0.2)">labarchives-mcp start -k $KEY --access-secret $SECRET --folder-path "Projects/AI"</span>
-```
-
-#### 7.2.3.2 Authentication Testing
-
-```bash
-# Test authentication with API credentials
-<span style="background-color: rgba(91, 57, 243, 0.2)">labarchives-mcp authenticate -k $KEY --access-secret $SECRET</span>
-
-#### Test authentication with verbose output
-<span style="background-color: rgba(91, 57, 243, 0.2)">labarchives-mcp authenticate -k $KEY --access-secret $SECRET --verbose</span>
-
-#### Test authentication with JSON output
-<span style="background-color: rgba(91, 57, 243, 0.2)">labarchives-mcp authenticate -k $KEY --access-secret $SECRET --format json</span>
-```
-
-#### 7.2.3.3 Configuration Management
-
-```bash
-# Display current configuration
-labarchives-mcp config show --format yaml
-
-#### Validate configuration file
-labarchives-mcp config validate --config-file /path/to/config.json --strict
-
-#### Reload configuration without restart
-labarchives-mcp config reload --config-file /path/to/new-config.json
-```
-
-### 7.2.4 Error Handling and Exit Codes
-
-The CLI implements comprehensive error handling with standardized exit codes for automation and monitoring integration:
-
-```yaml
-Exit Code Standards:
-  0: Success - Operation completed successfully
-  1: General Error - Generic failure condition
-  2: Configuration Error - Invalid configuration or missing required parameters
-  3: Authentication Error - Invalid credentials or authentication failure
-  4: Network Error - Connection failure or timeout
-  5: Permission Error - Access denied or insufficient permissions
-  6: Resource Error - Requested resource not found or unavailable
-  7: Validation Error - Input validation failure
-  8: System Error - System-level failure (file permissions, disk space, etc.)
-  9: Interrupt Error - Operation interrupted by user or system signal
-```
-
-**Error Output Format:**
-```json
-{
-  "error": {
-    "code": 2,
-    "type": "ConfigurationError",
-    "message": "Required parameter --access-key missing",
-    "details": {
-      "parameter": "access_key",
-      "suggestion": "Use -k/--access-key to provide API access key"
-    }
-  },
-  "timestamp": "2024-07-16T11:30:45Z",
-  "command": "labarchives-mcp start"
-}
-```
-
-### 7.2.5 Shell Integration Features
-
-#### 7.2.5.1 Tab Completion Support
-
-The CLI provides comprehensive tab completion for enhanced user experience:
-
-```bash
-# Enable bash completion (add to ~/.bashrc)
-eval "$(labarchives-mcp --completion bash)"
-
-#### Enable zsh completion (add to ~/.zshrc)
-eval "$(labarchives-mcp --completion zsh)"
-
-#### Enable fish completion
-labarchives-mcp --completion fish | source
-```
-
-**Completion Features:**
-- Command and subcommand completion
-- Option flag completion with descriptions
-- File path completion for configuration files
-- Environment variable completion for common parameters
-- Context-aware completion based on current arguments
-
-#### 7.2.5.2 Environment Variable Integration
-
-```bash
-# Supported environment variables
-LABARCHIVES_ACCESS_KEY       # Equivalent to -k/--access-key
-LABARCHIVES_ACCESS_SECRET    # Equivalent to --access-secret
-LABARCHIVES_API_BASE_URL     # Equivalent to --api-base-url
-LABARCHIVES_CONFIG_FILE      # Equivalent to --config-file
-LABARCHIVES_LOG_FILE         # Equivalent to --log-file
-LABARCHIVES_NOTEBOOK_ID      # Equivalent to --notebook-id
-LABARCHIVES_FOLDER_PATH      # Equivalent to --folder-path
-
-#### Example usage with environment variables
-export LABARCHIVES_ACCESS_KEY="your-access-key"
-export LABARCHIVES_ACCESS_SECRET="your-secret"
-export LABARCHIVES_FOLDER_PATH="Projects/AI"
-labarchives-mcp start --verbose
-```
-
-### 7.2.6 Advanced CLI Features
-
-#### 7.2.6.1 Configuration Precedence
-
-The CLI implements a clear configuration precedence hierarchy:
-
-```yaml
-Configuration Precedence (highest to lowest):
-  1. Command-line arguments (highest priority)
-  2. Environment variables  
-  3. Configuration file values
-  4. Default values (lowest priority)
-```
-
-**Example Configuration Merging:**
-```bash
-# Configuration file contains: {"access_key": "file-key", "verbose": true}
-# Environment variable: LABARCHIVES_ACCESS_KEY="env-key"
-# Command line: labarchives-mcp start -k "cli-key" --quiet
-
-#### Final configuration:
-#### access_key: "cli-key" (command line wins)
-#### verbose: false (--quiet overrides config file)
-```
-
-#### 7.2.6.2 Daemon Mode Operation
-
-```bash
-# Start as daemon with PID file
-labarchives-mcp start --daemon --pid-file /var/run/labarchives-mcp.pid
-
-#### Check daemon status
-ps -p $(cat /var/run/labarchives-mcp.pid)
-
-#### Stop daemon gracefully
-kill -TERM $(cat /var/run/labarchives-mcp.pid)
-```
-
-**Daemon Features:**
-- Automatic log rotation integration
-- Signal handling for graceful shutdown
-- PID file management
-- Systemd service integration ready
-- Health check endpoints for monitoring
-
-## 7.3 CONFIGURATION MANAGEMENT INTERFACE
-
-### 7.3.1 Configuration Precedence System
-
-The system implements a **four-tier configuration precedence** system ensuring flexibility across deployment scenarios:
-
-```mermaid
-graph TD
-    subgraph "Configuration Precedence (Highest to Lowest)"
-        CLI[1. CLI Arguments]
-        ENV[2. Environment Variables]
-        FILE[3. Configuration File]
-        DEFAULT[4. Built-in Defaults]
-    end
-    
-    subgraph "Configuration Sources"
-        ARGS[Command Line Args]
-        ENVVARS[Environment Variables]
-        JSON[JSON Config File]
-        BUILTIN[Default Values]
-    end
-    
-    ARGS --> CLI
-    ENVVARS --> ENV
-    JSON --> FILE
-    BUILTIN --> DEFAULT
-    
-    CLI --> FINAL[Final Configuration]
-    ENV --> FINAL
-    FILE --> FINAL
-    DEFAULT --> FINAL
-```
-
-### 7.3.2 Configuration Schema
-
-```json
-{
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "type": "object",
-  "properties": {
-    "authentication": {
-      "type": "object",
-      "properties": {
-        "api_base_url": {
-          "type": "string",
-          "default": "https://api.labarchives.com/api",
-          "description": "Regional API endpoint"
-        },
-        "access_key_id": {
-          "type": "string",
-          "description": "LabArchives API access key ID"
-        },
-        "access_secret": {
-          "type": "string",
-          "description": "LabArchives API access secret"
-        },
-        "username": {
-          "type": "string",
-          "description": "Username for SSO authentication"
-        }
-      },
-      "required": ["access_key_id", "access_secret"]
-    },
-    "scope": {
-      "type": "object",
-      "properties": {
-        "notebook_id": {
-          "type": "string",
-          "description": "Restrict access to specific notebook ID"
-        },
-        "notebook_name": {
-          "type": "string",
-          "description": "Restrict access to specific notebook name"
-        },
-        "folder_path": {
-          "type": "string",
-          "description": "Restrict access to specific folder path"
-        }
-      }
-    },
-    "output": {
-      "type": "object",
-      "properties": {
-        "json_ld_enabled": {
-          "type": "boolean",
-          "default": false,
-          "description": "Enable JSON-LD semantic output"
-        },
-        "structured_output": {
-          "type": "boolean",
-          "default": true,
-          "description": "Enable structured JSON output"
-        }
-      }
-    },
-    "logging": {
-      "type": "object",
-      "properties": {
-        "log_file": {
-          "type": "string",
-          "default": "labarchives_mcp.log",
-          "description": "Log file path"
-        },
-        "log_level": {
-          "type": "string",
-          "enum": ["DEBUG", "INFO", "WARNING", "ERROR"],
-          "default": "INFO",
-          "description": "Logging verbosity level"
-        },
-        "verbose": {
-          "type": "boolean",
-          "default": false,
-          "description": "Enable verbose logging"
-        }
-      }
-    }
-  }
-}
-```
-
-### 7.3.3 Environment Variable Mapping
-
-```bash
-# Authentication configuration
-export LABARCHIVES_AKID="your_access_key_id"
-export LABARCHIVES_SECRET="your_access_secret"
-export LABARCHIVES_USER="username@institution.edu"
-export LABARCHIVES_API_BASE="https://api.labarchives.com/api"
-
-#### Scope configuration
-export LABARCHIVES_NOTEBOOK_ID="12345"
-export LABARCHIVES_NOTEBOOK_NAME="Research Project 2024"
-export LABARCHIVES_FOLDER_PATH="/experiments/2024"
-
-#### Output configuration
-export LABARCHIVES_JSON_LD="true"
-export LABARCHIVES_STRUCTURED_OUTPUT="true"
-
-#### Logging configuration
-export LABARCHIVES_LOG_LEVEL="INFO"
-export LABARCHIVES_LOG_FILE="/var/log/labarchives_mcp.log"
-export LABARCHIVES_VERBOSE="false"
-```
-
-## 7.4 MCP PROTOCOL INTERFACE
-
-### 7.4.1 Protocol Communication Architecture
-
-The MCP protocol interface serves as the **primary operational interface** for AI client integration, implementing JSON-RPC 2.0 communication over stdin/stdout streams.
-
-```mermaid
-sequenceDiagram
-    participant CLAUDE as Claude Desktop
-    participant CLI as CLI Interface
-    participant MCP as MCP Handler
-    participant AUTH as Auth Manager
-    participant API as LabArchives API
-    
-    Note over CLAUDE,CLI: Initial Setup
-    CLAUDE->>CLI: Execute: labarchives-mcp start
-    CLI->>AUTH: Initialize authentication
-    AUTH->>API: Validate credentials
-    API->>AUTH: Authentication success
-    CLI->>MCP: Start MCP server
-    MCP->>CLAUDE: Ready (stdin/stdout)
-    
-    Note over CLAUDE,MCP: MCP Protocol Session
-    loop MCP Request/Response Cycle
-        CLAUDE->>MCP: JSON-RPC Request
-        MCP->>AUTH: Validate session
-        MCP->>API: Fetch requested data
-        API->>MCP: Resource data
-        MCP->>CLAUDE: JSON-RPC Response
-    end
-```
-
-### 7.4.2 MCP Protocol Message Types
-
-#### 7.4.2.1 Capability Negotiation
-
+#### 7.4.2.1 Message Structure
 ```json
 {
   "jsonrpc": "2.0",
-  "method": "initialize",
+  "id": "string|number",
+  "method": "string",
   "params": {
-    "protocolVersion": "2024-11-05",
-    "capabilities": {
-      "resources": {
-        "subscribe": false,
-        "listChanged": false
-      }
-    },
-    "clientInfo": {
-      "name": "claude-desktop",
-      "version": "1.0.0"
-    }
+    // Method-specific parameters
   },
-  "id": 1
+  "result": {
+    // Success response data
+  },
+  "error": {
+    "code": "integer",
+    "message": "string", 
+    "data": {} // Optional error context
+  }
 }
 ```
 
-#### 7.4.2.2 Resource Discovery
+#### 7.4.2.2 Resource Schema
+```json
+{
+  "resources": [
+    {
+      "uri": "labarchives://notebook/{notebook_id}/page/{page_id}",
+      "name": "string",
+      "description": "string",
+      "mimeType": "application/json"
+    }
+  ]
+}
+```
+
+#### 7.4.2.3 Authentication Context Schema
+
+The MCP protocol maintains authentication context throughout the session lifecycle, integrating with the CLI authentication parameters:
+
+```json
+{
+  "authentication": {
+    "session_id": "string",
+    "access_key_id": "string",
+    "username": "string",
+    "authenticated_at": "ISO8601_timestamp",
+    "expires_at": "ISO8601_timestamp",
+    "region": "string",
+    "permissions": {
+      "notebook_scope": "string|null",
+      "folder_scope": "string|null",
+      "read_access": "boolean"
+    }
+  }
+}
+```
+
+#### 7.4.2.4 Error Response Schema
+
+The system implements standardized JSON-RPC 2.0 error responses with detailed error context for comprehensive debugging and audit capabilities:
 
 ```json
 {
   "jsonrpc": "2.0",
+  "id": "request_id",
+  "error": {
+    "code": -32603,
+    "message": "Internal error",
+    "data": {
+      "error_type": "AuthenticationError|ScopeViolationError|ValidationError",
+      "timestamp": "ISO8601_timestamp",
+      "session_id": "string",
+      "request_context": {
+        "method": "string",
+        "resource_uri": "string",
+        "scope_applied": "string"
+      },
+      "retry_after": "integer_seconds",
+      "correlation_id": "string"
+    }
+  }
+}
+```
+
+### 7.4.3 Configuration File Schema
+
+#### 7.4.3.1 JSON Configuration Structure
+
+The system supports comprehensive JSON-based configuration that integrates with CLI parameters and supports all authentication methods:
+
+```json
+{
+  "$schema": "https://labarchives.com/schemas/mcp-config-v1.json",
+  "server": {
+    "log_level": "INFO|DEBUG|WARNING|ERROR",
+    "log_file": "path/to/logfile.log",
+    "max_log_size": "10MB",
+    "log_rotation_count": 5,
+    "json_ld_enabled": true
+  },
+  "authentication": {
+    "access_key_id": "string",
+    "secret_key": "string",
+    "username": "string",
+    "api_base_url": "https://api.labarchives.com",
+    "region": "US|AU|UK",
+    "session_timeout": 3600,
+    "auto_refresh": true
+  },
+  "scope": {
+    "notebook_id": "string|null",
+    "notebook_name": "string|null", 
+    "folder_path": "string|null",
+    "include_archived": false,
+    "max_results": 1000
+  },
+  "security": {
+    "audit_logging": true,
+    "parameter_sanitization": true,
+    "session_validation": true,
+    "rate_limiting": {
+      "enabled": true,
+      "requests_per_minute": 100,
+      "burst_limit": 200
+    }
+  }
+}
+```
+
+#### 7.4.3.2 Configuration Validation Schema
+
+The configuration file undergoes comprehensive validation with specific rules for each section:
+
+| Section | Required Fields | Optional Fields | Validation Rules |
+|---------|----------------|-----------------|------------------|
+| `server` | `log_level` | `log_file`, `max_log_size`, `log_rotation_count` | Log level enum validation |
+| `authentication` | `access_key_id`, `secret_key` | <span style="background-color: rgba(91, 57, 243, 0.2)">`username`</span>, `api_base_url`, `region` | Credential format validation |
+| `scope` | None | `notebook_id`, `notebook_name`, `folder_path` | Mutual exclusivity enforcement |
+| `security` | None | All fields optional | Boolean and numeric range validation |
+
+#### 7.4.3.3 Environment Variable Schema
+
+The system supports environment variable configuration that complements the JSON configuration file and CLI parameters:
+
+```bash
+# Authentication Environment Variables
+export LABARCHIVES_ACCESS_KEY_ID="access_key_123"
+export LABARCHIVES_SECRET_KEY="secret_456"
+export LABARCHIVES_USERNAME="researcher@university.edu"
+export LABARCHIVES_API_BASE_URL="https://api.labarchives.com"
+export LABARCHIVES_REGION="US"
+
+#### Server Configuration Environment Variables
+export LABARCHIVES_MCP_LOG_LEVEL="INFO"
+export LABARCHIVES_MCP_LOG_FILE="/var/log/labarchives-mcp.log"
+export LABARCHIVES_MCP_CONFIG_FILE="/etc/labarchives-mcp/config.json"
+
+#### Scope Configuration Environment Variables
+export LABARCHIVES_NOTEBOOK_ID="12345"
+export LABARCHIVES_NOTEBOOK_NAME="Research_Project_*"
+export LABARCHIVES_FOLDER_PATH="/experiments/2024"
+```
+
+### 7.4.4 Data Transfer Schema
+
+#### 7.4.4.1 Resource Content Schema
+
+The system implements structured data schemas for all LabArchives resource types with comprehensive metadata preservation:
+
+```json
+{
+  "notebook": {
+    "id": "integer",
+    "name": "string",
+    "description": "string",
+    "created_at": "ISO8601_timestamp",
+    "modified_at": "ISO8601_timestamp",
+    "owner": {
+      "id": "integer",
+      "name": "string",
+      "email": "string"
+    },
+    "permissions": {
+      "read": "boolean",
+      "write": "boolean",
+      "admin": "boolean"
+    },
+    "metadata": {
+      "page_count": "integer",
+      "total_size": "integer_bytes",
+      "last_activity": "ISO8601_timestamp"
+    }
+  },
+  "page": {
+    "id": "integer",
+    "notebook_id": "integer",
+    "title": "string",
+    "content": "string|html",
+    "folder_path": "string|null",
+    "created_at": "ISO8601_timestamp",
+    "modified_at": "ISO8601_timestamp",
+    "author": {
+      "id": "integer",
+      "name": "string"
+    },
+    "entries": [
+      {
+        "id": "integer",
+        "type": "text|file|table|image",
+        "content": "mixed",
+        "timestamp": "ISO8601_timestamp"
+      }
+    ]
+  }
+}
+```
+
+#### 7.4.4.2 MCP Resource URI Schema
+
+The system implements a hierarchical URI scheme for resource identification and access control:
+
+```
+labarchives://notebook/{notebook_id}/page/{page_id}/entry/{entry_id}
+labarchives://notebook/{notebook_id}/page/{page_id}
+labarchives://notebook/{notebook_id}
+labarchives://folder/{folder_path}
+labarchives://search/{query_parameters}
+```
+
+**URI Component Validation Rules:**
+
+| Component | Format | Constraints | Examples |
+|-----------|--------|-------------|----------|
+| `notebook_id` | Integer | Positive integer, must exist | `12345` |
+| `page_id` | Integer | Positive integer, within notebook scope | `67890` |
+| `entry_id` | Integer | Positive integer, within page scope | `11111` |
+| `folder_path` | String | URL-encoded path, slash-separated | `/experiments/2024` |
+| `query_parameters` | String | URL-encoded query string | `q=protein&type=text` |
+
+#### 7.4.4.3 Session Data Schema
+
+The system maintains comprehensive session state information for authentication persistence and scope enforcement:
+
+```json
+{
+  "session": {
+    "id": "uuid",
+    "user_id": "integer",
+    "access_key_id": "string",
+    "username": "string",
+    "created_at": "ISO8601_timestamp",
+    "expires_at": "ISO8601_timestamp",
+    "last_activity": "ISO8601_timestamp",
+    "region": "US|AU|UK",
+    "api_endpoint": "https://api.labarchives.com",
+    "scope": {
+      "type": "notebook|folder|global",
+      "value": "string|null",
+      "permissions": ["read", "write", "admin"]
+    },
+    "statistics": {
+      "requests_count": "integer",
+      "data_transferred": "integer_bytes",
+      "error_count": "integer",
+      "last_error": "ISO8601_timestamp|null"
+    }
+  }
+}
+```
+
+### 7.4.5 Validation and Constraint Schema
+
+#### 7.4.5.1 Input Validation Rules
+
+The system implements comprehensive input validation across all interface layers:
+
+```json
+{
+  "validation_rules": {
+    "cli_parameters": {
+      "access_key": {
+        "pattern": "^[A-Za-z0-9_-]+$",
+        "min_length": 8,
+        "max_length": 128,
+        "required": true
+      },
+      "secret_key": {
+        "pattern": "^[A-Za-z0-9+/=]+$",
+        "min_length": 16,
+        "max_length": 256,
+        "required": true
+      },
+      "username": {
+        "pattern": "^[A-Za-z0-9._@-]+$",
+        "min_length": 3,
+        "max_length": 254,
+        "required": false,
+        "validation": "email_or_username"
+      },
+      "notebook_name": {
+        "pattern": "^[A-Za-z0-9_\\s\\-*]+$",
+        "min_length": 1,
+        "max_length": 100,
+        "wildcards_allowed": true
+      },
+      "folder_path": {
+        "pattern": "^(/[A-Za-z0-9_\\s\\-]+)*/?$",
+        "max_depth": 10,
+        "max_length": 500
+      }
+    },
+    "mcp_protocol": {
+      "jsonrpc": {
+        "exact_value": "2.0",
+        "required": true
+      },
+      "method": {
+        "enum": ["initialize", "resources/list", "resources/read"],
+        "required": true
+      },
+      "id": {
+        "type": "string|number",
+        "required": true,
+        "unique_per_session": true
+      }
+    }
+  }
+}
+```
+
+#### 7.4.5.2 Constraint Enforcement Schema
+
+The system enforces operational constraints to ensure system stability and compliance:
+
+| Constraint Type | Limit | Enforcement Point | Error Response |
+|-----------------|-------|------------------|----------------|
+| **Request Rate** | 100 requests/minute | Ingress controller | HTTP 429 Rate Limit Exceeded |
+| **Session Duration** | 3600 seconds | Authentication manager | Session expiration error |
+| **Resource Scope** | Configured scope boundaries | Resource manager | Access denied error |
+| **Data Transfer** | 10MB per request | MCP protocol handler | Request too large error |
+| **Concurrent Sessions** | 5 per access key | Session manager | Session limit exceeded |
+
+### 7.4.6 Schema Evolution and Versioning
+
+#### 7.4.6.1 Schema Versioning Strategy
+
+The system implements backward-compatible schema evolution with semantic versioning:
+
+```json
+{
+  "schema_version": {
+    "current": "v1.2.0",
+    "supported": ["v1.0.0", "v1.1.0", "v1.2.0"],
+    "deprecated": ["v0.9.0"],
+    "migration_path": {
+      "v1.0.0_to_v1.1.0": {
+        "changes": ["added_username_parameter"],
+        "backward_compatible": true
+      },
+      "v1.1.0_to_v1.2.0": {
+        "changes": ["enhanced_error_schema", "session_refresh_support"],
+        "backward_compatible": true
+      }
+    }
+  }
+}
+```
+
+#### 7.4.6.2 Schema Documentation Standards
+
+All schema definitions follow comprehensive documentation standards for enterprise integration:
+
+- **JSON Schema Validation**: All schemas include JSON Schema definitions for automated validation
+- **OpenAPI Specification**: REST-like endpoints documented with OpenAPI 3.0
+- **MCP Protocol Compliance**: Full compliance with Model Context Protocol specification
+- **Semantic Versioning**: Schema changes follow semantic versioning principles
+- **Migration Guides**: Comprehensive documentation for schema version upgrades
+- **Validation Examples**: Complete examples for all supported schema formats
+
+This comprehensive schema framework ensures robust data integrity, comprehensive validation, and seamless integration across all system components while supporting the <span style="background-color: rgba(91, 57, 243, 0.2)">enhanced username authentication functionality</span> and maintaining backward compatibility for existing implementations.
+
+## 7.5 Interface Screens and Displays
+
+### 7.5.1 CLI Output Displays
+
+As a command-line application, the system provides structured text-based displays rather than traditional GUI screens:
+
+#### 7.5.1.1 Application Startup Display
+```
+============================================================
+LabArchives MCP Server v0.1.0
+============================================================
+Configuration Summary:
+  API Base URL: https://api.labarchives.com/api
+  Authentication: API Key (AKID: ak_****1234)
+  Scope Restriction: Notebook "Research Project 2024"
+  JSON-LD Context: Enabled
+  Log Level: INFO
+  Output Format: Structured JSON
+============================================================
+[2024-01-15 10:30:45] [INFO] [cli.main] Loading configuration
+[2024-01-15 10:30:45] [INFO] [auth.manager] Establishing authentication
+[2024-01-15 10:30:46] [INFO] [mcp.protocol] Starting MCP protocol session
+[2024-01-15 10:30:46] [INFO] [cli.main] MCP server ready for connections
+```
+
+#### 7.5.1.2 Command Help Display (updated)
+```
+usage: labarchives-mcp [-h] [--config-file CONFIG_FILE] [--log-file LOG_FILE]
+                      [--verbose] [--quiet] [--version]
+                      {start,authenticate,config} ...
+
+LabArchives MCP Server - Secure AI access to electronic lab notebooks
+
+Enables AI applications to access LabArchives data through the standardized
+Model Context Protocol (MCP), providing secure, auditable integration between
+research data and AI workflows.
+
+positional arguments:
+  {start,authenticate,config}
+    start               Launch the LabArchives MCP Server
+    authenticate        Validate credentials and test authentication
+    config              Configuration management operations
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --config-file CONFIG_FILE
+                        Path to JSON configuration file
+  --log-file LOG_FILE   Path to log file for output
+  --verbose             Enable verbose logging and output
+  --quiet               Suppress non-error output
+  <span style="background-color: rgba(91, 57, 243, 0.2)">-u USERNAME, --username USERNAME
+                        LabArchives account username</span>
+  --version             Display version information and exit
+
+For detailed help on specific commands, use:
+  labarchives-mcp <command> --help
+
+Documentation: https://github.com/labarchives/labarchives-mcp-server
+Support: https://help.labarchives.com/mcp-server
+```
+
+#### 7.5.1.3 Error Display Format
+```
+ERROR: Authentication Failed
+────────────────────────────────────────────────────────────
+Error Code: 2001
+Message: Invalid credentials provided
+Timestamp: 2024-01-15T10:30:45Z
+
+Details:
+  API Base URL: https://api.labarchives.com/api
+  Authentication Method: API Key
+  Access Key ID: ak_****1234
+  Response Status: 401 Unauthorized
+
+Troubleshooting Steps:
+  1. Verify your access key ID is correct
+  2. Check that your secret key hasn't expired
+  3. Ensure you're using the correct regional endpoint
+  4. Test authentication with: labarchives-mcp authenticate
+
+For additional help:
+  Documentation: https://help.labarchives.com/mcp-server/authentication
+  Support: https://help.labarchives.com/contact
+────────────────────────────────────────────────────────────
+```
+
+#### 7.5.1.4 Scope Violation Error Display (updated)
+```
+<span style="background-color: rgba(91, 57, 243, 0.2)">ERROR: Entry Outside Configured Notebook Scope
+────────────────────────────────────────────────────────────
+Error Code: 3103
+Message: Entry belongs to notebook 789, but scope is restricted to notebook 456
+Timestamp: 2024-01-15T10:30:45Z
+
+Details:
+  Requested Resource: labarchives://notebook/789/page/123/entry/456
+  Configured Scope: notebook "Research Project 2024" (ID: 456)
+  Authentication Method: API Key
+  Access Key ID: ak_****1234
+  Username: researcher@university.edu
+
+Scope Configuration:
+  Notebook Name: "Research Project 2024"
+  Notebook ID: 456
+  Folder Restriction: None
+  Permission Level: Read-only
+
+Troubleshooting Steps:
+  1. Verify the requested entry is within the configured notebook scope
+  2. Check your notebook scope configuration with: labarchives-mcp config show
+  3. Update notebook scope with: labarchives-mcp config set notebook_name "Target Notebook"
+  4. Confirm access permissions for the target notebook
+  5. Re-authenticate after scope changes: labarchives-mcp authenticate
+
+For additional help:
+  Documentation: https://help.labarchives.com/mcp-server/scope-configuration
+  Support: https://help.labarchives.com/contact
+────────────────────────────────────────────────────────────</span>
+```
+
+### 7.5.2 Status and Progress Indicators
+
+#### 7.5.2.1 Operation Progress Display
+```
+Authenticating with LabArchives API...
+├─ Validating credentials format... ✓
+├─ Connecting to API endpoint... ✓
+├─ Performing HMAC-SHA256 authentication... ✓
+├─ Verifying user permissions... ✓
+└─ Creating session context... ✓
+Authentication successful (User ID: 12345)
+
+Loading available resources...
+├─ Discovering notebooks... (3 found)
+├─ Scanning pages... (47 found)
+├─ Applying scope filters... (12 after filtering)
+└─ Generating resource URIs... ✓
+Resource discovery complete
+
+Starting MCP protocol session...
+├─ Initializing JSON-RPC handler... ✓
+├─ Configuring stdin/stdout channels... ✓
+├─ Enabling protocol compliance mode... ✓
+└─ Ready for client connections... ✓
+```
+
+#### 7.5.2.2 Real-time Status Updates
+```
+[10:30:45] [INFO] MCP server listening for connections
+[10:30:52] [INFO] Client connected: Claude Desktop v1.2.3
+[10:30:52] [DEBUG] Protocol initialized: MCP v2024-11-05
+[10:30:53] [INFO] Resource list requested (scope: Research Project 2024)
+[10:30:53] [DEBUG] Fetching notebooks from LabArchives API
+[10:30:54] [INFO] Returned 12 resources to client
+[10:30:55] [INFO] Content requested: labarchives://notebook/123/page/456
+[10:30:55] [DEBUG] Retrieving page content from LabArchives
+[10:30:56] [INFO] Content delivered (2.3KB JSON)
+```
+
+### 7.5.3 Interactive Command Prompts
+
+#### 7.5.3.1 Configuration Setup Wizard
+```
+LabArchives MCP Server Configuration Setup
+==========================================
+
+Step 1/5: Authentication Credentials
+────────────────────────────────────────
+Enter your LabArchives Access Key ID: ak_12345678901234567890
+Enter your LabArchives Secret Key: [hidden input]
+Enter your LabArchives Username (optional): researcher@university.edu
+
+Step 2/5: API Endpoint Configuration  
+────────────────────────────────────────
+Select your LabArchives region:
+  [1] United States (api.labarchives.com) [DEFAULT]
+  [2] Australia (api.labarchives.com.au)
+  [3] United Kingdom (api.labarchives.co.uk)
+  [4] Custom endpoint
+Selection: 1
+
+Step 3/5: Scope Configuration
+────────────────────────────────────────
+Configure access scope (optional):
+  Notebook name pattern: Research Project 2024
+  Folder path restriction: /experiments
+  Include archived content: No
+
+Step 4/5: Logging and Output
+────────────────────────────────────────
+Log level: INFO
+Log file path: /var/log/labarchives-mcp.log
+Enable JSON-LD context: Yes
+
+Step 5/5: Review Configuration
+────────────────────────────────────────
+Configuration Summary:
+  ✓ Credentials configured (Access Key: ak_****7890)
+  ✓ Region: United States
+  ✓ Scope: Notebook "Research Project 2024", Folder "/experiments"
+  ✓ Logging: INFO level to /var/log/labarchives-mcp.log
+  ✓ JSON-LD: Enabled
+
+Save configuration? (y/N): y
+Configuration saved to /etc/labarchives-mcp/config.json
+```
+
+#### 7.5.3.2 Authentication Validation Prompts
+```
+Testing LabArchives Authentication...
+────────────────────────────────────────
+✓ Credentials format validation passed
+✓ API endpoint connectivity established
+✓ HMAC-SHA256 signature generation successful
+✓ Authentication handshake completed
+✓ User permissions verified (User ID: 12345)
+✓ Session context initialized
+
+Authentication test completed successfully!
+
+Available resources in scope:
+  • Notebook: "Research Project 2024" (ID: 456, 23 pages)
+  • Notebook: "Lab Methods 2024" (ID: 789, 15 pages)
+  • Folder: "/experiments" (12 pages across 3 notebooks)
+
+Would you like to start the MCP server now? (y/N): y
+Starting LabArchives MCP Server...
+```
+
+### 7.5.4 System Monitoring Displays
+
+#### 7.5.4.1 Real-time Performance Dashboard
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                     LabArchives MCP Server Status                           │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Server Status: ●RUNNING    Uptime: 02:34:12    Version: v0.1.0            │
+│ Active Sessions: 3         Memory Usage: 45.2MB   CPU: 2.1%                │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                              Session Activity                               │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Session 1: claude-desktop-v1.2.3  │ Active: 00:34:12 │ Requests: 47      │
+│ Session 2: anthropic-workbench     │ Active: 00:12:35 │ Requests: 23      │
+│ Session 3: custom-mcp-client       │ Active: 00:05:18 │ Requests: 8       │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                            Recent Activity Log                              │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ [14:32:15] [INFO] Resource requested: notebook/456/page/789                │
+│ [14:32:14] [INFO] Content delivered: 1.2KB JSON (cached)                   │
+│ [14:32:12] [DEBUG] MCP method: resources/read                              │
+│ [14:32:10] [INFO] Client connected: anthropic-workbench                    │
+│ [14:31:58] [DEBUG] Authentication refresh successful                       │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                              System Health                                  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ LabArchives API: ●CONNECTED   Response Time: 145ms   Error Rate: 0.0%     │
+│ Local Cache: ●HEALTHY         Hit Rate: 78.3%        Size: 12.4MB         │
+│ Protocol Handler: ●ACTIVE     Success Rate: 99.8%    Queue Depth: 0       │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### 7.5.4.2 Error and Warning Alerts
+```
+SYSTEM ALERTS
+═════════════════════════════════════════════════════════════════════════════
+
+⚠️  WARNING [14:25:33] - Rate limit approaching
+    Current rate: 87/100 requests per minute
+    Source: Session claude-desktop-v1.2.3
+    Action: Throttling enabled for this session
+
+🔒 SECURITY [14:22:15] - Failed authentication attempt
+    IP Address: 192.168.1.100
+    Reason: Invalid secret key format
+    Action: Request blocked, IP logged for monitoring
+
+ℹ️  INFO [14:18:42] - Cache cleanup completed  
+    Expired entries removed: 23
+    Memory freed: 2.1MB
+    Next cleanup: 15:18:42
+
+🔄 MAINTENANCE [14:15:00] - Session refresh cycle started
+    Active sessions: 3
+    Refresh operations: 3/3 completed successfully
+    Total time: 0.8 seconds
+
+⚡ PERFORMANCE [14:12:18] - High resource usage detected
+    Memory usage: 89.3MB (threshold: 100MB)
+    Recommendation: Consider increasing cache cleanup frequency
+    
+═════════════════════════════════════════════════════════════════════════════
+Press 'r' to refresh, 'q' to quit monitoring, 'c' to clear alerts
+```
+
+### 7.5.5 Debug and Diagnostic Displays
+
+#### 7.5.5.1 Protocol Message Tracing
+```
+MCP Protocol Message Trace - Session: claude-desktop-v1.2.3
+═══════════════════════════════════════════════════════════
+
+[14:30:45.123] ←── INCOMING REQUEST
+{
+  "jsonrpc": "2.0",
+  "id": "req-789",
   "method": "resources/list",
   "params": {
     "cursor": null
-  },
-  "id": 2
+  }
 }
-```
 
-**Resource List Response:**
-```json
+[14:30:45.124] ──→ PROCESSING
+├─ Method validation: ✓ resources/list (supported)
+├─ Parameter validation: ✓ cursor=null (valid)
+├─ Authentication check: ✓ Session active
+├─ Scope enforcement: ✓ 12 resources in scope
+├─ Resource discovery: ✓ LabArchives API query successful
+└─ Response preparation: ✓ JSON serialization complete
+
+[14:30:45.145] ──→ OUTGOING RESPONSE
 {
   "jsonrpc": "2.0",
+  "id": "req-789", 
   "result": {
     "resources": [
       {
-        "id": "notebook_12345",
-        "uri": "labarchives://notebook/12345",
-        "type": "notebook",
-        "title": "Research Project 2024",
-        "description": "Primary research notebook for 2024 experiments",
-        "metadata": {
-          "created": "2024-01-01T00:00:00Z",
-          "modified": "2024-07-15T14:30:00Z",
-          "owner": "researcher@institution.edu",
-          "permissions": ["read"],
-          "entry_count": 156
-        }
+        "uri": "labarchives://notebook/456/page/123",
+        "name": "Protein Analysis - Day 1",
+        "description": "Initial protein extraction and purification results",
+        "mimeType": "application/json"
       }
-    ],
-    "nextCursor": null
-  },
-  "id": 2
-}
-```
-
-#### 7.4.2.3 Content Retrieval
-
-```json
-{
-  "jsonrpc": "2.0",
-  "method": "resources/read",
-  "params": {
-    "uri": "labarchives://notebook/12345/page/67890"
-  },
-  "id": 3
-}
-```
-
-## 7.5 USER INTERACTION PATTERNS
-
-### 7.5.1 Terminal-Based Interaction Flows
-
-#### 7.5.1.1 Standard Startup Workflow
-
-```bash
-# 1. Initial server launch
-$ labarchives-mcp start --verbose
-
-============================================================
-LabArchives MCP Server v1.0.0
-============================================================
-Configuration Summary:
-  Authentication: API Key (AKID: <span style="background-color: rgba(91, 57, 243, 0.2)">***REDACTED***</span>)
-  API Endpoint: https://api.labarchives.com/api
-  Scope: Unrestricted
-  JSON-LD: Disabled
-  Log Level: INFO
-============================================================
-
-[2024-07-16 10:30:45] INFO: Starting LabArchives MCP Server...
-[2024-07-16 10:30:45] INFO: Loading configuration from multiple sources
-[2024-07-16 10:30:45] INFO: Configuration precedence: CLI > ENV > FILE > DEFAULTS
-[2024-07-16 10:30:45] INFO: Authenticating with LabArchives API...
-[2024-07-16 10:30:46] INFO: Authentication successful (User ID: 12345)
-[2024-07-16 10:30:46] INFO: Session expires: 2024-07-16T11:30:46Z
-[2024-07-16 10:30:46] INFO: MCP server ready and listening for connections
-[2024-07-16 10:30:46] INFO: Waiting for client connections on stdin/stdout...
-```
-
-<span style="background-color: rgba(91, 57, 243, 0.2)">All sensitive credentials are fully redacted in log output per security requirement G-3.</span>
-
-#### 7.5.1.2 Configuration Management Workflow
-
-```bash
-# Display current configuration
-$ labarchives-mcp config show --format json --redact-secrets
-
-{
-  "authentication": {
-    "api_base_url": "https://api.labarchives.com/api",
-    "access_key_id": "***REDACTED***",
-    "access_secret": "***REDACTED***",
-    "username": null
-  },
-  "scope": {
-    "notebook_id": null,
-    "notebook_name": "Research Project 2024",
-    "folder_path": null
-  },
-  "output": {
-    "json_ld_enabled": false,
-    "structured_output": true
-  },
-  "logging": {
-    "log_file": "/var/log/labarchives_mcp.log",
-    "log_level": "INFO",
-    "verbose": false
+      // ... 11 more resources
+    ]
   }
 }
 
-#### Validate configuration
-$ labarchives-mcp config validate --strict
-
-✓ Configuration validation successful
-  - Authentication: Valid API credentials
-  - Scope: Valid notebook name "Research Project 2024"
-  - Output: Valid formatting options
-  - Logging: Valid log file path and level
-
-#### Test authentication
-$ labarchives-mcp authenticate --format table
-
-┌─────────────────┬──────────────────────────────────────┐
-│ Parameter       │ Value                                │
-├─────────────────┼──────────────────────────────────────┤
-│ Status          │ ✓ Success                           │
-│ Method          │ API Key                             │
-│ Endpoint        │ https://api.labarchives.com/api     │
-│ User ID         │ 12345                               │
-│ Account Type    │ Premium                             │
-│ Session Expires │ 2024-07-16T11:30:45Z               │
-│ Notebooks       │ 15 total, 12 accessible            │
-│ Response Time   │ 0.234s                              │
-└─────────────────┴──────────────────────────────────────┘
+[14:30:45.146] ✓ MESSAGE COMPLETED
+Response time: 23ms | Data size: 2.3KB | Cache hit: No
 ```
 
-### 7.5.2 Error Handling and User Feedback
+#### 7.5.5.2 Authentication Debug Display
+```
+AUTHENTICATION DEBUG SESSION
+═════════════════════════════════════════════════════════
 
-#### 7.5.2.1 Error Display Hierarchy
+User Context:
+├─ Access Key ID: ak_****1234 (validated: ✓)
+├─ Username: researcher@university.edu (verified: ✓)
+├─ Region: US (api.labarchives.com)
+├─ Session ID: sess_abc123def456 
+└─ Expires: 2024-01-15T15:30:45Z (in 3421 seconds)
 
+HMAC-SHA256 Signature Verification:
+├─ Timestamp: 1705319445 (2024-01-15T14:30:45Z)
+├─ String to sign: "GET\n/api/users/current\n1705319445"
+├─ Signature generated: 8a7b9c3d2e1f4567890abcdef1234567
+├─ Signature received: 8a7b9c3d2e1f4567890abcdef1234567
+└─ Verification result: ✓ MATCH
+
+API Response Headers:
+├─ HTTP Status: 200 OK
+├─ Content-Type: application/json
+├─ X-RateLimit-Remaining: 97
+├─ X-RateLimit-Reset: 1705319505
+└─ X-Session-Expires: 1705323045
+
+User Permissions:
+├─ Account Type: Premium Research
+├─ Notebook Access: Read/Write (12 notebooks)
+├─ Scope Applied: notebook_456 ("Research Project 2024")
+├─ Filtered Resources: 12 pages accessible
+└─ Admin Privileges: No
+
+Connection Health:
+├─ Latency: 145ms (good)
+├─ SSL Certificate: Valid until 2024-12-31
+├─ DNS Resolution: 12ms
+└─ Connection Pool: 3/10 connections active
+```
+
+### 7.5.6 Configuration and Settings Displays
+
+#### 7.5.6.1 Current Configuration View
+```
+LABARCHIVES MCP SERVER CONFIGURATION
+════════════════════════════════════════════════════════════════════════════
+
+Server Settings:
+├─ Version: v0.1.0
+├─ Log Level: INFO
+├─ Log File: /var/log/labarchives-mcp.log (142.3MB)
+├─ Max Log Size: 100MB (rotation: 5 files)
+├─ JSON-LD Context: Enabled
+└─ Protocol Compliance: MCP v2024-11-05
+
+Authentication:
+├─ Method: HMAC-SHA256 API Key
+├─ Access Key ID: ak_****1234
+├─ Username: researcher@university.edu
+├─ Region: US (api.labarchives.com)
+├─ Session Timeout: 3600 seconds
+└─ Auto Refresh: Enabled
+
+Scope Configuration:
+├─ Type: Notebook Restriction
+├─ Notebook Name: "Research Project 2024"
+├─ Notebook ID: 456
+├─ Folder Path: None (all folders)
+├─ Include Archived: No
+└─ Max Results: 1000
+
+Security Settings:
+├─ Audit Logging: Enabled
+├─ Parameter Sanitization: Enabled  
+├─ Session Validation: Strict
+├─ Rate Limiting: 100 req/min (burst: 200)
+└─ IP Restrictions: None
+
+Performance Settings:
+├─ Cache Size: 50MB (12.4MB used)
+├─ Cache TTL: 300 seconds
+├─ Connection Pool: 10 max connections
+├─ Request Timeout: 30 seconds
+└─ Memory Limit: 100MB (45.2MB used)
+
+Configuration File: /etc/labarchives-mcp/config.json
+Last Modified: 2024-01-15T09:15:32Z
+Checksum: sha256:8a7b9c3d2e1f4567890abcdef1234567890abcdef123
+```
+
+#### 7.5.6.2 Settings Validation Report
+```
+CONFIGURATION VALIDATION REPORT
+═══════════════════════════════════════════════════════════════════════════
+
+✓ PASSED: All required authentication parameters present
+✓ PASSED: Access key format validation (AKID format)
+✓ PASSED: Secret key format validation (base64 compatible)
+✓ PASSED: Username format validation (valid email)
+✓ PASSED: API endpoint URL format validation
+✓ PASSED: Log file path writable and accessible
+✓ PASSED: JSON-LD context file exists and valid
+✓ PASSED: Notebook scope restriction properly configured
+✓ PASSED: Rate limiting parameters within acceptable ranges
+✓ PASSED: Memory and cache limits properly configured
+
+⚠️  WARNING: Log file approaching rotation threshold (142.3/100MB)
+⚠️  WARNING: No IP restrictions configured (recommended for production)
+
+📋 RECOMMENDATIONS:
+├─ Consider enabling IP address restrictions for enhanced security
+├─ Review log retention policy (current: 5 rotation files)
+├─ Monitor cache hit rate to optimize performance
+└─ Enable webhook notifications for system alerts
+
+🔧 CONFIGURATION SCORE: 92/100 (Excellent)
+   Security: 88/100 | Performance: 95/100 | Reliability: 94/100
+
+Validation completed at: 2024-01-15T14:30:45Z
+Next validation: 2024-01-15T15:30:45Z (auto-scheduled)
+```
+
+## 7.6 User Interactions and Workflows
+
+### 7.6.1 CLI Interaction Patterns
+
+#### 7.6.1.1 Direct Command Execution
+```mermaid
+sequenceDiagram
+    participant User
+    participant Terminal
+    participant CLI
+    participant Config
+    participant Auth
+    participant Server
+    
+    User->>Terminal: labarchives-mcp start
+    Terminal->>CLI: Parse arguments
+    CLI->>Config: Load configuration
+    Config-->>CLI: Configuration loaded
+    CLI->>Auth: Authenticate user
+    Auth-->>CLI: Session established
+    CLI->>Server: Start MCP server
+    Server-->>CLI: Server ready
+    CLI->>Terminal: Display status
+    Terminal-->>User: Ready for connections
+    
+    Note over User,Server: Server runs until interrupted
+    
+    User->>Terminal: Ctrl+C
+    Terminal->>CLI: SIGINT received
+    CLI->>Server: Graceful shutdown
+    Server-->>CLI: Shutdown complete
+    CLI->>Terminal: Exit code 0
+    Terminal-->>User: Process terminated
+```
+
+#### 7.6.1.2 MCP Protocol Interaction
+```mermaid
+sequenceDiagram
+    participant AI as AI Client
+    participant MCP as MCP Server
+    participant Auth as Auth Manager
+    participant Resource as Resource Manager
+    participant Lab as LabArchives API
+    
+    AI->>MCP: {"method": "initialize", "params": {}}
+    MCP->>Auth: Validate session
+    Auth-->>MCP: Session valid
+    MCP-->>AI: {"result": {"protocolVersion": "2024-11-05"}}
+    
+    AI->>MCP: {"method": "resources/list", "params": {}}
+    MCP->>Resource: List resources
+    Resource->>Lab: GET /notebooks
+    Lab-->>Resource: Notebook data
+    Resource->>Lab: GET /pages
+    Lab-->>Resource: Page data
+    Resource-->>MCP: MCP resources
+    MCP-->>AI: {"result": {"resources": [...]}}
+    
+    AI->>MCP: {"method": "resources/read", "params": {"uri": "..."}}
+    MCP->>Resource: Read resource
+    Resource->>Lab: GET /entries
+    Lab-->>Resource: Entry content
+    Resource-->>MCP: MCP content
+    MCP-->>AI: {"result": {"contents": [...]}}
+```
+
+### 7.6.2 Configuration Management Interactions
+
+#### 7.6.2.1 Configuration Validation Workflow
 ```bash
-# Standard error output
-LabArchives MCP Error: Authentication failed
-  ✗ Invalid API credentials provided
-  
-  Resolution steps:
-  1. Verify your access key ID is correct
-  2. Check that your access secret has not expired
-  3. Ensure you have necessary permissions
-  4. Try accessing LabArchives web interface
-  
-  For detailed diagnostics, run with --verbose flag
+#### Interactive configuration validation
+$ labarchives-mcp config validate --config-file myconfig.json
 
-#### Verbose error output (--verbose)
-[2024-07-16 10:30:45] ERROR: AuthManager - Authentication failed
-  Error Details:
-    Code: AUTH_001
-    Type: AuthenticationError
-    Message: Invalid HMAC signature
-    API Response: 401 Unauthorized
-    Request ID: req_abc123def456
-    Timestamp: 2024-07-16T10:30:45.123Z
-  
-  Stack Trace:
-    File "/src/cli/auth/manager.py", line 142, in authenticate
-    File "/src/cli/api/client.py", line 89, in post
-    File "/src/cli/api/signing.py", line 34, in sign_request
-  
-  Diagnostic Information:
-    - API Endpoint: https://api.labarchives.com/api
-    - Request Method: POST
-    - Request Path: /api/authenticate
-    - HMAC Algorithm: SHA256
-    - Timestamp: 1721124645
+Validating configuration file: myconfig.json
+┌─────────────────────────────────────────────────────────┐
+│                Configuration Validation                 │
+├─────────────────────────────────────────────────────────┤
+│ ✓ JSON syntax valid                                     │
+│ ✓ Required fields present                               │
+│ ✓ API base URL format valid                             │
+│ ✓ Authentication method supported                       │
+│ ✓ Scope configuration valid                             │
+│ ✓ Log level setting valid                               │
+│ ✗ Warning: JSON-LD context URL unreachable             │
+└─────────────────────────────────────────────────────────┘
+
+Validation Result: PASSED (1 warning)
+Configuration is valid and ready for use.
 ```
 
-#### Scope violation errors
-
+#### 7.6.2.2 Runtime Configuration Updates
 ```bash
-# Out-of-scope resource access attempt
-$ labarchives-mcp start --notebook-id 12345 --folder-path "ProjectA"
-[MCP Client Request] Read resource: labarchives://notebook/67890/page/123
+#### Dynamic configuration updates
+$ labarchives-mcp config set log_level DEBUG
+Configuration updated: log_level = DEBUG
 
-#### Raw MCP error response
-{
-  "jsonrpc": "2.0",
-  "id": 12,
-  "error": {
-    "code": 403,
-    "message": "ScopeViolation"
-  }
-}
+$ labarchives-mcp config get scope.notebook_name
+Current value: "Research Project 2024"
 
-#### Human-friendly error display
-LabArchives MCP Error: Access denied
-  ✗ Resource outside configured scope
+$ labarchives-mcp config reload
+Configuration reloaded successfully
+New settings applied to running server
+```
+
+## 7.7 Visual Design and Formatting
+
+### 7.7.1 Terminal Output Styling
+
+#### 7.7.1.1 Color Coding System
+When terminal color support is available, the system uses a consistent color palette:
+
+| Message Type | Color Code | Usage Context |
+|-------------|------------|---------------|
+| **INFO** | Default/White | General status and operation messages |
+| **SUCCESS** | Green (\033[92m) | Successful completions and confirmations |
+| **WARNING** | Yellow (\033[93m) | Non-critical issues requiring attention |
+| **ERROR** | Red (\033[91m) | Critical failures and error conditions |
+| **DEBUG** | Cyan (\033[96m) | Detailed debugging information (--verbose) |
+
+<span style="background-color: rgba(91, 57, 243, 0.2)">**Security Note**: URL parameter sanitization is automatically applied at DEBUG level with negligible performance overhead, ensuring sensitive authentication credentials are redacted from all terminal output.</span>
+
+#### 7.7.1.2 Progress Indicators
+```
+Loading notebooks... [████████████████████████████████] 100% (12/12)
+Fetching pages... [████████████░░░░░░░░░░░░░░░░░░░░░░░░] 45% (47/104)
+Processing entries... [██████████████████████████████] 100% Complete
+```
+
+### 7.7.2 Structured Output Format
+
+#### 7.7.2.1 Log Message Format
+```
+[TIMESTAMP] [LEVEL] [COMPONENT] Message content
+[2024-01-15 10:30:45.123] [INFO] [cli.main] Starting LabArchives MCP Server
+[2024-01-15 10:30:45.125] [DEBUG] [auth.manager] Loading credentials from environment
+[2024-01-15 10:30:45.234] [INFO] [mcp.protocol] Protocol handler initialized
+```
+
+**Security Features:**
+- <span style="background-color: rgba(91, 57, 243, 0.2)">All sensitive query-string parameters (e.g., token, password, secret) are automatically replaced with [REDACTED] before logging</span>
+- Structured formatting supports both JSON and key-value output modes
+- Comprehensive audit trail maintains compliance with enterprise security standards
+
+#### 7.7.2.2 Configuration Summary Display
+```
+Configuration Summary
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Core Settings
+├─ API Base URL: https://api.labarchives.com/api
+├─ Authentication: API Key (AKID: ak_****1234)
+├─ Region: US (auto-detected)
+└─ Protocol Version: MCP 2024-11-05
+
+Scope Configuration
+├─ Notebook Filter: "Research Project 2024"
+├─ Folder Filter: None
+└─ Access Level: Read-only
+
+Output Configuration
+├─ JSON-LD Context: Enabled
+├─ Log Level: INFO
+├─ Log File: /var/log/labarchives-mcp.log
+└─ Verbose Mode: Disabled
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+### 7.7.3 MCP Protocol Message Formatting
+
+#### 7.7.3.1 Protocol Message Symbols
+For debugging and logging purposes, the system uses consistent symbols to represent different message types:
+
+| Symbol | Meaning | Usage |
+|--------|---------|-------|
+| `→` | Input message (from AI client) | JSON-RPC request logging |
+| `←` | Output message (to AI client) | JSON-RPC response logging |
+| `⚡` | Error response | Exception and error condition logging |
+| `✓` | Success response | Successful operation completion |
+| `📋` | Resource listing | Resource discovery operations |
+| `📄` | Resource content | Content retrieval operations |
+| `🔑` | Authentication | Security-related operations |
+| `⚙️` | Configuration | Configuration management operations |
+
+#### 7.7.3.2 Protocol Debug Output
+```
+[DEBUG] Protocol Exchange:
+→ {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}}
+← {"jsonrpc": "2.0", "id": 1, "result": {"protocolVersion": "2024-11-05"}}
+
+[DEBUG] Resource Discovery:
+→ {"jsonrpc": "2.0", "id": 2, "method": "resources/list", "params": {}}
+📋 Found 3 notebooks, 47 pages, 12 entries (after scope filtering)
+← {"jsonrpc": "2.0", "id": 2, "result": {"resources": [12 items]}}
+
+[DEBUG] Content Retrieval:
+→ {"jsonrpc": "2.0", "id": 3, "method": "resources/read", "params": {"uri": "labarchives://notebook/123/page/456<span style="background-color: rgba(91, 57, 243, 0.2)">?token=[REDACTED]&api_key=[REDACTED]</span>"}}
+📄 Retrieved 2.3KB content with JSON-LD context
+← {"jsonrpc": "2.0", "id": 3, "result": {"contents": [...]}}
+
+[DEBUG] Authentication Request:
+→ {"jsonrpc": "2.0", "id": 4, "method": "auth/validate", "params": {"endpoint": "https://api.labarchives.com/auth<span style="background-color: rgba(91, 57, 243, 0.2)">?password=[REDACTED]&secret=[REDACTED]</span>"}}
+🔑 Session validation with credential sanitization applied
+← {"jsonrpc": "2.0", "id": 4, "result": {"authenticated": true, "session": "sess_****"}}
+```
+
+## 7.8 Accessibility and Usability
+
+### 7.8.1 Command-Line Accessibility
+
+#### 7.8.1.1 Screen Reader Compatibility
+- **Text-Only Interface**: Fully compatible with screen readers (NVDA, JAWS, VoiceOver)
+- **Structured Output**: Consistent formatting for predictable navigation
+- **Clear Hierarchy**: Logical information organization with headers and sections
+
+#### 7.8.1.2 Keyboard Navigation
+```bash
+#### Tab completion support (where supported by shell)
+$ labarchives-mcp <TAB>
+authenticate    config    start
+
+$ labarchives-mcp start --<TAB>
+--access-key    --api-base-url    --config-file    --help    --json-ld    --notebook-name
+```
+
+### 7.8.2 Error Recovery and Help
+
+#### 7.8.2.1 Comprehensive Help System
+```bash
+#### Context-sensitive help at every level
+$ labarchives-mcp --help                    # Global help
+$ labarchives-mcp start --help             # Command-specific help
+$ labarchives-mcp config validate --help   # Subcommand help
+```
+
+#### 7.8.2.2 Error Recovery Guidance
+```
+ERROR: Missing required authentication credentials
+────────────────────────────────────────────────────────────
+
+Quick Fix:
+  Set environment variables:
+    export LABARCHIVES_AKID="your-access-key"
+    export LABARCHIVES_SECRET="your-secret-key"
+
+Alternative Solutions:
+  1. Use command-line arguments:
+     labarchives-mcp start -k "key" -p "secret"
   
-  Requested: notebook/67890/page/123
-  Configured scope: notebook/12345, folder "ProjectA"
+  2. Create configuration file:
+     labarchives-mcp config set auth.access_key "your-key"
   
-  Resolution steps:
-  1. Verify the requested resource is within your configured scope
-  2. Check notebook ID and folder path restrictions
-  3. Update scope configuration if access is intended
-  4. Contact administrator if broader access is required
-  
-  Current scope configuration:
-  - Notebook ID: 12345
-  - Folder Path: ProjectA
-  - Permissions: read
+  3. Interactive credential setup:
+     labarchives-mcp authenticate --interactive
+
+Need Help?
+  Documentation: https://help.labarchives.com/mcp-server
+  Support: https://help.labarchives.com/contact
 ```
 
-#### 7.5.2.2 Progressive Error Resolution
+### 7.8.3 Performance and Responsiveness
 
-```bash
-# Network connectivity issues
-LabArchives MCP Error: Connection failed
-  ✗ Unable to connect to LabArchives API
-  
-  Troubleshooting:
-  1. Check internet connectivity
-  2. Verify API endpoint URL
-  3. Check firewall settings
-  4. Try alternative regional endpoints:
-     - US: https://api.labarchives.com/api
-     - AU: https://api.labarchives.com.au/api
-     - UK: https://api.labarchives.com.uk/api
-  
-  Current endpoint: https://api.labarchives.com/api
-  Connection timeout: 30 seconds
-  
-  For network diagnostics, run: labarchives-mcp config validate --verbose
+#### 7.8.3.1 Response Time Expectations
+- **Command execution**: < 1 second for local operations
+- **Authentication**: < 3 seconds for credential validation
+- **Resource listing**: < 5 seconds for complete discovery
+- **Content retrieval**: < 10 seconds for large entries
 
-#### Configuration validation errors
-Configuration Error: Invalid scope configuration
-  ✗ Notebook "Invalid Project" not found
-  
-  Available notebooks:
-  1. "Research Project 2024" (ID: 12345)
-  2. "Lab Notes 2023" (ID: 67890)
-  3. "Experiment Data 2024" (ID: 11111)
-  
-  Suggestion: Use --notebook-id 12345 or --notebook-name "Research Project 2024"
+#### 7.8.3.2 Resource Usage Indicators
+```
+System Performance
+├─ Memory Usage: 45.2MB (normal)
+├─ CPU Usage: 2.3% (idle)
+├─ Active Connections: 1
+└─ Cache Hit Rate: 85%
+
+API Performance
+├─ Average Response Time: 1.2s
+├─ Requests/Minute: 12
+├─ Error Rate: 0.0%
+└─ Rate Limit Status: 85% remaining
 ```
 
-### 7.5.3 Visual Design and Terminal Formatting
+## 7.9 Integration with System Architecture
 
-#### 7.5.3.1 Color Coding and Symbols
+### 7.9.1 Component Integration
 
-```bash
-# Status indicators with color coding
-✓ Success    # Green (\033[92m)
-✗ Error      # Red (\033[91m)
-ℹ Info       # Blue (\033[94m)
-⚠ Warning    # Yellow (\033[93m)
-⟳ Progress   # Cyan (\033[96m)
+The user interface components integrate seamlessly with the overall system architecture:
 
-#### Operation states
-◆ Required   # Bold white
-◇ Optional   # Light gray
-→ Flow       # Arrow for process flow
-[...] Truncated  # Content abbreviated
-
-#### Security indicators
-*** Redacted     # Sensitive data hidden
-🔒 Encrypted     # Secure connection
-🔑 Authenticated # Valid session
+```mermaid
+graph TB
+    subgraph "User Interface Layer"
+        A[CLI Parser]
+        B[MCP Protocol Handler]
+        C[Terminal Output Formatter]
+    end
+    
+    subgraph "Application Layer"
+        D[Authentication Manager]
+        E[Resource Manager]
+        F[Configuration Manager]
+    end
+    
+    subgraph "Integration Layer"
+        G[LabArchives API Client]
+        H[Audit Logger]
+    end
+    
+    A --> D
+    A --> F
+    B --> E
+    B --> D
+    C --> H
+    
+    D --> G
+    E --> G
+    F --> G
+    
+    style A fill:#e1f5fe,stroke:#0277bd,stroke-width:2px
+    style B fill:#e1f5fe,stroke:#0277bd,stroke-width:2px
+    style C fill:#e1f5fe,stroke:#0277bd,stroke-width:2px
 ```
 
-#### 7.5.3.2 Table and List Formatting
+### 7.9.2 Cross-Cutting Concerns
 
-```bash
-# Structured table output
-┌─────────────────┬──────────────────────┬──────────────────┐
-│ Notebook ID     │ Name                 │ Last Modified    │
-├─────────────────┼──────────────────────┼──────────────────┤
-│ 12345          │ Research Project 2024 │ 2024-07-15      │
-│ 67890          │ Lab Notes 2023       │ 2024-06-20      │
-│ 11111          │ Experiment Data 2024 │ 2024-07-16      │
-└─────────────────┴──────────────────────┴──────────────────┘
+#### 7.9.2.1 Security Integration
+- **Credential Management**: Secure handling of API keys and tokens
+- **Session Management**: Proper authentication context maintenance
+- **Audit Integration**: Comprehensive logging of all user interactions
 
-#### Progress indicators
-Loading configuration... [████████████████████] 100%
-Authenticating with API... [████████████--------] 75%
-Starting MCP server... [████████████████████] Complete ✓
-
-#### Hierarchical list display
-📁 Research Project 2024 (notebook_12345)
-├── 📄 Introduction (page_001)
-│   ├── 📝 Project Overview (entry_001)
-│   └── 📝 Objectives (entry_002)
-├── 📄 Methods (page_002)
-│   ├── 📝 Experimental Design (entry_003)
-│   └── 📊 Data Collection (entry_004)
-└── 📄 Results (page_003)
-    ├── 📈 Statistical Analysis (entry_005)
-    └── 📸 Figures (entry_006)
-```
-
-## 7.6 INTEGRATION INTERFACES
-
-### 7.6.1 Claude Desktop Integration
-
-The CLI provides seamless integration with Claude Desktop through MCP protocol implementation:
-
-```json
-{
-  "mcp-servers": {
-    "labarchives": {
-      "command": "labarchives-mcp",
-      "args": ["start", "--verbose"],
-      "env": {
-        "LABARCHIVES_AKID": "your_access_key_id",
-        "LABARCHIVES_SECRET": "your_access_secret",
-        "LABARCHIVES_NOTEBOOK_NAME": "Research Project 2024",
-        "LABARCHIVES_JSON_LD": "true",
-        "LABARCHIVES_LOG_LEVEL": "INFO"
-      }
-    }
-  }
-}
-```
-
-### 7.6.2 System Integration Patterns
-
-#### 7.6.2.1 Container Deployment
-
-```bash
-# Docker container execution
-docker run -d \
-  --name labarchives-mcp \
-  -e LABARCHIVES_AKID="your_key" \
-  -e LABARCHIVES_SECRET="your_secret" \
-  -e LABARCHIVES_LOG_LEVEL="INFO" \
-  -v /var/log:/var/log \
-  labarchives/mcp-server:latest \
-  start --daemon --pid-file /var/run/labarchives-mcp.pid
-```
-
-#### 7.6.2.2 Kubernetes Deployment
-
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: labarchives-mcp
-spec:
-  replicas: 3
-  selector:
-    matchLabels:
-      app: labarchives-mcp
-  template:
-    metadata:
-      labels:
-        app: labarchives-mcp
-    spec:
-      containers:
-      - name: mcp-server
-        image: labarchives/mcp-server:latest
-        command: ["labarchives-mcp", "start", "--daemon"]
-        env:
-        - name: LABARCHIVES_AKID
-          valueFrom:
-            secretKeyRef:
-              name: labarchives-credentials
-              key: access-key-id
-        - name: LABARCHIVES_SECRET
-          valueFrom:
-            secretKeyRef:
-              name: labarchives-credentials
-              key: access-secret
-        - name: LABARCHIVES_LOG_LEVEL
-          value: "INFO"
-        resources:
-          requests:
-            memory: "64Mi"
-            cpu: "100m"
-          limits:
-            memory: "128Mi"
-            cpu: "200m"
-        livenessProbe:
-          exec:
-            command:
-            - labarchives-mcp
-            - authenticate
-            - --format
-            - json
-          initialDelaySeconds: 30
-          periodSeconds: 60
-```
-
-## 7.7 OPERATIONAL INTERFACE FEATURES
-
-### 7.7.1 System Exit Codes
-
-```bash
-# Standard exit codes for automation
-0   - Success: Operation completed successfully
-1   - Configuration Error: Invalid configuration or parameters
-2   - Authentication Error: Invalid credentials or authentication failure
-3   - Protocol Error: MCP communication or protocol compliance issue
-4   - API Error: LabArchives API communication failure
-5   - Permission Error: Insufficient permissions or scope restrictions
-130 - User Interruption: SIGINT (Ctrl+C) received
-143 - Termination: SIGTERM received (graceful shutdown)
-```
-
-### 7.7.2 Signal Handling
-
-```bash
-# Signal processing for operational control
-SIGINT (Ctrl+C)  - Graceful shutdown with cleanup
-SIGTERM          - Graceful shutdown for container orchestration
-SIGHUP           - Reload configuration without restart
-SIGUSR1          - Increase log verbosity
-SIGUSR2          - Decrease log verbosity
-```
-
-### 7.7.3 Health Check Interface
-
-```bash
-# Health check command for monitoring
-$ labarchives-mcp authenticate --format json --quiet
-
-{
-  "status": "healthy",
-  "response_time": "0.234s",
-  "api_accessible": true,
-  "session_valid": true,
-  "last_check": "2024-07-16T10:30:45Z"
-}
-
-#### Exit code: 0 for healthy, 2 for unhealthy
-```
-
-## 7.8 ACCESSIBILITY AND USABILITY
-
-### 7.8.1 Help System Design
-
-The CLI implements a comprehensive help system with context-sensitive documentation:
-
-```bash
-# Global help
-$ labarchives-mcp --help
-
-#### Command-specific help
-$ labarchives-mcp start --help
-
-#### Configuration help
-$ labarchives-mcp config --help
-
-#### Examples and usage patterns
-$ labarchives-mcp --examples
-```
-
-### 7.8.2 Auto-completion Support
-
-```bash
-# Bash completion support
-complete -F _labarchives_mcp labarchives-mcp
-
-#### Zsh completion support
-compdef _labarchives_mcp labarchives-mcp
-
-#### PowerShell completion (Windows)
-Register-ArgumentCompleter -Native -CommandName labarchives-mcp -ScriptBlock {
-#### PowerShell completion logic
-}
-```
-
-### 7.8.3 International Localization
-
-```bash
-# Locale support for error messages
-export LANG=en_US.UTF-8
-export LC_ALL=en_US.UTF-8
-
-#### Multi-language error messages (future enhancement)
-export LABARCHIVES_LANG=en_US  # English (default)
-export LABARCHIVES_LANG=es_ES  # Spanish
-export LABARCHIVES_LANG=fr_FR  # French
-```
+#### 7.9.2.2 Monitoring Integration
+- **Health Checks**: Built-in health check endpoints for container orchestration
+- **Metrics Collection**: Integration with CloudWatch and monitoring systems
+- **Performance Tracking**: Response time and error rate monitoring
 
 #### References
 
-#### Files Examined:
-- `src/cli/cli_parser.py` - CLI argument parsing and command dispatch implementation
-- `src/cli/main.py` - Main entry point and application orchestration
-- `src/cli/commands/start.py` - Server startup command implementation
-- `src/cli/commands/authenticate.py` - Authentication testing command implementation
-- `src/cli/commands/config_cmd.py` - Configuration management command implementation
-- `src/cli/mcp/handlers.py` - MCP protocol request handlers and message processing
-- `src/cli/mcp/protocol.py` - JSON-RPC protocol implementation and transport layer
-- `src/cli/mcp/models.py` - Data models for MCP resources and protocol messages
-- `src/cli/examples/config_examples.sh` - Usage examples and configuration workflows
-- `src/cli/README.md` - Comprehensive CLI documentation and usage guide
-- `src/cli/.env.example` - Environment variable configuration template
+The following files and components were analyzed to create this comprehensive USER INTERFACE DESIGN documentation:
 
-#### Folders Explored:
-- `src/cli/` - Primary CLI implementation package
-- `src/cli/commands/` - CLI command implementations and handlers
-- `src/cli/mcp/` - MCP protocol implementation layer
-- `src/cli/examples/` - Usage examples and configuration templates
-- `src/cli/api/` - LabArchives API client implementation
-- `src/cli/auth/` - Authentication manager and security components
-- `blitzy/` - Project documentation and specification folder
-
-#### Technical Specification Sections Referenced:
-- **1.2 SYSTEM OVERVIEW** - System architecture and component integration context
-- **2.1 FEATURE CATALOG** - Feature F-006 (CLI Interface and Configuration) detailed specifications
-- **5.1 HIGH-LEVEL ARCHITECTURE** - System architecture and interface boundaries
-- **5.2 COMPONENT DETAILS** - Component architecture and interaction patterns
+- `cli_parser.py` - Command-line argument parsing and subcommand structure
+- `mcp/protocol.py` - MCP protocol handler and JSON-RPC communication
+- `auth/manager.py` - Authentication session management and credential validation
+- `resource/manager.py` - Resource discovery and content transformation
+- `config/` - Configuration management and validation systems
+- `logging/` - Structured logging and terminal output formatting
+- `examples/` - Example scripts and usage patterns for CLI commands
+- Technical Specification sections 1.1, 1.2, 4.1, and 5.1 for system context and architecture integration
 
 # 8. INFRASTRUCTURE
 
@@ -9889,1012 +8549,944 @@ export LABARCHIVES_LANG=fr_FR  # French
 
 ### 8.1.1 Target Environment Assessment
 
-The LabArchives MCP Server is designed for **hybrid deployment environments** supporting flexible infrastructure patterns from local desktop execution to enterprise cloud deployments. The system's architecture accommodates diverse deployment scenarios while maintaining consistent security and operational standards.
+#### 8.1.1.1 Environment Type
+**Primary Deployment Model:** Hybrid (Desktop-First with Cloud-Ready Architecture)
+- **Desktop Integration**: Standalone application for Claude Desktop integration via Model Context Protocol (MCP)
+- **Cloud Deployment**: Containerized cloud deployment for enterprise environments
+- **Multi-Environment Support**: Development, staging, and production configurations with environment-specific overlays
 
-**Environment Type Classification:**
-- **Local Development**: Desktop installation via pip for development and testing
-- **Container Deployment**: Docker-based deployment for consistent environments
-- **Kubernetes Orchestration**: Enterprise-grade container orchestration for production
-- **Cloud-Native**: AWS ECS Fargate for serverless container execution
-- **Hybrid Cloud**: Multi-environment deployment with centralized management
+#### 8.1.1.2 Geographic Distribution Requirements
+**Multi-Region API Support:**
+- **United States**: `https://api.labarchives.com/api` (primary endpoint)
+- **Australia**: `https://auapi.labarchives.com/api` (regional endpoint)
+- **United Kingdom**: `https://ukapi.labarchives.com/api` (regional endpoint)
+- **Latency Requirements**: <2 seconds for resource listing, <5 seconds for content retrieval to support research workflows
 
-**Geographic Distribution Requirements:**
-The system supports **multi-region deployments** with built-in regional endpoint compatibility:
+#### 8.1.1.3 Resource Requirements
 
-| Region | LabArchives Endpoint | Deployment Considerations |
-|--------|---------------------|---------------------------|
-| **United States** | `my-eln.labarchives.com` | Primary deployment region |
-| **Australia** | `au-myeln.labarchives.com` | Asia-Pacific operations |
-| **United Kingdom** | `uk-myeln.labarchives.com` | European operations |
+| Component | Development | Staging | Production |
+|-----------|-------------|---------|------------|
+| **Compute** | 0.5 vCPU, 128MB RAM | 1 vCPU, 256MB RAM | 2 vCPU, 512MB RAM |
+| **Memory** | 64Mi min, 128Mi max | 128Mi min, 256Mi max | 256Mi min, 512Mi max |
+| **Storage** | 1GB for logs | 5GB for logs | 10GB for logs/audit |
+| **Network** | Standard bandwidth | Enhanced monitoring | High availability |
 
-**Resource Requirements:**
-
-| Resource Type | Minimum | Recommended | Maximum |
-|---------------|---------|-------------|---------|
-| **CPU** | 250m (0.25 cores) | 500m (0.5 cores) | 1000m (1 core) |
-| **Memory** | 64MB | 128MB | 256MB |
-| **Storage** | 100MB (logs only) | 500MB (extended logs) | 1GB (debug/audit) |
-| **Network** | 1Mbps | 10Mbps | 100Mbps |
-
-**Compliance and Regulatory Requirements:**
-- **SOC2 Type II**: Comprehensive audit logging and access controls
-- **ISO 27001**: Information security management systems
-- **HIPAA**: Protected health information handling capabilities
-- **GDPR**: Data minimization through zero-persistence architecture
+#### 8.1.1.4 Compliance and Regulatory Requirements
+**Enterprise Security Standards:**
+- **SOC2 Type II**: Access control monitoring and data security controls
+- **ISO 27001**: Information security management system compliance
+- **HIPAA**: Healthcare data protection for PHI access tracking
+- **GDPR**: Data privacy protection with data minimization principles
 
 ### 8.1.2 Environment Management
 
-**Infrastructure as Code (IaC) Approach:**
-The system employs **Terraform** for comprehensive infrastructure provisioning with version-controlled, reproducible deployments:
+#### 8.1.2.1 Infrastructure as Code (IaC) Approach
+**Terraform-Based Infrastructure:**
+- **Provider**: AWS Provider >= 5.0.0 with Terraform >= 1.4.0
+- **Module Structure**: Reusable modules for ECS, RDS, VPC, and security components
+- **State Management**: Remote state with DynamoDB locking for concurrent access protection
+- **Workspace Strategy**: Environment separation (dev, staging, prod) with parameterized configurations
+
+#### 8.1.2.2 Configuration Management Strategy
+**Kubernetes-Native Configuration:**
+- **ConfigMaps**: Non-sensitive configuration data with environment-specific overlays
+- **Secrets**: Encrypted credential management with AWS Secrets Manager integration
+- **Validation**: Automated configuration validation in CI/CD pipeline
+- **Versioning**: Git-based configuration versioning with rollback capabilities
+
+#### 8.1.2.3 Environment Promotion Strategy
 
 ```mermaid
-graph TB
-    subgraph "Terraform Architecture"
-        WORKSPACES[Terraform Workspaces]
-        MODULES[Terraform Modules]
-        STATE[Remote State Management]
-        PROVIDERS[Cloud Providers]
-    end
+flowchart LR
+    A[Development] --> B[CI/CD Pipeline]
+    B --> C[Staging]
+    C --> D[Validation]
+    D --> E[Production]
     
-    subgraph "Environment Modules"
-        ECS_MODULE[ECS Fargate Module]
-        RDS_MODULE[RDS PostgreSQL Module]
-        MONITORING[CloudWatch Module]
-        SECURITY[Security Groups Module]
-    end
+    B --> F[Automated Tests]
+    D --> G[Manual Approval]
     
-    subgraph "Deployment Environments"
-        DEV[Development Environment]
-        STAGING[Staging Environment]
-        PROD[Production Environment]
-    end
+    F --> H[Quality Gates]
+    G --> I[Deployment Approval]
     
-    WORKSPACES --> ECS_MODULE
-    WORKSPACES --> RDS_MODULE
-    WORKSPACES --> MONITORING
-    WORKSPACES --> SECURITY
-    
-    ECS_MODULE --> DEV
-    ECS_MODULE --> STAGING
-    ECS_MODULE --> PROD
-    
-    RDS_MODULE --> STAGING
-    RDS_MODULE --> PROD
-    
-    MODULES --> STATE
-    STATE --> PROVIDERS
+    style A fill:#e1f5fe
+    style C fill:#fff3e0
+    style E fill:#c8e6c9
+    style H fill:#f3e5f5
 ```
 
-**Configuration Management Strategy:**
-- **Environment Variables**: Secure credential management through Kubernetes Secrets and AWS Parameter Store
-- **ConfigMaps**: Non-sensitive configuration data with version control
-- **Hierarchical Configuration**: Environment-specific overrides with inheritance
-- **Validation**: Comprehensive configuration validation at startup
-
-**Environment Promotion Strategy:**
-
-| Environment | Purpose | Promotion Trigger | Validation Requirements |
-|-------------|---------|-------------------|------------------------|
-| **Development** | Feature development | Automated on commit | Unit tests, linting |
-| **Staging** | Integration testing | Manual promotion | Integration tests, security scans |
-| **Production** | Live operations | Approval-based | Full test suite, performance validation |
-
-**Backup and Disaster Recovery Plans:**
-- **Zero-Persistence Architecture**: No data backup required for application state
-- **Configuration Backup**: Infrastructure state stored in version control
-- **Log Backup**: Automated log rotation with S3 archival
-- **Recovery Time Objective**: <15 minutes for container restart
-- **Recovery Point Objective**: No data loss (stateless architecture)
+#### 8.1.2.4 Backup and Disaster Recovery Plans
+**Backup Strategy:**
+- **Configuration Backups**: Automated S3 backups with 7-day retention for production
+- **Audit Logs**: 15-backup retention for security logs, 7-year compliance retention
+- **Database Backups**: Automated RDS snapshots with point-in-time recovery
+- **Recovery Objectives**: RTO 4 hours, RPO 24 hours with automated recovery scripts
 
 ## 8.2 CLOUD SERVICES
 
 ### 8.2.1 Cloud Provider Selection and Justification
+**Primary Provider:** Amazon Web Services (AWS)
+- **Justification**: Comprehensive service ecosystem, global availability, enterprise adoption, and mature security services
+- **Multi-Cloud Strategy**: Platform-agnostic containerization enables future multi-cloud deployment
+- **Region Selection**: US-East-1 (primary), with cross-region replication for high availability
 
-**AWS Cloud Services Integration:**
-The system leverages **Amazon Web Services (AWS)** as the primary cloud provider, chosen for its comprehensive container orchestration capabilities, robust security model, and global infrastructure presence.
+### 8.2.2 Core Services Required
 
-**Core Services Required:**
+| Service | Purpose | Version/Configuration | Justification |
+|---------|---------|---------------------|---------------|
+| **AWS ECS Fargate** | Serverless container orchestration | Latest stable | Reduces operational overhead |
+| **AWS RDS PostgreSQL** | Future stateful requirements | 14.9 (optional) | Managed database service |
+| **Amazon CloudWatch** | Centralized logging and monitoring | 30-day log retention | Comprehensive observability |
+| **AWS Secrets Manager** | Secure credential storage | Automatic rotation | Enhanced security |
+| **Application Load Balancer** | HTTPS termination and routing | With ACM certificates | High availability |
+| **Amazon VPC** | Network isolation | Custom CIDR blocks | Security isolation |
 
-| Service | Version/Type | Purpose | Justification |
-|---------|-------------|---------|---------------|
-| **ECS Fargate** | Latest | Serverless container hosting | Eliminates server management overhead |
-| **CloudWatch** | Current | Monitoring and logging | Native AWS integration |
-| **IAM** | Current | Identity and access management | Granular security controls |
-| **KMS** | Current | Encryption key management | Compliance requirements |
-| **Optional RDS** | PostgreSQL 14+ | Future persistence needs | Scalable database solution |
+### 8.2.3 High Availability Design
+**Multi-AZ Architecture:**
+- **ECS Services**: Multi-AZ deployment with automatic failover
+- **Load Balancer**: Cross-AZ traffic distribution with health checks
+- **Auto Scaling**: CPU/memory-based scaling with predictive scaling
+- **Database**: Multi-AZ RDS with automated backups and read replicas
 
-### 8.2.2 High Availability Design
+### 8.2.4 Cost Optimization Strategy
+**Cost Control Measures:**
+- **Fargate Spot**: Spot instances for non-critical workloads (60% cost reduction)
+- **Right-Sizing**: Monitoring-based resource optimization
+- **Scheduled Scaling**: Time-based scaling for predictable patterns
+- **Resource Tagging**: Detailed cost allocation and chargeback
+- **Reserved Capacity**: Long-term commitment discounts for stable workloads
 
-**Multi-AZ Deployment Architecture:**
-
-```mermaid
-graph TB
-    subgraph "AWS Region (us-east-1)"
-        subgraph "Availability Zone A"
-            ECS_A[ECS Fargate Task A]
-            RDS_PRIMARY[RDS Primary]
-        end
-        
-        subgraph "Availability Zone B"
-            ECS_B[ECS Fargate Task B]
-            RDS_STANDBY[RDS Standby]
-        end
-        
-        ALB[Application Load Balancer]
-        CLOUDWATCH[CloudWatch]
-        KMS[KMS Key Management]
-    end
-    
-    ALB --> ECS_A
-    ALB --> ECS_B
-    ECS_A --> RDS_PRIMARY
-    ECS_B --> RDS_PRIMARY
-    RDS_PRIMARY --> RDS_STANDBY
-    
-    ECS_A --> CLOUDWATCH
-    ECS_B --> CLOUDWATCH
-    KMS --> ECS_A
-    KMS --> ECS_B
-```
-
-**Availability Features:**
-- **Auto-scaling**: Automatic horizontal scaling based on demand
-- **Health Checks**: Continuous health monitoring with automatic replacement
-- **Load Balancing**: Application Load Balancer for traffic distribution
-- **Fault Tolerance**: Multi-AZ deployment with automatic failover
-
-### 8.2.3 Cost Optimization Strategy
-
-**Resource Optimization:**
-
-| Optimization Area | Strategy | Expected Savings |
-|------------------|----------|------------------|
-| **Compute** | ECS Fargate Spot pricing | 50-70% reduction |
-| **Storage** | S3 lifecycle policies | 60-80% reduction |
-| **Monitoring** | CloudWatch log retention | 40-60% reduction |
-| **Networking** | VPC endpoints for AWS services | 20-30% reduction |
-
-**Cost Monitoring:**
-- **Budget Alerts**: Automated cost threshold notifications
-- **Resource Tagging**: Comprehensive cost allocation tracking
-- **Usage Analytics**: Regular cost optimization reviews
-
-### 8.2.4 Security and Compliance Considerations
-
-**Security Architecture:**
-- **VPC Isolation**: Private network environment with security groups
-- **IAM Least Privilege**: Minimal required permissions for all services
-- **KMS Encryption**: Encryption at rest for all sensitive data
-- **Network Security**: NACLs and security groups for traffic control
+### 8.2.5 Security and Compliance Considerations
+**Security Implementation:**
+- **VPC Isolation**: Private subnets with NAT Gateway for outbound traffic
+- **Security Groups**: Least-privilege network access rules
+- **KMS Encryption**: Customer-managed keys for data at rest
+- **IAM Roles**: Service-specific authentication without long-term credentials
+- **CloudTrail**: Comprehensive API audit logging
 
 ## 8.3 CONTAINERIZATION
 
 ### 8.3.1 Container Platform Selection
-
-**Docker Implementation Strategy:**
-The system utilizes **Docker** as the primary containerization platform, leveraging multi-stage builds for optimal security and performance.
-
-**Container Specifications:**
-
-| Specification | Value | Justification |
-|---------------|-------|---------------|
-| **Base Image** | `python:3.11-slim-bookworm` | Minimal attack surface (149MB) |
-| **Runtime User** | `mcpuser` (non-root) | Security hardening |
-| **Working Directory** | `/app` | Consistent application structure |
-| **Exposed Ports** | None (stdio communication) | Security through isolation |
+**Docker Platform:**
+- **Base Image**: `python:3.11-slim-bookworm` (optimized for security and size)
+- **Final Size**: ~150MB uncompressed with multi-stage optimization
+- **Security Features**: Non-root user execution, minimal attack surface
+- **Performance**: Layer caching and dependency pre-installation
 
 ### 8.3.2 Base Image Strategy
+**Multi-Stage Build Implementation:**
+```dockerfile
+#### Security-hardened base configuration
+FROM python:3.11-slim-bookworm
 
-**Multi-Stage Build Architecture:**
+#### Security hardening
+RUN groupadd --gid 1000 mcpuser && \
+    useradd --uid 1000 --gid mcpuser --shell /bin/bash --create-home mcpuser
 
-```mermaid
-graph LR
-    subgraph "Build Stage"
-        BUILD_BASE[python:3.11-slim-bookworm]
-        BUILD_DEPS[Build Dependencies]
-        COMPILE[Compile Application]
-        TEST[Run Tests]
-    end
-    
-    subgraph "Runtime Stage"
-        RUNTIME_BASE[python:3.11-slim-bookworm]
-        RUNTIME_DEPS[Runtime Dependencies]
-        APP_FILES[Application Files]
-        SECURITY[Security Hardening]
-    end
-    
-    BUILD_BASE --> BUILD_DEPS
-    BUILD_DEPS --> COMPILE
-    COMPILE --> TEST
-    TEST --> RUNTIME_BASE
-    RUNTIME_BASE --> RUNTIME_DEPS
-    RUNTIME_DEPS --> APP_FILES
-    APP_FILES --> SECURITY
+#### Minimal dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends gcc ca-certificates curl && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+#### Non-root execution
+USER mcpuser
 ```
-
-**Security Hardening Features:**
-- **Non-root execution**: Dedicated `mcpuser` with minimal privileges
-- **Build tool removal**: Elimination of build dependencies from runtime
-- **Package updates**: Latest security patches applied
-- **Minimal surface**: Only required runtime dependencies included
 
 ### 8.3.3 Image Versioning Approach
-
-**Container Image Versioning Strategy:**
-
-| Version Type | Pattern | Usage | Retention |
-|-------------|---------|--------|-----------|
-| **Development** | `dev-<git-sha>` | Development builds | 7 days |
-| **Release Candidates** | `rc-<version>` | Pre-production testing | 30 days |
-| **Production** | `v<major>.<minor>.<patch>` | Production deployment | 90 days |
-| **Latest** | `latest` | Current stable release | Permanent |
+**Semantic Versioning Strategy:**
+- **Version Format**: `MAJOR.MINOR.PATCH` aligned with Git tags
+- **Commit Traceability**: Git SHA tagging for build traceability
+- **Environment Tags**: `latest` for development, immutable tags for production
+- **Registry Strategy**: DockerHub public registry with automated builds
 
 ### 8.3.4 Build Optimization Techniques
-
-**Build Performance Optimizations:**
-- **Layer Caching**: Optimized layer ordering for maximum cache utilization
-- **Multi-stage Builds**: Separate build and runtime environments
-- **Dependency Optimization**: Minimal runtime dependencies
-- **Image Compression**: Optimized image size through layer optimization
+**Performance Optimization:**
+- **Layer Caching**: Strategic `COPY` ordering for maximum cache efficiency
+- **Dependency Caching**: Separate dependency and application layers
+- **Multi-Stage Build**: Build-time dependencies excluded from runtime image
+- **Minimal Base**: Distroless-style approach with security scanning
 
 ### 8.3.5 Security Scanning Requirements
-
 **Container Security Pipeline:**
-
-```mermaid
-graph TB
-    BUILD[Container Build] --> SCAN[Security Scanning]
-    SCAN --> TRIVY[Trivy Vulnerability Scan]
-    SCAN --> COMPLIANCE[Compliance Check]
-    TRIVY --> REPORT[Security Report]
-    COMPLIANCE --> REPORT
-    REPORT --> GATE{Security Gate}
-    GATE -->|Pass| PUBLISH[Publish Image]
-    GATE -->|Fail| BLOCK[Block Deployment]
-    PUBLISH --> REGISTRY[Container Registry]
-    BLOCK --> REMEDIATE[Remediation Required]
-```
-
-**Security Scanning Tools:**
-- **Trivy**: Comprehensive vulnerability scanning
-- **Snyk**: Dependency vulnerability analysis
-- **SBOM Generation**: Software Bill of Materials creation
-- **Policy Enforcement**: Automated security policy compliance
+- **Trivy Scanning**: Integrated vulnerability scanning in CI/CD
+- **Zero Critical Policy**: No critical vulnerabilities allowed in production
+- **Base Image Updates**: Weekly automated security updates
+- **SBOM Generation**: Software Bill of Materials for compliance
 
 ## 8.4 ORCHESTRATION
 
 ### 8.4.1 Orchestration Platform Selection
-
-**Kubernetes Deployment Strategy:**
-The system supports **Kubernetes** orchestration for enterprise deployments, providing comprehensive container lifecycle management, service discovery, and scaling capabilities.
-
-**Kubernetes Components:**
-
-| Component | Purpose | Configuration |
-|-----------|---------|---------------|
-| **Deployment** | Application instance management | Single replica with rolling updates |
-| **Service** | Internal service discovery | ClusterIP with monitoring integration |
-| **Ingress** | External access management | NGINX with TLS termination |
-| **ConfigMap** | Configuration management | Non-sensitive configuration data |
-| **Secret** | Credential management | Encrypted sensitive data |
+**Kubernetes 1.24+:**
+- **Primary Platform**: Cloud-native orchestration with extensive ecosystem
+- **Development Alternative**: Docker Compose for local development
+- **Cloud Integration**: EKS, GKE, AKS compatibility
+- **Service Mesh**: Istio/Linkerd ready for advanced traffic management
 
 ### 8.4.2 Cluster Architecture
 
-**Kubernetes Cluster Design:**
-
 ```mermaid
-graph TB
+flowchart TB
     subgraph "Kubernetes Cluster"
-        subgraph "Control Plane"
-            API_SERVER[API Server]
-            ETCD[etcd]
-            SCHEDULER[Scheduler]
-            CONTROLLER[Controller Manager]
+        subgraph "Namespace: labarchives-mcp"
+            A[Deployment] --> B[ReplicaSet]
+            B --> C[Pod 1]
+            B --> D[Pod 2]
+            B --> E[Pod N]
+            
+            F[Service] --> C
+            F --> D
+            F --> E
+            
+            G[ConfigMap] -.-> C
+            G -.-> D
+            G -.-> E
+            
+            H[Secret] -.-> C
+            H -.-> D
+            H -.-> E
         end
         
-        subgraph "Worker Nodes"
-            NODE_1[Node 1]
-            NODE_2[Node 2]
-            NODE_3[Node 3]
-        end
-        
-        subgraph "Application Layer"
-            DEPLOYMENT[MCP Server Deployment]
-            SERVICE[ClusterIP Service]
-            INGRESS[NGINX Ingress]
-            CONFIGMAP[ConfigMap]
-            SECRET[Secret]
-        end
+        I[Ingress Controller] --> F
+        J[ServiceMonitor] --> F
     end
     
-    API_SERVER --> DEPLOYMENT
-    DEPLOYMENT --> NODE_1
-    DEPLOYMENT --> NODE_2
-    SERVICE --> DEPLOYMENT
-    INGRESS --> SERVICE
-    CONFIGMAP --> DEPLOYMENT
-    SECRET --> DEPLOYMENT
+    K[External Traffic] --> I
+    L[Prometheus] --> J
+    
+    style A fill:#e1f5fe
+    style F fill:#fff3e0
+    style I fill:#c8e6c9
 ```
 
 ### 8.4.3 Service Deployment Strategy
-
-**Deployment Configuration:**
-
-```yaml
-# Key deployment specifications
-replicas: 1
-strategy:
-  type: RollingUpdate
-  rollingUpdate:
-    maxUnavailable: 0
-    maxSurge: 1
-```
-
-**Service Configuration:**
-- **Service Type**: ClusterIP for internal communication
-- **Port Configuration**: 80 (HTTP) with optional 443 (HTTPS)
-- **Health Checks**: Liveness and readiness probes
-- **Monitoring**: ServiceMonitor for Prometheus integration
+**Rolling Update Configuration:**
+- **Strategy**: Rolling updates with zero downtime
+- **Health Checks**: Readiness and liveness probes
+- **Pod Disruption Budget**: Minimum 1 available pod during updates
+- **Rollback**: Automatic rollback on health check failures
 
 ### 8.4.4 Auto-scaling Configuration
 
-**Horizontal Pod Autoscaler (HPA) Settings:**
-
-| Metric | Target | Min Replicas | Max Replicas |
-|--------|--------|-------------|-------------|
-| **CPU** | 70% | 1 | 10 |
-| **Memory** | 80% | 1 | 10 |
-| **Custom Metrics** | Request rate | 1 | 5 |
+| Metric | Target | Min Replicas | Max Replicas | Scale Up | Scale Down |
+|--------|--------|--------------|--------------|----------|------------|
+| CPU Utilization | 70% | 2 | 10 | 30 seconds | 5 minutes |
+| Memory Utilization | 80% | 2 | 10 | 30 seconds | 5 minutes |
+| Custom Metrics | 100 req/s | 2 | 10 | 15 seconds | 3 minutes |
 
 ### 8.4.5 Resource Allocation Policies
-
-**Resource Limits and Requests:**
-
-| Resource Type | Request | Limit | Justification |
-|---------------|---------|-------|---------------|
-| **CPU** | 250m | 500m | Lightweight processing requirements |
-| **Memory** | 64Mi | 128Mi | Stateless architecture efficiency |
-| **Storage** | 100Mi | 500Mi | Log storage requirements |
+**Resource Management:**
+```yaml
+resources:
+  requests:
+    memory: "128Mi"
+    cpu: "250m"
+  limits:
+    memory: "256Mi"
+    cpu: "500m"
+```
 
 ## 8.5 CI/CD PIPELINE
 
 ### 8.5.1 Build Pipeline
 
-**GitHub Actions CI/CD Architecture:**
+#### 8.5.1.1 Source Control Triggers
+**GitHub Actions Workflow Triggers:**
+- **Main Branch**: Automated staging deployment on push
+- **Develop Branch**: Integration testing and quality gates
+- **Pull Requests**: Comprehensive validation builds
+- **Release Tags**: Production deployment with manual approval
 
-```mermaid
-graph TB
-    subgraph "Source Control"
-        GITHUB[GitHub Repository]
-        BRANCH[Feature Branch]
-        PR[Pull Request]
-        MAIN[Main Branch]
-    end
-    
-    subgraph "CI Pipeline"
-        TRIGGER[Workflow Trigger]
-        MATRIX[Matrix Testing]
-        SECURITY[Security Scanning]
-        QUALITY[Code Quality]
-        BUILD[Build Artifacts]
-    end
-    
-    subgraph "CD Pipeline"
-        PACKAGE[Package Build]
-        CONTAINER[Container Build]
-        REGISTRY[Registry Push]
-        DEPLOY[Deploy to Environment]
-    end
-    
-    GITHUB --> TRIGGER
-    BRANCH --> PR
-    PR --> TRIGGER
-    MAIN --> TRIGGER
-    
-    TRIGGER --> MATRIX
-    MATRIX --> SECURITY
-    SECURITY --> QUALITY
-    QUALITY --> BUILD
-    
-    BUILD --> PACKAGE
-    PACKAGE --> CONTAINER
-    CONTAINER --> REGISTRY
-    REGISTRY --> DEPLOY
+#### 8.5.1.2 Build Environment Requirements
+**CI/CD Infrastructure:**
+- **Runners**: Ubuntu-latest with Docker buildx support
+- **Python Matrix**: 3.11 and 3.12 compatibility testing
+- **Caching**: Dependencies cached with hash-based invalidation
+- **Artifacts**: Container images, Python wheels, test reports
+
+#### 8.5.1.3 Dependency Management
+**Dependency Resolution:**
+```yaml
+- name: Cache Dependencies
+  uses: actions/cache@v3
+  with:
+    path: ~/.cache/pip
+    key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+    restore-keys: |
+      ${{ runner.os }}-pip-
 ```
 
-**Source Control Triggers:**
-- **Push Events**: Automated testing on all branches
-- **Pull Request Events**: Full validation pipeline
-- **Release Events**: Production deployment pipeline
-- **Schedule Events**: Nightly security scans
+#### 8.5.1.4 Artifact Generation and Storage
+**Artifact Management:**
+- **Container Images**: Multi-arch builds pushed to DockerHub
+- **Python Packages**: Wheels generated for PyPI distribution
+- **Test Reports**: JUnit XML and coverage reports
+- **Security Artifacts**: SBOM and vulnerability reports
 
-**Build Environment Requirements:**
+#### 8.5.1.5 Quality Gates
 
-| Environment | Python Version | OS Support | Testing Scope |
-|-------------|---------------|------------|---------------|
-| **Development** | 3.11, 3.12 | Ubuntu, Windows, macOS | Unit tests |
-| **Integration** | 3.11 | Ubuntu | Integration tests |
-| **Production** | 3.11 | Ubuntu | Full test suite |
+| Gate | Threshold | Action on Failure | Bypass Option |
+|------|-----------|-------------------|---------------|
+| Unit Test Coverage | > 80% | Block merge | Maintainer override |
+| Security Scan | No critical issues | Block deployment | Security team approval |
+| Type Checking | No errors | Block merge | Developer fix required |
+| Code Formatting | 100% compliance | Auto-fix available | Pre-commit hooks |
 
 ### 8.5.2 Deployment Pipeline
 
-**Deployment Strategy Configuration:**
-
-| Strategy | Environment | Trigger | Validation |
-|----------|-------------|---------|------------|
-| **Rolling Update** | Development | Automatic | Health checks |
-| **Blue-Green** | Staging | Manual | Full test suite |
-| **Canary** | Production | Approval-based | Performance monitoring |
-
-**Environment Promotion Workflow:**
+#### 8.5.2.1 Deployment Strategy
 
 ```mermaid
-graph LR
-    DEV[Development] --> STAGING[Staging Environment]
-    STAGING --> APPROVAL{Manual Approval}
-    APPROVAL -->|Approved| PROD[Production Environment]
-    APPROVAL -->|Rejected| ROLLBACK[Rollback Required]
-    PROD --> MONITOR[Post-Deployment Monitoring]
-    ROLLBACK --> DEV
+flowchart LR
+    A[Build] --> B[Test]
+    B --> C{Branch?}
+    C -->|main| D[Deploy Staging]
+    C -->|release| E[Deploy Production]
+    C -->|other| F[Skip Deploy]
+    
+    D --> G[Smoke Tests]
+    E --> H[Health Checks]
+    
+    G --> I[Manual Approval]
+    I --> E
+    
+    H --> J[Success]
+    H --> K[Rollback]
+    
+    style D fill:#fff3e0
+    style E fill:#c8e6c9
+    style K fill:#ffebee
 ```
 
-### 8.5.3 Quality Gates (updated)
+#### 8.5.2.2 Environment Promotion Workflow
+**Promotion Strategy:**
+1. **Development**: Automated deployment on feature branch commits
+2. **Staging**: Automated deployment on main branch merge
+3. **Production**: Manual approval required with staged rollout
+4. **Rollback**: Automated rollback on health check failure
 
-**Automated Quality Assurance:**
+#### 8.5.2.3 Rollback Procedures
+**Rollback Mechanisms:**
+- **Kubernetes**: `kubectl rollout undo` with 10-revision history
+- **Database**: Migration rollback scripts with data preservation
+- **Configuration**: Git-based configuration rollback
+- **Monitoring**: Automated rollback triggers on error rate thresholds
 
-| Gate Type | Tool | Threshold | Action |
-|-----------|------|-----------|---------|
-| **Unit Tests** | pytest | **92% coverage** | Block deployment |
-| **Security Scan** | Bandit, Semgrep | No high/critical | Block deployment |
-| **Code Quality** | mypy, Black | 100% compliance | Block deployment |
-| **Container Scan** | Trivy | No critical vulnerabilities | Block deployment |
+#### 8.5.2.4 Post-deployment Validation
+**Validation Pipeline:**
+```bash
+#### Health check validation
+curl -f http://service:8000/health/ready || exit 1
 
-### 8.5.4 Artifact Management
+#### Functional validation
+pytest tests/smoke/ --environment=production
 
-**Build Artifact Storage:**
+#### Performance validation
+ab -n 1000 -c 10 http://service:8000/health
+```
 
-| Artifact Type | Storage Location | Retention Policy | Access Control |
-|---------------|------------------|------------------|----------------|
-| **Python Packages** | PyPI | Permanent | Public access |
-| **Container Images** | Docker Hub | 90 days | Public access |
-| **Helm Charts** | GitHub Packages | 60 days | Repository access |
-| **Terraform State** | S3 Backend | Permanent | Team access |
-
-### 8.5.5 Release Management Process
-
+#### 8.5.2.5 Release Management Process
 **Release Workflow:**
-
-```mermaid
-graph TB
-    FEATURE[Feature Development] --> INTEGRATION[Integration Testing]
-    INTEGRATION --> RELEASE_PREP[Release Preparation]
-    RELEASE_PREP --> STAGING_DEPLOY[Staging Deployment]
-    STAGING_DEPLOY --> VALIDATION[Validation Testing]
-    VALIDATION --> APPROVAL[Release Approval]
-    APPROVAL --> PROD_DEPLOY[Production Deployment]
-    PROD_DEPLOY --> MONITORING[Post-Release Monitoring]
-    MONITORING --> CLEANUP[Environment Cleanup]
-```
+1. **Version Tagging**: Semantic versioning with Git tags
+2. **Changelog Generation**: Automated changelog from commit messages
+3. **GitHub Release**: Automated release notes and asset uploads
+4. **Container Registry**: Docker image tagging and publishing
+5. **Package Distribution**: PyPI package publishing
 
 ## 8.6 INFRASTRUCTURE MONITORING
 
 ### 8.6.1 Resource Monitoring Approach
-
-**Multi-Layer Monitoring Architecture:**
-
-```mermaid
-graph TB
-    subgraph "Application Layer"
-        APP_METRICS[Application Metrics]
-        HEALTH_CHECKS[Health Checks]
-        AUDIT_LOGS[Audit Logs]
-        SECRET_SCRUBBING[Secret Scrubbing Verification]
-    end
-    
-    subgraph "Container Layer"
-        CONTAINER_METRICS[Container Metrics]
-        RESOURCE_USAGE[Resource Usage]
-        PERFORMANCE[Performance Metrics]
-    end
-    
-    subgraph "Infrastructure Layer"
-        SYSTEM_METRICS[System Metrics]
-        NETWORK_METRICS[Network Metrics]
-        STORAGE_METRICS[Storage Metrics]
-    end
-    
-    subgraph "Collection Systems"
-        PROMETHEUS[Prometheus]
-        CLOUDWATCH[CloudWatch]
-        CONTAINER_INSIGHTS[Container Insights]
-    end
-    
-    APP_METRICS --> PROMETHEUS
-    CONTAINER_METRICS --> CONTAINER_INSIGHTS
-    SYSTEM_METRICS --> CLOUDWATCH
-    AUDIT_LOGS --> SECRET_SCRUBBING
-    
-    PROMETHEUS --> GRAFANA[Grafana Dashboards]
-    CLOUDWATCH --> CW_DASHBOARDS[CloudWatch Dashboards]
-    CONTAINER_INSIGHTS --> CLOUDWATCH
-```
-
-The monitoring architecture integrates comprehensive resource tracking across application, container, and infrastructure layers. <span style="background-color: rgba(91, 57, 243, 0.2)">A dedicated Secret Scrubbing Verification component continuously monitors audit log streams to ensure complete credential sanitization, preventing any literal secret or token strings from appearing in retained logs.</span>
-
-The system leverages Prometheus for application-level metrics collection with 30-second intervals, CloudWatch for infrastructure monitoring with 60-second collection cycles, and Container Insights for detailed container performance analysis. This multi-layered approach provides comprehensive visibility into system health, performance characteristics, and security posture.
+**Monitoring Stack:**
+- **AWS CloudWatch**: Container Insights for ECS metrics
+- **Prometheus**: Custom metrics collection with /metrics endpoint
+- **Grafana**: Real-time dashboards and alerting
+- **ELK Stack**: Centralized log aggregation and analysis
 
 ### 8.6.2 Performance Metrics Collection
 
-**Key Performance Indicators:**
-
-The performance monitoring framework tracks critical metrics across multiple operational dimensions, providing real-time visibility into system health and operational effectiveness.
-
-| Metric Category | Metrics | Collection Method | Alert Threshold |
-|-----------------|---------|-------------------|-----------------|
-| **Application** | Request rate, response time, error rate | Prometheus | P95 > 2s |
-| **System** | CPU usage, memory consumption, disk I/O | CloudWatch | CPU > 80% |
-| **Network** | Throughput, latency, packet loss | CloudWatch | Latency > 5s |
-| **Business** | Authentication success, API calls | Custom metrics | Success < 95% |
-
-The metrics collection strategy implements intelligent alerting thresholds based on operational SLA requirements, with P95 response times maintained below 2 seconds for optimal user experience. System-level monitoring ensures resource utilization remains within sustainable limits, while network performance tracking maintains connectivity reliability.
+| Metric Category | Collection Method | Retention Period | Alerting Threshold |
+|-----------------|-------------------|------------------|-------------------|
+| **System Metrics** | Container Insights | 30 days | CPU > 80%, Memory > 85% |
+| **Application Metrics** | Prometheus | 90 days | Error rate > 5% |
+| **Business Metrics** | Custom counters | 30 days | Response time > 2s |
+| **Security Metrics** | CloudWatch Logs | 7 years | Failed auth > 5/min |
 
 ### 8.6.3 Cost Monitoring and Optimization
-
-**Cost Tracking Framework:**
-
-The cost monitoring system provides comprehensive financial visibility across all infrastructure components, enabling proactive cost optimization and budget management.
-
-| Cost Category | Tracking Method | Optimization Strategy | Target Savings |
-|---------------|-----------------|----------------------|----------------|
-| **Compute** | CloudWatch Cost Explorer | Spot instances, right-sizing | 50-70% |
-| **Storage** | S3 lifecycle policies | Automated archival | 60-80% |
-| **Networking** | VPC Flow Logs | Traffic optimization | 20-30% |
-| **Monitoring** | CloudWatch usage | Log retention policies | 40-60% |
-
-The cost optimization framework implements automated policies for resource rightsizing, leveraging spot instances for non-critical workloads, and implementing intelligent storage lifecycle management. Monitoring costs are controlled through strategic log retention policies and selective metric collection, achieving significant operational cost reductions.
+**Cost Management:**
+- **AWS Cost Explorer**: Resource-level cost analysis
+- **Tagging Strategy**: Environment and project-based cost allocation
+- **Anomaly Detection**: Automated cost spike alerts
+- **Optimization Reviews**: Monthly right-sizing analysis
 
 ### 8.6.4 Security Monitoring
+**Security Observability:**
+- **AWS GuardDuty**: Threat detection and behavioral analysis
+- **CloudTrail**: API audit logging with integrity validation
+- **VPC Flow Logs**: Network traffic analysis
+- **Container Security**: Runtime security monitoring
 
-**Security Event Monitoring:**
-
-The security monitoring framework provides comprehensive threat detection and response capabilities, with real-time analysis of security events and immediate response protocols.
-
-| Event Type | Detection Method | Response Time | Escalation |
-|-----------|------------------|---------------|------------|
-| **Authentication Failures** | Real-time log analysis | <1 minute | Immediate |
-| **Authorization Violations** | Audit log monitoring | <5 minutes | High priority |
-| **Unusual Access Patterns** | Behavioral analysis | <15 minutes | Investigation |
-| **Container Security Events** | Runtime monitoring | <1 minute | Immediate |
-| **<span style="background-color: rgba(91, 57, 243, 0.2)">Credential Leakage</span>** | **<span style="background-color: rgba(91, 57, 243, 0.2)">Real-time secret-scan on log stream</span>** | **<span style="background-color: rgba(91, 57, 243, 0.2)"><1 minute</span>** | **<span style="background-color: rgba(91, 57, 243, 0.2)">Immediate</span>** |
-
-The security monitoring system integrates with the comprehensive audit logging infrastructure, providing multi-layered security event detection with behavioral analysis capabilities. Authentication failures and authorization violations trigger immediate response protocols, while unusual access patterns initiate investigation workflows. <span style="background-color: rgba(91, 57, 243, 0.2)">Credential leakage detection operates through continuous real-time scanning of log streams, ensuring immediate detection and response to any potential secret exposure.</span>
+<span style="background-color: rgba(91, 57, 243, 0.2)">**Sensitive Data Sanitization Best Practices:**</span>
+- <span style="background-color: rgba(91, 57, 243, 0.2)">All application log messages MUST pass through the sanitizer defined in src/cli/security/sanitizers.py before emission.</span>
+- <span style="background-color: rgba(91, 57, 243, 0.2)">The sanitizer shall redact the values of sensitive query parameters and credentials (e.g., token, access_password, password, secret) replacing them with the literal string "[REDACTED]" while preserving parameter names.</span>
+- <span style="background-color: rgba(91, 57, 243, 0.2)">Only sanitized logs may be forwarded to CloudWatch Logs, Prometheus, and the ELK stack; raw, unsanitized logs MUST NOT leave the application container.</span>
+- <span style="background-color: rgba(91, 57, 243, 0.2)">The sanitization process must introduce < 1 ms average overhead per log operation to satisfy the "must not impact performance" directive.</span>
+- <span style="background-color: rgba(91, 57, 243, 0.2)">This policy supports SOC2, HIPAA, and GDPR compliance obligations by preventing accidental disclosure of sensitive information in monitoring systems.</span>
 
 ### 8.6.5 Compliance Auditing
+**Audit Framework:**
+- **Automated Compliance**: Policy-as-code with OPA/Gatekeeper
+- **Audit Trails**: Comprehensive logging with 7-year retention
+- **Compliance Reports**: Monthly SOC2, HIPAA, GDPR reports
+- **Access Reviews**: Quarterly privilege access reviews
 
-**Compliance Monitoring Framework:**
+## 8.7 INFRASTRUCTURE DIAGRAMS
 
-The compliance monitoring system ensures continuous adherence to regulatory requirements through automated evidence collection and comprehensive audit trail maintenance.
-
-| Standard | Monitoring Scope | Audit Frequency | Evidence Collection |
-|----------|------------------|-----------------|-------------------|
-| **SOC2 Type II** | Access controls, logging | Continuous | Automated audit trails<br><span style="background-color: rgba(91, 57, 243, 0.2)">• Verified absence of secrets/tokens in all retained logs (automated grep scan)</span> |
-| **ISO 27001** | Security controls | Monthly | Security assessment reports<br><span style="background-color: rgba(91, 57, 243, 0.2)">• Verified absence of secrets/tokens in all retained logs (automated grep scan)</span> |
-| **HIPAA** | Data protection | Continuous | Compliance dashboards<br><span style="background-color: rgba(91, 57, 243, 0.2)">• Verified absence of secrets/tokens in all retained logs (automated grep scan)</span> |
-| **GDPR** | Data processing | Continuous | Privacy impact assessments<br><span style="background-color: rgba(91, 57, 243, 0.2)">• Verified absence of secrets/tokens in all retained logs (automated grep scan)</span> |
-
-The compliance framework implements continuous monitoring with automated evidence collection, ensuring real-time compliance verification across all applicable standards. SOC2 Type II compliance is maintained through comprehensive access control monitoring and structured audit trail generation, while ISO 27001 requirements are met through monthly security control assessments.
-
-HIPAA compliance is ensured through continuous data protection monitoring and compliance dashboard visualization, while GDPR requirements are addressed through continuous data processing monitoring and privacy impact assessments. <span style="background-color: rgba(91, 57, 243, 0.2)">All compliance standards include automated verification of secret sanitization through continuous grep scanning of retained logs, ensuring complete credential protection across all audit trails.</span>
-
-### 8.6.6 Monitoring Integration Architecture
-
-**Comprehensive Monitoring Ecosystem:**
-
-The monitoring ecosystem integrates multiple specialized monitoring systems to provide complete operational visibility and automated response capabilities.
+### 8.7.1 Infrastructure Architecture Diagram
 
 ```mermaid
-graph TB
-    subgraph "Monitoring Sources"
-        PROMETHEUS_METRICS[Prometheus Metrics]
-        CLOUDWATCH_METRICS[CloudWatch Metrics]
-        AUDIT_LOGS[Audit Logs]
-        SECURITY_EVENTS[Security Events]
-        COMPLIANCE_EVENTS[Compliance Events]
+flowchart TB
+    subgraph "User Layer"
+        A[Claude Desktop]
+        B[CLI Users]
+        C[Enterprise AI Systems]
     end
     
-    subgraph "Processing Layer"
-        ALERT_MANAGER[Alert Manager]
-        LOG_AGGREGATION[Log Aggregation]
-        METRICS_CORRELATION[Metrics Correlation]
-        ANOMALY_DETECTION[Anomaly Detection]
+    subgraph "AWS Cloud"
+        subgraph "Public Subnets"
+            D[Application Load Balancer]
+            E[NAT Gateway]
+        end
+        
+        subgraph "Private Subnets"
+            F[ECS Fargate Tasks]
+            G[RDS PostgreSQL]
+        end
+        
+        H[CloudWatch Logs]
+        I[Secrets Manager]
+        J[S3 Backup Storage]
+        K[KMS Encryption]
     end
     
-    subgraph "Response Systems"
-        AUTOMATED_RESPONSE[Automated Response]
-        NOTIFICATION_ROUTING[Notification Routing]
-        INCIDENT_MANAGEMENT[Incident Management]
-        COMPLIANCE_REPORTING[Compliance Reporting]
+    subgraph "External Services"
+        L[LabArchives API US]
+        M[LabArchives API AU]
+        N[LabArchives API UK]
+        O[DockerHub Registry]
     end
     
-    subgraph "Dashboard Layer"
-        OPERATIONAL_DASHBOARDS[Operational Dashboards]
-        SECURITY_DASHBOARDS[Security Dashboards]
-        COMPLIANCE_DASHBOARDS[Compliance Dashboards]
-        EXECUTIVE_DASHBOARDS[Executive Dashboards]
-    end
+    A --> D
+    B --> D
+    C --> D
+    D --> F
+    F --> G
+    F --> I
+    F --> L
+    F --> M
+    F --> N
     
-    PROMETHEUS_METRICS --> ALERT_MANAGER
-    CLOUDWATCH_METRICS --> METRICS_CORRELATION
-    AUDIT_LOGS --> LOG_AGGREGATION
-    SECURITY_EVENTS --> ANOMALY_DETECTION
-    COMPLIANCE_EVENTS --> COMPLIANCE_REPORTING
+    F -.-> H
+    G -.-> H
+    H --> J
+    I --> K
     
-    ALERT_MANAGER --> AUTOMATED_RESPONSE
-    LOG_AGGREGATION --> NOTIFICATION_ROUTING
-    METRICS_CORRELATION --> INCIDENT_MANAGEMENT
-    ANOMALY_DETECTION --> AUTOMATED_RESPONSE
+    O --> F
     
-    AUTOMATED_RESPONSE --> OPERATIONAL_DASHBOARDS
-    NOTIFICATION_ROUTING --> SECURITY_DASHBOARDS
-    INCIDENT_MANAGEMENT --> COMPLIANCE_DASHBOARDS
-    COMPLIANCE_REPORTING --> EXECUTIVE_DASHBOARDS
+    style A fill:#e1f5fe
+    style F fill:#c8e6c9
+    style L fill:#fff3e0
+    style H fill:#f3e5f5
 ```
 
-The monitoring integration architecture provides comprehensive operational visibility through interconnected monitoring systems. Prometheus metrics feed into sophisticated alert management systems, while CloudWatch metrics enable advanced correlation analysis. Audit logs and security events flow through specialized processing pipelines, enabling automated anomaly detection and response capabilities.
-
-### 8.6.7 Operational Procedures
-
-**Monitoring Operational Framework:**
-
-The operational procedures ensure consistent monitoring system management, maintenance, and optimization across all infrastructure components.
-
-| Procedure Category | Frequency | Responsibility | Automation Level |
-|-------------------|-----------|---------------|------------------|
-| **Dashboard Review** | Daily | Operations Team | Semi-automated |
-| **Alert Tuning** | Weekly | Engineering Team | Manual |
-| **Metric Retention** | Monthly | Platform Team | Automated |
-| **Cost Optimization** | Monthly | Financial Operations | Semi-automated |
-
-The operational framework implements structured procedures for monitoring system maintenance, ensuring consistent performance and cost efficiency. Daily dashboard reviews provide operational teams with real-time system health visibility, while weekly alert tuning sessions optimize notification effectiveness.
-
-Monthly metric retention reviews ensure optimal storage costs while maintaining compliance requirements, and cost optimization procedures maintain financial efficiency across all monitoring infrastructure components.
-
-## 8.7 NETWORK ARCHITECTURE
-
-### 8.7.1 Network Topology
-
-**Multi-Layer Network Design:**
+### 8.7.2 Deployment Workflow Diagram
 
 ```mermaid
-graph TB
-    subgraph "Internet"
-        CLIENTS[MCP Clients]
-        LABARCHIVES[LabArchives API]
-    end
+flowchart TD
+    A[Developer Push] --> B[GitHub Actions]
+    B --> C[Build & Test]
+    C --> D{Quality Gates Pass?}
     
-    subgraph "Public Subnet"
-        LB[Load Balancer]
-        INGRESS[Ingress Controller]
-        NAT[NAT Gateway]
-    end
+    D -->|Yes| E[Container Build]
+    D -->|No| F[Notify Developer]
     
-    subgraph "Private Subnet"
-        MCP_PODS[MCP Server Pods]
-        MONITORING[Monitoring Services]
-        LOGS[Log Aggregation]
-    end
+    E --> G[Security Scan]
+    G --> H{Vulnerability Check}
     
-    subgraph "Database Subnet"
-        RDS[RDS Database]
-        BACKUP[Backup Storage]
-    end
+    H -->|Pass| I[Push to Registry]
+    H -->|Fail| F
     
-    CLIENTS --> LB
-    LB --> INGRESS
-    INGRESS --> MCP_PODS
-    MCP_PODS --> LABARCHIVES
-    MCP_PODS --> RDS
-    MCP_PODS --> MONITORING
-    MONITORING --> LOGS
+    I --> J{Target Environment}
+    J -->|Dev| K[Deploy to Dev]
+    J -->|Staging| L[Deploy to Staging]
+    J -->|Prod| M[Manual Approval]
     
-    MCP_PODS --> NAT
-    NAT --> LABARCHIVES
+    M --> N[Deploy to Production]
+    
+    K --> O[Smoke Tests]
+    L --> P[Integration Tests]
+    N --> Q[Health Checks]
+    
+    O --> R[Development Success]
+    P --> S[Staging Success]
+    Q --> T[Production Success]
+    
+    Q --> U{Health Check Pass?}
+    U -->|No| V[Automatic Rollback]
+    U -->|Yes| T
+    
+    style E fill:#e1f5fe
+    style I fill:#c8e6c9
+    style N fill:#fff3e0
+    style V fill:#ffebee
 ```
 
-### 8.7.2 Security Groups and Network Policies
+### 8.7.3 Environment Promotion Flow
 
-**Network Security Configuration:**
+```mermaid
+flowchart LR
+    subgraph "Development Environment"
+        A[Local Docker Compose]
+        B[Unit Tests]
+        C[Integration Tests]
+    end
+    
+    subgraph "CI/CD Pipeline"
+        D[Build Pipeline]
+        E[Quality Gates]
+        F[Security Scans]
+    end
+    
+    subgraph "Staging Environment"
+        G[ECS Staging Cluster]
+        H[End-to-End Tests]
+        I[Performance Tests]
+    end
+    
+    subgraph "Production Environment"
+        J[ECS Production Cluster]
+        K[Health Monitoring]
+        L[Audit Logging]
+    end
+    
+    A --> B
+    B --> C
+    C --> D
+    D --> E
+    E --> F
+    F --> G
+    G --> H
+    H --> I
+    I --> J
+    J --> K
+    K --> L
+    
+    L -.-> A
+    
+    style A fill:#e1f5fe
+    style G fill:#fff3e0
+    style J fill:#c8e6c9
+    style K fill:#f3e5f5
+```
 
-| Component | Inbound Rules | Outbound Rules | Security Group |
-|-----------|--------------|---------------|----------------|
-| **Load Balancer** | 80/443 from Internet | 8080 to MCP pods | Public ALB |
-| **MCP Server** | 8080 from ALB | 443 to Internet | Private App |
-| **RDS Database** | 5432 from MCP pods | None | Database |
-| **Monitoring** | 9090 from MCP pods | 443 to Internet | Monitoring |
+### 8.7.4 Network Architecture
+
+```mermaid
+flowchart TB
+    subgraph "Internet Gateway"
+        A[Public Internet]
+        B[Route 53 DNS]
+    end
+    
+    subgraph "AWS VPC - 10.0.0.0/16"
+        subgraph "Public Subnets - 10.0.1.0/24"
+            C[Application Load Balancer]
+            D[NAT Gateway]
+        end
+        
+        subgraph "Private Subnets - 10.0.10.0/24"
+            E[ECS Fargate Tasks]
+            F[RDS Database]
+        end
+        
+        subgraph "Database Subnets - 10.0.20.0/24"
+            G[RDS Multi-AZ]
+            H[ElastiCache]
+        end
+        
+        subgraph "Security Groups"
+            I[ALB SG: 443 from 0.0.0.0/0]
+            J[ECS SG: 8000 from ALB]
+            K[RDS SG: 5432 from ECS]
+        end
+    end
+    
+    subgraph "External Services"
+        L[LabArchives APIs]
+        M[AWS Services]
+    end
+    
+    A --> B
+    B --> C
+    C --> E
+    E --> F
+    E --> G
+    E --> D
+    D --> L
+    E --> M
+    
+    C -.-> I
+    E -.-> J
+    F -.-> K
+    G -.-> K
+    
+    style C fill:#e1f5fe
+    style E fill:#c8e6c9
+    style F fill:#fff3e0
+    style I fill:#f3e5f5
+```
 
 ## 8.8 INFRASTRUCTURE COST ESTIMATES
 
-### 8.8.1 AWS Cost Breakdown
+### 8.8.1 Monthly Cost Breakdown
 
-**Monthly Cost Estimates (US East Region):**
+| Resource Category | Development | Staging | Production | Enterprise |
+|------------------|-------------|---------|------------|------------|
+| **ECS Fargate** | $15/month | $75/month | $300/month | $800/month |
+| **Application Load Balancer** | $0 | $20/month | $25/month | $50/month |
+| **RDS PostgreSQL** | $0 | $25/month | $150/month | $500/month |
+| **CloudWatch Logs** | $5/month | $25/month | $75/month | $200/month |
+| **Secrets Manager** | $1/month | $5/month | $15/month | $50/month |
+| **Data Transfer** | $2/month | $15/month | $75/month | $200/month |
+| **KMS Encryption** | $1/month | $5/month | $15/month | $25/month |
+| **Backup Storage** | $1/month | $10/month | $50/month | $150/month |
+| **Total Monthly** | $25/month | $180/month | $705/month | $1,975/month |
 
-| Service | Configuration | Monthly Cost | Annual Cost |
-|---------|---------------|-------------|-------------|
-| **ECS Fargate** | 1 task, 0.5 vCPU, 128MB | $15-25 | $180-300 |
-| **Application Load Balancer** | Standard ALB | $20-25 | $240-300 |
-| **CloudWatch** | Standard monitoring | $10-15 | $120-180 |
-| **RDS PostgreSQL** | db.t3.micro (optional) | $15-20 | $180-240 |
-| **KMS** | Key usage | $3-5 | $36-60 |
-| **Total Estimated** | - | **$63-90** | **$756-1,080** |
+### 8.8.2 Annual Cost Projections
 
-### 8.8.2 Kubernetes Cost Optimization
+| Scenario | Year 1 | Year 2 | Year 3 | Cost Optimization |
+|----------|--------|--------|--------|------------------|
+| **Development** | $300 | $300 | $300 | Minimal optimization |
+| **Staging** | $2,160 | $2,160 | $2,160 | Right-sizing benefits |
+| **Production** | $8,460 | $7,614 | $6,863 | Reserved instances |
+| **Enterprise** | $23,700 | $21,330 | $19,197 | Volume discounts |
 
-**Cost Optimization Strategies:**
+## 8.9 EXTERNAL DEPENDENCIES
 
-| Strategy | Implementation | Expected Savings | ROI Timeline |
-|----------|---------------|-----------------|-------------|
-| **Spot Instances** | EKS Spot node groups | 60-70% | 1 month |
-| **Resource Right-sizing** | Automated scaling | 30-40% | 2 months |
-| **Reserved Instances** | 1-year commitment | 40-50% | 12 months |
-| **Storage Optimization** | S3 lifecycle policies | 60-80% | 1 month |
+### 8.9.1 Critical Dependencies
 
-## 8.9 DISASTER RECOVERY
+| Dependency | Purpose | SLA Requirement | Fallback Strategy |
+|------------|---------|-----------------|------------------|
+| **LabArchives API** | Primary data source | 99.9% availability | Regional failover |
+| **AWS ECS** | Container orchestration | 99.99% availability | Multi-AZ deployment |
+| **DockerHub** | Container registry | 99.9% availability | AWS ECR backup |
+| **GitHub** | Source control & CI/CD | 99.9% availability | GitLab mirror |
+| **Let's Encrypt** | TLS certificates | Best effort | AWS ACM backup |
 
-### 8.9.1 Recovery Procedures
+### 8.9.2 Dependency Risk Assessment
 
-**Disaster Recovery Framework:**
+| Risk Level | Dependencies | Mitigation Strategy | Recovery Time |
+|------------|-------------|-------------------|---------------|
+| **High** | LabArchives API | Regional endpoint failover | < 5 minutes |
+| **Medium** | Container Registry | Multi-registry strategy | < 30 minutes |
+| **Low** | Certificate Authority | Automated renewal | < 1 hour |
+| **Minimal** | Monitoring Services | Graceful degradation | < 4 hours |
 
-```mermaid
-graph TB
-    DISASTER[Disaster Event] --> ASSESS[Impact Assessment]
-    ASSESS --> SEVERITY{Severity Level}
-    
-    SEVERITY -->|Low| STANDARD[Standard Recovery]
-    SEVERITY -->|Medium| EXPEDITED[Expedited Recovery]
-    SEVERITY -->|High| EMERGENCY[Emergency Recovery]
-    
-    STANDARD --> CONTAINER_RESTART[Container Restart]
-    EXPEDITED --> REGION_SWITCH[Region Failover]
-    EMERGENCY --> FULL_REBUILD[Full Infrastructure Rebuild]
-    
-    CONTAINER_RESTART --> VALIDATE[Validate Recovery]
-    REGION_SWITCH --> VALIDATE
-    FULL_REBUILD --> VALIDATE
-    
-    VALIDATE --> MONITOR[Monitor Operations]
-    MONITOR --> DOCUMENT[Document Incident]
-```
+## 8.10 RESOURCE SIZING GUIDELINES
 
-### 8.9.2 Backup and Recovery Metrics
+### 8.10.1 Deployment Size Recommendations
 
-**Recovery Time Objectives:**
+#### 8.10.1.1 Small Deployment (1-10 users)
+**Resource Allocation:**
+- **ECS Tasks**: 1 task with 0.5 vCPU, 1GB memory
+- **Database**: No RDS required (stateless operation)
+- **Availability**: Single AZ deployment acceptable
+- **Monitoring**: Basic CloudWatch metrics
+- **Cost**: ~$25/month
 
-| Failure Type | RTO | RPO | Recovery Method |
-|-------------|-----|-----|----------------|
-| **Container Failure** | <2 minutes | 0 (stateless) | Automatic restart |
-| **Node Failure** | <5 minutes | 0 (stateless) | Pod rescheduling |
-| **Region Failure** | <30 minutes | 0 (stateless) | Cross-region failover |
-| **Complete Disaster** | <4 hours | 0 (stateless) | Full rebuild |
+#### 8.10.1.2 Medium Deployment (10-100 users)
+**Resource Allocation:**
+- **ECS Tasks**: 2-5 tasks with 1 vCPU, 2GB memory each
+- **Database**: Optional RDS db.t3.small for future state
+- **Availability**: Multi-AZ deployment recommended
+- **Monitoring**: Enhanced monitoring with custom metrics
+- **Cost**: ~$180/month
 
-#### References
+#### 8.10.1.3 Large Deployment (100+ users)
+**Resource Allocation:**
+- **ECS Tasks**: 5-10 tasks with 2 vCPU, 4GB memory each
+- **Database**: RDS db.t3.medium with read replicas
+- **Availability**: Multi-region consideration
+- **Monitoring**: Comprehensive observability stack
+- **Cost**: ~$705/month
 
-**Infrastructure Files Examined:**
-- `infrastructure/README.md` - Comprehensive infrastructure documentation and deployment strategies
-- `infrastructure/docker-compose.prod.yml` - Production Docker Compose configuration with security hardening
-- `infrastructure/docker-compose.dev.yml` - Development environment configuration with debugging support
-- `infrastructure/docker-compose.yml` - Base Docker Compose configuration for all environments
-- `infrastructure/kubernetes/deployment.yaml` - Kubernetes deployment manifest with health checks and scaling
-- `infrastructure/kubernetes/service.yaml` - Service configuration with monitoring integration
-- `infrastructure/kubernetes/ingress.yaml` - NGINX Ingress with TLS termination and cert-manager
-- `infrastructure/kubernetes/configmap.yaml` - Configuration management for non-sensitive data
-- `infrastructure/kubernetes/secret.yaml` - Kubernetes Secret management with RBAC
-- `infrastructure/terraform/modules/ecs/main.tf` - ECS Fargate module with auto-scaling and monitoring
-- `infrastructure/terraform/modules/rds/main.tf` - RDS PostgreSQL module with backup and encryption
-- `src/cli/Dockerfile` - Multi-stage container build with security hardening
-- `.github/workflows/ci.yml` - Continuous integration pipeline with matrix testing
-- `.github/workflows/deploy.yml` - Deployment automation with environment promotion
-- `.github/workflows/release.yml` - Release pipeline with Docker/PyPI publishing
+#### 8.10.1.4 Enterprise Deployment (1000+ users)
+**Resource Allocation:**
+- **ECS Tasks**: 10-50 tasks with 4 vCPU, 8GB memory each
+- **Database**: RDS db.r5.large with multi-AZ and read replicas
+- **Availability**: Multi-region deployment
+- **Monitoring**: Advanced analytics and alerting
+- **Cost**: ~$1,975/month
 
-**Technical Specification Sections Referenced:**
-- `1.2 SYSTEM OVERVIEW` - System architecture and deployment requirements
-- `3.6 DEVELOPMENT & DEPLOYMENT` - Containerization and CI/CD infrastructure
-- `5.1 HIGH-LEVEL ARCHITECTURE` - Architectural patterns and deployment strategies
-- `6.4 SECURITY ARCHITECTURE` - Security infrastructure and compliance requirements
-- `6.5 MONITORING AND OBSERVABILITY` - Monitoring infrastructure and alerting systems
+### 8.10.2 Scaling Thresholds
+
+| Metric | Scale Up Threshold | Scale Down Threshold | Cooldown Period |
+|--------|-------------------|---------------------|----------------|
+| **CPU Utilization** | > 70% for 2 minutes | < 30% for 10 minutes | 5 minutes |
+| **Memory Utilization** | > 80% for 2 minutes | < 40% for 10 minutes | 5 minutes |
+| **Request Rate** | > 100 req/s for 1 minute | < 20 req/s for 15 minutes | 3 minutes |
+| **Response Time** | > 2 seconds for 1 minute | < 500ms for 10 minutes | 5 minutes |
+
+## 8.11 MAINTENANCE PROCEDURES
+
+### 8.11.1 Regular Maintenance Tasks
+
+| Task | Frequency | Responsibility | Automation Level |
+|------|-----------|----------------|------------------|
+| **Security Updates** | Weekly | DevOps Team | Fully automated |
+| **Dependency Updates** | Monthly | Development Team | Semi-automated |
+| **Certificate Renewal** | Quarterly | Platform Team | Fully automated |
+| **Backup Verification** | Monthly | Operations Team | Automated with manual validation |
+| **Capacity Planning** | Quarterly | Architecture Team | Manual analysis |
+
+### 8.11.2 Disaster Recovery Procedures
+
+#### 8.11.2.1 Recovery Time Objectives (RTO)
+- **Complete Service Restoration**: 4 hours
+- **Partial Service Restoration**: 1 hour
+- **Configuration Recovery**: 30 minutes
+- **Data Recovery**: 2 hours
+
+#### 8.11.2.2 Recovery Point Objectives (RPO)
+- **Configuration Data**: 1 hour
+- **Audit Logs**: 24 hours
+- **Application State**: Immediate (stateless)
+- **Database State**: 15 minutes
+
+### 8.11.3 References
+
+#### 8.11.3.1 Files Examined
+- `src/cli/Dockerfile` - Complete containerization configuration with security hardening
+- `infrastructure/README.md` - Comprehensive infrastructure documentation and operational procedures
+- `infrastructure/kubernetes/deployment.yaml` - Kubernetes deployment specifications
+- `infrastructure/kubernetes/service.yaml` - Service configuration and networking
+- `infrastructure/kubernetes/ingress.yaml` - Ingress controller and TLS configuration
+- `infrastructure/terraform/main.tf` - AWS infrastructure provisioning
+- `infrastructure/terraform/modules/ecs/main.tf` - ECS service configuration
+- `.github/workflows/ci.yml` - CI/CD pipeline configuration
+- `.github/workflows/deploy.yml` - Deployment automation
+
+#### 8.11.3.2 Folders Analyzed
+- `infrastructure/` - All deployment and orchestration artifacts
+- `infrastructure/kubernetes/` - Production-grade Kubernetes manifests
+- `infrastructure/terraform/` - AWS infrastructure as code
+- `infrastructure/terraform/modules/` - Reusable Terraform modules
+- `.github/workflows/` - Complete CI/CD pipeline definitions
+- `src/cli/` - Application source with containerization
 
 # APPENDICES
 
-## 9.1 ADDITIONAL TECHNICAL INFORMATION
+## A.1 ADDITIONAL TECHNICAL INFORMATION
 
-### 9.1.1 Exit Codes and Error Handling
+### A.1.1 Authentication Session Management
 
-The LabArchives MCP Server implements standardized exit codes for systematic error handling and troubleshooting:
+The MCP server implements sophisticated session management with the following technical specifications:
 
-| Exit Code | Error Type | Description | Resolution |
-|-----------|-----------|-------------|------------|
-| **1** | Configuration Error | Invalid configuration parameters during startup | Verify configuration files and environment variables |
-| **2** | Authentication Error | Invalid credentials or API access failure | Check LabArchives credentials and API permissions |
-| **3** | Startup Error | System initialization failure | Review system logs and dependency availability |
-| **130** | User Interruption | Graceful shutdown on Ctrl+C (SIGINT) | Normal termination, no action required |
+- **Session Lifetime**: AUTH_SESSION_LIFETIME_SECONDS = 3600 (1 hour)
+- **<span style="background-color: rgba(91, 57, 243, 0.2)">Automatic Session Refresh</span>**: <span style="background-color: rgba(91, 57, 243, 0.2)">MCP server detects impending or actual 401/expired-token responses and transparently re-authenticates using stored refresh data before retrying the request</span>
+- **<span style="background-color: rgba(91, 57, 243, 0.2)">Token Expiration Tracking</span>**: <span style="background-color: rgba(91, 57, 243, 0.2)">AuthenticationManager now records token expiry timestamps and exposes them to the MCP server for proactive session refresh</span>
+- **Credential Sanitization**: Automatic scrubbing of sensitive data from logs using predefined regex patterns
 
-### 9.1.2 Development Environment Configuration
+### A.1.2 Resource URI Scheme
 
-**Virtual Environment Management:**
-The project supports multiple virtual environment directory patterns for flexible development workflows:
-- `venv/` - Standard Python virtual environment
-- `.venv/` - Hidden virtual environment directory
-- `env/` - Alternative environment directory
-- `.env/` - Environment-specific configuration files
+The system employs a custom URI scheme for resource identification:
 
-**Pre-commit Quality Assurance:**
-Automated code quality enforcement includes:
-- **Black Formatting**: Consistent code style across all Python files
-- **Flake8 Linting**: Static analysis for code quality and PEP 8 compliance
-- **isort Import Sorting**: Organized import statement management
-- **mypy Type Checking**: Static type verification for enhanced code reliability
+- **Format**: `labarchives://[resource_type]/[resource_id]`
+- **Supported Types**: notebook, page, entry
+- **Maximum URI Length**: Implementation-specific limit enforced during URI validation
 
-**Live Development Workflow:**
-Docker development environment features source code mounting for real-time changes without container rebuilds, enabling rapid development iteration.
+### A.1.3 Logging Configuration
 
-### 9.1.3 Repository Architecture Patterns
+Comprehensive logging system with differentiated handling:
 
-**Documentation Consolidation:**
-All project documentation is centralized in the `blitzy/documentation/` folder, providing a single source of truth for project specifications and guides.
+- **Log Rotation**: Main logs (10 MB/5 backups), Audit logs (50 MB/10 backups)
+- **Log Formats**: Structured JSON or key-value formats supported
+- **Audit Events**: Authentication, Resource Access, Configuration Changes, Errors, System Events
+- **<span style="background-color: rgba(91, 57, 243, 0.2)">URL Parameter Sanitization</span>**: <span style="background-color: rgba(91, 57, 243, 0.2)">All debug and audit logs automatically mask sensitive query-string parameters (e.g., token, password, secret) using the centralized `security.sanitizers` module before log emission</span>
+- **<span style="background-color: rgba(91, 57, 243, 0.2)">Security Best Practices</span>**: <span style="background-color: rgba(91, 57, 243, 0.2)">Never log full credential strings; verify that `[REDACTED]` placeholders appear for all sensitive values in log output during review</span>
 
-**Infrastructure as Code Organization:**
-Infrastructure components are logically separated into dedicated folders:
-- `infrastructure/docker/` - Container definitions and configurations
-- `infrastructure/kubernetes/` - Orchestration manifests and policies
-- `infrastructure/terraform/` - Infrastructure provisioning templates
+### A.1.4 Network Configuration
 
-**CI/CD Automation Framework:**
-Three comprehensive GitHub Actions workflows provide complete automation:
-- `ci.yml` - Continuous integration with testing and quality checks
-- `deploy.yml` - Automated deployment pipeline with environment promotion
-- `release.yml` - Release automation with artifact publishing
+HTTP client configuration parameters:
 
-### 9.1.4 Container Security Hardening
+- **HTTP Timeouts**: DEFAULT_TIMEOUT_SECONDS = 30
+- **Retry Configuration**: DEFAULT_RETRY_COUNT = 3, DEFAULT_RETRY_BACKOFF = 2 seconds
+- **Connection Pooling**: Managed via requests.Session with HTTPAdapter
 
-**Security-First Container Design:**
-- **Non-root User Execution**: All containers run with dedicated user accounts (UID/GID 1000)
-- **Read-only Root Filesystem**: Prevents runtime file system modifications
-- **No-new-privileges Flag**: Blocks privilege escalation within containers
-- **Minimal Base Images**: Reduces attack surface through minimalist container design
+### A.1.5 Docker Network Configuration
 
-### 9.1.5 Network Architecture Details
+Container networking specifications:
 
-**Isolated Network Topology:**
-- **Bridge Networks**: Custom Docker networks with specific subnets (172.20.0.0/16) for service isolation
-- **IPv6 Disabled**: Simplified network configuration for compatibility and security
-- **Inter-container Communication**: Controlled through Docker network policies with microsegmentation
+- **Production Network**: mcp-prod (bridge, subnet 172.20.0.0/16)
+- **Development Network**: labarchives-mcp-dev (bridge, custom IPAM)
+- **Container Resource Limits**: 2.0 CPUs, 512M memory (development)
 
-## 9.2 GLOSSARY
+### A.1.6 Kubernetes Resource Configuration
 
-### 9.2.1 Technical Terms and Definitions
+Kubernetes deployment specifications:
 
-| Term | Definition |
-|------|------------|
-| **12-Factor App** | A methodology for building software-as-a-service applications with best practices for portability and resilience |
-| **API Key** | A unique identifier used to authenticate requests to an API service |
-| **Audit Trail** | A chronological record of system activities to enable security monitoring and compliance |
-| **Circuit Breaker** | A design pattern that prevents cascading failures by temporarily disabling failing services |
-| **Command-Line Interface** | A text-based user interface for interacting with software through commands |
-| **Container Orchestration** | Automated management of containerized applications including deployment, scaling, and networking |
-| **Dependency Injection** | A design pattern where dependencies are provided to an object rather than created internally |
-| **Electronic Lab Notebook** | Digital platform for documenting research data, experiments, and scientific workflows |
-| **Environment Variables** | Dynamic values that affect the behavior of running processes on a computer |
-| **Exponential Backoff** | A retry strategy that progressively increases wait time between retry attempts |
-| **Graceful Shutdown** | Process of cleanly terminating a service by completing active requests before stopping |
-| **Health Check** | Automated verification of service availability and operational status |
-| **Hierarchical Configuration** | Configuration system that merges settings from multiple sources with defined precedence |
-| **Infrastructure as Code** | Managing infrastructure through declarative configuration files rather than manual processes |
-| **JSON for Linked Data** | A method of encoding linked data using JSON format for semantic web applications |
-| **Large Language Model** | AI system trained on vast text data capable of understanding and generating human language |
-| **Matrix Testing** | Testing strategy that runs tests across multiple combinations of environments and configurations |
-| **Microsegmentation** | Security technique dividing network into small zones for granular access control |
-| **Model Context Protocol** | Open standard for connecting AI systems with data sources via structured interfaces |
-| **Multi-stage Build** | Docker build process using multiple FROM statements to optimize final image size |
-| **Pre-commit Hook** | Script that runs automatically before a git commit to enforce code quality standards |
-| **Rate Limiting** | Controlling the frequency of requests to prevent resource exhaustion |
-| **Resource Discovery** | Process of automatically finding and cataloging available resources in a system |
-| **Rolling Update** | Deployment strategy that gradually replaces instances with zero downtime |
-| **Scope Limitation** | Security feature restricting access to specific subsets of available resources |
-| **Service Discovery** | Automatic detection of services and endpoints in distributed systems |
-| **Session Management** | Handling of user authentication state across multiple requests |
-| **Software Bill of Materials** | Comprehensive inventory of components in a software application |
-| **Static Analysis** | Code examination without execution to find bugs and security issues |
-| **Structured Logging** | Logging format using consistent, parseable structure for automated analysis |
-| **Type Safety** | Programming language feature preventing type errors through compile-time checking |
-| **Virtual Environment** | Isolated Python runtime environment with separate package installations |
-| **Zero-persistence Architecture** | System design where no data is stored locally between requests |
+- **Ingress Class**: nginx-labarchives-mcp
+- **Service Type**: ClusterIP (internal only)
+- **Health Check Paths**: /health/live, /health/ready
+- **Metrics Path**: /metrics (Prometheus scraping)
 
-## 9.3 ACRONYMS
+### A.1.7 Package Versions
 
-### 9.3.1 Expanded Forms
+Version specifications for core components:
 
-| Acronym | Expanded Form |
-|---------|---------------|
-| **AKID** | Access Key Identifier |
-| **ALB** | Application Load Balancer |
-| **API** | Application Programming Interface |
-| **AWS** | Amazon Web Services |
-| **CI/CD** | Continuous Integration/Continuous Deployment |
-| **CLI** | Command-Line Interface |
-| **DNS** | Domain Name System |
-| **E2E** | End-to-End |
-| **ECS** | Elastic Container Service |
-| **ELK** | Elasticsearch, Logstash, Kibana |
-| **ELN** | Electronic Lab Notebook |
-| **EU** | European Union |
-| **GDPR** | General Data Protection Regulation |
-| **GID** | Group Identifier |
-| **HIPAA** | Health Insurance Portability and Accountability Act |
-| **HMAC** | Hash-based Message Authentication Code |
-| **HTTP** | Hypertext Transfer Protocol |
-| **HTTPS** | Hypertext Transfer Protocol Secure |
-| **IaC** | Infrastructure as Code |
-| **IAM** | Identity and Access Management |
-| **IDE** | Integrated Development Environment |
-| **IP** | Internet Protocol |
-| **IPAM** | IP Address Management |
-| **ISO** | International Organization for Standardization |
-| **JSON** | JavaScript Object Notation |
-| **JSON-LD** | JSON for Linked Data |
-| **JSON-RPC** | JSON Remote Procedure Call |
-| **KMS** | Key Management Service |
-| **KPI** | Key Performance Indicator |
-| **LLM** | Large Language Model |
-| **MCP** | Model Context Protocol |
-| **MVP** | Minimum Viable Product |
-| **NGINX** | Engine-X (web server) |
-| **OWASP** | Open Web Application Security Project |
-| **PRD** | Product Requirements Document |
-| **PyPI** | Python Package Index |
-| **QA** | Quality Assurance |
-| **RBAC** | Role-Based Access Control |
-| **RDS** | Relational Database Service |
-| **REST** | Representational State Transfer |
-| **RPC** | Remote Procedure Call |
-| **SARIF** | Static Analysis Results Interchange Format |
-| **SAST** | Static Application Security Testing |
-| **SBOM** | Software Bill of Materials |
-| **SDK** | Software Development Kit |
-| **SHA** | Secure Hash Algorithm |
-| **SIGINT** | Signal Interrupt |
-| **SIGTERM** | Signal Terminate |
-| **SLA** | Service Level Agreement |
-| **SMTP** | Simple Mail Transfer Protocol |
-| **SNS** | Simple Notification Service |
-| **SOC** | Service Organization Control |
-| **SSO** | Single Sign-On |
-| **TLS** | Transport Layer Security |
-| **TTL** | Time To Live |
-| **UID** | User Identifier |
-| **UK** | United Kingdom |
-| **URI** | Uniform Resource Identifier |
-| **URL** | Uniform Resource Locator |
-| **US** | United States |
-| **VPC** | Virtual Private Cloud |
-| **VS Code** | Visual Studio Code |
-| **YAML** | YAML Ain't Markup Language |
+- **MCP Server Version**: 1.0.0
+- **CLI Package Version**: 0.1.0
+- **Python Requirement**: >= 3.11
+
+## A.2 GLOSSARY
+
+### A.2.1 System Components
+
+**API Client**: Component that manages HTTP communication with the LabArchives REST API, including authentication, request signing, and response parsing.
+
+**Audit Logger**: Specialized logging component that records all data access operations, configuration changes, and security events for compliance purposes.
+
+**Protocol Handler**: Component that manages JSON-RPC 2.0 message processing for the MCP protocol, including request parsing and response formatting.
+
+**Resource Manager**: Core business logic layer that bridges the LabArchives API client and MCP protocol handler for resource discovery and retrieval.
+
+### A.2.2 Configuration and Security
+
+**Configuration Precedence**: The order in which configuration values are resolved: CLI arguments > Environment variables > Configuration files > Default values.
+
+**Folder Scope**: Access control mechanism that limits resource visibility to a specific folder path and its descendants within the notebook hierarchy.
+
+**Scope Enforcement**: Security mechanism that validates resource access against configured limitations (notebook ID, notebook name, or folder path).
+
+### A.2.3 Data and Processing
+
+**Deep Search**: Systematic exploration strategy using folder hierarchy traversal to discover all resources within a repository structure.
+
+**JSON-LD Context**: Semantic enrichment data added to MCP resources to provide additional meaning and relationships for AI applications.
+
+**MCP Resource**: A standardized representation of LabArchives data (notebook, page, or entry) formatted according to the Model Context Protocol specification.
+
+**Structured Formatter**: Logging component that outputs log entries in JSON or key-value format for machine parsing and analysis.
+
+**Two-Phase Listing**: Resource discovery pattern that first lists parent containers, then retrieves child resources to enforce scope boundaries.
+
+## A.3 ACRONYMS
+
+### A.3.1 Authentication and Security
+
+| Acronym | Expansion |
+|---------|-----------|
+| AKID | Access Key ID |
+| HMAC | Hash-based Message Authentication Code |
+| IAM | Identity and Access Management |
+| KMS | Key Management Service |
+| RBAC | Role-Based Access Control |
+| SHA | Secure Hash Algorithm |
+| SSO | Single Sign-On |
+| TLS | Transport Layer Security |
+
+### A.3.2 Cloud and Infrastructure
+
+| Acronym | Expansion |
+|---------|-----------|
+| ALB | Application Load Balancer |
+| ARN | Amazon Resource Name |
+| AWS | Amazon Web Services |
+| DNS | Domain Name System |
+| ECS | Elastic Container Service |
+| IaC | Infrastructure as Code |
+| RDS | Relational Database Service |
+| SNS | Simple Notification Service |
+| VPC | Virtual Private Cloud |
+
+### A.3.3 Development and Protocols
+
+| Acronym | Expansion |
+|---------|-----------|
+| API | Application Programming Interface |
+| CI/CD | Continuous Integration/Continuous Deployment |
+| CLI | Command-Line Interface |
+| HTTP | Hypertext Transfer Protocol |
+| HTTPS | Hypertext Transfer Protocol Secure |
+| JSON | JavaScript Object Notation |
+| JSON-LD | JSON for Linked Data |
+| JSON-RPC | JSON Remote Procedure Call |
+| MCP | Model Context Protocol |
+| REST | Representational State Transfer |
+| RPC | Remote Procedure Call |
+| SDK | Software Development Kit |
+
+### A.3.4 Standards and Compliance
+
+| Acronym | Expansion |
+|---------|-----------|
+| GDPR | General Data Protection Regulation |
+| HIPAA | Health Insurance Portability and Accountability Act |
+| ISO | International Organization for Standardization |
+| MIT | Massachusetts Institute of Technology |
+| PEP | Python Enhancement Proposal |
+| SOC2 | Service Organization Control 2 |
+| SLA | Service Level Agreement |
+
+### A.3.5 Technical and Regional
+
+| Acronym | Expansion |
+|---------|-----------|
+| AU | Australia |
+| CPU | Central Processing Unit |
+| E2E | End-to-End |
+| ELK | Elasticsearch, Logstash, Kibana |
+| ELN | Electronic Lab Notebook |
+| GB | Gigabyte |
+| GID | Group ID |
+| ID | Identifier |
+| IPAM | IP Address Management |
+| KB | Kilobyte |
+| KPI | Key Performance Indicator |
+| LLM | Large Language Model |
+| MB | Megabyte |
+| MVP | Minimum Viable Product |
+| OS | Operating System |
+| PyPI | Python Package Index |
+| QA | Quality Assurance |
+| SQL | Structured Query Language |
+| TTL | Time To Live |
+| UI | User Interface |
+| UID | User ID |
+| UK | United Kingdom |
+| URI | Uniform Resource Identifier |
+| URL | Uniform Resource Locator |
+| US | United States |
+| UTC | Coordinated Universal Time |
+| XML | Extensible Markup Language |
+| YAML | YAML Ain't Markup Language |
+
+### A.3.6 System Signals
+
+| Acronym | Expansion |
+|---------|-----------|
+| SIGHUP | Signal Hang Up |
+| SIGINT | Signal Interrupt |
+| SIGTERM | Signal Terminate |
 
 #### References
 
-**Technical Specification Sections Referenced:**
-- `1.1 EXECUTIVE SUMMARY` - Project overview and key stakeholders
-- `1.4 References` - Source files examined
-- `3.1 PROGRAMMING LANGUAGES` - Python 3.11+ requirements
-- `3.2 FRAMEWORKS & LIBRARIES` - Core MCP framework and dependencies
-- `3.4 THIRD-PARTY SERVICES` - LabArchives API and external integrations
-- `3.6 DEVELOPMENT & DEPLOYMENT` - Containerization and infrastructure tools
-- `3.7 SECURITY & COMPLIANCE TOOLS` - Security scanning and compliance standards
-- `4.1 SYSTEM WORKFLOWS` - Business processes and integration patterns
-- `8.9 DISASTER RECOVERY` - Recovery procedures and backup strategies
-
-**Repository Structure Analysis:**
-- Root directory structure examination
-- `blitzy/` - Documentation consolidation folder
-- `blitzy/documentation/` - Individual documentation files
-- `infrastructure/` - Deployment and orchestration assets
-- `src/` - Python implementation structure
-- `.github/` - GitHub configuration and CI/CD workflows
+- `src/cli/auth_manager.py` - Authentication session management implementation
+- `src/cli/config.py` - Configuration management system with precedence handling
+- `src/cli/labarchives_api.py` - LabArchives API client interface and HTTP configuration
+- `src/cli/mcp_server.py` - MCP server orchestration and protocol handling
+- `src/cli/exceptions.py` - Exception hierarchy definitions for error handling
+- `src/cli/requirements.txt` - Production dependencies and version specifications
+- `src/cli/pyproject.toml` - Package configuration and metadata
+- `src/cli/Dockerfile` - Container build configuration and resource limits
+- `src/cli/.env.example` - Environment variable template and configuration options
+- `infrastructure/` - Deployment configurations including Docker and Kubernetes specifications
+- Technical Specification sections 1.1, 1.2, 2.1, 3.2, 3.3, 3.7, 4.5, 4.6 - System architecture and requirements context

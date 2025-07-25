@@ -266,3 +266,294 @@ class MCPError(LabArchivesMCPException):
             str(exception) -> "MCP resource not found (Code: -32602)"
         """
         return f"{self.message} (Code: {self.code})"
+
+
+class EntryOutsideNotebookScopeError(LabArchivesMCPException):
+    """
+    Exception raised when attempting to access an entry that belongs to a notebook outside the configured scope.
+    
+    This exception is raised when a client attempts to access an entry resource that exists within
+    a notebook that falls outside the configured notebook scope restrictions. This is a security
+    measure to prevent unauthorized cross-notebook data access and ensure data isolation.
+    
+    The exception provides detailed context about the attempted access including the entry ID,
+    the notebook it belongs to, and the configured scope boundaries to support audit logging
+    and security monitoring.
+    
+    This exception replaces generic "ScopeViolation" errors with specific diagnostic information
+    to improve error messaging and security monitoring capabilities.
+    
+    Common scenarios that trigger this exception:
+    - Client requests an entry by direct entry ID when the entry's parent notebook is not in scope
+    - Attempting to read entry content when notebook scope is restricted to specific notebooks
+    - Cross-notebook entry access attempts in multi-tenant environments
+    
+    The context parameter should contain diagnostic information including the requested entry ID,
+    the actual notebook ID it belongs to, and the configured notebook scope for audit purposes.
+    """
+    
+    def __init__(self, message: str, code: Optional[int] = None, context: Optional[object] = None):
+        """
+        Initialize the entry scope violation exception with diagnostic information.
+        
+        This constructor creates a specific exception for entry access violations when the
+        requested entry belongs to a notebook outside the configured scope. The exception
+        provides detailed context for security auditing and user feedback.
+        
+        Args:
+            message (str): Human-readable description of the scope violation. Should include
+                          specific details about which entry was requested and why access
+                          was denied to support troubleshooting and audit logging.
+            code (Optional[int]): Optional numeric error code for programmatic handling.
+                                 Common codes include 403 (Forbidden) for authorization failures.
+            context (Optional[object]): Optional context object containing diagnostic information
+                                       such as the requested entry ID, the notebook it belongs to,
+                                       configured scope boundaries, and request details for audit logging.
+        
+        Example:
+            raise EntryOutsideNotebookScopeError(
+                message="Entry 789 belongs to notebook 456 which is outside configured scope [123]",
+                code=403,
+                context={
+                    "entry_id": "789",
+                    "entry_notebook_id": "456", 
+                    "configured_scope": ["123"],
+                    "request_uri": "labarchives://entry/789"
+                }
+            )
+        """
+        super().__init__(message, code, context)
+        self.message = message
+        self.code = code
+        self.context = context
+    
+    def __str__(self) -> str:
+        """
+        Return a string representation of the entry scope violation with message and code if present.
+        
+        This method provides a formatted string representation specifically for entry scope
+        violations, maintaining consistency with the base exception class while providing
+        clear identification of the specific security violation type.
+        
+        Returns:
+            str: Formatted string containing the entry scope violation message and code if available.
+                 Format follows the same pattern as the base class for consistency.
+        
+        Example:
+            str(exception) -> "Entry 789 belongs to notebook 456 which is outside configured scope (Code: 403)"
+        """
+        if self.code is not None:
+            return f"{self.message} (Code: {self.code})"
+        return self.message
+
+
+class FolderScopeViolationError(LabArchivesMCPException):
+    """
+    Exception raised when attempting folder-related operations that violate configured folder scope.
+    
+    This exception is raised when a client attempts to perform operations that would expose
+    notebook metadata or content outside the configured folder scope boundaries. This typically
+    occurs when trying to read notebook-level information directly when only folder-level
+    access is configured.
+    
+    The exception prevents information leakage by denying access to notebook resources when
+    the notebook contains no pages within the configured folder scope, ensuring that clients
+    cannot infer notebook structure or metadata outside their authorized boundaries.
+    
+    This exception replaces generic "ScopeViolation" errors with specific diagnostic information
+    about folder-related access control violations to improve security monitoring and debugging.
+    
+    Common scenarios that trigger this exception:
+    - Direct notebook read attempts when folder scope is configured and notebook has no pages in scope folder
+    - Attempting to list notebook contents when folder restrictions apply
+    - Metadata access attempts that would reveal folder structure outside configured scope
+    - Cross-folder navigation attempts in restricted environments
+    
+    The context parameter should contain information about the requested operation, the folder
+    scope configuration, and the notebook's actual folder structure for audit purposes.
+    """
+    
+    def __init__(self, message: str, code: Optional[int] = None, context: Optional[object] = None):
+        """
+        Initialize the folder scope violation exception with diagnostic information.
+        
+        This constructor creates a specific exception for folder scope violations when
+        operations would expose information outside configured folder boundaries. The
+        exception provides detailed context for security auditing and access control.
+        
+        Args:
+            message (str): Human-readable description of the folder scope violation. Should
+                          include specific details about the attempted operation and why
+                          access was denied based on folder scope restrictions.
+            code (Optional[int]): Optional numeric error code for programmatic handling.
+                                 Common codes include 403 (Forbidden) for authorization failures.
+            context (Optional[object]): Optional context object containing diagnostic information
+                                       such as the requested notebook ID, configured folder scope,
+                                       actual folders in notebook, and operation details for audit logging.
+        
+        Example:
+            raise FolderScopeViolationError(
+                message="Direct notebook 456 read denied: no pages in configured folder scope '/research'",
+                code=403,
+                context={
+                    "notebook_id": "456",
+                    "configured_folder_scope": "/research",
+                    "notebook_folders": ["/admin", "/reports"],
+                    "operation": "notebook_read"
+                }
+            )
+        """
+        super().__init__(message, code, context)
+        self.message = message
+        self.code = code
+        self.context = context
+    
+    def __str__(self) -> str:
+        """
+        Return a string representation of the folder scope violation with message and code if present.
+        
+        This method provides a formatted string representation specifically for folder scope
+        violations, maintaining consistency with the base exception class while providing
+        clear identification of the specific access control violation type.
+        
+        Returns:
+            str: Formatted string containing the folder scope violation message and code if available.
+                 Format follows the same pattern as the base class for consistency.
+        
+        Example:
+            str(exception) -> "Direct notebook read denied: no pages in folder scope (Code: 403)"
+        """
+        if self.code is not None:
+            return f"{self.message} (Code: {self.code})"
+        return self.message
+
+
+class NotebookScopeViolationError(LabArchivesMCPException):
+    """
+    Exception raised when attempting to access notebooks outside the configured notebook scope.
+    
+    This exception is raised when a client attempts to access notebook resources that fall
+    outside the configured notebook scope restrictions. This enforces notebook-level access
+    control to ensure clients can only access notebooks they are explicitly authorized to use.
+    
+    The exception provides detailed diagnostic information about the attempted access including
+    the requested notebook ID and the configured scope boundaries to support comprehensive
+    audit logging and security monitoring of unauthorized access attempts.
+    
+    This exception replaces generic "ScopeViolation" errors with specific diagnostic information
+    about notebook-level access control violations to improve error messaging, security
+    monitoring, and compliance reporting capabilities.
+    
+    Common scenarios that trigger this exception:
+    - Direct notebook access attempts when notebook scope is restricted to specific notebooks
+    - Cross-notebook navigation attempts in multi-tenant environments
+    - Notebook resource enumeration outside authorized boundaries
+    - API calls targeting notebooks not included in configured scope
+    
+    The context parameter should contain detailed information about the requested notebook,
+    the configured scope boundaries, and the attempted operation for comprehensive audit trails.
+    """
+    
+    def __init__(self, message: str, code: Optional[int] = None, context: Optional[object] = None):
+        """
+        Initialize the notebook scope violation exception with detailed error context.
+        
+        This constructor creates a specific exception for notebook access violations when
+        the requested notebook falls outside the configured scope boundaries. The exception
+        provides comprehensive context for security auditing and access control enforcement.
+        
+        Args:
+            message (str): Human-readable description of the notebook scope violation. Should
+                          include specific details about which notebook was requested and why
+                          access was denied based on scope configuration to support troubleshooting.
+            code (Optional[int]): Optional numeric error code for programmatic handling.
+                                 Common codes include 403 (Forbidden) for authorization failures.
+            context (Optional[object]): Optional context object containing detailed diagnostic
+                                       information such as the requested notebook ID, configured
+                                       notebook scope boundaries, operation type, and request
+                                       details for comprehensive audit logging and security monitoring.
+        
+        Example:
+            raise NotebookScopeViolationError(
+                message="Notebook 789 access denied: outside configured scope [123, 456]",
+                code=403,
+                context={
+                    "requested_notebook_id": "789",
+                    "configured_notebook_scope": ["123", "456"],
+                    "operation": "notebook_read",
+                    "request_uri": "labarchives://notebook/789"
+                }
+            )
+        """
+        super().__init__(message, code, context)
+        self.message = message
+        self.code = code
+        self.context = context
+    
+    def __str__(self) -> str:
+        """
+        Return a string representation of the notebook scope violation with message and code if present.
+        
+        This method provides a formatted string representation specifically for notebook scope
+        violations, maintaining consistency with the base exception class while providing
+        clear identification of the specific security violation type.
+        
+        Returns:
+            str: Formatted string containing the notebook scope violation message and code if available.
+                 Format follows the same pattern as the base class for consistency.
+        
+        Example:
+            str(exception) -> "Notebook 789 access denied: outside configured scope (Code: 403)"
+        """
+        if self.code is not None:
+            return f"{self.message} (Code: {self.code})"
+        return self.message
+
+
+class ConfigurationError(LabArchivesMCPException):
+    """
+    Exception raised for configuration-related errors.
+    
+    This exception is raised when there are issues with loading, parsing,
+    or validating configuration parameters from CLI arguments, environment
+    variables, or configuration files.
+    
+    Examples of configuration errors include:
+    - Invalid configuration file format
+    - Missing required configuration parameters
+    - Invalid parameter values or ranges
+    - Configuration validation failures
+    """
+    pass
+
+
+class AuthenticationError(LabArchivesMCPException):
+    """
+    Exception raised for authentication-related errors.
+    
+    This exception is raised when authentication fails due to invalid
+    credentials, expired tokens, network issues, or server errors.
+    
+    Examples of authentication errors include:
+    - Invalid API key or access token
+    - Expired authentication credentials
+    - Authentication server unavailable
+    - Invalid user credentials
+    """
+    pass
+
+
+class StartupError(LabArchivesMCPException):
+    """
+    Exception raised for server startup-related errors.
+    
+    This exception is raised when the MCP server fails to start due to
+    initialization errors, resource conflicts, or other startup issues.
+    
+    Examples of startup errors include:
+    - Port already in use
+    - Failed to initialize required components
+    - Invalid startup configuration
+    - Resource initialization failures
+    """
+    pass

@@ -308,8 +308,7 @@ class TestResourceManagerListResources:
         """Test list_resources handles API authentication errors correctly."""
         # Mock API client to raise authentication error
         mock_api_client.list_notebooks.side_effect = APIAuthenticationError(
-            message="Authentication failed",
-            code=401
+            message="Authentication failed"
         )
         
         # Call list_resources and expect LabArchivesMCPException
@@ -325,8 +324,7 @@ class TestResourceManagerListResources:
         """Test list_resources handles API permission errors correctly."""
         # Mock API client to raise permission error
         mock_api_client.list_pages.side_effect = APIPermissionError(
-            message="Access denied to notebook",
-            code=403
+            message="Access denied to notebook"
         )
         
         # Call list_resources and expect LabArchivesMCPException
@@ -684,8 +682,7 @@ class TestResourceManagerReadResource:
         """Test read_resource handles API permission errors correctly."""
         # Mock API client to raise permission error
         mock_api_client.get_entry_content.side_effect = APIPermissionError(
-            message="Access denied to entry",
-            code=403
+            message="Access denied to entry"
         )
         
         # Call read_resource
@@ -700,8 +697,7 @@ class TestResourceManagerReadResource:
         """Test read_resource handles API authentication errors correctly."""
         # Mock API client to raise authentication error
         mock_api_client.get_entry_content.side_effect = APIAuthenticationError(
-            message="Authentication failed",
-            code=401
+            message="Authentication failed"
         )
         
         # Call read_resource
@@ -842,7 +838,6 @@ class TestResourceManagerErrorHandling:
         # Mock API client to raise authentication error
         mock_api_client.list_notebooks.side_effect = APIAuthenticationError(
             message="Invalid credentials",
-            code=401,
             context={"operation": "list_notebooks"}
         )
         
@@ -859,7 +854,6 @@ class TestResourceManagerErrorHandling:
         # Mock API client to raise permission error
         mock_api_client.list_notebooks.side_effect = APIPermissionError(
             message="Access denied",
-            code=403,
             context={"operation": "list_notebooks"}
         )
         
@@ -958,8 +952,7 @@ class TestResourceManagerConfigurationValidation:
         # Create mock API client that simulates authentication failure
         mock_api_client = Mock(spec=LabArchivesAPIClient)
         mock_api_client.list_notebooks.side_effect = APIAuthenticationError(
-            message="Invalid credentials",
-            code=401
+            message="Invalid credentials"
         )
         
         # Create ResourceManager with valid structure but invalid credentials

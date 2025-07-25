@@ -327,13 +327,14 @@ class TestCLIParserConfigurationIntegration:
             # Mock the configuration loading and command execution
             with patch('src.cli.cli_parser.load_configuration') as mock_load_config:
                 with patch('src.cli.cli_parser.setup_logging') as mock_setup_logging:
-                    with patch('src.cli.commands.start.start_command') as mock_start_command:
+                    with patch('src.cli.cli_parser.start_command') as mock_start_command:
                         # Configure mocks
                         mock_config = Mock()
                         mock_config.logging = Mock()
                         mock_load_config.return_value = mock_config
                         mock_setup_logging.return_value = (Mock(), Mock())
                         mock_start_command.return_value = 0
+                        mock_start_command.__name__ = 'start_command'
                         
                         # Test CLI with config file
                         exit_code = parse_and_dispatch_cli([
@@ -363,13 +364,14 @@ class TestCLIParserConfigurationIntegration:
         with patch.dict(os.environ, env_vars):
             with patch('src.cli.cli_parser.load_configuration') as mock_load_config:
                 with patch('src.cli.cli_parser.setup_logging') as mock_setup_logging:
-                    with patch('src.cli.commands.start.start_command') as mock_start_command:
+                    with patch('src.cli.cli_parser.start_command') as mock_start_command:
                         # Configure mocks
                         mock_config = Mock()
                         mock_config.logging = Mock()
                         mock_load_config.return_value = mock_config
                         mock_setup_logging.return_value = (Mock(), Mock())
                         mock_start_command.return_value = 0
+                        mock_start_command.__name__ = 'start_command'
                         
                         # Test CLI arguments override environment variables
                         exit_code = parse_and_dispatch_cli([
@@ -399,13 +401,14 @@ class TestCLIParserConfigurationIntegration:
         with patch.dict(os.environ, env_vars):
             with patch('src.cli.cli_parser.load_configuration') as mock_load_config:
                 with patch('src.cli.cli_parser.setup_logging') as mock_setup_logging:
-                    with patch('src.cli.commands.start.start_command') as mock_start_command:
+                    with patch('src.cli.cli_parser.start_command') as mock_start_command:
                         # Configure mocks
                         mock_config = Mock()
                         mock_config.logging = Mock()
                         mock_load_config.return_value = mock_config
                         mock_setup_logging.return_value = (Mock(), Mock())
                         mock_start_command.return_value = 0
+                        mock_start_command.__name__ = 'start_command'
                         
                         # Test CLI arguments with -k flag override environment variables
                         exit_code = parse_and_dispatch_cli([
@@ -460,7 +463,7 @@ class TestCLIParserLoggingIntegration:
         """Test integration with logging setup."""
         with patch('src.cli.cli_parser.load_configuration') as mock_load_config:
             with patch('src.cli.cli_parser.setup_logging') as mock_setup_logging:
-                with patch('src.cli.commands.start.start_command') as mock_start_command:
+                with patch('src.cli.cli_parser.start_command') as mock_start_command:
                     # Configure mocks
                     mock_config = Mock()
                     mock_config.logging = Mock()
@@ -470,6 +473,7 @@ class TestCLIParserLoggingIntegration:
                     mock_audit_logger = Mock()
                     mock_setup_logging.return_value = (mock_main_logger, mock_audit_logger)
                     mock_start_command.return_value = 0
+                    mock_start_command.__name__ = 'start_command'
                     
                     # Test CLI execution
                     exit_code = parse_and_dispatch_cli(['start'])
@@ -485,7 +489,7 @@ class TestCLIParserLoggingIntegration:
         """Test that CLI commands generate appropriate audit log entries."""
         with patch('src.cli.cli_parser.load_configuration') as mock_load_config:
             with patch('src.cli.cli_parser.setup_logging') as mock_setup_logging:
-                with patch('src.cli.commands.authenticate.authenticate_command') as mock_auth_command:
+                with patch('src.cli.cli_parser.authenticate_command') as mock_auth_command:
                     # Configure mocks
                     mock_config = Mock()
                     mock_config.logging = Mock()
@@ -495,6 +499,7 @@ class TestCLIParserLoggingIntegration:
                     mock_audit_logger = Mock()
                     mock_setup_logging.return_value = (mock_main_logger, mock_audit_logger)
                     mock_auth_command.return_value = 0
+                    mock_auth_command.__name__ = 'authenticate_command'
                     
                     # Test authenticate command
                     exit_code = parse_and_dispatch_cli(['authenticate'])
@@ -520,13 +525,14 @@ class TestCLIParserCommandDispatch:
         """Test dispatch to start command handler."""
         with patch('src.cli.cli_parser.load_configuration') as mock_load_config:
             with patch('src.cli.cli_parser.setup_logging') as mock_setup_logging:
-                with patch('src.cli.commands.start.start_command') as mock_start_command:
+                with patch('src.cli.cli_parser.start_command') as mock_start_command:
                     # Configure mocks
                     mock_config = Mock()
                     mock_config.logging = Mock()
                     mock_load_config.return_value = mock_config
                     mock_setup_logging.return_value = (Mock(), Mock())
                     mock_start_command.return_value = 0
+                    mock_start_command.__name__ = 'start_command'
                     
                     # Test start command dispatch
                     exit_code = parse_and_dispatch_cli(['start'])
@@ -539,7 +545,7 @@ class TestCLIParserCommandDispatch:
         """Test dispatch to authenticate command handler."""
         with patch('src.cli.cli_parser.load_configuration') as mock_load_config:
             with patch('src.cli.cli_parser.setup_logging') as mock_setup_logging:
-                with patch('src.cli.commands.authenticate.authenticate_command') as mock_auth_command:
+                with patch('src.cli.cli_parser.authenticate_command') as mock_auth_command:
                     # Configure mocks
                     mock_config = Mock()
                     mock_config.logging = Mock()
@@ -547,6 +553,7 @@ class TestCLIParserCommandDispatch:
                     mock_setup_logging.return_value = (Mock(), Mock())
                     mock_auth_command.return_value = 0
                     
+                    mock_auth_command.__name__ = 'authenticate_command'
                     # Test authenticate command dispatch
                     exit_code = parse_and_dispatch_cli(['authenticate'])
                     
@@ -586,7 +593,7 @@ class TestCLIParserCommandDispatch:
         """Test error handling during command execution."""
         with patch('src.cli.cli_parser.load_configuration') as mock_load_config:
             with patch('src.cli.cli_parser.setup_logging') as mock_setup_logging:
-                with patch('src.cli.commands.start.start_command') as mock_start_command:
+                with patch('src.cli.cli_parser.start_command') as mock_start_command:
                     # Configure mocks
                     mock_config = Mock()
                     mock_config.logging = Mock()
@@ -988,13 +995,14 @@ class TestCLIParserAccessKeyAliases:
         """Test access key aliases work correctly with configuration loading."""
         with patch('src.cli.cli_parser.load_configuration') as mock_load_config:
             with patch('src.cli.cli_parser.setup_logging') as mock_setup_logging:
-                with patch('src.cli.commands.start.start_command') as mock_start_command:
+                with patch('src.cli.cli_parser.start_command') as mock_start_command:
                     # Configure mocks
                     mock_config = Mock()
                     mock_config.logging = Mock()
                     mock_load_config.return_value = mock_config
                     mock_setup_logging.return_value = (Mock(), Mock())
                     mock_start_command.return_value = 0
+                    mock_start_command.__name__ = 'start_command'
                     
                     # Test CLI with -k flag
                     exit_code = parse_and_dispatch_cli([
@@ -1044,12 +1052,13 @@ class TestCLIParserIntegration:
         }):
             with patch('src.cli.cli_parser.load_configuration') as mock_load_config:
                 with patch('src.cli.cli_parser.setup_logging') as mock_setup_logging:
-                    with patch('src.cli.commands.start.start_command') as mock_start_command:
+                    with patch('src.cli.cli_parser.start_command') as mock_start_command:
                         # Configure mocks
                         mock_config = Mock()
                         mock_config.logging = Mock()
                         mock_load_config.return_value = mock_config
                         mock_setup_logging.return_value = (Mock(), Mock())
+                        mock_start_command.__name__ = 'start_command'
                         mock_start_command.return_value = 0
                         
                         # Test complete workflow
@@ -1073,11 +1082,12 @@ class TestCLIParserIntegration:
         }):
             with patch('src.cli.cli_parser.load_configuration') as mock_load_config:
                 with patch('src.cli.cli_parser.setup_logging') as mock_setup_logging:
-                    with patch('src.cli.commands.start.start_command') as mock_start_command:
+                    with patch('src.cli.cli_parser.start_command') as mock_start_command:
                         # Configure mocks
                         mock_config = Mock()
                         mock_config.logging = Mock()
                         mock_load_config.return_value = mock_config
+                        mock_start_command.__name__ = 'start_command'
                         mock_setup_logging.return_value = (Mock(), Mock())
                         mock_start_command.return_value = 0
                         
@@ -1110,13 +1120,14 @@ class TestCLIParserIntegration:
         }):
             with patch('src.cli.cli_parser.load_configuration') as mock_load_config:
                 with patch('src.cli.cli_parser.setup_logging') as mock_setup_logging:
-                    with patch('src.cli.commands.start.start_command') as mock_start_command:
+                    with patch('src.cli.cli_parser.start_command') as mock_start_command:
                         # Configure mocks
                         mock_config = Mock()
                         mock_config.logging = Mock()
                         mock_load_config.return_value = mock_config
                         mock_setup_logging.return_value = (Mock(), Mock())
                         mock_start_command.return_value = 0
+                        mock_start_command.__name__ = 'start_command'
                         
                         # Test complete workflow with --access-key flag
                         exit_code = parse_and_dispatch_cli([
@@ -1145,7 +1156,7 @@ class TestCLIParserIntegration:
         """Test complete authenticate command workflow."""
         with patch('src.cli.cli_parser.load_configuration') as mock_load_config:
             with patch('src.cli.cli_parser.setup_logging') as mock_setup_logging:
-                with patch('src.cli.commands.authenticate.authenticate_command') as mock_auth_command:
+                with patch('src.cli.cli_parser.authenticate_command') as mock_auth_command:
                     # Configure mocks
                     mock_config = Mock()
                     mock_config.logging = Mock()
@@ -1153,6 +1164,7 @@ class TestCLIParserIntegration:
                     mock_setup_logging.return_value = (Mock(), Mock())
                     mock_auth_command.return_value = 0
                     
+                    mock_auth_command.__name__ = 'authenticate_command'
                     # Test complete workflow
                     exit_code = parse_and_dispatch_cli([
                         'authenticate',
@@ -1170,7 +1182,7 @@ class TestCLIParserIntegration:
         """Test complete authenticate command workflow using harmonized CLI flag aliases."""
         with patch('src.cli.cli_parser.load_configuration') as mock_load_config:
             with patch('src.cli.cli_parser.setup_logging') as mock_setup_logging:
-                with patch('src.cli.commands.authenticate.authenticate_command') as mock_auth_command:
+                with patch('src.cli.cli_parser.authenticate_command') as mock_auth_command:
                     # Configure mocks
                     mock_config = Mock()
                     mock_config.logging = Mock()
@@ -1178,6 +1190,7 @@ class TestCLIParserIntegration:
                     mock_setup_logging.return_value = (Mock(), Mock())
                     mock_auth_command.return_value = 0
                     
+                    mock_auth_command.__name__ = 'authenticate_command'
                     # Test complete workflow with -k flag
                     exit_code = parse_and_dispatch_cli([
                         'authenticate',
@@ -1325,12 +1338,13 @@ def test_documented_command_format_integration():
     # Note: -p is not implemented in the current system, using --access-secret instead
     with patch('src.cli.cli_parser.load_configuration') as mock_load_config:
         with patch('src.cli.cli_parser.setup_logging') as mock_setup_logging:
-            with patch('src.cli.commands.start.start_command') as mock_start_command:
+            with patch('src.cli.cli_parser.start_command') as mock_start_command:
                 # Configure mocks
                 mock_config = Mock()
                 mock_config.logging = Mock()
                 mock_load_config.return_value = mock_config
                 mock_setup_logging.return_value = (Mock(), Mock())
+                mock_start_command.__name__ = 'start_command'
                 mock_start_command.return_value = 0
                 
                 # Test the documented command format

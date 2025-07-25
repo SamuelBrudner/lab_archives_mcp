@@ -35,6 +35,16 @@ from src.cli.constants import (
     MCP_SERVER_VERSION
 )
 
+# Define explicit exports for security validators module and other importers
+# This ensures proper access to core data models throughout the application
+__all__ = [
+    "AuthenticationConfig",
+    "ScopeConfig",
+    "OutputConfig", 
+    "LoggingConfig",
+    "ServerConfiguration"
+]
+
 
 class AuthenticationConfig(BaseModel):
     """

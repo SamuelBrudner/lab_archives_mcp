@@ -801,3 +801,147 @@ class LabArchivesAPI:
                     "operation": "get_entry_content"
                 }
             )
+
+
+# =============================================================================
+# High-Level API Functions
+# =============================================================================
+# These functions provide a simplified interface to the LabArchivesAPI class
+# for common operations. They are used by the CLI and MCP server components.
+
+
+async def get_authenticated_client(access_key_id: str, access_password: str, 
+                           region: Optional[str] = None, 
+                           username: Optional[str] = None) -> LabArchivesAPI:
+    """
+    Create and return an authenticated LabArchives API client.
+    
+    Args:
+        access_key_id: API access key ID or permanent API key
+        access_password: API access password or temporary token
+        region: LabArchives region (US, AU, UK)
+        username: Username (required for token-based auth)
+    
+    Returns:
+        LabArchivesAPI: Authenticated API client instance
+    """
+    # Placeholder implementation - needs to be fully implemented
+    api_client = LabArchivesAPI(
+        access_key_id=access_key_id,
+        access_secret=access_password,
+        region=region or "US"
+    )
+    return api_client
+
+
+async def list_user_notebooks(api_client: LabArchivesAPI) -> List[Dict[str, Any]]:
+    """
+    List all notebooks accessible to the authenticated user.
+    
+    Args:
+        api_client: Authenticated LabArchives API client
+    
+    Returns:
+        List[Dict[str, Any]]: List of notebook metadata dictionaries
+    """
+    # Placeholder implementation - needs to be fully implemented
+    try:
+        response = api_client.list_user_notebooks()
+        return response.notebooks if hasattr(response, 'notebooks') else []
+    except Exception:
+        return []
+
+
+async def list_notebook_pages(api_client: LabArchivesAPI, notebook_id: str) -> List[Dict[str, Any]]:
+    """
+    List all pages in the specified notebook.
+    
+    Args:
+        api_client: Authenticated LabArchives API client
+        notebook_id: Target notebook identifier
+    
+    Returns:
+        List[Dict[str, Any]]: List of page metadata dictionaries
+    """
+    # Placeholder implementation - needs to be fully implemented
+    try:
+        response = api_client.list_notebook_pages(notebook_id)
+        return response.pages if hasattr(response, 'pages') else []
+    except Exception:
+        return []
+
+
+async def list_page_entries(api_client: LabArchivesAPI, page_id: str) -> List[Dict[str, Any]]:
+    """
+    List all entries in the specified page.
+    
+    Args:
+        api_client: Authenticated LabArchives API client
+        page_id: Target page identifier
+    
+    Returns:
+        List[Dict[str, Any]]: List of entry metadata dictionaries
+    """
+    # Placeholder implementation - needs to be fully implemented
+    try:
+        response = api_client.list_page_entries(page_id)
+        return response.entries if hasattr(response, 'entries') else []
+    except Exception:
+        return []
+
+
+async def get_notebook_metadata(api_client: LabArchivesAPI, notebook_id: str) -> Dict[str, Any]:
+    """
+    Get metadata for the specified notebook.
+    
+    Args:
+        api_client: Authenticated LabArchives API client
+        notebook_id: Target notebook identifier
+    
+    Returns:
+        Dict[str, Any]: Notebook metadata dictionary
+    """
+    # Placeholder implementation - needs to be fully implemented
+    try:
+        response = api_client.get_notebook_metadata(notebook_id)
+        return response.dict() if hasattr(response, 'dict') else {}
+    except Exception:
+        return {}
+
+
+async def get_page_metadata(api_client: LabArchivesAPI, page_id: str) -> Dict[str, Any]:
+    """
+    Get metadata for the specified page.
+    
+    Args:
+        api_client: Authenticated LabArchives API client
+        page_id: Target page identifier
+    
+    Returns:
+        Dict[str, Any]: Page metadata dictionary
+    """
+    # Placeholder implementation - needs to be fully implemented
+    try:
+        response = api_client.get_page_metadata(page_id)
+        return response.dict() if hasattr(response, 'dict') else {}
+    except Exception:
+        return {}
+
+
+async def get_entry_content(api_client: LabArchivesAPI, entry_id: str) -> Dict[str, Any]:
+    """
+    Get content for the specified entry.
+    
+    Args:
+        api_client: Authenticated LabArchives API client
+        entry_id: Target entry identifier
+    
+    Returns:
+        Dict[str, Any]: Entry content dictionary
+    """
+    # Placeholder implementation - needs to be fully implemented
+    try:
+        response = api_client.get_entry_content(entry_id)
+        return response.dict() if hasattr(response, 'dict') else {}
+    except Exception:
+        return {}

@@ -32,11 +32,20 @@ from urllib.parse import urlparse  # builtin - URL validation for API endpoints
 import importlib.util
 
 # Load models.py directly to avoid import conflicts with models package
-models_spec = importlib.util.spec_from_file_location("models", "src/cli/models.py")
-models_module = importlib.util.module_from_spec(models_spec)
-models_spec.loader.exec_module(models_module)
+# Use shared module loader to avoid class identity issues  
+import sys
+models_module_name = "labarchives_mcp_models"
+if models_module_name not in sys.modules:
+    import os
+    models_path = os.path.join(os.path.dirname(__file__), "models.py")
+    models_spec = importlib.util.spec_from_file_location(models_module_name, models_path)
+    models_module = importlib.util.module_from_spec(models_spec)
+    models_spec.loader.exec_module(models_module)
+    sys.modules[models_module_name] = models_module
+else:
+    models_module = sys.modules[models_module_name]
 
-# Import configuration classes from the loaded module
+# Import configuration classes from the shared module
 AuthenticationConfig = models_module.AuthenticationConfig
 ScopeConfig = models_module.ScopeConfig
 OutputConfig = models_module.OutputConfig

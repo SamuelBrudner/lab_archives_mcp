@@ -173,6 +173,49 @@ def is_token_expired(expires_at: datetime) -> bool:
     return datetime.utcnow() > expires_at
 
 
+def is_token_near_expiry(expires_at: datetime, refresh_threshold_seconds: int = 300) -> bool:
+    """
+    Checks if a given token expiration timestamp is close to expiring.
+    
+    This function provides proactive session refresh capabilities by checking if an
+    authentication token is within the specified threshold of expiring. This enables
+    automatic session renewal before the token actually expires, ensuring uninterrupted
+    access to API operations.
+    
+    The function uses UTC time for all comparisons to ensure consistent behavior
+    across different time zones and supports configurable threshold values to
+    accommodate different refresh strategies and network latency considerations.
+    
+    Args:
+        expires_at (datetime): The expiration timestamp to check against current time.
+                              Should be a timezone-aware datetime object in UTC for
+                              accurate comparison.
+        refresh_threshold_seconds (int): Number of seconds before expiration to trigger
+                                       refresh. Defaults to 300 seconds (5 minutes).
+    
+    Returns:
+        bool: True if the token is within the refresh threshold of expiring,
+              False if the token has sufficient time remaining before expiration.
+    
+    Example:
+        >>> from datetime import datetime, timedelta
+        >>> # Token that expires in 3 minutes (should trigger refresh with default threshold)
+        >>> near_expiry = datetime.utcnow() + timedelta(minutes=3)
+        >>> is_token_near_expiry(near_expiry)
+        True
+        >>> 
+        >>> # Token that expires in 10 minutes (should not trigger refresh)
+        >>> not_near_expiry = datetime.utcnow() + timedelta(minutes=10)
+        >>> is_token_near_expiry(not_near_expiry)
+        False
+    """
+    # Calculate the refresh trigger time
+    refresh_time = expires_at - timedelta(seconds=refresh_threshold_seconds)
+    
+    # Return True if current time is after the refresh trigger time
+    return datetime.utcnow() > refresh_time
+
+
 # =============================================================================
 # Authentication Session Management
 # =============================================================================
@@ -325,6 +368,47 @@ class AuthenticationSession:
         # Session is valid if all checks pass
         return True
     
+    def needs_refresh(self, refresh_threshold_seconds: int = 300) -> bool:
+        """
+        Checks if the session is approaching expiration and needs proactive refresh.
+        
+        This method implements proactive session management by detecting when a session
+        is close to expiring and should be refreshed before it becomes invalid. This
+        ensures uninterrupted access to API operations by refreshing sessions before
+        they expire rather than after they've already failed.
+        
+        The method uses a configurable threshold to determine when refresh should occur,
+        allowing for customization based on network latency, API response times, and
+        application requirements. The default threshold provides a safe margin for
+        refresh operations while minimizing unnecessary refresh requests.
+        
+        Args:
+            refresh_threshold_seconds (int): Number of seconds before expiration to
+                                           trigger refresh. Defaults to 300 seconds
+                                           (5 minutes) which provides adequate time
+                                           for refresh operations.
+        
+        Returns:
+            bool: True if the session should be refreshed proactively to prevent
+                  expiration, False if the session has sufficient time remaining
+                  or has no expiration set.
+        
+        Example:
+            >>> # Check if session needs refresh before API operation
+            >>> if session.needs_refresh():
+            ...     # Proactively refresh session before it expires
+            ...     session = auth_manager.authenticate()
+            ... 
+            >>> # Proceed with API operations using fresh session
+            >>> result = api_client.list_notebooks()
+        """
+        # If no expiration is set, session doesn't need refresh
+        if self.expires_at is None:
+            return False
+        
+        # Check if the session is within the refresh threshold
+        return is_token_near_expiry(self.expires_at, refresh_threshold_seconds)
+    
     def __str__(self) -> str:
         """
         Returns a string representation of the session with sanitized information.
@@ -455,7 +539,7 @@ class AuthenticationManager:
             # Instantiate the LabArchives API client with the provided configuration
             self.api_client = LabArchivesAPI(
                 access_key_id=config.access_key_id,
-                access_secret=config.access_secret,
+                access_password=config.access_secret,
                 username=config.username,
                 region=self._determine_region_from_url(config.api_base_url)
             )
@@ -650,23 +734,26 @@ class AuthenticationManager:
         Returns the current authentication session if valid, otherwise triggers re-authentication.
         
         This method provides access to the current authentication session, automatically
-        handling session validation and re-authentication when necessary. It ensures
-        that the returned session is always valid and can be used for API operations.
+        handling session validation, proactive refresh, and re-authentication when necessary.
+        It ensures that the returned session is always valid and has sufficient time remaining
+        for API operations.
         
         The method performs the following operations:
         1. Checks if a session exists and is valid
-        2. If no session exists or the session is invalid, triggers re-authentication
-        3. Returns the valid session for use in API operations
-        4. Logs session access events for audit purposes
+        2. Implements proactive session refresh when approaching expiration
+        3. If no session exists or the session is invalid, triggers re-authentication
+        4. Returns the valid session for use in API operations
+        5. Logs session access events for audit purposes
         
         This method is the primary way to access authentication state throughout
         the application, providing a reliable and secure way to ensure valid
-        authentication context for all API operations.
+        authentication context for all API operations with automatic session refresh.
         
         Returns:
             AuthenticationSession: A valid authentication session that can be used
                                   for API operations. The session is guaranteed to
-                                  be valid and not expired.
+                                  be valid and not expired, with sufficient time
+                                  remaining for operation completion.
         
         Raises:
             LabArchivesAPIException: If re-authentication fails or if the session
@@ -686,7 +773,8 @@ class AuthenticationManager:
             'component': 'AuthenticationManager',
             'operation': 'get_session',
             'has_session': self.session is not None,
-            'session_valid': self.session.is_valid() if self.session else False
+            'session_valid': self.session.is_valid() if self.session else False,
+            'needs_refresh': self.session.needs_refresh() if self.session else False
         })
         
         # Check if session exists and is valid
@@ -708,6 +796,47 @@ class AuthenticationManager:
             
             # Trigger re-authentication to establish a valid session
             self.session = self.authenticate()
+            
+        # Check for proactive session refresh if session is valid but approaching expiration
+        elif self.session.needs_refresh():
+            self.logger.info("Session approaching expiration, triggering proactive refresh", extra={
+                'component': 'AuthenticationManager',
+                'operation': 'get_session',
+                'reason': 'proactive_refresh',
+                'current_expires_at': self.session.expires_at.isoformat() if self.session.expires_at else None,
+                'user_id': self.session.user_id
+            })
+            
+            # Proactively refresh the session before it expires
+            try:
+                self.session = self.authenticate()
+                self.logger.info("Proactive session refresh completed successfully", extra={
+                    'component': 'AuthenticationManager',
+                    'operation': 'get_session',
+                    'new_expires_at': self.session.expires_at.isoformat() if self.session.expires_at else None,
+                    'user_id': self.session.user_id
+                })
+            except Exception as e:
+                # Log refresh failure but continue with current session if still valid
+                self.logger.warning("Proactive session refresh failed, continuing with current session", extra={
+                    'component': 'AuthenticationManager',
+                    'operation': 'get_session',
+                    'error': str(e),
+                    'fallback_to_current': True,
+                    'current_session_valid': self.session.is_valid()
+                })
+                
+                # If the current session is no longer valid after refresh failure, we need to fail
+                if not self.session.is_valid():
+                    raise LabArchivesAPIException(
+                        message=f"Session refresh failed and current session is invalid: {str(e)}",
+                        code=401,
+                        context={
+                            'operation': 'proactive_refresh',
+                            'error': str(e),
+                            'session_expired': True
+                        }
+                    )
         
         # Log successful session access
         self.logger.debug("Valid authentication session accessed", extra={
@@ -715,10 +844,98 @@ class AuthenticationManager:
             'operation': 'get_session',
             'user_id': self.session.user_id,
             'session_valid': self.session.is_valid(),
-            'expires_at': self.session.expires_at.isoformat() if self.session.expires_at else None
+            'expires_at': self.session.expires_at.isoformat() if self.session.expires_at else None,
+            'time_until_expiry': str(self.session.expires_at - datetime.utcnow()) if self.session.expires_at else None
         })
         
         return self.session
+    
+    def refresh_session(self) -> 'AuthenticationSession':
+        """
+        Explicitly refreshes the current authentication session by re-authenticating.
+        
+        This method provides an explicit way to refresh the authentication session,
+        typically used when a 401 Unauthorized error is received from API calls,
+        indicating that the current session has become invalid or expired on the
+        server side. This method forces re-authentication regardless of the local
+        session state.
+        
+        The refresh process includes:
+        1. Invalidating the current session (if any)
+        2. Performing fresh authentication with the LabArchives API
+        3. Creating a new session with updated expiration time
+        4. Comprehensive audit logging of the refresh operation
+        
+        This method is particularly useful for handling server-side session invalidation
+        that might not be detected by local session validation, ensuring that the
+        application can recover from authentication failures gracefully.
+        
+        Returns:
+            AuthenticationSession: A fresh authentication session that can be used
+                                  for API operations. The session is guaranteed to
+                                  be newly authenticated with the latest expiration time.
+        
+        Raises:
+            LabArchivesAPIException: If re-authentication fails due to invalid credentials,
+                                    network issues, API errors, or other authentication
+                                    problems. The exception contains detailed context
+                                    for debugging and audit logging.
+        
+        Example:
+            >>> try:
+            ...     # API call failed with 401 error
+            ...     session = auth_manager.refresh_session()
+            ...     # Retry the failed API call with refreshed session
+            ...     result = api_client.list_notebooks()
+            ... except LabArchivesAPIException as e:
+            ...     logger.error(f"Session refresh failed: {e}")
+        """
+        # Log the explicit session refresh request
+        self.logger.info("Explicit session refresh requested", extra={
+            'component': 'AuthenticationManager',
+            'operation': 'refresh_session',
+            'had_previous_session': self.session is not None,
+            'previous_session_valid': self.session.is_valid() if self.session else False,
+            'previous_expires_at': self.session.expires_at.isoformat() if self.session and self.session.expires_at else None
+        })
+        
+        # Clear the current session to force fresh authentication
+        if self.session is not None:
+            previous_user_id = self.session.user_id
+            self.logger.debug("Invalidating current session for refresh", extra={
+                'component': 'AuthenticationManager',
+                'operation': 'refresh_session',
+                'previous_user_id': previous_user_id
+            })
+        
+        self.session = None
+        
+        try:
+            # Perform fresh authentication
+            new_session = self.authenticate()
+            
+            # Log successful session refresh
+            self.logger.info("Session refresh completed successfully", extra={
+                'component': 'AuthenticationManager',
+                'operation': 'refresh_session',
+                'new_user_id': new_session.user_id,
+                'new_expires_at': new_session.expires_at.isoformat() if new_session.expires_at else None,
+                'session_valid': new_session.is_valid()
+            })
+            
+            return new_session
+            
+        except Exception as e:
+            # Log session refresh failure
+            self.logger.error("Session refresh failed", extra={
+                'component': 'AuthenticationManager',
+                'operation': 'refresh_session',
+                'error': str(e),
+                'error_type': type(e).__name__
+            })
+            
+            # Re-raise the exception to allow caller to handle the failure
+            raise
     
     def is_authenticated(self) -> bool:
         """
@@ -857,3 +1074,7 @@ class AuthenticationManager:
             str: A detailed string representation of the authentication manager.
         """
         return self.__str__()
+
+
+# Alias for backward compatibility and shorter imports
+AuthManager = AuthenticationManager

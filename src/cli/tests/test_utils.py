@@ -22,7 +22,7 @@ comprehensive test data to verify both success and failure scenarios.
 """
 
 import pytest  # version 7.0.0+ - Testing framework for writing and running unit tests
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from src.cli.utils import (
     sanitize_env_var,
     deep_merge_dicts, 
