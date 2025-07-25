@@ -26,6 +26,7 @@ __all__ = [
     'MCP_RESOURCE_URI_SCHEME',
     'MCP_SERVER_NAME',
     'MCP_SERVER_VERSION',
+    'DEFAULT_PROTOCOL_VERSION',
     
     # Logging Configuration
     'DEFAULT_LOG_FILE',
@@ -61,6 +62,9 @@ SUPPORTED_SCOPE_TYPES = ["notebook_id", "notebook_name", "folder_path"]
 
 # MCP Resource URI Scheme
 MCP_RESOURCE_URI_SCHEME = "labarchives://"
+
+# MCP Protocol Version (as per MCP specification 2024-11-05)
+DEFAULT_PROTOCOL_VERSION = "2024-11-05"
 
 # Default log configuration
 DEFAULT_LOG_FILE = "labarchives_mcp.log"
