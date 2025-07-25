@@ -94,7 +94,8 @@ markers = [
     "integration: Integration tests",
     "e2e: End-to-end tests",
     "slow: Slow running tests",
-    "network: Tests requiring network access"
+    "network: Tests requiring network access",
+    "cli: CLI interface tests"
 ]
 filterwarnings = [
     "error",
