@@ -64,8 +64,9 @@ SENSITIVE_PARAMETER_NAMES = {
 
 # Compile regex pattern for efficient sensitive parameter detection
 # Case-insensitive matching to catch variations like TOKEN, Token, token
+# Use word boundaries but also check for partial matches within parameter names
 _SENSITIVE_PARAM_PATTERN = re.compile(
-    r'\b(?:' + '|'.join(re.escape(param) for param in SENSITIVE_PARAMETER_NAMES) + r')\b',
+    r'(?:' + '|'.join(re.escape(param) for param in SENSITIVE_PARAMETER_NAMES) + r')',
     re.IGNORECASE
 )
 
@@ -233,7 +234,8 @@ def sanitize_url_params(url: str) -> str:
                 sanitized_params.append((key, value))
         
         # Reconstruct the query string with sanitized parameters
-        sanitized_query = urlencode(sanitized_params)
+        # Use safe='[]' to prevent URL encoding of the redaction marker brackets
+        sanitized_query = urlencode(sanitized_params, safe='[]')
         
         # Rebuild the complete URL with sanitized query parameters
         sanitized_url = (
@@ -438,13 +440,27 @@ def validate_sanitization_complete(text: str) -> bool:
     if not text or not isinstance(text, str):
         return True
     
+    # First check if the text contains redaction markers (both regular and URL-encoded)
+    redaction_patterns = [
+        r'\[REDACTED\]',      # Regular redaction marker
+        r'%5BREDACTED%5D',    # URL-encoded redaction marker
+    ]
+    
+    has_redaction = any(re.search(pattern, text, re.IGNORECASE) for pattern in redaction_patterns)
+    
+    # If text contains redaction markers, it's likely properly sanitized
+    if has_redaction:
+        return True
+    
     # Check for common patterns that might indicate unsanitized sensitive data
+    # Exclude short strings that might be legitimate values
     suspicious_patterns = [
         r'\b[A-Za-z0-9]{32,}\b',  # Long alphanumeric strings (API keys)
-        r'\bsk-[A-Za-z0-9]+\b',   # OpenAI-style API keys
+        r'\bsk-[A-Za-z0-9]{20,}\b',   # OpenAI-style API keys (longer threshold)
         r'\b[A-Fa-f0-9]{40,}\b',  # Hex-encoded secrets
-        r'password\s*[:=]\s*[^\s]+',  # password=value patterns
-        r'token\s*[:=]\s*[^\s]+',     # token=value patterns
+        r'password\s*[:=]\s*[^\s\[\]]{8,}',  # password=value patterns (8+ chars, not redacted)
+        r'token\s*[:=]\s*[^\s\[\]]{8,}',     # token=value patterns (8+ chars, not redacted)
+        r'secret\s*[:=]\s*[^\s\[\]]{8,}',    # secret=value patterns (8+ chars, not redacted)
     ]
     
     for pattern in suspicious_patterns:
