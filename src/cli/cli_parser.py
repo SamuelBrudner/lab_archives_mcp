@@ -209,7 +209,7 @@ def build_cli_parser() -> argparse.ArgumentParser:
         )
         
         start_parser.add_argument(
-            '--username',
+            '-u', '--username',
             type=str,
             help='Username for token-based authentication (SSO users). Can also be '
                  'set via LABARCHIVES_USER environment variable. Required when using '
@@ -255,6 +255,41 @@ def build_cli_parser() -> argparse.ArgumentParser:
                  'Provides richer metadata for AI processing but increases response size.'
         )
         
+        # Add global options to start subcommand for better UX (can be used after subcommand)
+        start_parser.add_argument(
+            '--config-file',
+            type=str,
+            default=None,
+            help=f'Path to JSON configuration file (default: {DEFAULT_CONFIG_FILE}). '
+                 'Supports ~ expansion for home directory. CLI arguments take precedence '
+                 'over configuration file values.'
+        )
+        
+        start_parser.add_argument(
+            '--log-file',
+            type=str,
+            default=None,
+            help='Path to log file for output. If not specified, logs to console. '
+                 'Supports ~ expansion for home directory. Log rotation is enabled '
+                 'with 10MB max size and 5 backup files.'
+        )
+        
+        start_parser.add_argument(
+            '--verbose',
+            action='store_true',
+            help='Enable verbose logging and output. Sets log level to DEBUG and '
+                 'provides detailed information about all operations. Useful for '
+                 'troubleshooting and development.'
+        )
+        
+        start_parser.add_argument(
+            '--quiet',
+            action='store_true',
+            help='Suppress non-error output. Sets log level to WARNING and reduces '
+                 'console output to essential information only. Useful for '
+                 'automated scripts and production environments.'
+        )
+        
         # Set the handler function for the start command
         start_parser.set_defaults(func=start_command)
         
@@ -286,7 +321,7 @@ def build_cli_parser() -> argparse.ArgumentParser:
         )
         
         auth_parser.add_argument(
-            '--username',
+            '-u', '--username',
             type=str,
             help='Username for token-based authentication (SSO users). Can also be '
                  'set via LABARCHIVES_USER environment variable. Required when using '
@@ -299,6 +334,41 @@ def build_cli_parser() -> argparse.ArgumentParser:
             help='LabArchives API base URL. Defaults to https://api.labarchives.com/api. '
                  'Use https://auapi.labarchives.com/api for Australian deployments. '
                  'Can also be set via LABARCHIVES_API_BASE environment variable.'
+        )
+        
+        # Add global options to authenticate subcommand for better UX (can be used after subcommand)
+        auth_parser.add_argument(
+            '--config-file',
+            type=str,
+            default=None,
+            help=f'Path to JSON configuration file (default: {DEFAULT_CONFIG_FILE}). '
+                 'Supports ~ expansion for home directory. CLI arguments take precedence '
+                 'over configuration file values.'
+        )
+        
+        auth_parser.add_argument(
+            '--log-file',
+            type=str,
+            default=None,
+            help='Path to log file for output. If not specified, logs to console. '
+                 'Supports ~ expansion for home directory. Log rotation is enabled '
+                 'with 10MB max size and 5 backup files.'
+        )
+        
+        auth_parser.add_argument(
+            '--verbose',
+            action='store_true',
+            help='Enable verbose logging and output. Sets log level to DEBUG and '
+                 'provides detailed information about all operations. Useful for '
+                 'troubleshooting and development.'
+        )
+        
+        auth_parser.add_argument(
+            '--quiet',
+            action='store_true',
+            help='Suppress non-error output. Sets log level to WARNING and reduces '
+                 'console output to essential information only. Useful for '
+                 'automated scripts and production environments.'
         )
         
         # Set the handler function for the authenticate command
@@ -429,8 +499,14 @@ def parse_and_dispatch_cli(argv: list[str] = None) -> int:
             
         except SystemExit as e:
             # Handle argparse SystemExit (help, version, or parse errors)
-            # argparse calls sys.exit() directly, so we catch SystemExit
-            return e.code if e.code is not None else 0
+            # For help and version (exit code 0), re-raise to match test expectations
+            # For argument errors (exit code 2), return the code
+            if e.code == 0:
+                # Re-raise SystemExit for --help and --version to match test expectations
+                raise
+            else:
+                # Return error code for argument parsing errors  
+                return e.code if e.code is not None else 1
         except Exception as e:
             # Handle unexpected parsing errors
             print(f"Argument parsing error: {str(e)}", file=sys.stderr)
@@ -482,9 +558,17 @@ def parse_and_dispatch_cli(argv: list[str] = None) -> int:
             })
             
         except LabArchivesMCPException as e:
-            # Handle configuration loading errors
-            print(f"Configuration Error: {e.message}", file=sys.stderr)
-            return 1
+            # Handle configuration loading errors with proper exit codes
+            error_message = f"Configuration Error: {e.message}"
+            print(error_message, file=sys.stderr)
+            
+            # Return appropriate exit code based on error type
+            if e.code and e.code >= 2000 and e.code < 3000:
+                return 2  # Authentication errors
+            elif e.code and e.code >= 3000 and e.code < 4000:
+                return 3  # Protocol errors
+            else:
+                return 1  # General errors
         except Exception as e:
             # Handle unexpected configuration or logging errors
             print(f"Initialization error: {str(e)}", file=sys.stderr)
@@ -547,6 +631,28 @@ def parse_and_dispatch_cli(argv: list[str] = None) -> int:
             
             return exit_code
             
+        except LabArchivesMCPException as e:
+            # Handle LabArchivesMCPException first (before generic Exception handler)
+            error_message = f"LabArchives MCP Error: {str(e)}"
+            print(error_message, file=sys.stderr)
+            
+            if logger:
+                logger.error(error_message, extra={
+                    "operation": "parse_and_dispatch_cli",
+                    "error": str(e),
+                    "error_code": e.code,
+                    "error_context": e.context,
+                    "error_type": type(e).__name__
+                })
+            
+            # Return appropriate exit code based on error type
+            if e.code and e.code >= 2000 and e.code < 3000:
+                return 2  # Authentication errors
+            elif e.code and e.code >= 3000 and e.code < 4000:
+                return 3  # Protocol errors
+            else:
+                return 1  # General errors
+            
         except Exception as e:
             # Handle errors during command execution
             logger.error(f"Command execution failed: {str(e)}", extra={
@@ -568,28 +674,6 @@ def parse_and_dispatch_cli(argv: list[str] = None) -> int:
             
             print(f"Command execution error: {str(e)}", file=sys.stderr)
             return 1
-    
-    except LabArchivesMCPException as e:
-        # Step 6: Catch LabArchivesMCPException and print/log user-friendly error message
-        error_message = f"LabArchives MCP Error: {str(e)}"
-        print(error_message, file=sys.stderr)
-        
-        if logger:
-            logger.error(error_message, extra={
-                "operation": "parse_and_dispatch_cli",
-                "error": str(e),
-                "error_code": e.code,
-                "error_context": e.context,
-                "error_type": type(e).__name__
-            })
-        
-        # Return appropriate exit code based on error type
-        if e.code and e.code >= 2000 and e.code < 3000:
-            return 2  # Authentication errors
-        elif e.code and e.code >= 3000 and e.code < 4000:
-            return 3  # Protocol errors
-        else:
-            return 1  # General errors
     
     except argparse.ArgumentError as e:
         # Step 7: Catch argparse.ArgumentError and print/log user-friendly error message
