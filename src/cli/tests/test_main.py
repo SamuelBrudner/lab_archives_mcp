@@ -57,7 +57,7 @@ from src.cli.auth_manager import AuthManager, AuthenticationSession
 from src.cli.resource_manager import ResourceManager
 
 # Internal imports - MCP server implementation for mocking
-from src.cli.mcp_server import LabArchivesMCPServer
+from src.cli.mcp_server import main as mcp_server_main, run_protocol_with_session_refresh
 
 # Internal imports - Exception handling for error simulation
 from src.cli.exceptions import (
@@ -201,7 +201,7 @@ def mock_mcp_server():
     Returns:
         unittest.mock.MagicMock: Mock MCP server with run method
     """
-    server = MagicMock(spec=LabArchivesMCPServer)
+    server = MagicMock()
     server.run = AsyncMock()
     return server
 
@@ -230,6 +230,7 @@ def mock_cli_args():
     args.notebook_name = None
     args.folder_path = None
     args.json_ld = False
+    args.command = None  # Ensure command is None to avoid authenticate path
     return args
 
 
@@ -270,7 +271,7 @@ async def test_main_successful_startup(mock_logger, mock_audit_logger, mock_auth
          patch('src.cli.main.setup_logging', return_value=(mock_logger, mock_audit_logger)), \
          patch("src.cli.main.AuthenticationManager", return_value=mock_auth_manager), \
          patch('src.cli.main.ResourceManager', return_value=mock_resource_manager), \
-         patch("src.cli.main.mcp_server_main", return_value=0), \
+         patch("src.cli.main.mcp_server_main", return_value=0) as mock_mcp_server_main, \
          patch('src.cli.main.logger', mock_logger), \
          patch('src.cli.main.signal.signal'), \
          patch('src.cli.main.asyncio.run') as mock_asyncio_run, \
@@ -528,7 +529,7 @@ async def test_main_signal_shutdown(mock_logger, mock_audit_logger, mock_cli_arg
          patch('src.cli.main.setup_logging', return_value=(mock_logger, mock_audit_logger)), \
          patch("src.cli.main.AuthenticationManager", return_value=mock_auth_manager), \
          patch('src.cli.main.ResourceManager', return_value=mock_resource_manager), \
-         patch("src.cli.main.mcp_server_main", return_value=0), \
+         patch("src.cli.main.mcp_server_main", return_value=0) as mock_mcp_server_main, \
          patch('src.cli.main.logger', mock_logger), \
          patch('src.cli.main.signal.signal') as mock_signal_register, \
          patch('src.cli.main.asyncio.run') as mock_asyncio_run, \
@@ -674,10 +675,9 @@ async def test_main_keyboard_interrupt(mock_logger, mock_audit_logger, mock_cli_
          patch('src.cli.main.setup_logging', return_value=(mock_logger, mock_audit_logger)), \
          patch("src.cli.main.AuthenticationManager", return_value=mock_auth_manager), \
          patch('src.cli.main.ResourceManager', return_value=mock_resource_manager), \
-         patch("src.cli.main.mcp_server_main", return_value=0), \
+         patch("src.cli.main.mcp_server_main", side_effect=KeyboardInterrupt) as mock_mcp_server_main, \
          patch('src.cli.main.logger', mock_logger), \
          patch('src.cli.main.signal.signal'), \
-         patch('src.cli.main.asyncio.run', side_effect=KeyboardInterrupt), \
          patch('src.cli.main.sys.exit') as mock_exit, \
          patch('builtins.print') as mock_print:
         
@@ -795,7 +795,7 @@ async def test_main_comprehensive_logging(mock_logger, mock_audit_logger, mock_c
          patch('src.cli.main.setup_logging', return_value=(mock_logger, mock_audit_logger)), \
          patch("src.cli.main.AuthenticationManager", return_value=mock_auth_manager), \
          patch('src.cli.main.ResourceManager', return_value=mock_resource_manager), \
-         patch("src.cli.main.mcp_server_main", return_value=0), \
+         patch("src.cli.main.mcp_server_main", return_value=0) as mock_mcp_server_main, \
          patch('src.cli.main.logger', mock_logger), \
          patch('src.cli.main.signal.signal'), \
          patch('src.cli.main.asyncio.run'), \
@@ -1070,7 +1070,7 @@ async def test_main_complete_integration_flow(mock_logger, mock_audit_logger, mo
          patch('src.cli.main.setup_logging', return_value=(mock_logger, mock_audit_logger)), \
          patch('src.cli.main.AuthenticationManager', return_value=mock_auth_manager), \
          patch('src.cli.main.ResourceManager', return_value=mock_resource_manager), \
-         patch('src.cli.main.mcp_server_main', return_value=0), \
+         patch('src.cli.main.mcp_server_main', return_value=0) as mock_mcp_server_main, \
          patch('src.cli.main.logger', mock_logger), \
          patch('src.cli.main.signal.signal') as mock_signal, \
          patch('src.cli.main.asyncio.run') as mock_asyncio_run, \
