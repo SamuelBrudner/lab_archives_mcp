@@ -455,7 +455,7 @@ class AuthenticationManager:
             # Instantiate the LabArchives API client with the provided configuration
             self.api_client = LabArchivesAPI(
                 access_key_id=config.access_key_id,
-                access_secret=config.access_secret,
+                access_password=config.access_secret,
                 username=config.username,
                 region=self._determine_region_from_url(config.api_base_url)
             )
