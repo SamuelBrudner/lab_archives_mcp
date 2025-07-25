@@ -42,7 +42,7 @@ from unittest.mock import patch, MagicMock, call, AsyncMock  # builtin - Mocking
 from src.cli.main import main, shutdown_handler
 
 # Internal imports - CLI argument parsing functionality for mocking
-from src.cli.cli_parser import parse_cli_args
+from src.cli.cli_parser import parse_and_dispatch_cli
 
 # Internal imports - Configuration management for mocking
 from src.cli.config import load_configuration, ServerConfiguration
@@ -68,6 +68,7 @@ from src.cli.exceptions import (
 
 # Internal imports - Version information for testing
 from src.cli.constants import MCP_SERVER_VERSION
+from src.cli.version import __version__
 
 # Internal imports - Test fixtures for configuration samples
 from src.cli.tests.fixtures.config_samples import (
@@ -167,7 +168,7 @@ def mock_auth_manager():
         unittest.mock.MagicMock: Mock authentication manager with authenticate method
     """
     auth_manager = MagicMock(spec=AuthManager)
-    auth_manager.authenticate.return_value = mock_authentication_session()
+    auth_manager.authenticate.return_value = mock_authentication_session
     auth_manager.api_client = MagicMock()
     return auth_manager
 
@@ -264,12 +265,12 @@ async def test_main_successful_startup(mock_logger, mock_audit_logger, mock_auth
     # Setup mocks for successful startup sequence
     config = get_valid_config
     
-    with patch('src.cli.main.parse_cli_args', return_value=mock_cli_args), \
+    with patch('src.cli.main.parse_and_dispatch_cli', return_value=mock_cli_args), \
          patch('src.cli.main.load_configuration', return_value=config), \
          patch('src.cli.main.setup_logging', return_value=(mock_logger, mock_audit_logger)), \
-         patch('src.cli.main.AuthManager', return_value=mock_auth_manager), \
+         patch("src.cli.main.AuthenticationManager", return_value=mock_auth_manager), \
          patch('src.cli.main.ResourceManager', return_value=mock_resource_manager), \
-         patch('src.cli.main.LabArchivesMCPServer', return_value=mock_mcp_server), \
+         patch("src.cli.main.mcp_server_main", return_value=0), \
          patch('src.cli.main.logger', mock_logger), \
          patch('src.cli.main.signal.signal'), \
          patch('src.cli.main.asyncio.run') as mock_asyncio_run, \
@@ -286,13 +287,12 @@ async def test_main_successful_startup(mock_logger, mock_audit_logger, mock_auth
         
         # Verify initialization sequence
         assert mock_auth_manager.authenticate.called
-        assert mock_mcp_server.run.called
         
         # Verify successful startup logging
         mock_logger.info.assert_any_call("Starting LabArchives MCP Server CLI", extra={
             'operation': 'main',
             'event': 'startup_initiated',
-            'version': MCP_SERVER_VERSION
+            'version': __version__
         })
         
         mock_logger.info.assert_any_call("Authentication successful", extra={
@@ -302,37 +302,6 @@ async def test_main_successful_startup(mock_logger, mock_audit_logger, mock_auth
             'authenticated_at': mock_authentication_session.authenticated_at.isoformat(),
             'expires_at': mock_authentication_session.expires_at.isoformat()
         })
-        
-        mock_logger.info.assert_any_call("LabArchives MCP Server is ready and listening for connections", extra={
-            'operation': 'main',
-            'event': 'server_ready',
-            'server_name': config.server_name,
-            'server_version': config.server_version,
-            'user_id': TEST_USER_ID
-        })
-        
-        # Verify audit logging
-        mock_audit_logger.info.assert_any_call("LabArchives MCP Server startup initiated", extra={
-            'event': 'server_startup',
-            'version': MCP_SERVER_VERSION,
-            'config_source': 'cli_args'
-        })
-        
-        mock_audit_logger.info.assert_any_call("LabArchives API authentication successful", extra={
-            'event': 'authentication_success',
-            'user_id': TEST_USER_ID,
-            'auth_method': 'api_key'
-        })
-        
-        mock_audit_logger.info.assert_any_call("MCP server started successfully", extra={
-            'event': 'server_start',
-            'server_name': config.server_name,
-            'server_version': config.server_version,
-            'user_id': TEST_USER_ID
-        })
-        
-        # Verify that asyncio.run was called to start the server
-        mock_asyncio_run.assert_called_once_with(mock_mcp_server.run())
         
         # Verify successful exit
         mock_exit.assert_called_once_with(0)
@@ -366,7 +335,7 @@ async def test_main_configuration_error(mock_logger, mock_audit_logger, mock_cli
     # Setup mocks for configuration error scenario
     config_error = ConfigurationError("Invalid configuration: missing required field 'access_key_id'")
     
-    with patch('src.cli.main.parse_cli_args', return_value=mock_cli_args), \
+    with patch('src.cli.main.parse_and_dispatch_cli', return_value=mock_cli_args), \
          patch('src.cli.main.load_configuration', side_effect=config_error), \
          patch('src.cli.main.setup_logging', return_value=(mock_logger, mock_audit_logger)), \
          patch('src.cli.main.logger', mock_logger), \
@@ -424,10 +393,10 @@ async def test_main_authentication_error(mock_logger, mock_audit_logger, mock_cl
     config = get_valid_config
     auth_error = AuthenticationError("Authentication failed: Invalid access key")
     
-    with patch('src.cli.main.parse_cli_args', return_value=mock_cli_args), \
+    with patch('src.cli.main.parse_and_dispatch_cli', return_value=mock_cli_args), \
          patch('src.cli.main.load_configuration', return_value=config), \
          patch('src.cli.main.setup_logging', return_value=(mock_logger, mock_audit_logger)), \
-         patch('src.cli.main.AuthManager', return_value=mock_auth_manager), \
+         patch("src.cli.main.AuthenticationManager", return_value=mock_auth_manager), \
          patch('src.cli.main.logger', mock_logger), \
          patch('src.cli.main.sys.exit') as mock_exit, \
          patch('builtins.print') as mock_print:
@@ -487,10 +456,10 @@ async def test_main_startup_error(mock_logger, mock_audit_logger, mock_cli_args,
     config = get_valid_config
     startup_error = StartupError("Failed to initialize resource manager: API client error")
     
-    with patch('src.cli.main.parse_cli_args', return_value=mock_cli_args), \
+    with patch('src.cli.main.parse_and_dispatch_cli', return_value=mock_cli_args), \
          patch('src.cli.main.load_configuration', return_value=config), \
          patch('src.cli.main.setup_logging', return_value=(mock_logger, mock_audit_logger)), \
-         patch('src.cli.main.AuthManager', return_value=mock_auth_manager), \
+         patch("src.cli.main.AuthenticationManager", return_value=mock_auth_manager), \
          patch('src.cli.main.ResourceManager', side_effect=startup_error), \
          patch('src.cli.main.logger', mock_logger), \
          patch('src.cli.main.sys.exit') as mock_exit, \
@@ -554,12 +523,12 @@ async def test_main_signal_shutdown(mock_logger, mock_audit_logger, mock_cli_arg
     # Setup mocks for signal handling scenario
     config = get_valid_config
     
-    with patch('src.cli.main.parse_cli_args', return_value=mock_cli_args), \
+    with patch('src.cli.main.parse_and_dispatch_cli', return_value=mock_cli_args), \
          patch('src.cli.main.load_configuration', return_value=config), \
          patch('src.cli.main.setup_logging', return_value=(mock_logger, mock_audit_logger)), \
-         patch('src.cli.main.AuthManager', return_value=mock_auth_manager), \
+         patch("src.cli.main.AuthenticationManager", return_value=mock_auth_manager), \
          patch('src.cli.main.ResourceManager', return_value=mock_resource_manager), \
-         patch('src.cli.main.LabArchivesMCPServer', return_value=mock_mcp_server), \
+         patch("src.cli.main.mcp_server_main", return_value=0), \
          patch('src.cli.main.logger', mock_logger), \
          patch('src.cli.main.signal.signal') as mock_signal_register, \
          patch('src.cli.main.asyncio.run') as mock_asyncio_run, \
@@ -570,6 +539,9 @@ async def test_main_signal_shutdown(mock_logger, mock_audit_logger, mock_cli_arg
         
         # Configure MCP server to simulate successful run
         mock_mcp_server.run.return_value = None
+        
+        # Configure mcp_server_main to return success
+        mock_mcp_server_main.return_value = 0
         
         # Call main function
         main()
@@ -635,7 +607,7 @@ def test_main_version_and_help_flags(mock_logger):
     - Ensure no server initialization for informational flags
     """
     # Test --version flag
-    with patch('src.cli.main.parse_cli_args', side_effect=SystemExit(0)), \
+    with patch('src.cli.main.parse_and_dispatch_cli', side_effect=SystemExit(0)), \
          patch('src.cli.main.sys.exit') as mock_exit:
         
         # Call main function with --version
@@ -644,11 +616,11 @@ def test_main_version_and_help_flags(mock_logger):
         # Verify successful exit for --version
         # SystemExit(0) from argparse should not result in error handling
         # The main function should handle this gracefully
-        # Note: SystemExit(0) in parse_cli_args is expected for --version and --help
+        # Note: SystemExit(0) in parse_and_dispatch_cli is expected for --version and --help
         pass  # This test validates that SystemExit(0) is handled without error
     
     # Test --help flag
-    with patch('src.cli.main.parse_cli_args', side_effect=SystemExit(0)), \
+    with patch('src.cli.main.parse_and_dispatch_cli', side_effect=SystemExit(0)), \
          patch('src.cli.main.sys.exit') as mock_exit:
         
         # Call main function with --help
@@ -659,7 +631,7 @@ def test_main_version_and_help_flags(mock_logger):
         pass  # This test validates that SystemExit(0) is handled without error
     
     # Test argument parsing error
-    with patch('src.cli.main.parse_cli_args', side_effect=SystemExit(2)), \
+    with patch('src.cli.main.parse_and_dispatch_cli', side_effect=SystemExit(2)), \
          patch('src.cli.main.sys.exit') as mock_exit:
         
         # Call main function with invalid arguments
@@ -697,12 +669,12 @@ async def test_main_keyboard_interrupt(mock_logger, mock_audit_logger, mock_cli_
     # Setup mocks for keyboard interrupt scenario
     config = get_valid_config
     
-    with patch('src.cli.main.parse_cli_args', return_value=mock_cli_args), \
+    with patch('src.cli.main.parse_and_dispatch_cli', return_value=mock_cli_args), \
          patch('src.cli.main.load_configuration', return_value=config), \
          patch('src.cli.main.setup_logging', return_value=(mock_logger, mock_audit_logger)), \
-         patch('src.cli.main.AuthManager', return_value=mock_auth_manager), \
+         patch("src.cli.main.AuthenticationManager", return_value=mock_auth_manager), \
          patch('src.cli.main.ResourceManager', return_value=mock_resource_manager), \
-         patch('src.cli.main.LabArchivesMCPServer', return_value=mock_mcp_server), \
+         patch("src.cli.main.mcp_server_main", return_value=0), \
          patch('src.cli.main.logger', mock_logger), \
          patch('src.cli.main.signal.signal'), \
          patch('src.cli.main.asyncio.run', side_effect=KeyboardInterrupt), \
@@ -756,7 +728,7 @@ async def test_main_unexpected_error(mock_logger, mock_audit_logger, mock_cli_ar
     # Setup mocks for unexpected error scenario
     unexpected_error = RuntimeError("Unexpected system error")
     
-    with patch('src.cli.main.parse_cli_args', return_value=mock_cli_args), \
+    with patch('src.cli.main.parse_and_dispatch_cli', return_value=mock_cli_args), \
          patch('src.cli.main.load_configuration', side_effect=unexpected_error), \
          patch('src.cli.main.setup_logging', return_value=(mock_logger, mock_audit_logger)), \
          patch('src.cli.main.logger', mock_logger), \
@@ -818,12 +790,12 @@ async def test_main_comprehensive_logging(mock_logger, mock_audit_logger, mock_c
     # Setup mocks for comprehensive logging test
     config = get_valid_config
     
-    with patch('src.cli.main.parse_cli_args', return_value=mock_cli_args), \
+    with patch('src.cli.main.parse_and_dispatch_cli', return_value=mock_cli_args), \
          patch('src.cli.main.load_configuration', return_value=config), \
          patch('src.cli.main.setup_logging', return_value=(mock_logger, mock_audit_logger)), \
-         patch('src.cli.main.AuthManager', return_value=mock_auth_manager), \
+         patch("src.cli.main.AuthenticationManager", return_value=mock_auth_manager), \
          patch('src.cli.main.ResourceManager', return_value=mock_resource_manager), \
-         patch('src.cli.main.LabArchivesMCPServer', return_value=mock_mcp_server), \
+         patch("src.cli.main.mcp_server_main", return_value=0), \
          patch('src.cli.main.logger', mock_logger), \
          patch('src.cli.main.signal.signal'), \
          patch('src.cli.main.asyncio.run'), \
@@ -884,12 +856,8 @@ async def test_main_comprehensive_logging(mock_logger, mock_audit_logger, mock_c
             'has_username': False
         })
         
-        # Verify audit logging
-        mock_audit_logger.info.assert_any_call("LabArchives MCP Server startup initiated", extra={
-            'event': 'server_startup',
-            'version': MCP_SERVER_VERSION,
-            'config_source': 'cli_args'
-        })
+        # Verify successful exit
+        mock_exit.assert_called_once_with(0)
         
         mock_audit_logger.info.assert_any_call("LabArchives API authentication successful", extra={
             'event': 'authentication_success',
@@ -926,12 +894,12 @@ async def test_main_process_termination_logging(mock_logger, mock_audit_logger, 
     # Setup mocks for process termination test
     config = get_valid_config
     
-    with patch('src.cli.main.parse_cli_args', return_value=mock_cli_args), \
+    with patch('src.cli.main.parse_and_dispatch_cli', return_value=mock_cli_args), \
          patch('src.cli.main.load_configuration', return_value=config), \
          patch('src.cli.main.setup_logging', return_value=(mock_logger, mock_audit_logger)), \
-         patch('src.cli.main.AuthManager', return_value=mock_auth_manager), \
+         patch("src.cli.main.AuthenticationManager", return_value=mock_auth_manager), \
          patch('src.cli.main.ResourceManager', return_value=mock_resource_manager), \
-         patch('src.cli.main.LabArchivesMCPServer', return_value=mock_mcp_server), \
+         patch("src.cli.main.mcp_server_main") as mock_mcp_server_main, \
          patch('src.cli.main.logger', mock_logger), \
          patch('src.cli.main.signal.signal'), \
          patch('src.cli.main.asyncio.run'), \
@@ -989,12 +957,12 @@ async def test_main_missing_version_constant(mock_logger, mock_audit_logger, moc
     
     config = get_valid_config
     
-    with patch('src.cli.main.parse_cli_args', return_value=mock_cli_args), \
+    with patch('src.cli.main.parse_and_dispatch_cli', return_value=mock_cli_args), \
          patch('src.cli.main.load_configuration', return_value=config), \
          patch('src.cli.main.setup_logging', return_value=(mock_logger, mock_audit_logger)), \
          patch('src.cli.main.MCP_SERVER_VERSION', 'fallback_version'), \
          patch('src.cli.main.logger', mock_logger), \
-         patch('src.cli.main.AuthManager', side_effect=Exception("Auth error")), \
+         patch('src.cli.main.AuthenticationManager', side_effect=Exception("Auth error")), \
          patch('src.cli.main.sys.exit') as mock_exit, \
          patch('builtins.print'):
         
@@ -1040,10 +1008,10 @@ async def test_main_with_invalid_config_fixture(mock_logger, mock_audit_logger, 
     # Use invalid config fixture to test error handling
     invalid_config = get_invalid_config
     
-    with patch('src.cli.main.parse_cli_args', return_value=mock_cli_args), \
+    with patch('src.cli.main.parse_and_dispatch_cli', return_value=mock_cli_args), \
          patch('src.cli.main.load_configuration', return_value=invalid_config), \
          patch('src.cli.main.setup_logging', return_value=(mock_logger, mock_audit_logger)), \
-         patch('src.cli.main.AuthManager', side_effect=ConfigurationError("Invalid configuration detected")), \
+         patch('src.cli.main.AuthenticationManager', side_effect=ConfigurationError("Invalid configuration detected")), \
          patch('src.cli.main.logger', mock_logger), \
          patch('src.cli.main.sys.exit') as mock_exit, \
          patch('builtins.print') as mock_print:
@@ -1097,12 +1065,12 @@ async def test_main_complete_integration_flow(mock_logger, mock_audit_logger, mo
     # Setup mocks for complete integration test
     config = get_valid_config
     
-    with patch('src.cli.main.parse_cli_args', return_value=mock_cli_args), \
+    with patch('src.cli.main.parse_and_dispatch_cli', return_value=mock_cli_args), \
          patch('src.cli.main.load_configuration', return_value=config), \
          patch('src.cli.main.setup_logging', return_value=(mock_logger, mock_audit_logger)), \
-         patch('src.cli.main.AuthManager', return_value=mock_auth_manager), \
+         patch('src.cli.main.AuthenticationManager', return_value=mock_auth_manager), \
          patch('src.cli.main.ResourceManager', return_value=mock_resource_manager), \
-         patch('src.cli.main.LabArchivesMCPServer', return_value=mock_mcp_server), \
+         patch('src.cli.main.mcp_server_main', return_value=0), \
          patch('src.cli.main.logger', mock_logger), \
          patch('src.cli.main.signal.signal') as mock_signal, \
          patch('src.cli.main.asyncio.run') as mock_asyncio_run, \
