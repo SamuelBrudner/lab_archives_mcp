@@ -249,13 +249,6 @@ def is_resource_in_scope(resource_info: Dict[str, str], scope_config: Dict[str, 
     """
     logger = get_logger()
     
-    # Enhanced audit logging for security compliance
-    logger.debug(f"Performing immediate scope validation (fail-secure): {resource_info} against scope: {scope_config}", extra={
-        "resource_type": resource_info.get('type'),
-        "validation_approach": "immediate_fail_secure",
-        "validation_event": "scope_check_start"
-    })
-    
     # Validate input parameters - fail secure on invalid input
     if not isinstance(resource_info, dict) or 'type' not in resource_info:
         logger.error("Invalid resource_info provided - failing secure", extra={
@@ -270,6 +263,13 @@ def is_resource_in_scope(resource_info: Dict[str, str], scope_config: Dict[str, 
             "validation_event": "invalid_scope_config_fail_secure"
         })
         return False
+    
+    # Enhanced audit logging for security compliance (after validation to avoid null pointer errors)
+    logger.debug(f"Performing immediate scope validation (fail-secure): {resource_info} against scope: {scope_config}", extra={
+        "resource_type": resource_info.get('type'),
+        "validation_approach": "immediate_fail_secure",
+        "validation_event": "scope_check_start"
+    })
     
     # Extract scope parameters
     notebook_id = scope_config.get('notebook_id')
