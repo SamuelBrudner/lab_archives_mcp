@@ -125,7 +125,25 @@ def sanitize_argv(argv: list) -> list:
     try:
         # Step 1: Apply basic command-line argument scrubbing using existing utilities
         # This handles traditional credential flags like --password, --token, etc.
-        scrubbed_args = scrub_argv(argv)
+        # Filter to string arguments only for scrub_argv, preserve non-strings as-is
+        string_args = [arg for arg in argv if isinstance(arg, str)]
+        non_string_args = [(i, arg) for i, arg in enumerate(argv) if not isinstance(arg, str)]
+        
+        # Apply basic scrubbing to string arguments
+        if string_args:
+            scrubbed_strings = scrub_argv(string_args)
+        else:
+            scrubbed_strings = []
+        
+        # Reconstruct the full argument list with original positions preserved
+        scrubbed_args = []
+        string_index = 0
+        for i, arg in enumerate(argv):
+            if isinstance(arg, str):
+                scrubbed_args.append(scrubbed_strings[string_index])
+                string_index += 1
+            else:
+                scrubbed_args.append(arg)
         
         # Step 2: Apply URL parameter sanitization to detect URLs in arguments
         # This ensures that any URLs passed as argument values also get sanitized
@@ -140,13 +158,18 @@ def sanitize_argv(argv: list) -> list:
             # Check if this argument contains a URL (either as standalone value or in --flag=value format)
             if '://' in arg:
                 # Argument contains a URL - need to sanitize URL parameters
-                if '=' in arg:
-                    # Handle --flag=URL format
+                # Check if '=' appears BEFORE '://' (indicating --flag=URL format)
+                # vs. after '://' (indicating URL query parameters)
+                url_start = arg.find('://')
+                equals_pos = arg.find('=')
+                
+                if equals_pos != -1 and equals_pos < url_start:
+                    # Handle --flag=URL format (= comes before ://)
                     key, url_value = arg.split('=', 1)
                     sanitized_url = sanitize_url_params(url_value)
                     enhanced_args.append(f"{key}={sanitized_url}")
                 else:
-                    # Handle standalone URL argument
+                    # Handle standalone URL argument (no = before ://, or = is in query params)
                     sanitized_url = sanitize_url_params(arg)
                     enhanced_args.append(sanitized_url)
             else:
