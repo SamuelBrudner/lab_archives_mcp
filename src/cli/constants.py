@@ -34,6 +34,9 @@ DEFAULT_LOG_FILE = "labarchives_mcp.log"
 DEFAULT_AUDIT_LOG_FILE = "labarchives_mcp_audit.log"
 DEFAULT_LOG_LEVEL = "INFO"
 
+# Default CLI configuration file
+DEFAULT_CLI_CONFIG_FILE = "labarchives_mcp_config.json"
+
 # Log format strings
 LOG_FORMAT_STRING = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 AUDIT_LOG_FORMAT_STRING = "%(asctime)s - AUDIT - %(name)s - %(levelname)s - %(message)s"
