@@ -857,3 +857,7 @@ class AuthenticationManager:
             str: A detailed string representation of the authentication manager.
         """
         return self.__str__()
+
+
+# Alias for backward compatibility and shorter imports
+AuthManager = AuthenticationManager
