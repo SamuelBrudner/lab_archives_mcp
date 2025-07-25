@@ -514,6 +514,18 @@ def is_resource_in_scope(
     """
     logger = get_logger()
     
+    # Validate input before attempting to access attributes (fail-secure)
+    if resource_info is None or not isinstance(resource_info, dict):
+        logger.error(
+            f"Invalid resource_info provided to is_resource_in_scope: {type(resource_info).__name__}",
+            extra={
+                "resource_info_type": type(resource_info).__name__,
+                "validation_event": "invalid_input_fail_secure",
+                "validation_approach": "fail_secure"
+            }
+        )
+        return False
+    
     # Log all scope validation attempts for audit compliance
     logger.debug(
         f"Performing immediate scope validation for {resource_info.get('type', 'unknown')} resource",
@@ -580,6 +592,9 @@ def _get_active_scope_type(scope_config: ScopeConfig) -> Optional[str]:
 
 def _extract_primary_resource_id(resource_info: Dict[str, Any]) -> str:
     """Extract the primary identifier from resource info for logging."""
+    if not isinstance(resource_info, dict):
+        return 'invalid'
+    
     resource_type = resource_info.get('type', '')
     if resource_type == 'notebook':
         return resource_info.get('notebook_id', 'unknown')
