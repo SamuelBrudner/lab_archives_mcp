@@ -27,7 +27,7 @@ import logging  # builtin - Standard logging interface for error and status repo
 import os  # builtin - Operating system interface for environment variables and process management
 
 # Internal imports - CLI argument parsing functionality
-from src.cli.cli_parser import parse_and_dispatch_cli
+from src.cli.cli_parser import parse_and_dispatch_cli, parse_cli_args
 
 # Internal imports - Configuration management and loading
 from src.cli.config import load_configuration
