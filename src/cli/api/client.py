@@ -53,6 +53,7 @@ from src.cli.constants import (
     DEFAULT_RETRY_BACKOFF
 )
 from src.cli.utils import safe_serialize
+from src.cli.security.sanitizers import sanitize_url_params
 
 # Global constants for retry behavior
 MAX_RETRIES = 3
@@ -65,6 +66,32 @@ LABARCHIVES_API_ENDPOINTS = {
     "pages_list": "/pages/list",
     "entries_get": "/entries/get"
 }
+
+
+def mask_sensitive_query_params(url: str) -> str:
+    """
+    Helper function for secure debug logging that automatically redacts sensitive query parameters.
+    
+    This function serves as a dedicated interface for masking sensitive query parameters
+    (tokens, passwords, secrets) in URLs before they are logged. It integrates with the
+    centralized Security Utilities sanitizers module to ensure consistent parameter
+    masking policies across all API client debug output.
+    
+    This implementation addresses Section 0.3.2 security sanitization pattern requirements
+    and Section 6.4.7.4.1 audit event processing requirements to prevent credentials
+    from appearing in logs, debug outputs, or audit trails.
+    
+    Args:
+        url (str): The URL string containing query parameters to sanitize
+        
+    Returns:
+        str: Sanitized URL with sensitive parameter values replaced by [REDACTED]
+        
+    Examples:
+        >>> mask_sensitive_query_params("https://api.labarchives.com/users?akid=123&token=secret")
+        'https://api.labarchives.com/users?akid=[REDACTED]&token=[REDACTED]'
+    """
+    return sanitize_url_params(url)
 
 
 def build_api_url(endpoint: str, params: Dict[str, Any], base_url: str = DEFAULT_API_BASE_URL) -> str:
@@ -303,7 +330,7 @@ class LabArchivesAPIClient:
             self.logger.debug(f"Making {method} request to {endpoint}", extra={
                 "method": method,
                 "endpoint": endpoint,
-                "url": url,
+                "url": mask_sensitive_query_params(url),
                 "retry_count": retry_count
             })
             
