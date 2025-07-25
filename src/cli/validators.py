@@ -32,7 +32,9 @@ from urllib.parse import urlparse  # builtin - URL validation for API endpoints
 import importlib.util
 
 # Load models.py directly to avoid import conflicts with models package
-models_spec = importlib.util.spec_from_file_location("models", "src/cli/models.py")
+import os
+models_path = os.path.join(os.path.dirname(__file__), "models.py")
+models_spec = importlib.util.spec_from_file_location("models", models_path)
 models_module = importlib.util.module_from_spec(models_spec)
 models_spec.loader.exec_module(models_module)
 
