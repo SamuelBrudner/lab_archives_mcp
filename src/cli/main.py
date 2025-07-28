@@ -20,35 +20,39 @@ credential handling, and robust error management while providing user feedback a
 status reporting for operational transparency.
 """
 
-import sys  # builtin - System parameters and functions for exit codes and argv access
-import signal  # builtin - Signal handling for graceful shutdown (SIGINT, SIGTERM)
 import asyncio  # builtin - Async event loop for MCP server operations
 import logging  # builtin - Standard logging interface for error and status reporting
 import os  # builtin - Operating system interface for environment variables and process management
-
-# Internal imports - CLI argument parsing functionality
-from cli_parser import parse_and_dispatch_cli, parse_cli_args
-
-# Internal imports - Configuration management and loading
-from config import load_configuration
-
-# Internal imports - Logging setup and configuration
-from logging_setup import setup_logging
+import signal  # builtin - Signal handling for graceful shutdown (SIGINT, SIGTERM)
+import sys  # builtin - System parameters and functions for exit codes and argv access
 
 # Internal imports - Authentication management for LabArchives API
 from auth_manager import AuthenticationManager
 
-# Internal imports - Resource management for MCP protocol handlers
-from resource_manager import ResourceManager
+# Internal imports - CLI argument parsing functionality
+from cli_parser import parse_and_dispatch_cli
+from cli_parser import parse_cli_args
+
+# Internal imports - Configuration management and loading
+from config import load_configuration
+
+# Internal imports - Exception handling for structured error management
+from exceptions import AuthenticationError
+from exceptions import ConfigurationError
+from exceptions import StartupError
+
+# Internal imports - Logging setup and configuration
+from logging_setup import setup_logging
 
 # Internal imports - MCP server implementation using FastMCP
 from mcp_server import main as mcp_server_main
 
-# Internal imports - Exception handling for structured error management
-from exceptions import ConfigurationError, AuthenticationError, StartupError
+# Internal imports - Resource management for MCP protocol handlers
+from resource_manager import ResourceManager
 
 # Internal imports - Version information for display and logging
 from version import __version__
+
 
 # Make version available as MCP_SERVER_VERSION for test compatibility
 MCP_SERVER_VERSION = __version__
