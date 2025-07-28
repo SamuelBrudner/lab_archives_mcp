@@ -1,6 +1,8 @@
 # setuptools>=65.0.0 - Core Python packaging library for building and distributing Python projects
-from setuptools import setup, find_packages
 import os
+
+from setuptools import find_packages
+from setuptools import setup
 
 
 # Read the long description from README.md to provide detailed package description for PyPI
@@ -59,7 +61,7 @@ def setup_package():
     # Entry points for console script registration
     entry_points = {
         "console_scripts": [
-            "labarchives-mcp=cli_entry:main",  # Register the CLI command for global access
+            "labarchives-mcp=main:main",  # Register the CLI command for global access
         ],
     }
 
