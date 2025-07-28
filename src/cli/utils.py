@@ -27,7 +27,7 @@ import json  # builtin - Used for reading and writing JSON configuration and sta
 import re  # builtin - Used for regex operations in environment variable sanitization
 from typing import Any, Optional, Union  # builtin - Supports type annotations for utility function signatures
 
-from src.cli.exceptions import LabArchivesMCPException
+from exceptions import LabArchivesMCPException
 
 
 def expand_path(path: str) -> str:
@@ -764,6 +764,7 @@ def parse_iso_datetime(datetime_str: str):
         datetime: The parsed datetime object.
     """
     from datetime import datetime
+    import re
     
     if datetime_str is None:
         raise TypeError("datetime_str cannot be None")
@@ -773,6 +774,12 @@ def parse_iso_datetime(datetime_str: str):
     
     if not datetime_str.strip():
         raise ValueError("datetime_str cannot be empty")
+    
+    # Validate that it's a proper ISO datetime format (not just date)
+    # Must have T separator and time portion, timezone is optional
+    iso_pattern = r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})?$'
+    if not re.match(iso_pattern, datetime_str):
+        raise ValueError(f"Invalid ISO 8601 datetime format: {datetime_str}")
     
     try:
         # Try parsing with timezone info
