@@ -29,31 +29,31 @@ secure, authenticated access to LabArchives electronic lab notebook data through
 standardized Model Context Protocol.
 """
 
-import logging
-from typing import List, Dict, Any, Optional
 from datetime import datetime
+import logging
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
 
 # Internal imports for API client and data models
 from api.client import LabArchivesAPIClient
-from mcp.models import (
-    MCPResource,
-    MCPResourceContent,
-    labarchives_to_mcp_resource,
-    MCP_JSONLD_CONTEXT,
-)
-from api.errors import (
-    APIError,
-    APIAuthenticationError,
-    APIPermissionError,
-    APIResponseParseError,
-)
-from exceptions import LabArchivesMCPException
+from api.errors import APIAuthenticationError
+from api.errors import APIError
+from api.errors import APIPermissionError
+from api.errors import APIResponseParseError
 from constants import MCP_RESOURCE_URI_SCHEME
-from logging_setup import get_logger
 from data_models.scoping import FolderPath
+from exceptions import LabArchivesMCPException
+from logging_setup import get_logger
+from mcp.models import MCPResource
+from mcp.models import MCPResourceContent
+from mcp.models import MCP_JSONLD_CONTEXT
+from mcp.models import labarchives_to_mcp_resource
 
 # Security utilities for fail-secure validation
 from security.validators import validate_folder_scope_access
+
 
 # Logger name for resource management operations
 RESOURCE_MANAGER_LOGGER_NAME = "mcp.resources"
