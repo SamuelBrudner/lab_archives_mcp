@@ -27,7 +27,7 @@ from typing import Optional, List
 from pydantic import BaseModel, Field  # pydantic>=2.11.7
 
 # Internal imports from constants module
-from src.cli.constants import (
+from constants import (
     DEFAULT_API_BASE_URL,
     DEFAULT_LOG_FILE,
     DEFAULT_LOG_LEVEL,
@@ -197,7 +197,7 @@ class ScopeConfig(BaseModel):
         
         if len(configured_options) > 1:
             raise ValueError(
-                "Only one scope type can be configured at a time. "
+                "Only one scope type can be configured at a time - these options are mutually exclusive. "
                 "Please specify either notebook_id, notebook_name, or folder_path."
             )
     
