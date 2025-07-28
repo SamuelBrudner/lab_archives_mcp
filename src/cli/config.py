@@ -700,8 +700,10 @@ def _merge_configuration_dicts(
                 merged_config[key] = value
         
         # Handle mutual exclusivity of verbose and quiet modes
-        # If one is explicitly set to True, ensure the other is set to False
-        if merged_config.get('verbose') is True and merged_config.get('quiet') is True:
+        # Only resolve conflicts between different sources, but preserve conflicts within same source
+        # to be caught by validation later
+        if (merged_config.get('verbose') is True and merged_config.get('quiet') is True and
+            (('verbose' in overlay_config) != ('quiet' in overlay_config))):  # Different sources
             # Apply precedence: if overlay config has verbose or quiet, it wins
             if 'verbose' in overlay_config and overlay_config['verbose'] is True:
                 merged_config['quiet'] = False
