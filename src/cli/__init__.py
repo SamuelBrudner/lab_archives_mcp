@@ -12,4 +12,5 @@ __email__ = "team@labarchives.com"
 # Import main function for console script entry point
 from .main import main
 
+
 __all__ = ["main", "__version__"]
