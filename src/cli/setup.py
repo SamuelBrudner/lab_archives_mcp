@@ -75,8 +75,8 @@ def setup_package():
         url="https://github.com/org/labarchives-mcp-server",
         
         # Package discovery and structure
-        packages=find_packages(where="src/cli"),
-        package_dir={"": "src/cli"},
+        packages=find_packages(where="."),
+        package_dir={"": "."},
         
         # Entry points for CLI registration
         entry_points=entry_points,
