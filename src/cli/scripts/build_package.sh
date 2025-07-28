@@ -8,8 +8,9 @@
 set -e
 
 # Configuration variables
-PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-SRC_DIR="$PROJECT_ROOT/src/cli"
+# The script is at src/cli/scripts/build_package.sh, so we need to go up one level to get to src/cli
+SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PROJECT_ROOT="$(cd "$SRC_DIR/../.." && pwd)"
 DIST_DIR="$SRC_DIR/dist"
 BUILD_DIR="$SRC_DIR/build"
 EGG_INFO_DIR="$SRC_DIR/src/labarchives_mcp.egg-info"
@@ -104,6 +105,14 @@ validate_python_version() {
 # Function to install or upgrade dependencies
 install_dependencies() {
     log_info "Installing and upgrading build dependencies..."
+    
+    # Ensure we're using the virtual environment
+    if [ -f "$SRC_DIR/.venv/bin/activate" ]; then
+        log_info "Activating virtual environment..."
+        source "$SRC_DIR/.venv/bin/activate"
+    else
+        log_warning "No virtual environment found, using system Python"
+    fi
     
     # Upgrade pip to latest version
     log_info "Upgrading pip..."
@@ -330,6 +339,14 @@ main() {
     
     # Change to project root
     cd "$PROJECT_ROOT"
+    
+    # Ensure we're using the virtual environment if it exists
+    if [ -f "$SRC_DIR/.venv/bin/activate" ]; then
+        log_info "Activating virtual environment..."
+        source "$SRC_DIR/.venv/bin/activate"
+    else
+        log_warning "No virtual environment found, using system Python"
+    fi
     
     # Execute build steps
     validate_python_version
