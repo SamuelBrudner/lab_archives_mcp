@@ -51,7 +51,7 @@ LoggingConfig = models_module.LoggingConfig
 ServerConfiguration = models_module.ServerConfiguration
 
 # Internal imports - Configuration validators for comprehensive validation
-from src.cli.validators import (
+from validators import (
     validate_authentication_config,
     validate_scope_config,
     validate_output_config,
@@ -60,17 +60,17 @@ from src.cli.validators import (
 )
 
 # Internal imports - Utility functions for file operations and environment variable access
-from src.cli.utils import (
+from utils import (
     expand_path,
     get_env_var,
     read_json_file
 )
 
 # Internal imports - Exception handling for structured error reporting
-from src.cli.exceptions import LabArchivesMCPException
+from exceptions import LabArchivesMCPException
 
 # Internal imports - Constants for default values and configuration keys
-from src.cli.constants import (
+from constants import (
     DEFAULT_API_BASE_URL,
     DEFAULT_LOG_FILE,
     DEFAULT_LOG_LEVEL,
@@ -698,6 +698,15 @@ def _merge_configuration_dicts(
         for key, value in overlay_config.items():
             if value is not None:
                 merged_config[key] = value
+        
+        # Handle mutual exclusivity of verbose and quiet modes
+        # If one is explicitly set to True, ensure the other is set to False
+        if merged_config.get('verbose') is True and merged_config.get('quiet') is True:
+            # Apply precedence: if overlay config has verbose or quiet, it wins
+            if 'verbose' in overlay_config and overlay_config['verbose'] is True:
+                merged_config['quiet'] = False
+            elif 'quiet' in overlay_config and overlay_config['quiet'] is True:
+                merged_config['verbose'] = False
         
         return merged_config
         
