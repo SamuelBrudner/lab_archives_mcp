@@ -710,6 +710,19 @@ def _merge_configuration_dicts(
             elif 'quiet' in overlay_config and overlay_config['quiet'] is True:
                 merged_config['verbose'] = False
         
+        # Handle mutual exclusivity of scope options (notebook_id, notebook_name, folder_path)
+        # Only resolve conflicts between different sources
+        scope_options = ['notebook_id', 'notebook_name', 'folder_path']
+        configured_scopes = [opt for opt in scope_options if merged_config.get(opt) is not None]
+        overlay_scopes = [opt for opt in scope_options if opt in overlay_config and overlay_config[opt] is not None]
+        
+        if len(configured_scopes) > 1 and len(overlay_scopes) > 0:
+            # If overlay config provides any scope option, clear the others from the merged config
+            # This gives precedence to the most recent source
+            for scope_opt in scope_options:
+                if scope_opt not in overlay_scopes:
+                    merged_config[scope_opt] = None
+        
         return merged_config
         
     except Exception as e:
