@@ -26,17 +26,14 @@ All authentication operations are designed to be secure, auditable, and producti
 with comprehensive error handling and detailed logging for troubleshooting and compliance.
 """
 
-import logging  # builtin - Python 3.11+ logging framework for audit and security event logging
 from datetime import (
-    datetime,
-    timedelta,
-)  # builtin - Python 3.11+ datetime handling for session timestamps and expiration
+    datetime,  # builtin - Python 3.11+ datetime handling for session timestamps and expiration
+)
+from datetime import timedelta
+import logging  # builtin - Python 3.11+ logging framework for audit and security event logging
 from typing import (
-    Optional,
-)  # builtin - Python 3.11+ type annotations for optional fields in session and config
-
-# Internal imports - LabArchives API client for direct communication with LabArchives REST API
-from labarchives_api import LabArchivesAPI
+    Optional,  # builtin - Python 3.11+ type annotations for optional fields in session and config
+)
 
 # Internal imports - Authentication configuration schema from configuration management
 from config import AuthenticationConfig
@@ -44,8 +41,12 @@ from config import AuthenticationConfig
 # Internal imports - Custom exception for authentication failures and structured error handling
 from exceptions import LabArchivesAPIException
 
+# Internal imports - LabArchives API client for direct communication with LabArchives REST API
+from labarchives_api import LabArchivesAPI
+
 # Internal imports - Configured logger for audit and security event logging
 from logging_setup import get_logger
+
 
 # =============================================================================
 # Global Constants
