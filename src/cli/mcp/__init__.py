@@ -46,78 +46,76 @@ deployment with comprehensive audit logging, security controls, and error handli
 # =============================================================================
 
 # Import the main protocol handler class for MCP session management
-from src.cli.mcp.protocol import MCPProtocolHandler
+from .protocol import MCPProtocolHandler
 
 # Import JSON-RPC 2.0 message processing functions
-from src.cli.mcp.protocol import parse_jsonrpc_message
-from src.cli.mcp.protocol import build_jsonrpc_response
+from .protocol import parse_jsonrpc_message
+from .protocol import build_jsonrpc_response
 
 # Import request routing functionality
-from src.cli.mcp.protocol import route_mcp_request
+from .protocol import route_mcp_request
 
 # =============================================================================
 # Resource Management Layer - Resource Discovery and Content Retrieval
 # =============================================================================
 
 # Import the main resource manager class
-from src.cli.mcp.resources import MCPResourceManager
+from .resources import MCPResourceManager
 
 # Import resource URI parsing and validation utilities
-from src.cli.mcp.resources import parse_resource_uri
+from .resources import parse_resource_uri
 
 # Import scope validation and access control functions
-from src.cli.mcp.resources import is_resource_in_scope
+from .resources import is_resource_in_scope
 
 # =============================================================================
 # Data Models Layer - MCP Protocol Data Structures
 # =============================================================================
 
 # Import core MCP resource models
-from src.cli.mcp.models import MCPResource
-from src.cli.mcp.models import MCPResourceContent
+from .models import MCPResource
+from .models import MCPResourceContent
 
 # Import MCP protocol response models
-from src.cli.mcp.models import MCPResourceListResponse
-from src.cli.mcp.models import MCPResourceReadResponse
+from .models import MCPResourceListResponse
+from .models import MCPResourceReadResponse
 
 # Import data transformation utilities
-from src.cli.mcp.models import labarchives_to_mcp_resource
+from .models import labarchives_to_mcp_resource
 
 # Import JSON-LD context for semantic enrichment
-from src.cli.mcp.models import MCP_JSONLD_CONTEXT
+from .models import MCP_JSONLD_CONTEXT
 
 # =============================================================================
 # Error Handling Layer - Comprehensive Error Management
 # =============================================================================
 
 # Import centralized error handling function
-from src.cli.mcp.errors import handle_mcp_error
+from .errors import handle_mcp_error
 
 # Import standardized error codes and messages
-from src.cli.mcp.errors import MCP_ERROR_CODES
-from src.cli.mcp.errors import MCP_ERROR_MESSAGES
+from .errors import MCP_ERROR_CODES
+from .errors import MCP_ERROR_MESSAGES
 
 # Import MCP protocol exception class
-from src.cli.mcp.errors import MCPProtocolError
+from .errors import MCPProtocolError
 
 # =============================================================================
 # Package Exports - Public API Surface
 # =============================================================================
 
 # Define the complete public API for the MCP protocol package
-# This ensures only the intended components are exposed when using 'from src.cli.mcp import *'
+# This ensures only the intended components are exposed when using 'from mcp import *'
 __all__ = [
     # Protocol Handler Layer
     "MCPProtocolHandler",
     "parse_jsonrpc_message",
-    "build_jsonrpc_response", 
+    "build_jsonrpc_response",
     "route_mcp_request",
-    
     # Resource Management Layer
     "MCPResourceManager",
     "parse_resource_uri",
     "is_resource_in_scope",
-    
     # Data Models Layer
     "MCPResource",
     "MCPResourceContent",
@@ -125,7 +123,6 @@ __all__ = [
     "MCPResourceReadResponse",
     "labarchives_to_mcp_resource",
     "MCP_JSONLD_CONTEXT",
-    
     # Error Handling Layer
     "handle_mcp_error",
     "MCP_ERROR_CODES",
@@ -148,13 +145,10 @@ __mcp_protocol_version__ = "2024-11-05"
 
 # Supported MCP capabilities exposed by this package
 __mcp_capabilities__ = {
-    "resources": {
-        "subscribe": False,
-        "listChanged": False
-    },
+    "resources": {"subscribe": False, "listChanged": False},
     "tools": {},
     "prompts": {},
-    "logging": {}
+    "logging": {},
 }
 
 # =============================================================================
@@ -177,15 +171,16 @@ MCP_LOGGER_NAME = "mcp"
 # Package Initialization and Validation
 # =============================================================================
 
+
 # Validate that all required components are available
 def _validate_package_integrity():
     """
     Validates that all required MCP protocol components are properly imported and available.
-    
+
     This function performs a comprehensive check of all exported components to ensure
     the package is in a valid state for use. It verifies that all classes, functions,
     and constants are properly imported and accessible.
-    
+
     Raises:
         ImportError: If any required component is missing or not properly imported
         AttributeError: If any component is missing required attributes or methods
@@ -193,37 +188,38 @@ def _validate_package_integrity():
     # Validate protocol handler components
     if not hasattr(MCPProtocolHandler, 'handle_message'):
         raise ImportError("MCPProtocolHandler missing required handle_message method")
-    
+
     if not hasattr(MCPProtocolHandler, 'run_session'):
         raise ImportError("MCPProtocolHandler missing required run_session method")
-    
+
     # Validate resource manager components
     if not hasattr(MCPResourceManager, 'list_resources'):
         raise ImportError("MCPResourceManager missing required list_resources method")
-    
+
     if not hasattr(MCPResourceManager, 'read_resource'):
         raise ImportError("MCPResourceManager missing required read_resource method")
-    
+
     # Validate data model components
     if not hasattr(MCPResource, 'dict'):
         raise ImportError("MCPResource missing required dict method")
-    
+
     if not hasattr(MCPResourceContent, 'dict'):
         raise ImportError("MCPResourceContent missing required dict method")
-    
+
     # Validate error handling components
     if not isinstance(MCP_ERROR_CODES, dict):
         raise ImportError("MCP_ERROR_CODES is not a dictionary")
-    
+
     if not isinstance(MCP_ERROR_MESSAGES, dict):
         raise ImportError("MCP_ERROR_MESSAGES is not a dictionary")
-    
+
     # Validate JSON-LD context
     if not isinstance(MCP_JSONLD_CONTEXT, dict):
         raise ImportError("MCP_JSONLD_CONTEXT is not a dictionary")
-    
+
     if "@context" not in MCP_JSONLD_CONTEXT:
         raise ImportError("MCP_JSONLD_CONTEXT missing required @context field")
+
 
 # Perform package validation on import
 try:
@@ -231,6 +227,7 @@ try:
 except (ImportError, AttributeError) as e:
     # Log the validation error for debugging
     import logging
+
     logger = logging.getLogger(MCP_LOGGER_NAME)
     logger.error(f"MCP package validation failed: {e}")
     raise
@@ -241,6 +238,7 @@ except (ImportError, AttributeError) as e:
 
 # Log successful package initialization for audit trail
 import logging
+
 logger = logging.getLogger(MCP_LOGGER_NAME)
 logger.info(
     f"MCP protocol package initialized successfully",
@@ -248,6 +246,6 @@ logger.info(
         "package_version": __version__,
         "mcp_protocol_version": __mcp_protocol_version__,
         "exported_components": len(__all__),
-        "capabilities": __mcp_capabilities__
-    }
+        "capabilities": __mcp_capabilities__,
+    },
 )
