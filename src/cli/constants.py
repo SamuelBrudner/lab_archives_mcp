@@ -14,27 +14,22 @@ __all__ = [
     'DEFAULT_TIMEOUT_SECONDS',
     'DEFAULT_RETRY_COUNT',
     'DEFAULT_RETRY_BACKOFF',
-    
     # Region Configuration
     'SUPPORTED_REGIONS',
     'REGION_API_BASE_URLS',
-    
     # Security and Scope Constants - Required for security validators module
     'SUPPORTED_SCOPE_TYPES',
-    
     # MCP Configuration
     'MCP_RESOURCE_URI_SCHEME',
     'MCP_SERVER_NAME',
     'MCP_SERVER_VERSION',
     'DEFAULT_PROTOCOL_VERSION',
-    
     # Logging Configuration
     'DEFAULT_LOG_FILE',
     'DEFAULT_AUDIT_LOG_FILE',
     'DEFAULT_LOG_LEVEL',
     'LOG_FORMAT_STRING',
     'AUDIT_LOG_FORMAT_STRING',
-    
     # CLI Configuration
     'DEFAULT_CLI_CONFIG_FILE',
 ]
@@ -54,7 +49,7 @@ SUPPORTED_REGIONS = ["US", "AU", "UK"]
 REGION_API_BASE_URLS = {
     "US": DEFAULT_API_BASE_URL,
     "AU": AU_API_BASE_URL,
-    "UK": UK_API_BASE_URL
+    "UK": UK_API_BASE_URL,
 }
 
 # Supported scope types

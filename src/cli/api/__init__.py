@@ -22,54 +22,48 @@ security compliance.
 """
 
 # Import API client for LabArchives REST API integration
-from src.cli.api.client import LabArchivesAPIClient as APIClient
+from api.client import LabArchivesAPIClient as APIClient
 
 # Import error classes for structured exception handling
-from src.cli.api.errors import (
-    APIError,
-    APIAuthenticationError as AuthenticationError,
-    APIRateLimitError as RateLimitError,
-    APIResponseParseError,
-    APIPermissionError
-)
+from api.errors import APIAuthenticationError as AuthenticationError
+from api.errors import APIError
+from api.errors import APIPermissionError
+from api.errors import APIRateLimitError as RateLimitError
+from api.errors import APIResponseParseError
 
 # Import data models for LabArchives entities
-from src.cli.api.models import (
-    NotebookMetadata as LabArchivesNotebook,
-    PageMetadata as LabArchivesPage,
-    EntryContent as LabArchivesEntry,
-    UserContext,
-    NotebookListResponse,
-    PageListResponse,
-    EntryListResponse,
-    UserContextResponse
-)
+from api.models import EntryContent as LabArchivesEntry
+from api.models import EntryListResponse
+from api.models import NotebookListResponse
+from api.models import NotebookMetadata as LabArchivesNotebook
+from api.models import PageListResponse
+from api.models import PageMetadata as LabArchivesPage
+from api.models import UserContext
+from api.models import UserContextResponse
 
 # Import response parser for API response processing
-from src.cli.api.response_parser import parse_api_response
+from api.response_parser import parse_api_response
+
 
 # Define the public API exports
 __all__ = [
     # Primary API client
     "APIClient",
-    
     # Error classes for exception handling
     "APIError",
     "AuthenticationError",
     "RateLimitError",
     "APIResponseParseError",
     "APIPermissionError",
-    
     # Data models for LabArchives entities
     "LabArchivesNotebook",
-    "LabArchivesPage", 
+    "LabArchivesPage",
     "LabArchivesEntry",
     "UserContext",
     "NotebookListResponse",
     "PageListResponse",
     "EntryListResponse",
     "UserContextResponse",
-    
     # Response parsing utilities
-    "parse_api_response"
+    "parse_api_response",
 ]

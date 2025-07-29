@@ -48,6 +48,9 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Use .dockerignore to exclude unnecessary files and reduce build context
 COPY . .
 
+# Install the package to register console script entry points
+RUN pip install --no-cache-dir .
+
 # Set proper ownership for the application directory
 # Ensure the mcpuser has access to all application files
 RUN chown -R mcpuser:mcpuser /app

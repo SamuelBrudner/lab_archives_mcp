@@ -186,7 +186,15 @@ validate_dependencies() {
     
     for package in "${required_packages[@]}"; do
         local package_name=$(echo "$package" | cut -d'>' -f1 | cut -d'=' -f1)
-        if ! python -c "import ${package_name}" 2>/dev/null; then
+        # Handle package names that differ between pip and import
+        local import_name="$package_name"
+        case "$package_name" in
+            "pytest-cov")
+                import_name="pytest_cov"
+                ;;
+        esac
+        
+        if ! python -c "import ${import_name}" 2>/dev/null; then
             print_error "Required package not found: ${package}"
             print_status "Please install with: pip install ${package}"
             exit 1

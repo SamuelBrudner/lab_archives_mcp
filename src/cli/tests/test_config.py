@@ -27,7 +27,7 @@ from unittest.mock import patch, MagicMock, mock_open  # builtin - Mocking frame
 from typing import Dict, Any, Optional  # builtin - Type annotations for test functions
 
 # Internal imports - Configuration management functions under test
-from src.cli.config import (
+from config import (
     load_configuration,
     reload_configuration,
     get_config_value,
@@ -37,7 +37,7 @@ from src.cli.config import (
 )
 
 # Internal imports - Configuration models for type checking and validation
-from src.cli.models import (
+from models import (
     ServerConfiguration,
     AuthenticationConfig,
     ScopeConfig,
@@ -46,17 +46,17 @@ from src.cli.models import (
 )
 
 # Internal imports - Exception classes for error handling tests
-from src.cli.exceptions import LabArchivesMCPException
+from exceptions import LabArchivesMCPException
 
 # Internal imports - Test fixtures for sample configuration data
-from src.cli.tests.fixtures.config_samples import (
+from tests.fixtures.config_samples import (
     get_valid_config,
     get_invalid_config,
     get_edge_case_config
 )
 
 # Internal imports - Constants for default values and validation
-from src.cli.constants import (
+from constants import (
     DEFAULT_API_BASE_URL,
     DEFAULT_LOG_FILE,
     DEFAULT_LOG_LEVEL,
@@ -573,6 +573,13 @@ class TestEdgeCaseConfiguration:
         
         # Create a config file with unicode characters in the name
         config_file = tmp_path / "config_测试.json"
+        config_file.write_text(json.dumps(config_data, indent=2, ensure_ascii=False))
+        
+        # Create the logs directory that's referenced in the log_file path
+        (tmp_path / "logs").mkdir(exist_ok=True)
+        
+        # Change the log_file path to be relative to tmp_path
+        config_data['log_file'] = str(tmp_path / "logs" / "with spaces and unicode 测试.log")
         config_file.write_text(json.dumps(config_data, indent=2, ensure_ascii=False))
         
         # Act: Load configuration from file with special characters
