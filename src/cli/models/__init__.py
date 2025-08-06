@@ -18,7 +18,9 @@ import importlib.util
 models_module_name = "labarchives_mcp_models"
 if models_module_name not in sys.modules:
     models_path = os.path.join(os.path.dirname(__file__), "..", "models.py")
-    models_spec = importlib.util.spec_from_file_location(models_module_name, models_path)
+    models_spec = importlib.util.spec_from_file_location(
+        models_module_name, models_path
+    )
     models_module = importlib.util.module_from_spec(models_spec)
     models_spec.loader.exec_module(models_module)
     sys.modules[models_module_name] = models_module
@@ -27,7 +29,7 @@ else:
 
 # Export configuration classes
 AuthenticationConfig = models_module.AuthenticationConfig
-ScopeConfig = models_module.ScopeConfig  
+ScopeConfig = models_module.ScopeConfig
 OutputConfig = models_module.OutputConfig
 LoggingConfig = models_module.LoggingConfig
 ServerConfiguration = models_module.ServerConfiguration
@@ -35,8 +37,8 @@ ServerConfiguration = models_module.ServerConfiguration
 __all__ = [
     'FolderPath',
     'AuthenticationConfig',
-    'ScopeConfig', 
+    'ScopeConfig',
     'OutputConfig',
     'LoggingConfig',
-    'ServerConfiguration'
+    'ServerConfiguration',
 ]

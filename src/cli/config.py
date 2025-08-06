@@ -41,7 +41,9 @@ import sys
 models_module_name = "labarchives_mcp_models"
 if models_module_name not in sys.modules:
     models_path = os.path.join(os.path.dirname(__file__), "models.py")
-    models_spec = importlib.util.spec_from_file_location(models_module_name, models_path)
+    models_spec = importlib.util.spec_from_file_location(
+        models_module_name, models_path
+    )
     models_module = importlib.util.module_from_spec(models_spec)
     models_spec.loader.exec_module(models_module)
     sys.modules[models_module_name] = models_module
@@ -56,7 +58,7 @@ LoggingConfig = models_module.LoggingConfig
 ServerConfiguration = models_module.ServerConfiguration
 
 # Internal imports - Configuration validators for comprehensive validation
-from validators import (
+from src.cli.validators import (
     validate_authentication_config,
     validate_scope_config,
     validate_output_config,
@@ -65,13 +67,13 @@ from validators import (
 )
 
 # Internal imports - Utility functions for file operations and environment variable access
-from utils import expand_path, get_env_var, read_json_file
+from src.cli.utils import expand_path, get_env_var, read_json_file
 
 # Internal imports - Exception handling for structured error reporting
-from exceptions import LabArchivesMCPException
+from src.cli.exceptions import LabArchivesMCPException
 
 # Internal imports - Constants for default values and configuration keys
-from constants import (
+from src.cli.constants import (
     DEFAULT_API_BASE_URL,
     DEFAULT_LOG_FILE,
     DEFAULT_LOG_LEVEL,
@@ -165,7 +167,9 @@ def load_configuration(
         if config_file_path is not None:
             try:
                 file_config = _load_file_configuration(config_file_path)
-                config_dict = _merge_configuration_dicts(config_dict, file_config, "file")
+                config_dict = _merge_configuration_dicts(
+                    config_dict, file_config, "file"
+                )
             except LabArchivesMCPException as e:
                 raise LabArchivesMCPException(
                     message=f"Failed to load configuration file: {e.message}",
@@ -196,7 +200,9 @@ def load_configuration(
         # Step 4: Overlay CLI arguments (highest precedence)
         if cli_args is not None:
             try:
-                config_dict = _merge_configuration_dicts(config_dict, cli_args, "cli_args")
+                config_dict = _merge_configuration_dicts(
+                    config_dict, cli_args, "cli_args"
+                )
             except LabArchivesMCPException as e:
                 raise LabArchivesMCPException(
                     message=f"Failed to process CLI arguments: {e.message}",
@@ -441,7 +447,9 @@ def get_config_value(key: str) -> Any:
             if not hasattr(current_value, part):
                 # Build the partial path for error reporting
                 partial_path = '.'.join(key_parts[: i + 1])
-                available_attrs = [attr for attr in dir(current_value) if not attr.startswith('_')]
+                available_attrs = [
+                    attr for attr in dir(current_value) if not attr.startswith('_')
+                ]
 
                 raise LabArchivesMCPException(
                     message=f"Configuration key '{partial_path}' not found in configuration object",
@@ -714,7 +722,9 @@ def _merge_configuration_dicts(
         # Handle mutual exclusivity of scope options (notebook_id, notebook_name, folder_path)
         # Only resolve conflicts between different sources
         scope_options = ['notebook_id', 'notebook_name', 'folder_path']
-        configured_scopes = [opt for opt in scope_options if merged_config.get(opt) is not None]
+        configured_scopes = [
+            opt for opt in scope_options if merged_config.get(opt) is not None
+        ]
         overlay_scopes = [
             opt
             for opt in scope_options

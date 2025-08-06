@@ -27,31 +27,30 @@ import signal  # builtin - Signal handling for graceful shutdown (SIGINT, SIGTER
 import sys  # builtin - System parameters and functions for exit codes and argv access
 
 # Internal imports - Authentication management for LabArchives API
-from auth_manager import AuthenticationManager
+from src.cli.auth_manager import AuthenticationManager
 
 # Internal imports - CLI argument parsing functionality
-from cli_parser import parse_and_dispatch_cli
-from cli_parser import parse_cli_args
+from src.cli.cli_parser import parse_cli_args
 
 # Internal imports - Configuration management and loading
-from config import load_configuration
+from src.cli.config import load_configuration
 
 # Internal imports - Exception handling for structured error management
-from exceptions import AuthenticationError
-from exceptions import ConfigurationError
-from exceptions import StartupError
+from src.cli.exceptions import AuthenticationError
+from src.cli.exceptions import ConfigurationError
+from src.cli.exceptions import StartupError
 
 # Internal imports - Logging setup and configuration
-from logging_setup import setup_logging
+from src.cli.logging_setup import setup_logging
 
 # Internal imports - MCP server implementation using FastMCP
-from mcp_server import main as mcp_server_main
+from src.cli.mcp_server import main as mcp_server_main
 
 # Internal imports - Resource management for MCP protocol handlers
-from resource_manager import ResourceManager
+from src.cli.resource_manager import ResourceManager
 
 # Internal imports - Version information for display and logging
-from version import __version__
+from src.cli.version import __version__
 
 
 # Make version available as MCP_SERVER_VERSION for test compatibility
@@ -227,7 +226,7 @@ def main() -> None:
         )
 
         try:
-            args = parse_and_dispatch_cli()
+            args = parse_cli_args()
 
             # Log successful argument parsing
             logger.debug(
@@ -277,7 +276,11 @@ def main() -> None:
         # --help and --version are handled by argparse and cause SystemExit
 
         # Check if authenticate command - handle separately (only if args was parsed successfully)
-        if args is not None and hasattr(args, 'command') and args.command == 'authenticate':
+        if (
+            args is not None
+            and hasattr(args, 'command')
+            and args.command == 'authenticate'
+        ):
             from commands.authenticate import authenticate_command
 
             try:
@@ -301,7 +304,9 @@ def main() -> None:
             # Load configuration from all sources (CLI, env, file, defaults)
             config = load_configuration(
                 cli_args=cli_args_dict,
-                config_file_path=(getattr(args, 'config_file', None) if args is not None else None),
+                config_file_path=(
+                    getattr(args, 'config_file', None) if args is not None else None
+                ),
             )
 
             logger.info(
@@ -379,7 +384,9 @@ def main() -> None:
         logger.info("=" * 60)
         logger.info("Configuration Summary:")
         logger.info(f"  API Base URL: {config.authentication.api_base_url}")
-        logger.info(f"  Authentication: {'Token' if config.authentication.username else 'API Key'}")
+        logger.info(
+            f"  Authentication: {'Token' if config.authentication.username else 'API Key'}"
+        )
         logger.info(
             f"  Scope Restriction: {'Yes' if any([config.scope.notebook_id, config.scope.notebook_name, config.scope.folder_path]) else 'No'}"
         )
@@ -436,7 +443,9 @@ def main() -> None:
                     'user_id': auth_session.user_id,
                     'authenticated_at': auth_session.authenticated_at.isoformat(),
                     'expires_at': (
-                        auth_session.expires_at.isoformat() if auth_session.expires_at else None
+                        auth_session.expires_at.isoformat()
+                        if auth_session.expires_at
+                        else None
                     ),
                 },
             )
@@ -447,7 +456,9 @@ def main() -> None:
                 extra={
                     'event': 'authentication_success',
                     'user_id': auth_session.user_id,
-                    'auth_method': ('user_token' if config.authentication.username else 'api_key'),
+                    'auth_method': (
+                        'user_token' if config.authentication.username else 'api_key'
+                    ),
                 },
             )
 
@@ -537,7 +548,9 @@ def main() -> None:
                 },
             )
             # Non-fatal error - continue without signal handlers
-            logger.warning("Continuing without signal handlers - manual shutdown required")
+            logger.warning(
+                "Continuing without signal handlers - manual shutdown required"
+            )
 
         # Step 10: Launch MCP server with resource handlers
         logger.info(

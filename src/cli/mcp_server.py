@@ -41,28 +41,25 @@ import traceback  # builtin - Detailed error reporting for uncaught exceptions
 import time  # builtin - Time delays for retry mechanisms and session management
 
 # Internal imports - Configuration management for loading and validating server configuration
-from config import load_configuration
-
-# Internal imports - Configuration models for type safety and validation
-from models import ServerConfiguration
+from src.cli.config import load_configuration
 
 # Internal imports - Authentication management for secure LabArchives API access
-from auth_manager import AuthenticationManager
+from src.cli.auth_manager import AuthenticationManager
 
 # Internal imports - LabArchives API client for authenticated data retrieval
-from api.client import LabArchivesAPIClient
+from src.cli.api.client import LabArchivesAPIClient
 
 # Internal imports - MCP resource manager for resource discovery and content retrieval
-from mcp.resources import MCPResourceManager
+from src.cli.mcp.resources import MCPResourceManager
 
 # Internal imports - MCP protocol handler for managing protocol sessions
-from mcp.protocol import MCPProtocolHandler
+from src.cli.mcp.protocol import MCPProtocolHandler
 
 # Internal imports - Logging setup for audit trails and operational monitoring
-from logging_setup import setup_logging, get_logger
+from src.cli.logging_setup import setup_logging, get_logger
 
 # Internal imports - Version information for server identification
-from version import __version__
+from src.cli.version import __version__
 
 # =============================================================================
 # Global Constants
@@ -192,7 +189,9 @@ def run_protocol_with_session_refresh(
                         )
 
                         # Add exponential backoff delay before retry to prevent overwhelming the API
-                        backoff_delay = min(2 ** (retry_count - 1), 10)  # Cap at 10 seconds
+                        backoff_delay = min(
+                            2 ** (retry_count - 1), 10
+                        )  # Cap at 10 seconds
                         if backoff_delay > 0:
                             logger.debug(
                                 f"Applying exponential backoff delay: {backoff_delay} seconds",
@@ -541,7 +540,9 @@ def main() -> int:
         )
 
         # Step 9: Run the MCP protocol session loop with session refresh capability
-        logger.info("Starting MCP protocol session loop with session refresh capability...")
+        logger.info(
+            "Starting MCP protocol session loop with session refresh capability..."
+        )
         run_protocol_with_session_refresh(
             protocol_handler=protocol_handler,
             auth_manager=auth_manager,

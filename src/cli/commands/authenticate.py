@@ -33,16 +33,16 @@ import logging  # builtin - Python 3.11+ logging framework for audit and securit
 import argparse  # builtin - Python 3.11+ argument parsing for CLI interface
 
 # Internal imports - Authentication manager for secure session establishment
-from auth_manager import AuthenticationManager
+from src.cli.auth_manager import AuthenticationManager
 
 # Internal imports - Configuration loader for centralized configuration management
-from config import load_configuration
+from src.cli.config import load_configuration
 
 # Internal imports - Logging system setup for audit and security event logging
-from logging_setup import setup_logging
+from src.cli.logging_setup import setup_logging
 
 # Internal imports - Custom exception for structured error handling
-from exceptions import LabArchivesMCPException
+from src.cli.exceptions import LabArchivesMCPException
 
 # =============================================================================
 # Global Constants
@@ -119,7 +119,9 @@ def authenticate_command(args: argparse.Namespace) -> int:
         config_file_path = cli_args_dict.get('config_file')
 
         # Load and validate configuration from all sources
-        config = load_configuration(cli_args=cli_args_dict, config_file_path=config_file_path)
+        config = load_configuration(
+            cli_args=cli_args_dict, config_file_path=config_file_path
+        )
 
         # Step 2: Initialize logging system with loaded configuration
         main_logger, audit_logger = setup_logging(config.logging)
@@ -135,7 +137,9 @@ def authenticate_command(args: argparse.Namespace) -> int:
                 'has_cli_args': bool(cli_args_dict),
                 'api_base_url': config.authentication.api_base_url,
                 'has_username': bool(config.authentication.username),
-                'auth_method': ('user_token' if config.authentication.username else 'api_key'),
+                'auth_method': (
+                    'user_token' if config.authentication.username else 'api_key'
+                ),
             },
         )
 
@@ -159,7 +163,9 @@ def authenticate_command(args: argparse.Namespace) -> int:
             extra={
                 'component': 'authenticate_command',
                 'operation': 'establish_session',
-                'auth_method': ('user_token' if config.authentication.username else 'api_key'),
+                'auth_method': (
+                    'user_token' if config.authentication.username else 'api_key'
+                ),
             },
         )
 
@@ -170,7 +176,9 @@ def authenticate_command(args: argparse.Namespace) -> int:
         if session and session.is_valid():
             # Extract user information from session for feedback
             user_id = session.user_id
-            user_identifier = config.authentication.username or config.authentication.access_key_id
+            user_identifier = (
+                config.authentication.username or config.authentication.access_key_id
+            )
 
             # Provide success feedback to the user
             success_message = f"Authentication successful! Authenticated as user: {user_identifier} (UID: {user_id})"
@@ -187,7 +195,9 @@ def authenticate_command(args: argparse.Namespace) -> int:
                     'user_identifier': user_identifier,
                     'session_valid': session.is_valid(),
                     'authenticated_at': session.authenticated_at.isoformat(),
-                    'expires_at': (session.expires_at.isoformat() if session.expires_at else None),
+                    'expires_at': (
+                        session.expires_at.isoformat() if session.expires_at else None
+                    ),
                 },
             )
 

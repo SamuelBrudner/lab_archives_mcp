@@ -100,7 +100,9 @@ def parse_jsonrpc_message(raw_message: str) -> Dict[str, Any]:
             "Parsing JSON-RPC message",
             extra={
                 "message_length": len(raw_message),
-                "has_method": ("method" in message if isinstance(message, dict) else False),
+                "has_method": (
+                    "method" in message if isinstance(message, dict) else False
+                ),
             },
         )
 
@@ -204,7 +206,9 @@ def parse_jsonrpc_message(raw_message: str) -> Dict[str, Any]:
     return message
 
 
-def build_jsonrpc_response(result: Any = None, error: Optional[Any] = None, id: Any = None) -> str:
+def build_jsonrpc_response(
+    result: Any = None, error: Optional[Any] = None, id: Any = None
+) -> str:
     """
     Constructs a JSON-RPC 2.0 response message from the given result or error object.
 
@@ -293,7 +297,9 @@ def build_jsonrpc_response(result: Any = None, error: Optional[Any] = None, id: 
         return json.dumps(fallback_response, separators=(',', ':'))
 
 
-def route_mcp_request(request: Dict[str, Any], resource_manager: MCPResourceManager) -> str:
+def route_mcp_request(
+    request: Dict[str, Any], resource_manager: MCPResourceManager
+) -> str:
     """
     Routes an MCP protocol request to the appropriate handler based on the method.
 
@@ -506,7 +512,9 @@ class MCPProtocolHandler:
                     "error": str(e),
                     "error_type": type(e).__name__,
                     "message_preview": (
-                        raw_message[:100] + "..." if len(raw_message) > 100 else raw_message
+                        raw_message[:100] + "..."
+                        if len(raw_message) > 100
+                        else raw_message
                     ),
                 },
             )
@@ -591,7 +599,9 @@ class MCPProtocolHandler:
 
                 except KeyboardInterrupt:
                     # Handle graceful shutdown on interruption
-                    self.logger.info("Session interrupted by user, shutting down gracefully")
+                    self.logger.info(
+                        "Session interrupted by user, shutting down gracefully"
+                    )
                     break
 
                 except EOFError:

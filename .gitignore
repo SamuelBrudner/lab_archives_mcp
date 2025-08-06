@@ -17,6 +17,7 @@ venv/
 .venv/
 env/
 .env/
+conda_env/
 
 # Environment variable files
 .env

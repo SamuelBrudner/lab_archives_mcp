@@ -36,16 +36,16 @@ from typing import (
 )
 
 # Internal imports - Authentication configuration schema from configuration management
-from config import AuthenticationConfig
+from src.cli.config import AuthenticationConfig
 
 # Internal imports - Custom exception for authentication failures and structured error handling
-from exceptions import LabArchivesAPIException
+from src.cli.exceptions import LabArchivesAPIException
 
 # Internal imports - LabArchives API client for direct communication with LabArchives REST API
-from labarchives_api import LabArchivesAPI
+from src.cli.labarchives_api import LabArchivesAPI
 
 # Internal imports - Configured logger for audit and security event logging
-from logging_setup import get_logger
+from src.cli.logging_setup import get_logger
 
 
 # =============================================================================
@@ -134,7 +134,10 @@ def sanitize_credentials(credentials: dict) -> dict:
         if key.lower() in sensitive_fields:
             sanitized[key] = '[REDACTED]'
         # Also check if the field name contains sensitive keywords
-        elif any(sensitive in key.lower() for sensitive in ['secret', 'token', 'password', 'key']):
+        elif any(
+            sensitive in key.lower()
+            for sensitive in ['secret', 'token', 'password', 'key']
+        ):
             sanitized[key] = '[REDACTED]'
 
     return sanitized
@@ -180,7 +183,9 @@ def is_token_expired(expires_at: datetime) -> bool:
     return datetime.utcnow() > expires_at
 
 
-def is_token_near_expiry(expires_at: datetime, refresh_threshold_seconds: int = 300) -> bool:
+def is_token_near_expiry(
+    expires_at: datetime, refresh_threshold_seconds: int = 300
+) -> bool:
     """
     Checks if a given token expiration timestamp is close to expiring.
 
@@ -434,7 +439,9 @@ class AuthenticationSession:
         Returns:
             str: A sanitized string representation of the session.
         """
-        expires_str = self.expires_at.isoformat() if self.expires_at else "No expiration"
+        expires_str = (
+            self.expires_at.isoformat() if self.expires_at else "No expiration"
+        )
         return (
             f"AuthenticationSession(user_id={self.user_id}, "
             f"access_key_id=[REDACTED], authenticated_at={self.authenticated_at.isoformat()}, "
@@ -820,7 +827,9 @@ class AuthenticationManager:
                 'operation': 'get_session',
                 'has_session': self.session is not None,
                 'session_valid': self.session.is_valid() if self.session else False,
-                'needs_refresh': (self.session.needs_refresh() if self.session else False),
+                'needs_refresh': (
+                    self.session.needs_refresh() if self.session else False
+                ),
             },
         )
 
@@ -860,7 +869,9 @@ class AuthenticationManager:
                     'operation': 'get_session',
                     'reason': 'proactive_refresh',
                     'current_expires_at': (
-                        self.session.expires_at.isoformat() if self.session.expires_at else None
+                        self.session.expires_at.isoformat()
+                        if self.session.expires_at
+                        else None
                     ),
                     'user_id': self.session.user_id,
                 },
@@ -875,7 +886,9 @@ class AuthenticationManager:
                         'component': 'AuthenticationManager',
                         'operation': 'get_session',
                         'new_expires_at': (
-                            self.session.expires_at.isoformat() if self.session.expires_at else None
+                            self.session.expires_at.isoformat()
+                            if self.session.expires_at
+                            else None
                         ),
                         'user_id': self.session.user_id,
                     },
@@ -914,7 +927,9 @@ class AuthenticationManager:
                 'user_id': self.session.user_id,
                 'session_valid': self.session.is_valid(),
                 'expires_at': (
-                    self.session.expires_at.isoformat() if self.session.expires_at else None
+                    self.session.expires_at.isoformat()
+                    if self.session.expires_at
+                    else None
                 ),
                 'time_until_expiry': (
                     str(self.session.expires_at - datetime.utcnow())
@@ -973,7 +988,9 @@ class AuthenticationManager:
                 'component': 'AuthenticationManager',
                 'operation': 'refresh_session',
                 'had_previous_session': self.session is not None,
-                'previous_session_valid': (self.session.is_valid() if self.session else False),
+                'previous_session_valid': (
+                    self.session.is_valid() if self.session else False
+                ),
                 'previous_expires_at': (
                     self.session.expires_at.isoformat()
                     if self.session and self.session.expires_at
@@ -1008,7 +1025,9 @@ class AuthenticationManager:
                     'operation': 'refresh_session',
                     'new_user_id': new_session.user_id,
                     'new_expires_at': (
-                        new_session.expires_at.isoformat() if new_session.expires_at else None
+                        new_session.expires_at.isoformat()
+                        if new_session.expires_at
+                        else None
                     ),
                     'session_valid': new_session.is_valid(),
                 },
@@ -1108,7 +1127,9 @@ class AuthenticationManager:
                     'session_was_valid': self.session.is_valid(),
                     'authenticated_at': self.session.authenticated_at.isoformat(),
                     'expires_at': (
-                        self.session.expires_at.isoformat() if self.session.expires_at else None
+                        self.session.expires_at.isoformat()
+                        if self.session.expires_at
+                        else None
                     ),
                 },
             )

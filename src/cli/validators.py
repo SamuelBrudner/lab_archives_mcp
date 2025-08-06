@@ -31,6 +31,15 @@ from typing import (
 )  # builtin - Type annotations for function signatures
 from urllib.parse import urlparse  # builtin - URL validation for API endpoints
 
+# Define public API
+__all__ = [
+    "validate_authentication_config",
+    "validate_scope_config",
+    "validate_output_config",
+    "validate_logging_config",
+    "validate_server_configuration",
+]
+
 # Internal imports - Configuration models for validation
 # Import from models.py file (not models package) for configuration classes
 import importlib.util
@@ -44,7 +53,9 @@ if models_module_name not in sys.modules:
     import os
 
     models_path = os.path.join(os.path.dirname(__file__), "models.py")
-    models_spec = importlib.util.spec_from_file_location(models_module_name, models_path)
+    models_spec = importlib.util.spec_from_file_location(
+        models_module_name, models_path
+    )
     models_module = importlib.util.module_from_spec(models_spec)
     models_spec.loader.exec_module(models_module)
     sys.modules[models_module_name] = models_module
@@ -59,10 +70,10 @@ LoggingConfig = models_module.LoggingConfig
 ServerConfiguration = models_module.ServerConfiguration
 
 # Internal imports - Exception handling for structured error reporting
-from exceptions import LabArchivesMCPException
+from src.cli.exceptions import LabArchivesMCPException
 
 # Internal imports - Constants for validation rules and defaults
-from constants import DEFAULT_API_BASE_URL, SUPPORTED_SCOPE_TYPES, REGION_API_BASE_URLS
+from src.cli.constants import DEFAULT_API_BASE_URL, SUPPORTED_SCOPE_TYPES, REGION_API_BASE_URLS
 
 
 def validate_authentication_config(auth_config: AuthenticationConfig) -> None:
@@ -177,7 +188,9 @@ def validate_authentication_config(auth_config: AuthenticationConfig) -> None:
             )
 
         # Validate username format (basic email format validation)
-        if not re.match(r'^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$', auth_config.username):
+        if not re.match(
+            r'^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$', auth_config.username
+        ):
             raise LabArchivesMCPException(
                 message="Authentication validation failed: username must be a valid email address",
                 code=2003,
@@ -295,7 +308,9 @@ def validate_scope_config(scope_config: ScopeConfig) -> None:
     ]
 
     configured_options = [
-        (name, value) for name, value in scope_options if value is not None and value.strip()
+        (name, value)
+        for name, value in scope_options
+        if value is not None and value.strip()
     ]
 
     if len(configured_options) > 1:
@@ -390,7 +405,9 @@ def validate_scope_config(scope_config: ScopeConfig) -> None:
             )
 
         # Validate folder_path format (no path traversal, no absolute paths)
-        if scope_config.folder_path.startswith('/') or scope_config.folder_path.startswith('\\'):
+        if scope_config.folder_path.startswith(
+            '/'
+        ) or scope_config.folder_path.startswith('\\'):
             raise LabArchivesMCPException(
                 message="Scope validation failed: folder_path must be a relative path (cannot start with / or \\)",
                 code=3004,
@@ -564,7 +581,9 @@ def validate_logging_config(logging_config: LoggingConfig) -> None:
             )
 
         # Validate log_file is not a directory
-        if os.path.exists(logging_config.log_file) and os.path.isdir(logging_config.log_file):
+        if os.path.exists(logging_config.log_file) and os.path.isdir(
+            logging_config.log_file
+        ):
             raise LabArchivesMCPException(
                 message="Logging validation failed: log_file path points to a directory, not a file",
                 code=5001,
@@ -852,7 +871,10 @@ def validate_server_configuration(config: ServerConfiguration) -> None:
 
     if scope_configured:
         # Scope configuration requires valid authentication
-        if not config.authentication.access_key_id or not config.authentication.access_secret:
+        if (
+            not config.authentication.access_key_id
+            or not config.authentication.access_secret
+        ):
             raise LabArchivesMCPException(
                 message="Server configuration validation failed: Scope configuration requires valid authentication credentials",
                 code=6006,

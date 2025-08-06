@@ -56,8 +56,8 @@ _spec = importlib.util.spec_from_file_location("models_direct", _models_path)
 _models_module = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_models_module)
 LoggingConfig = _models_module.LoggingConfig
-from utils import scrub_argv
-from security.sanitizers import sanitize_url_params
+from src.cli.utils import scrub_argv
+from src.cli.security.sanitizers import sanitize_url_params
 
 # =============================================================================
 # Global State Management
@@ -129,7 +129,9 @@ def sanitize_argv(argv: list) -> list:
         # This handles traditional credential flags like --password, --token, etc.
         # Filter to string arguments only for scrub_argv, preserve non-strings as-is
         string_args = [arg for arg in argv if isinstance(arg, str)]
-        non_string_args = [(i, arg) for i, arg in enumerate(argv) if not isinstance(arg, str)]
+        non_string_args = [
+            (i, arg) for i, arg in enumerate(argv) if not isinstance(arg, str)
+        ]
 
         # Apply basic scrubbing to string arguments
         if string_args:
@@ -279,7 +281,9 @@ class StructuredFormatter(logging.Formatter):
             }:
                 attr_value = getattr(record, attr_name)
                 # Only include JSON-serializable attributes
-                if isinstance(attr_value, (str, int, float, bool, type(None), list, dict)):
+                if isinstance(
+                    attr_value, (str, int, float, bool, type(None), list, dict)
+                ):
                     context[attr_name] = attr_value
                 elif hasattr(attr_value, '__str__'):
                     # Convert other types to string representation
@@ -464,7 +468,9 @@ def setup_logging(
         _AUDIT_LOGGER.addHandler(audit_file_handler)
     except Exception as e:
         # If audit file handler creation fails, log error but continue
-        _MAIN_LOGGER.error(f"Failed to create audit file handler for {audit_log_file}: {e}")
+        _MAIN_LOGGER.error(
+            f"Failed to create audit file handler for {audit_log_file}: {e}"
+        )
 
     # Prevent audit logger from propagating to root logger
     _AUDIT_LOGGER.propagate = False
@@ -476,7 +482,9 @@ def setup_logging(
     _MAIN_LOGGER.info(
         f"Logging initialized - Main log: {log_file}, Audit log: {audit_log_file}, Level: {log_level}"
     )
-    _AUDIT_LOGGER.info("Audit logging initialized", extra={"event": "audit_system_start"})
+    _AUDIT_LOGGER.info(
+        "Audit logging initialized", extra={"event": "audit_system_start"}
+    )
 
     return _MAIN_LOGGER, _AUDIT_LOGGER
 

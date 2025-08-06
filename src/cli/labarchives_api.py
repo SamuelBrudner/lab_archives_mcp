@@ -30,21 +30,21 @@ from typing import (
     List,
 )  # builtin - Type annotations for method signatures and class properties
 
-from api.client import LabArchivesAPIClient
-from api.models import (
+from src.cli.api.client import LabArchivesAPIClient
+from src.cli.api.models import (
     NotebookListResponse,
     PageListResponse,
     EntryListResponse,
     UserContextResponse,
 )
-from api.errors import (
+from src.cli.api.errors import (
     APIError,
     APIAuthenticationError,
     APIRateLimitError,
     APIResponseParseError,
     APIPermissionError,
 )
-from constants import (
+from src.cli.constants import (
     DEFAULT_API_BASE_URL,
     AU_API_BASE_URL,
     UK_API_BASE_URL,
@@ -822,7 +822,9 @@ class LabArchivesAPI:
                     "region": self.region,
                     "operation": "get_entry_content",
                     "content_size": (
-                        len(entry_content.entries[0].content) if entry_content.entries else 0
+                        len(entry_content.entries[0].content)
+                        if entry_content.entries
+                        else 0
                     ),
                 },
             )
@@ -948,7 +950,9 @@ async def list_user_notebooks(api_client: LabArchivesAPI) -> List[Dict[str, Any]
         return []
 
 
-async def list_notebook_pages(api_client: LabArchivesAPI, notebook_id: str) -> List[Dict[str, Any]]:
+async def list_notebook_pages(
+    api_client: LabArchivesAPI, notebook_id: str
+) -> List[Dict[str, Any]]:
     """
     List all pages in the specified notebook.
 
@@ -967,7 +971,9 @@ async def list_notebook_pages(api_client: LabArchivesAPI, notebook_id: str) -> L
         return []
 
 
-async def list_page_entries(api_client: LabArchivesAPI, page_id: str) -> List[Dict[str, Any]]:
+async def list_page_entries(
+    api_client: LabArchivesAPI, page_id: str
+) -> List[Dict[str, Any]]:
     """
     List all entries in the specified page.
 
@@ -986,7 +992,9 @@ async def list_page_entries(api_client: LabArchivesAPI, page_id: str) -> List[Di
         return []
 
 
-async def get_notebook_metadata(api_client: LabArchivesAPI, notebook_id: str) -> Dict[str, Any]:
+async def get_notebook_metadata(
+    api_client: LabArchivesAPI, notebook_id: str
+) -> Dict[str, Any]:
     """
     Get metadata for the specified notebook.
 
@@ -1024,7 +1032,9 @@ async def get_page_metadata(api_client: LabArchivesAPI, page_id: str) -> Dict[st
         return {}
 
 
-async def get_entry_content(api_client: LabArchivesAPI, entry_id: str) -> Dict[str, Any]:
+async def get_entry_content(
+    api_client: LabArchivesAPI, entry_id: str
+) -> Dict[str, Any]:
     """
     Get content for the specified entry.
 

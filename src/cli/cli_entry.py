@@ -19,7 +19,9 @@ def main():
     # Run the main module using python -m to ensure proper package context
     try:
         # Change to the package directory and run as module
-        result = subprocess.run([sys.executable, '-m', 'main'] + sys.argv[1:], cwd=script_dir)
+        result = subprocess.run(
+            [sys.executable, '-m', 'main'] + sys.argv[1:], cwd=script_dir
+        )
         return result.returncode
     except Exception as e:
         print(f"Error running labarchives-mcp: {e}", file=sys.stderr)

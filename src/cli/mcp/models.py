@@ -38,7 +38,7 @@ from typing import List, Optional, Dict, Any, Union
 from pydantic import BaseModel, Field  # pydantic>=2.11.7
 
 # Import LabArchives API models for transformation
-from api.models import NotebookMetadata, PageMetadata, EntryContent
+from src.cli.api.models import NotebookMetadata, PageMetadata, EntryContent
 
 
 # Standard MCP JSON-LD context for semantic enrichment
@@ -816,7 +816,9 @@ def labarchives_to_mcp_resource(
         }
 
         # Return MCPResourceContent with optional JSON-LD context
-        return MCPResourceContent(content=content, context=MCP_JSONLD_CONTEXT, metadata=metadata)
+        return MCPResourceContent(
+            content=content, context=MCP_JSONLD_CONTEXT, metadata=metadata
+        )
 
     # This should never be reached due to initial validation
     raise ValueError(f"Unexpected object type: {type(labarchives_obj)}")

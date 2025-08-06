@@ -34,7 +34,7 @@ from typing import Optional, List, Dict, Any
 from urllib.parse import urlparse, parse_qs
 
 # Import LabArchives API client for data retrieval
-from api.client import LabArchivesAPIClient
+from src.cli.api.client import LabArchivesAPIClient
 
 # Import MCP data models for resource representation
 from .models import (
@@ -45,12 +45,12 @@ from .models import (
 )
 
 # Import exception classes for structured error handling
-from api.errors import APIError
-from exceptions import LabArchivesMCPException
-from logging_setup import get_logger
+from src.cli.api.errors import APIError
+from src.cli.exceptions import LabArchivesMCPException
+from src.cli.logging_setup import get_logger
 
 # Import constants for URI scheme and protocol configuration
-from constants import MCP_RESOURCE_URI_SCHEME
+from src.cli.constants import MCP_RESOURCE_URI_SCHEME
 
 # Global logger name for resource manager operations
 RESOURCE_MANAGER_LOGGER_NAME = "mcp.resources"
@@ -163,7 +163,9 @@ def parse_resource_uri(uri: str) -> Dict[str, str]:
         )
 
 
-def is_resource_in_scope(resource_info: Dict[str, str], scope_config: Dict[str, Any]) -> bool:
+def is_resource_in_scope(
+    resource_info: Dict[str, str], scope_config: Dict[str, Any]
+) -> bool:
     """
     Checks if a resource (by type and ID) is within the configured access scope.
 
@@ -330,7 +332,8 @@ class MCPResourceManager:
             extra={
                 "scope_config": scope_config,
                 "jsonld_enabled": jsonld_enabled,
-                "api_client_initialized": hasattr(api_client, 'uid') and api_client.uid is not None,
+                "api_client_initialized": hasattr(api_client, 'uid')
+                and api_client.uid is not None,
             },
         )
 

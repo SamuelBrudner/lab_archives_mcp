@@ -121,13 +121,18 @@ setup_environment() {
     # Determine the root directory of the CLI package
     local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     local cli_root="$(cd "${script_dir}/.." && pwd)"
+    # Determine project root (parent of src directory)
+    local project_root="$(cd "${cli_root}/.." && pwd)"
     
     # Export environment variables for test execution
     export CLI_ROOT="${cli_root}"
+    export PROJECT_ROOT="${project_root}"
     export TEST_DIR="${script_dir}/../tests"
-    export PYTHONPATH="${cli_root}:${PYTHONPATH:-}"
+    # Use project root in PYTHONPATH to avoid duplicate module resolutions (e.g., cli.main vs src.cli.main)
+    export PYTHONPATH="${project_root}:${CLI_ROOT}:${PYTHONPATH:-}"
     
     print_status "CLI root directory: ${CLI_ROOT}"
+    print_status "Project root directory: ${PROJECT_ROOT}"
     print_status "Test directory: ${TEST_DIR}"
     
     # Verify test directory exists
@@ -143,14 +148,23 @@ setup_environment() {
 activate_virtual_environment() {
     print_status "Checking for Python virtual environment..."
     
-    # Check for common virtual environment locations
-    local venv_paths=(
-        "${CLI_ROOT}/venv"
-        "${CLI_ROOT}/.venv"
-        "${CLI_ROOT}/env"
-        "${CLI_ROOT}/.env"
-        "${VIRTUAL_ENV}"
-    )
+    # ---------------------------------------------------------------------
+    # Build search directories: CLI_ROOT plus up to three ancestor levels
+    # ---------------------------------------------------------------------
+    local search_dirs=("${CLI_ROOT}")
+    local parent_dir="${CLI_ROOT}"
+    for _ in 1 2 3; do
+        parent_dir="$(cd "${parent_dir}/.." && pwd)"
+        search_dirs+=("${parent_dir}")
+    done
+
+    # Construct list of potential virtual-environment paths from search_dirs
+    local venv_paths=()
+    for base in "${search_dirs[@]}"; do
+        venv_paths+=("${base}/venv" "${base}/.venv" "${base}/env" "${base}/.env")
+    done
+    # Also consider currently-set VIRTUAL_ENV
+    venv_paths+=("${VIRTUAL_ENV}")
     
     for venv_path in "${venv_paths[@]}"; do
         if [ -n "${venv_path}" ] && [ -f "${venv_path}/bin/activate" ]; then
@@ -216,7 +230,10 @@ run_mypy_checks() {
         "--show-error-codes"
         "--show-error-context"
         "--pretty"
-        "${CLI_ROOT}/src/cli/"
+        "--exclude=\"(^|/)cli/\""
+        # Run mypy from the project root to ensure each module is only
+        # discovered once (avoids cli.main vs src.cli.main duplication)
+        "${PROJECT_ROOT}/.."
     )
     
     # Check if mypy config exists, create basic one if not
@@ -240,7 +257,8 @@ strict_equality = True
 EOF
     fi
     
-    if mypy "${mypy_args[@]}"; then
+    # Ensure mypy sees only the intended search path to avoid duplicate-module errors
+    if PYTHONPATH="${PROJECT_ROOT}" mypy "${mypy_args[@]}"; then
         print_success "Type checking passed"
         return 0
     else
@@ -256,7 +274,7 @@ run_pytest_with_coverage() {
         "${TEST_DIR}"
         "--verbose"
         "--tb=short"
-        "--cov=${CLI_ROOT}/src/cli"
+        "--cov=${CLI_ROOT}"
         "--cov-report=xml:${COVERAGE_REPORT}"
         "--cov-report=term-missing"
         "--cov-report=html:htmlcov"
@@ -289,7 +307,7 @@ run_black_check() {
         "--diff"
         "--color"
         "--line-length=88"
-        "${CLI_ROOT}/src/cli/"
+        "${CLI_ROOT}/"
         "${TEST_DIR}"
     )
     

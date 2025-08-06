@@ -29,7 +29,7 @@ TEST_USER_ID = "user_test_12345"
 
 # Common test configuration values
 TEST_ACCESS_KEY_ID = "test_access_key_id"
-TEST_ACCESS_SECRET = "test_access_secret"  
+TEST_ACCESS_SECRET = "test_access_secret"
 TEST_USERNAME = "test@example.com"
 TEST_API_BASE_URL = "https://api.labarchives.com/api"
 
@@ -38,10 +38,11 @@ MCP_PROTOCOL_VERSION = "2024-11-05"
 MCP_SERVER_NAME = "labarchives-mcp-server"
 MCP_SERVER_VERSION = "0.1.0"
 
+
 def get_test_notebook_data():
     """
     Return standard test notebook data for consistent testing.
-    
+
     Returns:
         dict: Sample notebook metadata structure
     """
@@ -53,13 +54,14 @@ def get_test_notebook_data():
         "created_date": "2024-01-01T00:00:00Z",
         "last_modified": "2024-01-01T12:00:00Z",
         "folder_count": 3,
-        "page_count": 5
+        "page_count": 5,
     }
+
 
 def get_test_page_data():
     """
     Return standard test page data for consistent testing.
-    
+
     Returns:
         dict: Sample page metadata structure
     """
@@ -71,13 +73,14 @@ def get_test_page_data():
         "created_date": "2024-01-01T10:00:00Z",
         "last_modified": "2024-01-01T14:00:00Z",
         "entry_count": 3,
-        "author": TEST_USERNAME
+        "author": TEST_USERNAME,
     }
+
 
 def get_test_entry_data():
     """
     Return standard test entry data for consistent testing.
-    
+
     Returns:
         dict: Sample entry content structure
     """
@@ -91,40 +94,44 @@ def get_test_entry_data():
         "last_modified": "2024-01-01T13:00:00Z",
         "author": TEST_USERNAME,
         "version": 1,
-        "metadata": {"test_flag": True}
+        "metadata": {"test_flag": True},
     }
+
 
 def get_test_mcp_resource_uri():
     """
     Return standard MCP resource URI for testing.
-    
+
     Returns:
         str: Sample MCP resource URI
     """
     return f"labarchives://notebook/{TEST_NOTEBOOK_ID}"
 
+
 def get_test_mcp_page_uri():
     """
     Return standard MCP page resource URI for testing.
-    
+
     Returns:
         str: Sample MCP page resource URI
     """
     return f"labarchives://notebook/{TEST_NOTEBOOK_ID}/page/{TEST_PAGE_ID}"
 
+
 def get_test_mcp_entry_uri():
     """
     Return standard MCP entry resource URI for testing.
-    
+
     Returns:
         str: Sample MCP entry resource URI
     """
     return f"labarchives://entry/{TEST_ENTRY_ID}"
 
+
 def get_test_auth_credentials():
     """
     Return standard test authentication credentials.
-    
+
     Returns:
         dict: Test authentication configuration
     """
@@ -132,13 +139,14 @@ def get_test_auth_credentials():
         "access_key_id": TEST_ACCESS_KEY_ID,
         "access_secret": TEST_ACCESS_SECRET,
         "username": TEST_USERNAME,
-        "api_base_url": TEST_API_BASE_URL
+        "api_base_url": TEST_API_BASE_URL,
     }
+
 
 def get_test_mcp_capabilities():
     """
     Return standard MCP server capabilities for testing.
-    
+
     Returns:
         dict: MCP server capabilities structure
     """
@@ -150,27 +158,29 @@ def get_test_mcp_capabilities():
             "resources": True,
             "tools": False,
             "prompts": False,
-            "logging": True
-        }
+            "logging": True,
+        },
     }
+
 
 def get_test_scope_config():
     """
     Return standard test scope configuration.
-    
+
     Returns:
         dict: Test scope configuration structure
     """
     return {
         "notebook_id": TEST_NOTEBOOK_ID,
         "notebook_name": "Test Lab Notebook",
-        "folder_path": "/Test Folder"
+        "folder_path": "/Test Folder",
     }
+
 
 # Export commonly used test utilities and constants
 __all__ = [
     "TEST_NOTEBOOK_ID",
-    "TEST_PAGE_ID", 
+    "TEST_PAGE_ID",
     "TEST_ENTRY_ID",
     "TEST_USER_ID",
     "TEST_ACCESS_KEY_ID",
@@ -188,5 +198,5 @@ __all__ = [
     "get_test_mcp_entry_uri",
     "get_test_auth_credentials",
     "get_test_mcp_capabilities",
-    "get_test_scope_config"
+    "get_test_scope_config",
 ]

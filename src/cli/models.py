@@ -255,7 +255,9 @@ class OutputConfig(BaseModel):
 
         validate_assignment = True
         use_enum_values = True
-        json_schema_extra = {"example": {"json_ld_enabled": False, "structured_output": True}}
+        json_schema_extra = {
+            "example": {"json_ld_enabled": False, "structured_output": True}
+        }
 
 
 class LoggingConfig(BaseModel):
@@ -306,7 +308,9 @@ class LoggingConfig(BaseModel):
 
     # Quiet mode for minimal output
     # Reduces log output to essential messages only
-    quiet: bool = Field(default=False, description="Enable quiet mode for minimal log output")
+    quiet: bool = Field(
+        default=False, description="Enable quiet mode for minimal log output"
+    )
 
     def __init__(self, **data):
         """

@@ -22,9 +22,9 @@ import json  # builtin
 
 from src.cli.api.models import (
     NotebookListResponse,
-    PageListResponse, 
+    PageListResponse,
     EntryListResponse,
-    UserContextResponse
+    UserContextResponse,
 )
 
 
@@ -261,14 +261,15 @@ MALFORMED_XML = """<?xml version="1.0" encoding="UTF-8"?>
 # Fixture Retrieval Functions
 # =============================================================================
 
+
 def get_notebook_list_json() -> str:
     """
     Returns a valid JSON string representing a successful notebook list API response.
-    
+
     This fixture provides a comprehensive notebook list response with multiple notebooks
     containing realistic metadata fields including IDs, names, descriptions, ownership,
     timestamps, and content counts. Used for testing notebook discovery functionality.
-    
+
     Returns:
         str: JSON string for notebook list response with success status
     """
@@ -278,11 +279,11 @@ def get_notebook_list_json() -> str:
 def get_page_list_json() -> str:
     """
     Returns a valid JSON string representing a successful page list API response.
-    
+
     This fixture provides a page list response with multiple pages containing
     hierarchical information including notebook relationships, folder paths,
     and entry counts. Used for testing page discovery within notebooks.
-    
+
     Returns:
         str: JSON string for page list response with success status
     """
@@ -292,11 +293,11 @@ def get_page_list_json() -> str:
 def get_entry_list_json() -> str:
     """
     Returns a valid JSON string representing a successful entry list API response.
-    
+
     This fixture provides an entry list response with multiple entries of different
     types (text, attachment) including content, metadata, and version information.
     Used for testing content retrieval and parsing functionality.
-    
+
     Returns:
         str: JSON string for entry list response with success status
     """
@@ -306,11 +307,11 @@ def get_entry_list_json() -> str:
 def get_user_context_json() -> str:
     """
     Returns a valid JSON string representing a successful user context API response.
-    
+
     This fixture provides a user context response with comprehensive user information
     including unique ID, profile details, and role assignments. Used for testing
     authentication and authorization workflows.
-    
+
     Returns:
         str: JSON string for user context response with success status
     """
@@ -320,11 +321,11 @@ def get_user_context_json() -> str:
 def get_notebook_list_xml() -> str:
     """
     Returns a valid XML string representing a successful notebook list API response.
-    
+
     This fixture provides the same notebook list data as the JSON version but in
     XML format for testing XML response parsing capabilities. Includes proper
     XML declaration and structured element hierarchy.
-    
+
     Returns:
         str: XML string for notebook list response with success status
     """
@@ -334,11 +335,11 @@ def get_notebook_list_xml() -> str:
 def get_page_list_xml() -> str:
     """
     Returns a valid XML string representing a successful page list API response.
-    
+
     This fixture provides the same page list data as the JSON version but in
     XML format for testing XML response parsing capabilities. Includes proper
     attribute encoding and hierarchical structure.
-    
+
     Returns:
         str: XML string for page list response with success status
     """
@@ -348,11 +349,11 @@ def get_page_list_xml() -> str:
 def get_entry_list_xml() -> str:
     """
     Returns a valid XML string representing a successful entry list API response.
-    
+
     This fixture provides the same entry list data as the JSON version but in
     XML format for testing XML response parsing capabilities. Includes proper
     content encoding and special character handling.
-    
+
     Returns:
         str: XML string for entry list response with success status
     """
@@ -362,11 +363,11 @@ def get_entry_list_xml() -> str:
 def get_user_context_xml() -> str:
     """
     Returns a valid XML string representing a successful user context API response.
-    
+
     This fixture provides the same user context data as the JSON version but in
     XML format for testing XML response parsing capabilities. Includes proper
     attribute formatting and comma-separated role lists.
-    
+
     Returns:
         str: XML string for user context response with success status
     """
@@ -376,11 +377,11 @@ def get_user_context_xml() -> str:
 def get_malformed_json() -> str:
     """
     Returns a malformed JSON string to test error handling and validation failures.
-    
+
     This fixture provides intentionally malformed JSON data with missing required
     fields, invalid data types, and incomplete structure. Used for testing the
     system's ability to handle malformed API responses gracefully.
-    
+
     Returns:
         str: Malformed JSON string with various structural and data errors
     """
@@ -390,11 +391,11 @@ def get_malformed_json() -> str:
 def get_error_json() -> str:
     """
     Returns a JSON string representing an error response from the API.
-    
+
     This fixture provides a structured error response representing authentication
     failures, authorization issues, or other API errors. Used for testing error
     handling logic and user-friendly error message generation.
-    
+
     Returns:
         str: Error JSON string with structured error information
     """
@@ -404,10 +405,10 @@ def get_error_json() -> str:
 def get_timeout_error_json() -> str:
     """
     Returns a JSON string representing a network timeout error response.
-    
+
     This fixture provides a structured error response for network timeout scenarios
     to test timeout handling, retry logic, and graceful degradation functionality.
-    
+
     Returns:
         str: Timeout error JSON string with retry information
     """
@@ -417,10 +418,10 @@ def get_timeout_error_json() -> str:
 def get_rate_limit_error_json() -> str:
     """
     Returns a JSON string representing a rate limiting error response.
-    
+
     This fixture provides a structured error response for rate limiting scenarios
     to test rate limit handling, backoff strategies, and user notification logic.
-    
+
     Returns:
         str: Rate limit error JSON string with limit and reset information
     """
@@ -430,11 +431,11 @@ def get_rate_limit_error_json() -> str:
 def get_malformed_xml() -> str:
     """
     Returns a malformed XML string to test XML parsing error handling.
-    
+
     This fixture provides intentionally malformed XML data with missing closing
     tags, invalid attributes, and incomplete structure. Used for testing the
     system's ability to handle malformed XML responses gracefully.
-    
+
     Returns:
         str: Malformed XML string with various structural errors
     """
@@ -445,23 +446,26 @@ def get_malformed_xml() -> str:
 # Dynamic Fixture Generation Functions
 # =============================================================================
 
-def create_notebook_response(notebook_count: int = 1, include_errors: bool = False) -> str:
+
+def create_notebook_response(
+    notebook_count: int = 1, include_errors: bool = False
+) -> str:
     """
     Creates a dynamic notebook list response with specified number of notebooks.
-    
+
     This function generates notebook list responses with configurable content for
     testing various scenarios including large result sets, empty responses, and
     error conditions. Supports both success and error response generation.
-    
+
     Args:
         notebook_count: Number of notebooks to include in response (default: 1)
         include_errors: Whether to include error status in response (default: False)
-        
+
     Returns:
         str: JSON string with dynamically generated notebook list response
     """
     notebooks = []
-    
+
     for i in range(notebook_count):
         notebook = {
             "id": f"nb_{1000000 + i}",
@@ -471,30 +475,30 @@ def create_notebook_response(notebook_count: int = 1, include_errors: bool = Fal
             "created_date": datetime.now().isoformat() + "Z",
             "last_modified": datetime.now().isoformat() + "Z",
             "folder_count": (i + 1) * 2,
-            "page_count": (i + 1) * 5
+            "page_count": (i + 1) * 5,
         }
         notebooks.append(notebook)
-    
+
     response = {
         "notebooks": notebooks,
         "status": "error" if include_errors else "success",
-        "message": f"Generated {notebook_count} notebooks for testing"
+        "message": f"Generated {notebook_count} notebooks for testing",
     }
-    
+
     return json.dumps(response, indent=2)
 
 
 def create_empty_response(response_type: str = "notebooks") -> str:
     """
     Creates an empty response for testing scenarios with no data.
-    
+
     This function generates empty API responses for testing edge cases where
     no data is available, such as empty notebooks, pages with no entries, or
     users with no accessible content.
-    
+
     Args:
         response_type: Type of response to create ("notebooks", "pages", "entries", "user")
-        
+
     Returns:
         str: JSON string with empty response of specified type
     """
@@ -502,25 +506,25 @@ def create_empty_response(response_type: str = "notebooks") -> str:
         "notebooks": {
             "notebooks": [],
             "status": "success",
-            "message": "No notebooks found for user"
+            "message": "No notebooks found for user",
         },
         "pages": {
             "pages": [],
-            "status": "success", 
-            "message": "No pages found in notebook"
+            "status": "success",
+            "message": "No pages found in notebook",
         },
         "entries": {
             "entries": [],
             "status": "success",
-            "message": "No entries found on page"
+            "message": "No entries found on page",
         },
         "user": {
             "user": None,
             "status": "error",
-            "message": "User not found or not authenticated"
-        }
+            "message": "User not found or not authenticated",
+        },
     }
-    
+
     return json.dumps(response_templates.get(response_type, {}), indent=2)
 
 
@@ -528,17 +532,18 @@ def create_empty_response(response_type: str = "notebooks") -> str:
 # Response Validation Functions
 # =============================================================================
 
+
 def validate_notebook_response(response_json: str) -> bool:
     """
     Validates a notebook list response against the expected schema.
-    
+
     This function parses and validates notebook list responses to ensure they
     conform to the expected data structure and contain valid data types. Used
     for testing response validation logic.
-    
+
     Args:
         response_json: JSON string to validate
-        
+
     Returns:
         bool: True if response is valid, False otherwise
     """
@@ -554,14 +559,14 @@ def validate_notebook_response(response_json: str) -> bool:
 def validate_page_response(response_json: str) -> bool:
     """
     Validates a page list response against the expected schema.
-    
+
     This function parses and validates page list responses to ensure they
     conform to the expected data structure and contain valid data types. Used
     for testing response validation logic.
-    
+
     Args:
         response_json: JSON string to validate
-        
+
     Returns:
         bool: True if response is valid, False otherwise
     """
@@ -577,14 +582,14 @@ def validate_page_response(response_json: str) -> bool:
 def validate_entry_response(response_json: str) -> bool:
     """
     Validates an entry list response against the expected schema.
-    
+
     This function parses and validates entry list responses to ensure they
     conform to the expected data structure and contain valid data types. Used
     for testing response validation logic.
-    
+
     Args:
         response_json: JSON string to validate
-        
+
     Returns:
         bool: True if response is valid, False otherwise
     """
@@ -600,14 +605,14 @@ def validate_entry_response(response_json: str) -> bool:
 def validate_user_response(response_json: str) -> bool:
     """
     Validates a user context response against the expected schema.
-    
+
     This function parses and validates user context responses to ensure they
     conform to the expected data structure and contain valid data types. Used
     for testing response validation logic.
-    
+
     Args:
         response_json: JSON string to validate
-        
+
     Returns:
         bool: True if response is valid, False otherwise
     """
@@ -638,41 +643,41 @@ FIXTURE_REGISTRY = {
     "error_json": get_error_json,
     "timeout_error_json": get_timeout_error_json,
     "rate_limit_error_json": get_rate_limit_error_json,
-    "malformed_xml": get_malformed_xml
+    "malformed_xml": get_malformed_xml,
 }
 
 
 def get_fixture(fixture_name: str) -> str:
     """
     Retrieves a test fixture by name from the registry.
-    
+
     This function provides a centralized way to access all available test fixtures
     for automated testing scenarios. Supports both static and dynamic fixture
     retrieval based on the fixture name.
-    
+
     Args:
         fixture_name: Name of the fixture to retrieve
-        
+
     Returns:
         str: The requested fixture data
-        
+
     Raises:
         KeyError: If the fixture name is not found in the registry
     """
     if fixture_name not in FIXTURE_REGISTRY:
         raise KeyError(f"Fixture '{fixture_name}' not found in registry")
-    
+
     return FIXTURE_REGISTRY[fixture_name]()
 
 
 def list_available_fixtures() -> list:
     """
     Returns a list of all available fixture names.
-    
+
     This function provides a way to discover all available test fixtures for
     documentation and testing purposes. Useful for automated test generation
     and fixture validation.
-    
+
     Returns:
         list: List of available fixture names
     """

@@ -37,7 +37,9 @@ class LabArchivesMCPException(Exception):
     maintaining the flexibility to add domain-specific error information.
     """
 
-    def __init__(self, message: str, code: Optional[int] = None, context: Optional[object] = None):
+    def __init__(
+        self, message: str, code: Optional[int] = None, context: Optional[object] = None
+    ):
         """
         Initialize the base exception with a message, optional error code, and optional context.
 
@@ -123,7 +125,9 @@ class LabArchivesAPIException(LabArchivesMCPException):
     while providing semantic meaning for API-related error conditions.
     """
 
-    def __init__(self, message: str, code: Optional[int] = None, context: Optional[object] = None):
+    def __init__(
+        self, message: str, code: Optional[int] = None, context: Optional[object] = None
+    ):
         """
         Initialize the API exception with a message, optional error code, and optional context.
 
@@ -292,7 +296,9 @@ class EntryOutsideNotebookScopeError(LabArchivesMCPException):
     the actual notebook ID it belongs to, and the configured notebook scope for audit purposes.
     """
 
-    def __init__(self, message: str, code: Optional[int] = None, context: Optional[object] = None):
+    def __init__(
+        self, message: str, code: Optional[int] = None, context: Optional[object] = None
+    ):
         """
         Initialize the entry scope violation exception with diagnostic information.
 
@@ -373,7 +379,9 @@ class FolderScopeViolationError(LabArchivesMCPException):
     scope configuration, and the notebook's actual folder structure for audit purposes.
     """
 
-    def __init__(self, message: str, code: Optional[int] = None, context: Optional[object] = None):
+    def __init__(
+        self, message: str, code: Optional[int] = None, context: Optional[object] = None
+    ):
         """
         Initialize the folder scope violation exception with diagnostic information.
 
@@ -454,7 +462,9 @@ class NotebookScopeViolationError(LabArchivesMCPException):
     the configured scope boundaries, and the attempted operation for comprehensive audit trails.
     """
 
-    def __init__(self, message: str, code: Optional[int] = None, context: Optional[object] = None):
+    def __init__(
+        self, message: str, code: Optional[int] = None, context: Optional[object] = None
+    ):
         """
         Initialize the notebook scope violation exception with detailed error context.
 

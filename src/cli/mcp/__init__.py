@@ -137,7 +137,9 @@ __all__ = [
 # Package version and metadata for identification and debugging
 __version__ = "0.1.0"
 __author__ = "LabArchives MCP Server Team"
-__description__ = "MCP Protocol Implementation for LabArchives Electronic Lab Notebook Integration"
+__description__ = (
+    "MCP Protocol Implementation for LabArchives Electronic Lab Notebook Integration"
+)
 __license__ = "MIT"
 
 # MCP protocol version supported by this implementation

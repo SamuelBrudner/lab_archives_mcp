@@ -48,7 +48,9 @@ class MCPProtocolHandler:
 
             return json.dumps(response)
         except Exception as e:
-            error_response = build_jsonrpc_response(None, error={"code": -32603, "message": str(e)})
+            error_response = build_jsonrpc_response(
+                None, error={"code": -32603, "message": str(e)}
+            )
             return json.dumps(error_response)
 
     def run_session(self):

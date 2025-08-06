@@ -37,22 +37,22 @@ import logging  # builtin - Logging of server events, errors, and diagnostics
 import traceback  # builtin - Detailed error reporting and diagnostics for uncaught exceptions
 
 # Internal imports for configuration management
-from config import load_configuration
+from src.cli.config import load_configuration
 
 # Internal imports for logging setup
-from logging_setup import setup_logging
+from src.cli.logging_setup import setup_logging
 
 # Internal imports for authentication management
-from auth_manager import AuthenticationManager
+from src.cli.auth_manager import AuthenticationManager
 
 # Internal imports for resource management
-from resource_manager import ResourceManager
+from src.cli.resource_manager import ResourceManager
 
 # Internal imports for MCP protocol handling
-from mcp.protocol import MCPProtocolHandler
+from src.cli.mcp.protocol import MCPProtocolHandler
 
 # Internal imports for exception handling
-from exceptions import LabArchivesMCPException, MCPError
+from src.cli.exceptions import LabArchivesMCPException, MCPError
 
 # =============================================================================
 # Global Constants
@@ -210,14 +210,20 @@ def start_command(cli_args: dict) -> int:
                 "server_name": config.server_name,
                 "server_version": config.server_version,
                 "api_base_url": config.authentication.api_base_url,
-                "auth_method": ("user_token" if config.authentication.username else "api_key"),
+                "auth_method": (
+                    "user_token" if config.authentication.username else "api_key"
+                ),
                 "scope_type": (
                     "notebook_id"
                     if config.scope.notebook_id
                     else (
                         "notebook_name"
                         if config.scope.notebook_name
-                        else ("folder_path" if config.scope.folder_path else "unrestricted")
+                        else (
+                            "folder_path"
+                            if config.scope.folder_path
+                            else "unrestricted"
+                        )
                     )
                 ),
                 "json_ld_enabled": config.output.json_ld_enabled,
@@ -232,7 +238,9 @@ def start_command(cli_args: dict) -> int:
                 "operation": "start_command",
                 "step": "authentication",
                 "api_base_url": config.authentication.api_base_url,
-                "auth_method": ("user_token" if config.authentication.username else "api_key"),
+                "auth_method": (
+                    "user_token" if config.authentication.username else "api_key"
+                ),
             },
         )
 
@@ -249,7 +257,9 @@ def start_command(cli_args: dict) -> int:
                     "user_id": session.user_id,
                     "access_key_id": session.access_key_id,
                     "authenticated_at": session.authenticated_at.isoformat(),
-                    "expires_at": (session.expires_at.isoformat() if session.expires_at else None),
+                    "expires_at": (
+                        session.expires_at.isoformat() if session.expires_at else None
+                    ),
                     "session_valid": session.is_valid(),
                 },
             )
@@ -426,7 +436,9 @@ def start_command(cli_args: dict) -> int:
 
         except (KeyboardInterrupt, EOFError) as e:
             # Step 9: Handle KeyboardInterrupt or EOFError for graceful shutdown
-            interruption_type = "keyboard_interrupt" if isinstance(e, KeyboardInterrupt) else "eof"
+            interruption_type = (
+                "keyboard_interrupt" if isinstance(e, KeyboardInterrupt) else "eof"
+            )
 
             logger.info(
                 f"MCP protocol session interrupted by {interruption_type}",

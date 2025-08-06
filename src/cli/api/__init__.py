@@ -22,27 +22,27 @@ security compliance.
 """
 
 # Import API client for LabArchives REST API integration
-from api.client import LabArchivesAPIClient as APIClient
+from src.cli.api.client import LabArchivesAPIClient as APIClient
 
 # Import error classes for structured exception handling
-from api.errors import APIAuthenticationError as AuthenticationError
-from api.errors import APIError
-from api.errors import APIPermissionError
-from api.errors import APIRateLimitError as RateLimitError
-from api.errors import APIResponseParseError
+from src.cli.api.errors import APIAuthenticationError as AuthenticationError
+from src.cli.api.errors import APIError
+from src.cli.api.errors import APIPermissionError
+from src.cli.api.errors import APIRateLimitError as RateLimitError
+from src.cli.api.errors import APIResponseParseError
 
 # Import data models for LabArchives entities
-from api.models import EntryContent as LabArchivesEntry
-from api.models import EntryListResponse
-from api.models import NotebookListResponse
-from api.models import NotebookMetadata as LabArchivesNotebook
-from api.models import PageListResponse
-from api.models import PageMetadata as LabArchivesPage
-from api.models import UserContext
-from api.models import UserContextResponse
+from src.cli.api.models import EntryContent as LabArchivesEntry
+from src.cli.api.models import EntryListResponse
+from src.cli.api.models import NotebookListResponse
+from src.cli.api.models import NotebookMetadata as LabArchivesNotebook
+from src.cli.api.models import PageListResponse
+from src.cli.api.models import PageMetadata as LabArchivesPage
+from src.cli.api.models import UserContext
+from src.cli.api.models import UserContextResponse
 
 # Import response parser for API response processing
-from api.response_parser import parse_api_response
+from src.cli.api.response_parser import parse_api_response
 
 
 # Define the public API exports

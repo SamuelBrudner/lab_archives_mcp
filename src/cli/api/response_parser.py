@@ -30,13 +30,13 @@ from pydantic import (
     ValidationError,
 )  # pydantic>=2.11.7 - Data validation and models
 
-from api.models import (
+from src.cli.api.models import (
     NotebookListResponse,
     PageListResponse,
     EntryListResponse,
     UserContextResponse,
 )
-from api.errors import APIResponseParseError, APIError
+from src.cli.api.errors import APIResponseParseError, APIError
 
 
 def safe_serialize(obj: Any) -> str:
@@ -163,7 +163,9 @@ def _parse_xml_to_dict(xml_string: str) -> Dict[str, Any]:
             message=f"Failed to parse XML response: {str(e)}",
             code=422,
             context={
-                "xml_string": (xml_string[:500] + "..." if len(xml_string) > 500 else xml_string),
+                "xml_string": (
+                    xml_string[:500] + "..." if len(xml_string) > 500 else xml_string
+                ),
                 "parse_error": str(e),
                 "error_type": "XMLParseError",
             },
@@ -173,14 +175,18 @@ def _parse_xml_to_dict(xml_string: str) -> Dict[str, Any]:
             message=f"Unexpected error parsing XML response: {str(e)}",
             code=500,
             context={
-                "xml_string": (xml_string[:500] + "..." if len(xml_string) > 500 else xml_string),
+                "xml_string": (
+                    xml_string[:500] + "..." if len(xml_string) > 500 else xml_string
+                ),
                 "error_type": type(e).__name__,
                 "error_details": str(e),
             },
         )
 
 
-def parse_notebook_list_response(raw_response: str, format: str) -> NotebookListResponse:
+def parse_notebook_list_response(
+    raw_response: str, format: str
+) -> NotebookListResponse:
     """
     Parses a raw JSON or XML response from the LabArchives API for notebook listing,
     validates it against the NotebookListResponse model, and returns the structured model.
@@ -219,7 +225,9 @@ def parse_notebook_list_response(raw_response: str, format: str) -> NotebookList
                     code=422,
                     context={
                         "raw_response": (
-                            raw_response[:500] + "..." if len(raw_response) > 500 else raw_response
+                            raw_response[:500] + "..."
+                            if len(raw_response) > 500
+                            else raw_response
                         ),
                         "format": format,
                         "json_error": str(e),
@@ -236,7 +244,9 @@ def parse_notebook_list_response(raw_response: str, format: str) -> NotebookList
                     "format": format,
                     "supported_formats": ["json", "xml"],
                     "raw_response": (
-                        raw_response[:500] + "..." if len(raw_response) > 500 else raw_response
+                        raw_response[:500] + "..."
+                        if len(raw_response) > 500
+                        else raw_response
                     ),
                 },
             )
@@ -253,7 +263,9 @@ def parse_notebook_list_response(raw_response: str, format: str) -> NotebookList
                 code=422,
                 context={
                     "raw_response": (
-                        raw_response[:500] + "..." if len(raw_response) > 500 else raw_response
+                        raw_response[:500] + "..."
+                        if len(raw_response) > 500
+                        else raw_response
                     ),
                     "format": format,
                     "parsed_data": safe_serialize(parsed_data),
@@ -272,7 +284,9 @@ def parse_notebook_list_response(raw_response: str, format: str) -> NotebookList
             code=500,
             context={
                 "raw_response": (
-                    raw_response[:500] + "..." if len(raw_response) > 500 else raw_response
+                    raw_response[:500] + "..."
+                    if len(raw_response) > 500
+                    else raw_response
                 ),
                 "format": format,
                 "error_type": type(e).__name__,
@@ -320,7 +334,9 @@ def parse_page_list_response(raw_response: str, format: str) -> PageListResponse
                     code=422,
                     context={
                         "raw_response": (
-                            raw_response[:500] + "..." if len(raw_response) > 500 else raw_response
+                            raw_response[:500] + "..."
+                            if len(raw_response) > 500
+                            else raw_response
                         ),
                         "format": format,
                         "json_error": str(e),
@@ -337,7 +353,9 @@ def parse_page_list_response(raw_response: str, format: str) -> PageListResponse
                     "format": format,
                     "supported_formats": ["json", "xml"],
                     "raw_response": (
-                        raw_response[:500] + "..." if len(raw_response) > 500 else raw_response
+                        raw_response[:500] + "..."
+                        if len(raw_response) > 500
+                        else raw_response
                     ),
                 },
             )
@@ -354,7 +372,9 @@ def parse_page_list_response(raw_response: str, format: str) -> PageListResponse
                 code=422,
                 context={
                     "raw_response": (
-                        raw_response[:500] + "..." if len(raw_response) > 500 else raw_response
+                        raw_response[:500] + "..."
+                        if len(raw_response) > 500
+                        else raw_response
                     ),
                     "format": format,
                     "parsed_data": safe_serialize(parsed_data),
@@ -373,7 +393,9 @@ def parse_page_list_response(raw_response: str, format: str) -> PageListResponse
             code=500,
             context={
                 "raw_response": (
-                    raw_response[:500] + "..." if len(raw_response) > 500 else raw_response
+                    raw_response[:500] + "..."
+                    if len(raw_response) > 500
+                    else raw_response
                 ),
                 "format": format,
                 "error_type": type(e).__name__,
@@ -421,7 +443,9 @@ def parse_entry_list_response(raw_response: str, format: str) -> EntryListRespon
                     code=422,
                     context={
                         "raw_response": (
-                            raw_response[:500] + "..." if len(raw_response) > 500 else raw_response
+                            raw_response[:500] + "..."
+                            if len(raw_response) > 500
+                            else raw_response
                         ),
                         "format": format,
                         "json_error": str(e),
@@ -438,7 +462,9 @@ def parse_entry_list_response(raw_response: str, format: str) -> EntryListRespon
                     "format": format,
                     "supported_formats": ["json", "xml"],
                     "raw_response": (
-                        raw_response[:500] + "..." if len(raw_response) > 500 else raw_response
+                        raw_response[:500] + "..."
+                        if len(raw_response) > 500
+                        else raw_response
                     ),
                 },
             )
@@ -455,7 +481,9 @@ def parse_entry_list_response(raw_response: str, format: str) -> EntryListRespon
                 code=422,
                 context={
                     "raw_response": (
-                        raw_response[:500] + "..." if len(raw_response) > 500 else raw_response
+                        raw_response[:500] + "..."
+                        if len(raw_response) > 500
+                        else raw_response
                     ),
                     "format": format,
                     "parsed_data": safe_serialize(parsed_data),
@@ -474,7 +502,9 @@ def parse_entry_list_response(raw_response: str, format: str) -> EntryListRespon
             code=500,
             context={
                 "raw_response": (
-                    raw_response[:500] + "..." if len(raw_response) > 500 else raw_response
+                    raw_response[:500] + "..."
+                    if len(raw_response) > 500
+                    else raw_response
                 ),
                 "format": format,
                 "error_type": type(e).__name__,
@@ -522,7 +552,9 @@ def parse_user_context_response(raw_response: str, format: str) -> UserContextRe
                     code=422,
                     context={
                         "raw_response": (
-                            raw_response[:500] + "..." if len(raw_response) > 500 else raw_response
+                            raw_response[:500] + "..."
+                            if len(raw_response) > 500
+                            else raw_response
                         ),
                         "format": format,
                         "json_error": str(e),
@@ -539,7 +571,9 @@ def parse_user_context_response(raw_response: str, format: str) -> UserContextRe
                     "format": format,
                     "supported_formats": ["json", "xml"],
                     "raw_response": (
-                        raw_response[:500] + "..." if len(raw_response) > 500 else raw_response
+                        raw_response[:500] + "..."
+                        if len(raw_response) > 500
+                        else raw_response
                     ),
                 },
             )
@@ -556,7 +590,9 @@ def parse_user_context_response(raw_response: str, format: str) -> UserContextRe
                 code=422,
                 context={
                     "raw_response": (
-                        raw_response[:500] + "..." if len(raw_response) > 500 else raw_response
+                        raw_response[:500] + "..."
+                        if len(raw_response) > 500
+                        else raw_response
                     ),
                     "format": format,
                     "parsed_data": safe_serialize(parsed_data),
@@ -575,7 +611,9 @@ def parse_user_context_response(raw_response: str, format: str) -> UserContextRe
             code=500,
             context={
                 "raw_response": (
-                    raw_response[:500] + "..." if len(raw_response) > 500 else raw_response
+                    raw_response[:500] + "..."
+                    if len(raw_response) > 500
+                    else raw_response
                 ),
                 "format": format,
                 "error_type": type(e).__name__,
@@ -631,7 +669,9 @@ def parse_api_response(raw_response: str, format: str, response_type: str) -> Ba
                 code=400,
                 context={
                     "raw_response": (
-                        raw_response[:500] + "..." if len(raw_response) > 500 else raw_response
+                        raw_response[:500] + "..."
+                        if len(raw_response) > 500
+                        else raw_response
                     ),
                     "format": format,
                     "response_type": response_type,
@@ -662,7 +702,9 @@ def parse_api_response(raw_response: str, format: str, response_type: str) -> Ba
                 code=400,
                 context={
                     "raw_response": (
-                        raw_response[:500] + "..." if len(raw_response) > 500 else raw_response
+                        raw_response[:500] + "..."
+                        if len(raw_response) > 500
+                        else raw_response
                     ),
                     "format": format,
                     "response_type": response_type,
@@ -685,7 +727,9 @@ def parse_api_response(raw_response: str, format: str, response_type: str) -> Ba
             code=500,
             context={
                 "raw_response": (
-                    raw_response[:500] + "..." if len(raw_response) > 500 else raw_response
+                    raw_response[:500] + "..."
+                    if len(raw_response) > 500
+                    else raw_response
                 ),
                 "format": format,
                 "response_type": response_type,

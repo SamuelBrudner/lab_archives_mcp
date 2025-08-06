@@ -33,22 +33,26 @@ import json  # builtin - Used for pretty-printing configuration as JSON for the 
 import sys  # builtin - Supports CLI exit codes and error output
 
 # Internal imports for configuration loading and management
-from config import load_configuration, reload_configuration, get_config_value
+from src.cli.config import (
+    load_configuration,
+    reload_configuration,
+    get_config_value,
+)
 
 # Internal imports for configuration validation
-from validators import validate_server_configuration
+from src.cli.validators import validate_server_configuration
 
 # Internal imports for exception handling
-from exceptions import LabArchivesMCPException
+from src.cli.exceptions import LabArchivesMCPException
 
 # Internal imports for data models
-from models import ServerConfiguration
+from src.cli.models import ServerConfiguration
 
 # Internal imports for logging setup
-from logging_setup import setup_logging
+from src.cli.logging_setup import setup_logging
 
 # Internal imports for utility functions
-from utils import expand_path
+from src.cli.utils import expand_path
 
 # =============================================================================
 # Global Constants
@@ -281,14 +285,18 @@ def show_config_command(args: argparse.Namespace) -> int:
                 config_dict = server_config.dict()
 
                 # Pretty-print with indentation for readability
-                json_output = json.dumps(config_dict, indent=2, ensure_ascii=False, sort_keys=True)
+                json_output = json.dumps(
+                    config_dict, indent=2, ensure_ascii=False, sort_keys=True
+                )
                 print(json_output)
 
             else:
                 # Handle other formats (currently only json is supported)
                 print(f"Unsupported output format: {output_format}", file=sys.stderr)
                 if logger:
-                    logger.warning(f"Unsupported output format requested: {output_format}")
+                    logger.warning(
+                        f"Unsupported output format requested: {output_format}"
+                    )
                 return 1
 
         except Exception as format_error:
@@ -296,7 +304,9 @@ def show_config_command(args: argparse.Namespace) -> int:
             print(error_msg, file=sys.stderr)
 
             if logger:
-                logger.error(error_msg, extra={"error_type": type(format_error).__name__})
+                logger.error(
+                    error_msg, extra={"error_type": type(format_error).__name__}
+                )
             if audit_logger:
                 audit_logger.error(
                     "Configuration show command failed - output formatting error",
@@ -322,7 +332,9 @@ def show_config_command(args: argparse.Namespace) -> int:
             )
 
         if logger:
-            logger.info(f"Configuration displayed successfully in {output_format} format")
+            logger.info(
+                f"Configuration displayed successfully in {output_format} format"
+            )
 
         # Return exit code 0 for success
         return 0
@@ -472,7 +484,9 @@ def validate_config_command(args: argparse.Namespace) -> int:
             # Display configuration summary if requested
             if getattr(args, 'strict', False):
                 print("\nConfiguration Summary:")
-                print(f"  Server: {server_config.server_name} v{server_config.server_version}")
+                print(
+                    f"  Server: {server_config.server_name} v{server_config.server_version}"
+                )
                 print(f"  API Base URL: {server_config.authentication.api_base_url}")
                 print(f"  Log Level: {server_config.logging.log_level}")
 
@@ -685,7 +699,9 @@ def reload_config_command(args: argparse.Namespace) -> int:
             # Display verification summary if requested
             if getattr(args, 'verify', False):
                 print("\nReloaded Configuration Summary:")
-                print(f"  Server: {reloaded_config.server_name} v{reloaded_config.server_version}")
+                print(
+                    f"  Server: {reloaded_config.server_name} v{reloaded_config.server_version}"
+                )
                 print(f"  API Base URL: {reloaded_config.authentication.api_base_url}")
                 print(f"  Log Level: {reloaded_config.logging.log_level}")
 
@@ -710,16 +726,18 @@ def reload_config_command(args: argparse.Namespace) -> int:
                 # Show logging configuration
                 log_file = reloaded_config.logging.log_file or "console only"
                 print(f"  Log File: {log_file}")
-                print(f"  Verbose: {'Enabled' if reloaded_config.logging.verbose else 'Disabled'}")
-                print(f"  Quiet: {'Enabled' if reloaded_config.logging.quiet else 'Disabled'}")
+                print(
+                    f"  Verbose: {'Enabled' if reloaded_config.logging.verbose else 'Disabled'}"
+                )
+                print(
+                    f"  Quiet: {'Enabled' if reloaded_config.logging.quiet else 'Disabled'}"
+                )
 
             return 0
 
         except LabArchivesMCPException as validation_error:
             # If validation fails after reload, report the error
-            error_msg = (
-                f"Configuration reload succeeded but validation failed: {validation_error.message}"
-            )
+            error_msg = f"Configuration reload succeeded but validation failed: {validation_error.message}"
             print(error_msg, file=sys.stderr)
 
             if logger:

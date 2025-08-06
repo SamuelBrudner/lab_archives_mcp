@@ -13,7 +13,9 @@ from exceptions import LabArchivesMCPException
 class APIError(LabArchivesMCPException):
     """Base exception for all LabArchives API errors."""
 
-    def __init__(self, message: str, code: int = 500, context: Optional[Dict[str, Any]] = None):
+    def __init__(
+        self, message: str, code: int = 500, context: Optional[Dict[str, Any]] = None
+    ):
         super().__init__(message, code, context)
 
 

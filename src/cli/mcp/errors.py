@@ -273,7 +273,9 @@ def handle_mcp_error(exc: Exception, context: Optional[Any] = None) -> Dict[str,
         # ValueError typically indicates invalid input parameters
         error_code = MCP_ERROR_CODES['INVALID_PARAMS']
         error_message = MCP_ERROR_MESSAGES['INVALID_PARAMS']
-        combined_context.update({"original_error": str(exc), "exception_type": "ValueError"})
+        combined_context.update(
+            {"original_error": str(exc), "exception_type": "ValueError"}
+        )
 
         logger.error(
             f"Parameter validation error mapped to MCP error: {error_message}",
@@ -288,7 +290,9 @@ def handle_mcp_error(exc: Exception, context: Optional[Any] = None) -> Dict[str,
         # KeyError often indicates missing required parameters or resources
         error_code = MCP_ERROR_CODES['RESOURCE_NOT_FOUND']
         error_message = MCP_ERROR_MESSAGES['RESOURCE_NOT_FOUND']
-        combined_context.update({"original_error": str(exc), "exception_type": "KeyError"})
+        combined_context.update(
+            {"original_error": str(exc), "exception_type": "KeyError"}
+        )
 
         logger.error(
             f"Resource access error mapped to MCP error: {error_message}",
@@ -303,7 +307,9 @@ def handle_mcp_error(exc: Exception, context: Optional[Any] = None) -> Dict[str,
         # PermissionError indicates authentication or authorization failures
         error_code = MCP_ERROR_CODES['AUTHENTICATION_FAILED']
         error_message = MCP_ERROR_MESSAGES['AUTHENTICATION_FAILED']
-        combined_context.update({"original_error": str(exc), "exception_type": "PermissionError"})
+        combined_context.update(
+            {"original_error": str(exc), "exception_type": "PermissionError"}
+        )
 
         logger.error(
             f"Permission error mapped to MCP error: {error_message}",
@@ -318,7 +324,9 @@ def handle_mcp_error(exc: Exception, context: Optional[Any] = None) -> Dict[str,
         # ConnectionError indicates network or API connectivity issues
         error_code = MCP_ERROR_CODES['INTERNAL_ERROR']
         error_message = MCP_ERROR_MESSAGES['INTERNAL_ERROR']
-        combined_context.update({"original_error": str(exc), "exception_type": "ConnectionError"})
+        combined_context.update(
+            {"original_error": str(exc), "exception_type": "ConnectionError"}
+        )
 
         logger.error(
             f"Connection error mapped to MCP error: {error_message}",

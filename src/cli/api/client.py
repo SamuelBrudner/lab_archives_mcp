@@ -36,33 +36,33 @@ from requests.packages.urllib3.util.retry import (
     Retry,
 )  # requests>=2.31.0 - For retry strategy
 
-from api.models import (
+from src.cli.api.models import (
     NotebookListResponse,
     PageListResponse,
     EntryListResponse,
     UserContextResponse,
 )
-from api.response_parser import (
+from src.cli.api.response_parser import (
     parse_notebook_list_response,
     parse_page_list_response,
     parse_entry_list_response,
     parse_user_context_response,
 )
-from api.errors import (
+from src.cli.api.errors import (
     APIError,
     APIAuthenticationError,
     APIRateLimitError,
     APIResponseParseError,
     APIPermissionError,
 )
-from constants import (
+from src.cli.constants import (
     DEFAULT_API_BASE_URL,
     DEFAULT_TIMEOUT_SECONDS,
     DEFAULT_RETRY_COUNT,
     DEFAULT_RETRY_BACKOFF,
 )
-from utils import safe_serialize
-from security.sanitizers import sanitize_url_params
+from src.cli.utils import safe_serialize
+from src.cli.security.sanitizers import sanitize_url_params
 
 # Global constants for retry behavior
 MAX_RETRIES = 3
@@ -248,7 +248,9 @@ class LabArchivesAPIClient:
             },
         )
 
-    def _generate_signature(self, method: str, endpoint: str, params: Dict[str, Any]) -> str:
+    def _generate_signature(
+        self, method: str, endpoint: str, params: Dict[str, Any]
+    ) -> str:
         """
         Generates HMAC-SHA256 signature for LabArchives API authentication.
 
@@ -364,7 +366,9 @@ class LabArchivesAPIClient:
             )
 
             # Make HTTP request
-            response = self.session.request(method, url, timeout=DEFAULT_TIMEOUT_SECONDS)
+            response = self.session.request(
+                method, url, timeout=DEFAULT_TIMEOUT_SECONDS
+            )
 
             # Handle rate limiting
             if response.status_code == 429:
@@ -651,7 +655,9 @@ class LabArchivesAPIClient:
             )
 
             # Parse and validate response
-            notebook_list = parse_notebook_list_response(raw_response=response.text, format="json")
+            notebook_list = parse_notebook_list_response(
+                raw_response=response.text, format="json"
+            )
 
             self.logger.info(
                 "Notebooks retrieved successfully",
@@ -733,7 +739,9 @@ class LabArchivesAPIClient:
             )
 
             # Parse and validate response
-            page_list = parse_page_list_response(raw_response=response.text, format="json")
+            page_list = parse_page_list_response(
+                raw_response=response.text, format="json"
+            )
 
             self.logger.info(
                 "Pages retrieved successfully",
@@ -823,7 +831,9 @@ class LabArchivesAPIClient:
             )
 
             # Parse and validate response
-            entry_list = parse_entry_list_response(raw_response=response.text, format="json")
+            entry_list = parse_entry_list_response(
+                raw_response=response.text, format="json"
+            )
 
             self.logger.info(
                 "Entries retrieved successfully",
@@ -913,7 +923,9 @@ class LabArchivesAPIClient:
             )
 
             # Parse and validate response
-            entry_content = parse_entry_list_response(raw_response=response.text, format="json")
+            entry_content = parse_entry_list_response(
+                raw_response=response.text, format="json"
+            )
 
             self.logger.info(
                 "Entry content retrieved successfully",
@@ -921,7 +933,9 @@ class LabArchivesAPIClient:
                     "entry_id": entry_id,
                     "user_id": self.uid,
                     "content_size": (
-                        len(entry_content.entries[0].content) if entry_content.entries else 0
+                        len(entry_content.entries[0].content)
+                        if entry_content.entries
+                        else 0
                     ),
                 },
             )

@@ -100,7 +100,9 @@ class NotebookMetadata(BaseModel):
         description="Number of folders within the notebook", example=5
     )
 
-    page_count: conint(ge=0) = Field(description="Number of pages within the notebook", example=24)
+    page_count: conint(ge=0) = Field(
+        description="Number of pages within the notebook", example=24
+    )
 
     class Config:
         """Pydantic configuration for NotebookMetadata model."""
@@ -166,7 +168,9 @@ class PageMetadata(BaseModel):
         example="2024-11-20T16:45:12Z",
     )
 
-    entry_count: conint(ge=0) = Field(description="Number of entries on this page", example=8)
+    entry_count: conint(ge=0) = Field(
+        description="Number of entries on this page", example=8
+    )
 
     author: constr(min_length=1, max_length=255) = Field(
         description="Username of the page author", example="researcher@university.edu"

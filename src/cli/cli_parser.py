@@ -35,25 +35,26 @@ import argparse  # builtin - Provides the ArgumentParser, subparsers, and CLI ar
 import os  # builtin - Used for environment variable access and path expansion for config file arguments
 import sys  # builtin - Supports CLI exit codes, error output, and process termination
 
-# Internal imports for configuration loading and management
-from config import load_configuration
+# -----------------------------------------------------------------------------#
+# Internal fully-qualified imports                                             #
+# We import via the public `src.cli.*` path to avoid shadowing issues when the #
+# package is imported from outside the repository root (e.g. during testing).  #
+# -----------------------------------------------------------------------------#
 
-# Internal imports for logging setup and audit trail
-from logging_setup import setup_logging
+# Configuration loading and management
+from src.cli.config import load_configuration
 
-# Internal imports for exception handling and error reporting
-from exceptions import LabArchivesMCPException
+# Logging setup and audit trail
+from src.cli.logging_setup import setup_logging
 
-# Internal imports for subcommand registration and handling
-from commands.config_cmd import add_config_subparser
-from commands.authenticate import authenticate_command
-from commands.start import start_command
+# Exception hierarchy
+from src.cli.exceptions import LabArchivesMCPException
 
-# Internal imports for version information
-from constants import MCP_SERVER_VERSION
+# Version information
+from src.cli.constants import MCP_SERVER_VERSION
 
-# Internal imports for utility functions
-from utils import sanitize_argv
+# Utility helpers
+from src.cli.utils import sanitize_argv
 
 # =============================================================================
 # Global Constants and Configuration
@@ -296,7 +297,11 @@ def build_cli_parser() -> argparse.ArgumentParser:
         )
 
         # Set the handler function for the start command
-        start_parser.set_defaults(func=start_command)
+        # Resolve the actual callable later to avoid import cycles
+        start_parser.set_defaults(handler='start')
+        # Explicitly initialise func to None so tests that check for its presence
+        # (after lazy-resolution) can rely on the attribute existing.
+        start_parser.set_defaults(func=None)
 
         # Register the 'authenticate' subcommand for credential validation
         auth_parser = subparsers.add_parser(
@@ -381,7 +386,10 @@ def build_cli_parser() -> argparse.ArgumentParser:
         )
 
         # Set the handler function for the authenticate command
-        auth_parser.set_defaults(func=authenticate_command)
+        # Resolve the actual callable later to avoid import cycles
+        auth_parser.set_defaults(handler='authenticate')
+        # Ensure func attribute is always present for symmetry with start command
+        auth_parser.set_defaults(func=None)
 
         # Register the 'config' subparser and its subcommands using add_config_subparser
         # This adds the config show, validate, and reload subcommands
@@ -393,6 +401,10 @@ def build_cli_parser() -> argparse.ArgumentParser:
         )
 
         # Add config subcommands using the dedicated function
+        # (Dynamic import here breaks potential circular dependency)
+        from importlib import import_module
+
+        add_config_subparser = import_module("src.cli.commands.config_cmd").add_config_subparser
         add_config_subparser(config_parser)
 
         # Return the fully constructed parser
@@ -539,7 +551,9 @@ def parse_and_dispatch_cli(argv: list[str] = None) -> int:
             cli_args_dict = vars(args)
 
             # Load configuration from all sources
-            config = load_configuration(cli_args=cli_args_dict, config_file_path=args.config_file)
+            config = load_configuration(
+                cli_args=cli_args_dict, config_file_path=args.config_file
+            )
 
             # Set up logging using the loaded configuration
             main_logger, audit_logger = setup_logging(config.logging)
@@ -590,6 +604,22 @@ def parse_and_dispatch_cli(argv: list[str] = None) -> int:
         try:
             # Get the handler function from the parsed args
             handler_func = getattr(args, 'func', None)
+
+            # ------------------------------------------------------------------
+            # Lazy-resolve handler if only a placeholder string was stored
+            # (this avoids heavy imports during parser construction).
+            # ------------------------------------------------------------------
+            if handler_func is None and hasattr(args, "handler"):
+                if args.handler == "start":
+                    from src.cli.commands.start import start_command as handler_func  # type: ignore
+                elif args.handler == "authenticate":
+                    from src.cli.commands.authenticate import (  # type: ignore
+                        authenticate_command as handler_func,
+                    )
+
+                # If we successfully resolved, attach for downstream use
+                if handler_func is not None:
+                    setattr(args, "func", handler_func)
 
             if handler_func is None:
                 # This shouldn't happen with proper subparser setup

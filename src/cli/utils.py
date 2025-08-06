@@ -280,7 +280,9 @@ def get_env_var(
                     if not raw_value.strip():
                         return []
                     # Split by comma and strip whitespace from each item
-                    return [item.strip() for item in raw_value.split(',') if item.strip()]
+                    return [
+                        item.strip() for item in raw_value.split(',') if item.strip()
+                    ]
 
                 # Handle standard type casting for int, float, str, etc.
                 else:
@@ -812,7 +814,9 @@ def parse_iso_datetime(datetime_str: str):
 
     # Validate that it's a proper ISO datetime format (not just date)
     # Must have T separator and time portion, timezone is optional
-    iso_pattern = r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})?$'
+    iso_pattern = (
+        r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})?$'
+    )
     if not re.match(iso_pattern, datetime_str):
         raise ValueError(f"Invalid ISO 8601 datetime format: {datetime_str}")
 
@@ -824,7 +828,9 @@ def parse_iso_datetime(datetime_str: str):
         return datetime.fromisoformat(datetime_str)
 
 
-def flatten_dict(d: dict, parent_key: str = '', sep: str = '.', separator: str = None) -> dict:
+def flatten_dict(
+    d: dict, parent_key: str = '', sep: str = '.', separator: str = None
+) -> dict:
     """
     Flattens a nested dictionary into a single-level dictionary.
 
