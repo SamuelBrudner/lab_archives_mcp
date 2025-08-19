@@ -549,7 +549,8 @@ class TestFolderPathIntegration:
 
         # Verify that the dataclass is configured with slots=True
         # This is confirmed by checking the dataclass parameters
-        assert path.__dataclass_params__.slots is True
+        # Python 3.11: _DataclassParams has no 'slots' attribute; verify via __slots__ instead
+        assert hasattr(FolderPath, "__slots__")
 
         # Verify that the dataclass is configured with frozen=True for immutability
         assert path.__dataclass_params__.frozen is True
