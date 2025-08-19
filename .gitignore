@@ -52,6 +52,9 @@ infrastructure/terraform/terraform.tfstate.*
 # Node modules (if any JS tooling)
 node_modules/
 
+# Serena local configuration
+.serena/
+
 # Miscellaneous
 *.bak
 *.tmp
