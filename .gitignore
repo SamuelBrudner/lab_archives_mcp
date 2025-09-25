@@ -34,3 +34,6 @@ dist/
 .idea/
 *.swp
 .DS_Store
+
+# Secrets
+conf/secrets.yml
