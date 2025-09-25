@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import hashlib
+import hmac
+import time
 from pathlib import Path
 from typing import cast
 
@@ -55,8 +58,44 @@ class AuthenticationManager:
         """Return a cached uid or trigger the LabArchives login handshake."""
         if self._uid:
             return self._uid
-        raise NotImplementedError("Implement LabArchives login handshake.")
+
+        response = await self._client.post(
+            self._login_url,
+            params=self._build_auth_params(),
+        )
+
+        try:
+            response.raise_for_status()
+        except httpx.HTTPStatusError as exc:  # pragma: no cover - exercised in tests
+            raise RuntimeError("LabArchives login failed") from exc
+
+        payload = response.json()
+        if payload.get("status") != "success" or not payload.get("uid"):
+            raise RuntimeError("LabArchives login failed: unexpected response payload")
+
+        self._uid = str(payload["uid"])
+        return self._uid
 
     def clear_uid(self) -> None:
         """Forget cached uid, forcing the next call to re-authenticate."""
         self._uid = None
+
+    @property
+    def _login_url(self) -> str:
+        region = str(self._credentials.region).rstrip("/")
+        return f"{region}/api/v1/login"
+
+    def _build_auth_params(self) -> dict[str, str]:
+        expires = str(int(time.time()) + 300)
+        message = f"{self._credentials.akid}{expires}".encode()
+        signature = hmac.new(
+            self._credentials.password.encode("utf-8"),
+            message,
+            hashlib.sha256,
+        ).hexdigest()
+
+        return {
+            "akid": self._credentials.akid,
+            "expires": expires,
+            "sig": signature,
+        }
