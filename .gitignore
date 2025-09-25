@@ -1,0 +1,35 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+.env/
+.env*/
+conda_env/
+
+# Tooling caches and coverage artefacts
+.mypy_cache/
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Build artefacts
+build/
+dist/
+*.egg-info/
+
+# Logs
+*.log
+
+# MCP / project-specific state
+.serena/
+
+# IDE and OS noise
+.vscode/
+.idea/
+*.swp
+.DS_Store
