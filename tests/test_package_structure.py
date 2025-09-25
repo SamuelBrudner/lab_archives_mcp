@@ -8,13 +8,43 @@ from labarchives_mcp import run_server
 from labarchives_mcp.auth import Credentials
 
 
-def test_credentials_from_env_missing_values() -> None:
-    """`Credentials.from_env` should fail fast when variables are missing."""
-    with pytest.raises(ValueError, match="Missing LabArchives environment variables"):
-        Credentials.from_env({})
+def test_credentials_from_file_missing_file(tmp_path: pytest.TempPathFactory) -> None:
+    """Missing secrets file should raise a FileNotFoundError."""
+    missing_path = tmp_path.mktemp("conf") / "secrets.yml"
+    with pytest.raises(FileNotFoundError):
+        Credentials.from_file(missing_path)
 
 
-@pytest.mark.asyncio
+def test_credentials_from_file_missing_values(tmp_path: pytest.TempPathFactory) -> None:
+    """Secrets file without required keys should fail fast."""
+    conf_dir = tmp_path.mktemp("conf")
+    secrets_file = conf_dir / "secrets.yml"
+    secrets_file.write_text("LABARCHIVES_AKID: example-akid\n")
+
+    with pytest.raises(ValueError, match="Missing LabArchives secrets"):
+        Credentials.from_file(secrets_file)
+
+
+def test_credentials_from_file_success(tmp_path: pytest.TempPathFactory) -> None:
+    """Valid secrets file loads into a `Credentials` instance."""
+    conf_dir = tmp_path.mktemp("conf")
+    secrets_file = conf_dir / "secrets.yml"
+    secrets_file.write_text(
+        """
+LABARCHIVES_AKID: example-akid
+LABARCHIVES_PASSWORD: example-pass
+LABARCHIVES_REGION: https://api.labarchives.com
+""".strip()
+    )
+
+    creds = Credentials.from_file(secrets_file)
+
+    assert creds.akid == "example-akid"
+    assert creds.password == "example-pass"
+    assert str(creds.region) == "https://api.labarchives.com"
+
+
+@pytest.mark.asyncio()  # type: ignore[misc]
 async def test_run_server_not_implemented() -> None:
     """`run_server` is a PoL stub and must raise until implemented."""
     with pytest.raises(NotImplementedError):

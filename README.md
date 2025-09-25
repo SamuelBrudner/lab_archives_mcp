@@ -51,12 +51,11 @@ The purpose is to verify end-to-end connectivity, authentication, and data retri
 ## Setup
 
 1. Clone this repo.
-2. Set environment variables:
+2. Copy the secrets template and fill in LabArchives credentials:
 
    ```bash
-   export LABARCHIVES_AKID=... 
-   export LABARCHIVES_PASSWORD=...
-   export LABARCHIVES_REGION=https://api.labarchives.com
+   cp conf/secrets.example.yml conf/secrets.yml
+   $EDITOR conf/secrets.yml
    ```
 3. Create the pinned Conda environment (local prefix):
 

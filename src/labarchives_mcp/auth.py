@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-import os
-from typing import Mapping
+from pathlib import Path
+from typing import cast
 
 import httpx
+from omegaconf import OmegaConf
 from pydantic import BaseModel, HttpUrl
 
 
@@ -17,16 +18,29 @@ class Credentials(BaseModel):
     region: HttpUrl
 
     @classmethod
-    def from_env(cls, env: Mapping[str, str] | None = None) -> "Credentials":
-        """Create credentials from environment variables, failing fast if missing."""
-        source = env or os.environ
-        keys = ["LABARCHIVES_AKID", "LABARCHIVES_PASSWORD", "LABARCHIVES_REGION"]
-        values = {key: source.get(key) for key in keys}
-        missing = [key for key, value in values.items() if not value]
-        if missing:
+    def from_file(cls, path: Path | str | None = None) -> Credentials:
+        """Create credentials from a YAML secrets file located under ``conf/`` by default."""
+
+        location = Path(path) if path is not None else Path("conf/secrets.yml")
+        if not location.exists():
+            raise FileNotFoundError(f"Secrets file not found: {location}")
+
+        raw_config = OmegaConf.load(location)
+        config = OmegaConf.to_container(raw_config, resolve=True)
+        if not isinstance(config, dict):
+            raise ValueError("Secrets file must contain a mapping of credential keys.")
+
+        normalized = {str(key).upper(): value for key, value in config.items()}
+        required_keys = ["LABARCHIVES_AKID", "LABARCHIVES_PASSWORD", "LABARCHIVES_REGION"]
+        if missing := [key for key in required_keys if not normalized.get(key)]:
             joined = ", ".join(missing)
-            raise ValueError(f"Missing LabArchives environment variables: {joined}")
-        return cls(akid=values[keys[0]], password=values[keys[1]], region=values[keys[2]])
+            raise ValueError(f"Missing LabArchives secrets: {joined}")
+
+        return cls(
+            akid=str(normalized["LABARCHIVES_AKID"]),
+            password=str(normalized["LABARCHIVES_PASSWORD"]),
+            region=cast(HttpUrl, str(normalized["LABARCHIVES_REGION"])),
+        )
 
 
 class AuthenticationManager:

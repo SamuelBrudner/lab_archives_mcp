@@ -1,0 +1,241 @@
+
+LabArchives API Notebook Hierarchy (Checklist)
+
+**Checked items include page text; unchecked items await review.**
+
+[x] Terms of Use
+    Use of the LabArchives APIs is governed by the general LabArchives Terms of Use agreement (see https://www.labarchives.com/terms-of-use/). You may have access to LabArchives products and services via an institutional enterprise license, in which case these Terms of Use may be superseded by the agreement in place with your institution or company. By using the APIs you agree to adhere to the Terms of Use that govern your access.
+
+[x] Overview
+    This notebook includes documentation for public LabArchives APIs. Public APIs are currently available for two LabArchives products, ELN and Scheduler. Good starting points for the two APIs are ELN Overview and Scheduler Overview.
+
+    Requirements and Best Practices includes guidelines and suggestions that are required or strongly recommended. Many of them directly affect the security and performance of LabArchives. Failure to follow required guidelines can lead to revocation of API credentials.
+
+    Users and Notebooks - Requirements and Best Practices is an ELN-specific page that gathers some points and discussion relevant to developing "admin" software for managing LabArchives users and notebooks at an institution.
+
+    COMMON MECHANISMS
+
+    Though the API methods for ELN and Scheduler are distinct and documented on separate pages for the most part, there are some common mechanisms shared by the two APIs:
+
+    Call Authentication – This page describes the mechanism to authenticate API calls, which uses the API access key ID (akid) and API password provided to the API client.
+
+    User Login / User ID Parameter – Most of the functionality provided by the APIs involves access to a specific user's LabArchives data. API methods providing access to user data require a special user API ID parameter, specific to a particular Access Key ID (akid parameter). The special user API ID will only be valid when used in conjunction with the specific akid used to obtain it.
+
+    See also the Scheduler Authentication page for Scheduler-specific information relevant to these common mechanisms.
+[x] Requirements and Best Practices
+    Every guideline and suggestion on this page is either required or strongly recommended. Many of them directly affect the security and performance of LabArchives. Failure to follow required guidelines can lead to revocation of API credentials.
+
+    API CREDENTIALS SECURITY
+
+    LabArchives API credentials (access ID and password) are issued to specific customer organizations and third‑party vendors, for specific intended purposes.
+
+    API credentials should never be shared outside the organization or group to which they were issued.
+
+    Inform LabArchives if the need for and intended use of API credentials changes or expands beyond the originally stated purpose. It’s usually better to issue a different set of API credentials for the new purpose rather than reuse the original credentials.
+
+    Keep the API password secure. In the event the password is compromised, inform LabArchives immediately so the password can be revoked and replaced.
+
+    Make the API credentials used by an app configurable if the app will be distributed and used outside of the institution where it was developed. Each site that installs and uses the app should obtain their own API credentials from LabArchives. (This approach is used in REDCap.)
+
+    API ERROR HANDLING
+
+    The LabArchives API provides access to shared online resources. It is vital that developers of API clients handle errors, slowdowns, and batch processing correctly, to help moderate load on the API site. Do not rely on API‑site throttling and overload‑mitigation measures as a substitute for good programming.
+
+    Do not make a potentially large number of calls simultaneously, or nearly so. Either stagger the calls with a delay of at least one second, or make the calls serially and wait for the response to one call before making the next call.
+
+    Do not automatically retry calls that return an HTTP 4xx status. They indicate either a client issue that must be addressed, if possible, before retrying; or the unavailability of a resource, at least temporarily, in which case a delay is in order before retrying.
+
+    Do not immediately retry any call, including especially those that failed due to a time out at some stage. Always wait at least one second before the first retry, then back off by waiting increasingly longer intervals between retries, up to some maximum retry count or maximum retry wait duration. (A simple “exponential backoff” technique is to double or triple the wait time for each retry.)
+
+    Do not retry a call indefinitely. Use a maximum retry count or maximum retry wait duration. Once reached, stop and report an error.
+
+    NB: HTTP STATUS 404 – NOT FOUND
+
+    The LabArchives API returns a 404 – Not Found from search and existence check methods if no match is found. Whether a 404 is the best status to return in the event a search returns zero results remains a debated topic; but for the LabArchives API it is a fait accompli.
+
+    API USER AUTHENTICATION
+
+    Launch “OAuth” user API login in a temporary window or frame. API user authentication is normally handled using an OAuth flow, as discussed here. Once login is completed or canceled, the window is no longer of use and should be closed.
+
+    Provide the user the option to enter a “temporary password token,” instead of going through the normal “OAuth” user API login method – see the ALTERNATIVE TO USER AUTHORIZATION CODE section on this page. The OAuth API login method requires the user to be redirected to an external window where authentication (and site domain changes in the case of SSO) occur as part of the normal LabArchives login process. This causes problems for some platforms and user configurations; the “alternative” method allows for API login without the need for a separate window, external redirection, etc.
+
+    USEFUL UTILITIES FUNCTIONS
+
+    Some of the methods in the utilities API class are particularly useful for specific needs.
+
+    Use epoch_time to adjust for time differences between the API servers. There are still platforms not regularly and reliably synchronized with NIST time. Avoid potential problems by calling epoch_time regularly, e.g. at the beginning of each API client app session, and adjusting the expires parameter used in each call as required accordingly. (NB: The expires parameter is confusingly named because it is set to the current time, plus or minus any adjustment due to an epoch_time comparison, not the time when the API call itself expires.)
+
+    Use api_base_urls to populate a region‑selection menu for the client app intended for users in different parts of the world. Using api_base_urls ensures the region is always appended to the api url when a new region‑level LabArchives site is added.
+[x] ELN Overview
+    Each call is authenticated via a call signature which is created based on a LabArchives assigned Access Key ID, Access Password and other parameters. This is described in detail in the Call Authentication section.
+
+    Call Specific
+
+    The various parameters, passed on in a single string to allow a specific request to be processed. Calls are broken down into multiple classes – see sub‑sections under the ELN API Classes section. A call must include the class as well as the method.
+
+    Example:
+
+    Below is an example of a call to the entry_info method: grey for the base URL, blue for the call specific portion, red for the call authentication.
+
+    https://api.labarchives.com/apientries/entry_info?akid=…&expires=1264469107000&sig=…&uid=285489257Ho%27s9%5EL4116011183268315271
+
+    Note on Protocol
+
+    The LabArchives ELN API supports only the https protocol.
+
+    Result Code
+
+    All calls return an http status code of 200 (ok) if the call succeeded. If the call failed a relevant status code will be returned – see the ELN Error codes section.
+
+    XML Response
+
+    Many API calls return an XML response. The root element start‑tag is the name of the called API class, with underscores converted to hyphens – e.g., `<entries>`, `<search‑tools>`, `<tree‑tools>`. There is always a `<response>` child element, which contains the called method and the authentication and method parameters passed in the API call. Other child elements vary depending on the method called.
+
+    Note that the order of child elements at all levels is not fixed, and may vary from call to call. Do not rely on child elements appearing in a particular sequence.
+
+    The response XML for many API method calls includes one or more `<entry>` elements. An `<entry>` element contains information about a LabArchives notebook entry, and sometimes (optionally) the actual data that constitutes the entry. Detailed information is provided in the ELN `<entry>` XML Response Element section.
+
+    For other XML response elements, see method‑specific API documentation.
+
+    User Login – UID parameter
+
+    Most of the functionality provided by the APIs involves access to a specific user’s LabArchives data. Methods providing access to user data require a `uid` parameter, which is a user ID specific to a particular Access Key ID. To obtain a user’s uid requires a user to login or create an account via the API – see discussion in the User Login / User ID Parameter section.
+[x] Call Authentication
+    Each API request must include caller authentication using three query‑string parameters: **akid** (the access key ID assigned to the third‑party client), **expires** (the time in milliseconds since the Unix epoch when the signature was created) and **sig** (a URI‑encoded HMAC‑SHA‑512 signature).  To create the signature, concatenate `<Access Key ID> + <api method called> + <expires>`, compute an HMAC‑SHA‑512 digest using the Access Password, Base64‑encode it and then URI‑encode the result.  The `expires` timestamp defines when the request expires, with a two‑minute tolerance to account for clock differences; clients can call the `epoch_time` utility to synchronise clocks.  A complete API call appends the akid, expires and sig parameters to the request URL; omitting the class name from the signature string.  If the signature or expiration is incorrect, the API returns HTTP 401 (Unauthorized).
+[x] User Login / User ID Parameter
+    Many API calls that access user data require a **uid** parameter, which uniquely identifies a user for a given Access Key ID.  To obtain a uid, an API client typically uses an OAuth‑like login flow: redirect the user to the `api_user_login` endpoint with `akid`, `expires`, a computed signature and a `redirect_uri`.  After the user signs in, LabArchives redirects back to the `redirect_uri` with an `auth_code` and the user’s email.  The client then calls `users:user_access_info`, passing the `auth_code` (as the password parameter) and email, to retrieve the user’s uid and other login information; the auth_code is short‑lived and should be redeemed promptly.  As an alternative, LabArchives can issue a “temporary password token” when a browser‑based login is impractical; this token can also be supplied to `users:user_access_info` to obtain a uid.  API clients may create new user accounts via `users:create_user_account`, which returns the same information as `user_access_info` and sends an activation email to the user.
+[x] ELN Container File
+    An ELN container file packages a proprietary file together with a preview image and searchable text so that LabArchives can display and index it.  Container files are ZIP archives that must include a special manifest file named `lamanifest.xml` describing its contents.  In the manifest, the `application_file` element identifies the actual file to store, `preview_file` names a PDF or image (PNG/GIF/JPG) used as a thumbnail or preview within LabArchives, optional `caption` and `change_description` elements provide descriptive text, and `index_file` names a text file whose contents will be indexed for search.  LA container files can be uploaded via the LabArchives application or through the `add_attachment` and `update_attachments` API methods.  The manifest allows third parties to supply custom thumbnails and indexable text for proprietary formats.
+[x] ELN <entry> XML Response Element
+    Many ELN API methods return one or more `<entry>` elements in their XML response.  Each `<entry>` contains metadata about a notebook entry and may include its data if requested.  Common child elements include: `eid` (entry ID); `created-at` and `updated-at` timestamps; `last-modified-verb`, `last-modified-by` and `last-modified-ip`; `part-type` specifying the entry type (attachment, plain text, heading, text entry, widget, sketch, reference, equation, assignment, etc.); `version` number; and a `user-access` element with sub‑elements (`can-read`, `can-write`, `can-read-comments`, `can-write-comments`) indicating the caller’s permissions.  Attachment entries add elements such as `attach-file-name`, `attach-file-size`, `caption` and `attach-content-type`.  Optional elements include `thumb-info` (none, generic or unique thumbnail), `entry-url` (URL to view/edit the entry online), `entry-data` (requires the method parameter `entry_data=true`; its contents vary by `part-type`—plain text returns raw text, headings and text entries return HTML fragments, attachments return the caption only, widgets and sketches return JSON, reference entries return XML, equation entries return MathML or LaTeX, etc.), `number-comments` and `comments` (each `<comment>` includes `cid`, creator information, timestamp and comment text).  Search‑related methods may also include call‑specific elements like `nbid` (notebook ID), `notebook` (notebook name), `tree_path_ids` and `tree_path` indicating the entry’s location.  Additional notes explain the meaning of `thumb-info`, how to construct `entry-url` with authentication parameters, and how to request full comment data via `comment_data=true`.
+[ ] ELN API Classes (folder)
+    [x] Users and Notebooks – Requirements and Best Practices
+        This page provides guidance for anyone writing “admin” software to manage LabArchives users and notebooks on behalf of an institution.  The key message is **don’t make one “super‑admin” account own every notebook**: LabArchives isn’t optimised for a single user to hold thousands of notebooks, and performance will degrade as ownership count grows.  An administrator account can act as a caretaker – creating and maintaining notebooks for others – but each notebook should be owned by the individual researcher or instructor rather than the admin account.
+
+        The page also explains that **API credentials by themselves do not grant access to user data**.  Every call that reads notebook content or metadata requires a `uid`, a user ID tied to the caller’s access key.  To avoid asking users to log in over and over, admin apps should capture and persist each user’s `uid`.  The credentials (akid/password) can be reused across users, but without the correct uid the API returns nothing.  Two mechanisms exist for obtaining a uid: either have the user complete the OAuth‑style login process (see the User Login / User ID Parameter page) and then call `users:user_access_info` to fetch their uid, or create the user with `users:create_user_account`, which returns the new uid.  Once issued, a uid remains valid until the user changes their password or LabArchives refreshes the uid; at that point, the user must log in again to get a replacement.  Because storing the user’s password is never required, persisting uids is both secure and convenient.
+    [x] entries (folder)
+        [x] add_attachment
+            Adds a new attachment entry to a notebook page. This POST method uploads a file (sent as application/octet‑stream) and requires the user’s uid, the filename and optionally a caption, change_description, client_ip, notebook ID (nbid) and page ID (pid).  It returns an XML response containing the new entry’s data and request detailshttps://mynotebook.labarchives.com/share/LabArchives%20API/NS4yfDI3LzQvVHJlZU5vZGUvMTF8MTMuMg==.  The API will automatically create a new entry of part‑type “attachment” and update the notebook page’s version.
+        [x] attachment_last_uploaded_at
+            Returns the date/time when a specified attachment entry was last uploaded.  The GET call takes uid and eid parameters and returns an XML response containing a `<last‑uploaded‑at>` element with a timestamp.  Changing the entry’s parent page or description increments the entry’s version but does not affect this timestamphttps://mynotebook.labarchives.com/share/LabArchives%20API/NS4yfDI3LzQvVHJlZU5vZGUvMTF8MTMuMg==.
+        [x] entry_attachment
+            Downloads the attached file for an attachment entry.  This GET method uses uid and eid parameters and returns the binary file; the Content‑Disposition header includes the original filename.  For LabArchives container files, only the primary file is returnedhttps://mynotebook.labarchives.com/share/LabArchives%20API/NS4yfDI3LzQvVHJlZU5vZGUvMTF8MTMuMg==.
+        [x] entry_thumb
+            Retrieves a thumbnail or miniature image for an attachment entry.  The GET call requires uid and eid; it returns a scaled image if the entry has a thumbnail or a generic file‑type icon.  If the entry has no thumbnail or thumbnail generation failed, an error is returnedhttps://mynotebook.labarchives.com/share/LabArchives%20API/NS4yfDI3LzQvVHJlZU5vZGUvMTF8MTMuMg==.
+        [x] entry_info
+            Fetches metadata for a specific entry, including its version number, part type and permissions.  Parameters include uid, eid and optional flags `entry_data` (include `<entry_data>` content) and `comment_data` (include full comment text).  The XML response contains the entry’s timestamps, last‑modified information, part‑type, version number, and nested comment data when requestedhttps://mynotebook.labarchives.com/share/LabArchives%20API/NS4yfDI3LzQvVHJlZU5vZGUvMTF8MTMuMg==.
+        [x] update_attachment
+            Updates an existing attachment entry by overwriting its contents.  This POST call is similar to `add_attachment` but requires the entry ID (`eid`) instead of notebook/page IDs.  Clients send the new file (application/octet‑stream) and may supply a caption, change_description and client_ip; the response includes the updated entry informationhttps://mynotebook.labarchives.com/share/LabArchives%20API/NS4yfDI3LzQvVHJlZU5vZGUvMTF8MTMuMg==.
+        [x] add_entry
+            Creates a new notebook entry of type “text entry”, “plain text entry” or “heading” on a specified page.  Clients may supply the notebook ID (`nbid`) and page ID (`pid`), but at least `pid` must be present; the `part_type` indicates the entry type.  Data for the entry is provided in `entry_data`, either as a query parameter or as form data when using POST.  Rich text entries accept HTML fragments, plain text entries accept UTF‑8 text, and headings accept UTF‑8 text.  Optional parameters include a caption, change_description, date and time_zone_name.  The call returns an XML response containing the new entryhttps://mynotebook.labarchives.com/share/LabArchives%20API/NS4yfDI3LzQvVHJlZU5vZGUvMTF8MTMuMg==.
+        [x] update_entry
+            Modifies an existing text or plain‑text entry (including headings).  The client supplies the entry ID (`eid`) and replacement `entry_data` using either a query parameter or POSTed form data.  Valid data formats mirror `add_entry`: HTML for rich text, UTF‑8 for plain text and headings.  Only the entry’s content is changed; other attributes remain the samehttps://mynotebook.labarchives.com/share/LabArchives%20API/NS4yfDI3LzQvVHJlZU5vZGUvMTF8MTMuMg==.
+        [x] add_comment
+            Appends a new plain‑text comment to an entry.  This API call uses uid, the entry ID (`eid`) and `comment_data` containing the comment.  Data may be transmitted via query string or POSTed form data.  An optional date parameter can set the comment’s timestamp.  The call returns the new comment within an updated entry response.
+        [x] delete_comment
+            Deletes a comment from an entry.  The GET method takes the comment ID (`cid`) and uid; only the user who created the comment or a notebook administrator may delete it.  The response confirms deletion.  If the caller lacks rights, the API returns an errorhttps://mynotebook.labarchives.com/share/LabArchives%20API/NS4yfDI3LzQvVHJlZU5vZGUvMTF8MTMuMg==.
+        [x] entry_snapshot
+            Retrieves a snapshot image of a widget or sketch entry.  The GET request uses uid and entry ID (`eid`) and returns a displayable view of the entry as it appears in LabArchives.  If the snapshot has not yet been generated or does not exist, the API returns an error; clients should retry laterhttps://mynotebook.labarchives.com/share/LabArchives%20API/NS4yfDI3LzQvVHJlZU5vZGUvMTF8MTMuMg==.
+    [x] search_tools (folder)
+        The **search_tools** group contains methods for searching attachments and entries across notebooks.  Each call is a GET request and requires the user’s uid.  Optional filters include file extensions, date ranges and query strings, and most methods offer pagination and flags to include entry or comment data.
+        [x] attachment_search
+            Searches a user’s notebooks for attachments matching specific criteria.  Parameters include **uid**, optional `extension` list (comma‑separated without periods), `begin_date`/`end_date` in UTC, a list of search `terms` and an optional `term_connector` (AND, OR or EXACT).  Additional options let the client limit results to a notebook (`nbid`), include student or hidden notebooks, specify user access levels (can_read or can_readwrite), limit the number of results returned (`max_to_return`) and include `<entry_data>` or `<comment_data>` blocks in the XML returnhttps://mynotebook.labarchives.com/share/LabArchives%20API/NS4yfDI3LzQvVHJlZU5vZGUvMTF8MTMuMg==https://mynotebook.labarchives.com/share/LabArchives%20API/NS4yfDI3LzQvVHJlZU5vZGUvMTF8MTMuMg==.
+        [x] most_recently_modified_attachment_by_extension
+            Returns the most recently modified attachments that match one or more file extensions.  The call requires **uid** and a comma‑separated `extension` list and may be restricted with `nbid`, `max_to_return`, `student_notebooks`, `hidden_notebooks`, `user_access`, `entry_data` and `comment_data` flags.  Results include each entry’s complete location path and notebook ID, ordered by modification datehttps://mynotebook.labarchives.com/share/LabArchives%20API/NS4yfDI3LzQvVHJlZU5vZGUvMTF8MTMuMg==https://mynotebook.labarchives.com/share/LabArchives%20API/NS4yfDI3LzQvVHJlZU5vZGUvMTF8MTMuMg==.
+        [x] modified_since
+            Retrieves all entries modified since a specific UTC timestamp.  Parameters include **uid**, an optional `since_time` (formatted `yyyy‑mm‑ddThh:mm:ssZ`, defaulting to the Unix epoch), `max_to_return`, `nbid`, `student_notebooks`, `hidden_notebooks`, `user_access`, `entry_data` and `comment_data`.  The API returns entries sorted from most recently modified to oldesthttps://mynotebook.labarchives.com/share/LabArchives%20API/NS4yfDI3LzQvVHJlZU5vZGUvMTF8MTMuMg==.
+        [x] entry_search
+            Performs a text search for entries within a single notebook.  Required parameters are **uid** and a `query` string that may include multiple words, quoted phrases and boolean operators (AND, OR, NOT).  Pagination is handled with `page_size` and `page_number`, and optional flags `nbid`, `entry_data` and `comment_data` refine resultshttps://mynotebook.labarchives.com/share/LabArchives%20API/NS4yfDI3LzQvVHJlZU5vZGUvMTF8MTMuMg==.
+    [x] utilities (folder)
+        Utility calls provide supplemental information used by client applications.  These methods are simple GET requests that do not require a uid unless otherwise noted.
+        [x] epoch_time
+            Returns the number of milliseconds since the Unix epoch as measured by LabArchives servers.  This call has no parameters and is used to synchronize client clocks when constructing call signatures.  Clients should call it sparingly; repeated requests may result in blocked accesshttps://mynotebook.labarchives.com/share/LabArchives%20API/NS4yfDI3LzQvVHJlZU5vZGUvMTF8MTMuMg==.
+        [x] promo_message
+            Retrieves a promotional text string associated with the calling access key.  If the organization has not arranged a special message, an empty string is returned.  No parameters are requiredhttps://mynotebook.labarchives.com/share/LabArchives%20API/NS4yfDI3LzQvVHJlZU5vZGUvMTF8MTMuMg==.
+        [x] suggested_thumbnail_size
+            Provides the recommended maximum width and height for thumbnail images within LabArchives container files.  Clients must supply either an `ext` parameter (file extension such as gif or jpg) or a `mimetype` parameter (e.g., `image/png`); if both are provided, `mimetype` takes precedence.  The XML response includes `<max-width>` and `<max-height>` elements specifying the suggested dimensionshttps://mynotebook.labarchives.com/share/LabArchives%20API/NS4yfDI3LzQvVHJlZU5vZGUvMTF8MTMuMg==.
+        [x] api_base_urls
+            Returns a list of LabArchives API base URLs and descriptions for different hosting regions (U.S./rest of world, Australia/New Zealand, Europe outside the UK and the UK).  This information allows applications to offer a region selector.  The call takes no parameters and returns an array of `<url>` and `<description>` elementshttps://mynotebook.labarchives.com/share/LabArchives%20API/NS4yfDI3LzQvVHJlZU5vZGUvMTF8MTMuMg.
+    [x] users (folder)
+        The **users** group contains methods for creating and managing LabArchives user accounts and retrieving user information.  All calls require either login credentials or an existing uid.
+        [x] create_user_account
+            Creates a new LabArchives user account and an associated notebook.  Required parameter `email` specifies the user’s email; optional parameters include `login`, `password`, `fullname`, `notebook_name`, `campaign_code`, `sso_id`, `orcid`, `can_own_notebooks` and `initial_folders` (values: Biomedical, Classroom or Empty).  Upon success, LabArchives sends an activation email and returns the new user’s uid and notebook info; an error is returned if the email already existshttps://mynotebook.labarchives.com/share/LabArchives%20API/NS4yfDI3LzQvVHJlZU5vZGUvMTF8MTMuMghttps://mynotebook.labarchives.com/share/LabArchives%20API/NS4yfDI3LzQvVHJlZU5vZGUvMTF8MTMuMg.
+        [x] user_access_info
+            Obtains a user’s uid and list of notebooks using a login or email and password (or temporary authentication code).  Optional `student_notebooks` and `hidden_notebooks` flags control whether those notebooks are included.  Returns uid and notebook information; invalid credentials produce an errorhttps://mynotebook.labarchives.com/share/LabArchives%20API/NS4yfDI3LzQvVHJlZU5vZGUvMTF8MTMuMg.
+        [x] user_info_via_id
+            Retrieves user and notebook information for an existing uid.  Parameters are **uid** and optional `student_notebooks`, `hidden_notebooks` and `authenticated` (set to true to bypass auto‑login restrictions).  Response mirrors `user_access_info`https://mynotebook.labarchives.com/share/LabArchives%20API/NS4yfDI3LzQvVHJlZU5vZGUvMTF8MTMuMg.
+        [x] max_file_size
+            Returns the maximum file size the specified user is allowed to upload.  The GET call requires **uid** and returns a `<max-file-size>` element containing the size in byteshttps://mynotebook.labarchives.com/share/LabArchives%20API/NS4yfDI3LzQvVHJlZU5vZGUvMTF8MTMuMg.
+        [x] set_campaign_code
+            Sets or updates the campaign code associated with a user account.  Requires **uid** and `campaign_code`.  Intended for vendors to track accounts created via `create_user_account`https://mynotebook.labarchives.com/share/LabArchives%20API/NS4yfDI3LzQvVHJlZU5vZGUvMTF8MTMuMg.
+    [x] tree_tools (folder)
+        Tree tools allow clients to traverse and modify the notebook page hierarchy.  Each method operates on a tree of pages and folders within a notebook and requires the user’s uid and notebook ID (`nbid`).
+        [x] get_tree_level
+            Retrieves one level of the notebook’s tree structure.  Required parameters are **uid**, `nbid` and `parent_tree_id` (0 for the root).  The method returns an array of nodes that the user can read, omitting branches without access.  Each node indicates whether it represents a page and includes identifiers used to navigate deeper levelshttps://mynotebook.labarchives.com/share/LabArchives%20API/NS4yfDI3LzQvVHJlZU5vZGUvMTF8MTMuMg.
+        [x] get_entries_for_page
+            Lists all entries on a specific page.  Requires **uid**, `page_tree_id` (the ID of the page) and `nbid`.  Optional flags `entry_data` and `comment_data` include `<entry_data>` and `<comment_data>` sections in the response.  The call returns only entries the user is permitted to readhttps://mynotebook.labarchives.com/share/LabArchives%20API/NS4yfDI3LzQvVHJlZU5vZGUvMTF8MTMuMg.
+        [x] get_node
+            Returns detailed information about a specific tree node.  Parameters include **uid**, `nbid` and `tree_id`.  The response describes the node’s title, user access rights, entry count, display text and other metadatahttps://mynotebook.labarchives.com/share/LabArchives%20API/NS4yfDI3LzQvVHJlZU5vZGUvMTF8MTMuMg.
+        [x] update_node
+            Updates a node’s display text, parent or position among its siblings.  Required parameters are **uid**, `nbid` and `tree_id`; optional `parent_tree_id` moves the node to a new parent, `display_text` changes the title and `node_position` sets its relative order (0 for first; larger values place it later).  Successful calls return updated node informationhttps://mynotebook.labarchives.com/share/LabArchives%20API/NS4yfDI3LzQvVHJlZU5vZGUvMTF8MTMuMg.
+        [x] insert_node
+            Creates a new page or folder under a specified parent.  Parameters include **uid**, `nbid`, `parent_tree_id` (0 to insert under the root), `display_text` (title) and `is_folder` (true to create a folder, false for a page).  The inserted node is added as the last sibling and its details are returnedhttps://mynotebook.labarchives.com/share/LabArchives%20API/NS4yfDI3LzQvVHJlZU5vZGUvMTF8MTMuMg.
+    [x] notifications (folder)
+        Notification methods manage user notifications, allowing counts, retrieval and marking read status.  All calls require the user’s uid.
+        [x] notification_counts
+            Returns counts of all notifications and unread notifications for the user, including subtotals for each notification type.  The single parameter is **uid**.  The XML response includes `<total>`, `<unread>` and type‑specific `<type>-total` and `<type>-unread` elementshttps://mynotebook.labarchives.com/share/LabArchives%20API/NS4yfDI3LzQvVHJlZU5vZGUvMTF8MTMuMg.
+        [x] get_notifications
+            Retrieves notifications for a user, ordered from most recent to oldest.  Required parameter **uid** identifies the user; optional parameters `action_types` (comma‑delimited list of “assignment”, “comment” or “notebook_modification”), `unread_only` (true to filter unread), `nbid` (to restrict to a notebook), `num_to_return` (maximum results) and `last_action_viewed` (returns notifications after a specified action ID) refine results.  Returns a `<count>` of unread notifications and an array of `<notification>` elementshttps://mynotebook.labarchives.com/share/LabArchives%20API/NS4yfDI3LzQvVHJlZU5vZGUvMTF8MTMuMg.
+        [x] mark_as_read
+            Marks one or more notifications as read.  Required parameters are **uid** and `aids` (semicolon‑delimited list of action IDs to mark read); passing `aids=all` marks every unread notification for the user.  The call may be sent via GET or POST with url‑encoded or form‑data encoding.  This action is irreversible—notifications cannot be marked as unreadhttps://mynotebook.labarchives.com/share/LabArchives%20API/NS4yfDI3LzQvVHJlZU5vZGUvMTF8MTMuMg.
+    [x] notebooks (folder)
+        The **notebooks** group provides methods to create new notebooks, retrieve and modify notebook settings, manage notebook users and roles, back up notebook data, manage site‑specific metadata, and transfer ownership of notebooks.  All calls require the `uid` of the notebook owner (or a site administrator with appropriate API rights) and the `nbid` of the notebook being acted upon.
+
+        [x] create_notebook
+            Creates a new notebook for a user.  Requires the owner’s **uid** and a `name` for the new notebook.  Optional parameters include `site_notebook_id` to assign a site‑specific ID and `initial_folders` to choose a template structure (Biomedical, Classroom, or Empty).  Returns the new notebook’s `<nbid>`https://mynotebook.labarchives.com/share/LabArchives%20API/NS4yfDI3LzQvVHJlZU5vZGUvMTF8MTMuMg.
+        [x] notebook_info
+            Retrieves settings for a specific notebook.  Takes **uid** and `nbid` and returns properties such as the notebook’s `<name>`, `add-entry-to-page-top` flag (whether new entries go at the top of pages), `is-student` flag, the page signing requirement (`SIGNING_NONE`, `SIGNING_NO_WITNESS` or `SIGNING_WITH_WITNESS`), and any `site-notebook-id`https://mynotebook.labarchives.com/share/LabArchives%20API/NS4yfDI3LzQvVHJlZU5vZGUvMTF8MTMuMg.
+        [x] modify_notebook_info
+            Modifies metadata and settings associated with a notebook.  Parameters include **uid**, `nbid` and optional `name`, `site_notebook_id`, `signing` (one of `SIGNING_NONE`, `SIGNING_NO_WITNESS` or `SIGNING_WITH_WITNESS`), and `add_entry_position` (`TOP` or `BOTTOM`) to control where new entries appear.  The call returns the updated notebook info in XMLhttps://mynotebook.labarchives.com/share/LabArchives%20API/NS4yfDI3LzQvVHJlZU5vZGUvMTF8MTMuMg.
+        [x] notebook_users
+            Returns the list of users associated with a notebook.  Requires **uid** and `nbid`.  The response includes each user’s full name, email, SSO ID (if applicable), ORCID, whether they can own notebooks, and their `user-role` within the notebook (Owner, User, Guest, Administrator, etc.).
+        [x] notebooks_with_user
+            Lists the notebooks that the owner (identified by **uid**) shares with another user (specified by `email`).  Requires **uid** and the user’s email; returns notebooks owned by the uid user to which the email user has access, including notebook IDs, site notebook IDs and user roles.
+        [x] add_user_to_notebook
+            Adds an existing user to a notebook and optionally assigns a role.  Requires **uid**, `nbid`, and the user’s `email`; optional `user_role` may be `NOTEBOOK ADMINISTRATOR`, `ADMINISTRATOR`, `USER` or `GUEST`.  Notes: the notebook owner cannot be changed via any API, `ACCOUNT ADMINISTRATOR` is not a valid user_role, and `NOTEBOOK ADMINISTRATOR` and `ADMINISTRATOR` are synonymous.
+        [x] remove_user_from_notebook
+            Removes a user (specified by `email`) from the notebook identified by `nbid`.  Requires **uid**, `nbid`, and `email`.  The call returns the user’s previous `user-role` before removal.
+        [x] set_user_role
+            Changes the role of an existing notebook user.  Parameters include **uid**, `nbid`, `email` of the user whose role is being changed, and `user_role` specifying the new role (allowed values are `NOTEBOOK ADMINISTRATOR`, `ADMINISTRATOR`, `USER` or `GUEST`).  Notes: the owner cannot be changed, `ACCOUNT ADMINISTRATOR` cannot be set at notebook level, and `NOTEBOOK ADMINISTRATOR` and `ADMINISTRATOR` are synonyms.
+        [x] notebook_backup
+            Downloads a complete backup of a notebook.  Requires **uid** and `nbid`.  Optional flags `json` (default false) return data in JSON format instead of an archive, and `no_attachments` (default false) exclude attachments.  The call returns an archive in 7‑Zip (.7z) format for authorized clients.
+        [x] modify_notebook_metadata
+            Updates site‑specific metadata for a notebook, including a description and up to four project ID values.  Requires **uid** (user with Site API Access Rights) and `nbid`; optional parameters `description`, `project_id1`, `project_id2`, `project_id3` and `project_id4` supply new values.  At least one optional parameter must be provided.
+        [x] notebook_metadata
+            Retrieves site‑specific metadata for a notebook.  Takes **uid** and `nbid` and returns any stored `description` and project ID labels (`project-id1` through `project-id4`) that have been assigned.
+        [x] transfer_notebook_ownership
+            Transfers ownership of a notebook from the current owner to another user.  Requires **uid** (current owner), `nbid` and the `email` of the user who will become the new owner (the recipient must already belong to the notebook with `can‑own‑notebooks` rights).  After transfer, the previous owner becomes a Notebook Administrator.  The XML return for this call is noted as forthcoming.
+
+    [x] site_license_tools (folder)
+        The **site_license_tools** group provides administrative reports and configuration methods intended for site administrators with Site API Access Rights.  Each call requires the `uid` of a user with site‑level API rights.
+
+        [x] usage_report
+            Downloads a detailed site usage report.  Requires **uid** and returns a comprehensive usage report for the site.
+        [x] notebook_usage_report
+            Downloads a site‑level notebook usage report.  Requires **uid** and returns a report summarizing notebook usage across the site.
+        [x] pdf_generation_report
+            Downloads a report on PDF/offline notebook generation.  Requires **uid** and returns a report covering PDF or offline notebook generation events.
+        [x] site_project_id_labels
+            Retrieves the current Project ID Labels defined for a site.  Requires **uid** and returns up to four label strings (`project-id-label1` through `project-id-label4`) that can be used to tag notebooks.
+        [x] modify_project_id_labels
+            Updates one or more of the site’s Project ID Labels.  Requires **uid** and optional `project_id_label1` through `project_id_label4` to set new label values.  At least one label must be provided.
+        [x] report_url
+            Generates a temporary URL to download a site administrative report.  Requires **uid** and `report_name` specifying the report type (`site_usage`, `notebook_usage` or `site_pdf_generation`).  The returned `<report-url>` expires soon after generation.
+[x] ELN Change log
+    The change log records updates to the ELN API documentation and available methods.  Entries document additions such as new user roles (“ACCOUNT ADMINISTRATOR” and “NOTEBOOK ADMINISTRATOR”) and updates to notebook methods (`add_user_to_notebook`, `set_user_role`, etc.) to support these roles.  New utility methods like `utilities::api_base_urls` have been introduced, and the “User Login / uid parameter” section was rewritten to describe the OAuth‑style login flow while removing older email/password and SSO descriptions.  The log notes the introduction of methods such as `entries::add_comment`, `entries::delete_comment`, `entries::entry_thumb`, `users::set_campaign_code`, and notebook metadata functions, the addition of site_license_tools methods (`usage_report`, `notebook_usage_report`, `pdf_generation_report`, `site_project_id_labels` and `modify_project_id_labels`), and optional parameters like `no_attachments` for `notebooks::notebook_backup`.  It also records infrastructure changes such as migrating the base URL from notebook.labarchives.com to api.labarchives.com and numerous minor text revisions.
+
+[x] ELN Error codes
+    This page lists the error codes returned by the ELN API.  While successful requests return HTTP 200, failed requests return another HTTP status and may include an `<error>` element with a code and human‑readable description.  Codes in the 4500–4999 range identify specific problems: for example, 4500 indicates missing mandatory parameters, 4501 and 4502 mean the user lacks rights to read or modify an item, 4503 denotes an unknown API method, 4504 signals that the `expires` parameter is too old, 4506 marks an invalid access key ID, 4507 indicates the uid was not found, 4509 flags an invalid notebook ID, 4514 means login or password information is incorrect, 4515–4517 relate to account creation and page lookups, 4520 points to an invalid signature, 4521 notes that the file size exceeds the maximum allowed, 4522 shows the call is invalid when using alternate authentication (e.g., LDAP), 4523–4524 involve duplicate UIDs or malformed email addresses, 4527 signals an unsupported entry type, 4528–4529 indicate missing comments or invalid parameter values, 4531–4533 cover invalid file formats, virus detection and session timeouts, and 4999 represents an unexpected internal error.  These codes help developers diagnose and handle API errors appropriately.
+
+[x] Scheduler
+    The Scheduler section provides a REST‑like API for LabArchives scheduling data.  All endpoints use the base URL `https://sapi.labarchives.com/v1` and are accessed exclusively over HTTPS.  The API uses standard HTTP methods—**GET** for queries, **POST** for creating or updating resources and **DELETE** for deletions—and exchanges JSON‑formatted request and response bodies with `Content‑Type: application/json`.  Endpoints return standard HTTP status codes: 200 for successful requests, 400 for invalid input, 401 for authentication failures, 403 for insufficient privileges, 404 when a path or object is not found and 500 for unexpected errors.  Certain APIs accept URL‑encoded query string parameters and/or path parameters; these are documented in each endpoint description.  Versioning is indicated in the base URL; currently only version 1 is supported, and breaking changes will increment the version.  If an error occurs, the response object includes an `errors` element with details, and further information is available in the Scheduler Authentication, Errors and APIs (v1) subpages.

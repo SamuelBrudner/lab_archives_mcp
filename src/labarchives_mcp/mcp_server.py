@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Awaitable, Callable
+from collections.abc import Callable, Coroutine
+from typing import Any
 
 from loguru import logger
 
@@ -13,7 +14,7 @@ async def run_server() -> None:
     raise NotImplementedError("Wire MCP server transport and handlers.")
 
 
-def run(main: Callable[[], Awaitable[None]] | None = None) -> None:
+def run(main: Callable[[], Coroutine[Any, Any, None]] | None = None) -> None:
     """Synchronous helper for CLI entry points."""
     entry = main or run_server
     try:
