@@ -15,16 +15,26 @@ conda_envs/
 .mypy_cache/
 .pytest_cache/
 .coverage
+.coverage.*
 coverage.xml
+coverage/
 htmlcov/
 
 # Build artefacts
 build/
 dist/
 *.egg-info/
+site/
 
 # Logs
 *.log
+logs/
+
+# Documentation artefacts
+docs/_build/
+docs/.doctrees/
+docs/.cache/
+*.ipynb_checkpoints
 
 # MCP / project-specific state
 .serena/
