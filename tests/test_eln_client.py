@@ -105,7 +105,10 @@ def test_list_notebooks_returns_notebook_records(monkeypatch: pytest.MonkeyPatch
                 )
                 request = httpx.Request("GET", url, params=params)
                 return httpx.Response(
-                    200, text=payload, headers={"content-type": "application/xml"}, request=request
+                    200,
+                    text=payload,
+                    headers={"content-type": "application/xml"},
+                    request=request,
                 )
 
             monkeypatch.setattr(async_client, "get", fake_get)
@@ -114,13 +117,12 @@ def test_list_notebooks_returns_notebook_records(monkeypatch: pytest.MonkeyPatch
                 return [
                     {
                         "nbid": "123",
-                        "name": "Fly Behavior Study",
                         "owner": "samuel.brudner@yale.edu",
                         "created_at": "2025-01-01T12:00:00Z",
                     }
                 ]
 
-            monkeypatch.setattr(LabArchivesClient, "parse_xml", fake_parse_xml)
+            monkeypatch.setattr(LabArchivesClient, "parse_xml", staticmethod(fake_parse_xml))
 
             notebooks = await client.list_notebooks("example-uid")
 
@@ -132,5 +134,3 @@ def test_list_notebooks_returns_notebook_records(monkeypatch: pytest.MonkeyPatch
                     created_at="2025-01-01T12:00:00Z",
                 )
             ]
-
-    asyncio.run(scenario())
