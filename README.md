@@ -58,15 +58,25 @@ The purpose is to verify end-to-end connectivity, authentication, and data retri
    export LABARCHIVES_PASSWORD=...
    export LABARCHIVES_REGION=https://api.labarchives.com
    ```
-3. Install dependencies:
+3. Create the pinned Conda environment (local prefix):
 
    ```bash
-   pip install -r requirements.txt
+   conda-lock install --prefix ./conda_envs/pol-dev conda-lock.yml
    ```
-4. Run server:
+4. Activate the environment:
 
    ```bash
-   python mcp_server.py
+   conda activate ./conda_envs/pol-dev
+   ```
+5. Install git hooks and tooling:
+
+   ```bash
+   pre-commit install
+   ```
+6. Run the MCP server (stub implementation for now):
+
+   ```bash
+   python -m labarchives_mcp.mcp_server
    ```
 
 ---

@@ -9,6 +9,7 @@ venv/
 .env/
 .env*/
 conda_env/
+conda_envs/
 
 # Tooling caches and coverage artefacts
 .mypy_cache/
