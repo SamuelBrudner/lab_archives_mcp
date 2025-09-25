@@ -2,22 +2,25 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from labarchives_mcp import run_server
 from labarchives_mcp.auth import Credentials
 
 
-def test_credentials_from_file_missing_file(tmp_path: pytest.TempPathFactory) -> None:
+def test_credentials_from_file_missing_file(tmp_path: Path) -> None:
     """Missing secrets file should raise a FileNotFoundError."""
-    missing_path = tmp_path.mktemp("conf") / "secrets.yml"
+    missing_path = tmp_path / "conf" / "secrets.yml"
     with pytest.raises(FileNotFoundError):
         Credentials.from_file(missing_path)
 
 
-def test_credentials_from_file_missing_values(tmp_path: pytest.TempPathFactory) -> None:
+def test_credentials_from_file_missing_values(tmp_path: Path) -> None:
     """Secrets file without required keys should fail fast."""
-    conf_dir = tmp_path.mktemp("conf")
+    conf_dir = tmp_path / "conf"
+    conf_dir.mkdir(parents=True, exist_ok=True)
     secrets_file = conf_dir / "secrets.yml"
     secrets_file.write_text("LABARCHIVES_AKID: example-akid\n")
 
@@ -25,9 +28,10 @@ def test_credentials_from_file_missing_values(tmp_path: pytest.TempPathFactory) 
         Credentials.from_file(secrets_file)
 
 
-def test_credentials_from_file_success(tmp_path: pytest.TempPathFactory) -> None:
+def test_credentials_from_file_success(tmp_path: Path) -> None:
     """Valid secrets file loads into a `Credentials` instance."""
-    conf_dir = tmp_path.mktemp("conf")
+    conf_dir = tmp_path / "conf"
+    conf_dir.mkdir(parents=True, exist_ok=True)
     secrets_file = conf_dir / "secrets.yml"
     secrets_file.write_text(
         """
@@ -41,7 +45,7 @@ LABARCHIVES_REGION: https://api.labarchives.com
 
     assert creds.akid == "example-akid"
     assert creds.password == "example-pass"
-    assert str(creds.region) == "https://api.labarchives.com"
+    assert str(creds.region) == "https://api.labarchives.com/"
 
 
 @pytest.mark.asyncio()  # type: ignore[misc]
