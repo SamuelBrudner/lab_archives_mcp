@@ -12,7 +12,8 @@ from labarchives_mcp.eln_client import LabArchivesClient, NotebookRecord
 
 
 def test_list_notebooks_handles_http_errors(monkeypatch: pytest.MonkeyPatch) -> None:
-    """`list_notebooks` should raise HTTPStatusError on non-200 responses."""
+    """Given a non-200 LabArchives response, when `list_notebooks()` is
+    called, then an `HTTPStatusError` is raised."""
 
     async def scenario() -> None:
         async with httpx.AsyncClient(base_url="https://example.com") as async_client:
@@ -30,7 +31,8 @@ def test_list_notebooks_handles_http_errors(monkeypatch: pytest.MonkeyPatch) -> 
 
 
 def test_notebook_record_model() -> None:
-    """`NotebookRecord` should normalize field aliases correctly."""
+    """Given LabArchives notebook metadata, when `NotebookRecord` validates
+    it, then alias fields normalize correctly."""
     record = NotebookRecord.model_validate(
         {
             "nbid": "12345",
@@ -47,7 +49,8 @@ def test_notebook_record_model() -> None:
 
 
 def test_parse_xml_hydrates_records() -> None:
-    """`parse_xml` should transform notebooks XML into dictionaries."""
+    """Given LabArchives notebook XML, when `parse_xml()` runs, then it
+    yields normalized dictionaries."""
     xml_payload = (
         "<notebooks>"
         "  <notebook>"
@@ -84,7 +87,8 @@ def test_parse_xml_hydrates_records() -> None:
 
 
 def test_list_notebooks_returns_notebook_records(monkeypatch: pytest.MonkeyPatch) -> None:
-    """`list_notebooks` should call the API, parse XML, and return records."""
+    """Given a well-formed API response, when `list_notebooks()` executes,
+    then it returns validated notebook records."""
 
     async def scenario() -> None:
         async with httpx.AsyncClient(base_url="https://example.com") as async_client:

@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
 from typing import Any
 
 import httpx
-from lxml import etree
 from pydantic import BaseModel, Field, ValidationError
+
+from .transform import NotebookTransformer
 
 
 class NotebookRecord(BaseModel):
@@ -47,22 +47,6 @@ class LabArchivesClient:
 
     @staticmethod
     def parse_xml(payload: str) -> list[dict[str, Any]]:
-        """Placeholder XML parser stub for PoL scope."""
-        root = etree.fromstring(payload.encode())
-        notebook_nodes: Iterable[etree._Element] = root.findall("notebook")
+        """Parse LabArchives notebook XML into dictionaries."""
 
-        records: list[dict[str, Any]] = []
-        for node in notebook_nodes:
-            record = {
-                "nbid": (node.findtext("nbid") or "").strip(),
-                "name": (node.findtext("name") or "").strip(),
-                "owner": (node.findtext("owner") or "").strip(),
-                "created_at": (node.findtext("created-at") or "").strip(),
-            }
-
-            if not record["nbid"]:
-                raise ValueError("Notebook record missing `nbid` field")
-
-            records.append(record)
-
-        return records
+        return NotebookTransformer.parse_notebook_list(payload)

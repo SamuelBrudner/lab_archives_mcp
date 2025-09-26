@@ -48,7 +48,8 @@ class DummyFastMCP:
 
 
 def test_notebooks_handler_propagates_errors(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The resource handler should surface underlying client failures."""
+    """Given a failing LabArchives client, when the notebooks resource
+    executes, then the original error propagates to the caller."""
 
     mcp_module = cast(Any, mcp_server)
     monkeypatch.setattr(
@@ -91,7 +92,8 @@ def test_notebooks_handler_propagates_errors(monkeypatch: pytest.MonkeyPatch) ->
 
 
 def test_run_server_uses_region_as_base_url(monkeypatch: pytest.MonkeyPatch) -> None:
-    """`httpx.AsyncClient` should be initialised against the region endpoint."""
+    """Given configured credentials, when `run_server()` builds the HTTP
+    client, then the client's base URL matches the credential region."""
 
     mcp_module = cast(Any, mcp_server)
     created_clients: list[DummyAsyncClient] = []

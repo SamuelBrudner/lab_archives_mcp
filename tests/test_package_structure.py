@@ -11,14 +11,16 @@ from labarchives_mcp.auth import Credentials
 
 
 def test_credentials_from_file_missing_file(tmp_path: Path) -> None:
-    """Missing secrets file should raise a FileNotFoundError."""
+    """Given no secrets file, when `Credentials.from_file()` runs,
+    then a `FileNotFoundError` is raised."""
     missing_path = tmp_path / "conf" / "secrets.yml"
     with pytest.raises(FileNotFoundError):
         Credentials.from_file(missing_path)
 
 
 def test_credentials_from_file_missing_values(tmp_path: Path) -> None:
-    """Secrets file without required keys should fail fast."""
+    """Given a secrets file missing required keys, when `Credentials.from_file()`
+    executes, then it raises a validation error."""
     conf_dir = tmp_path / "conf"
     conf_dir.mkdir(parents=True, exist_ok=True)
     secrets_file = conf_dir / "secrets.yml"
@@ -29,7 +31,8 @@ def test_credentials_from_file_missing_values(tmp_path: Path) -> None:
 
 
 def test_credentials_from_file_success(tmp_path: Path) -> None:
-    """Valid secrets file loads into a `Credentials` instance."""
+    """Given a fully populated secrets file, when `Credentials.from_file()` runs,
+    then it returns a validated instance."""
     conf_dir = tmp_path / "conf"
     conf_dir.mkdir(parents=True, exist_ok=True)
     secrets_file = conf_dir / "secrets.yml"
@@ -50,6 +53,7 @@ LABARCHIVES_REGION: https://api.labarchives.com
 
 @pytest.mark.asyncio()  # type: ignore[misc]
 async def test_run_server_not_implemented() -> None:
-    """`run_server` is a PoL stub and must raise until implemented."""
+    """Given the PoL state, when `run_server()` is awaited,
+    then a `NotImplementedError` surfaces."""
     with pytest.raises(NotImplementedError):
         await run_server()

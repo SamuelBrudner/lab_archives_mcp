@@ -42,8 +42,12 @@ class StubAsyncClient:
         return self._handler(url, params, json, data)
 
 
-def test_ensure_uid_caches_uid_and_applies_signature(monkeypatch: pytest.MonkeyPatch) -> None:
-    """First login should sign request, later calls reuse cached uid until cleared."""
+def test_ensure_uid_caches_uid_and_applies_signature(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Given valid credentials, when `ensure_uid()` is invoked repeatedly,
+    then the first call signs the request and later calls reuse the cached uid
+    until cleared."""
 
     credentials = Credentials(
         akid="AK123",
@@ -108,7 +112,8 @@ def test_ensure_uid_caches_uid_and_applies_signature(monkeypatch: pytest.MonkeyP
 
 
 def test_ensure_uid_raises_on_failed_login(monkeypatch: pytest.MonkeyPatch) -> None:
-    """HTTP authentication failures should surface as runtime errors."""
+    """Given an HTTP 403 response, when `ensure_uid()` attempts login,
+    then a runtime error is raised and the attempt is recorded."""
 
     credentials = Credentials(
         akid="AK999",

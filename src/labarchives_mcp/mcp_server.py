@@ -12,6 +12,7 @@ from loguru import logger
 
 from .auth import AuthenticationManager, Credentials
 from .eln_client import LabArchivesClient
+from .transform import LabArchivesAPIError, translate_labarchives_fault
 
 ResourceHandler = Callable[[], Awaitable[dict[str, Any]]]
 ResourceDecorator = Callable[[ResourceHandler], ResourceHandler]
@@ -82,7 +83,15 @@ async def run_server() -> None:
         @resource_decorator
         async def list_notebooks_resource() -> dict[str, Any]:
             uid = await auth_manager.ensure_uid()
-            notebooks = await notebook_client.list_notebooks(uid)
+            try:
+                notebooks = await notebook_client.list_notebooks(uid)
+            except LabArchivesAPIError as error:
+                translated = translate_labarchives_fault(error)
+                return {
+                    "resource": "labarchives:notebooks",
+                    "error": translated,
+                }
+
             return {
                 "resource": "labarchives:notebooks",
                 "list": [notebook.model_dump(by_alias=True) for notebook in notebooks],

@@ -7,6 +7,7 @@ from typing import Any, cast
 import pytest
 
 from labarchives_mcp import mcp_server
+from labarchives_mcp.transform import LabArchivesAPIError
 
 
 def test_run_server_contract(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -132,4 +133,86 @@ def test_run_server_contract(monkeypatch: pytest.MonkeyPatch) -> None:
                 "created_at": "2025-01-01T00:00:00Z",
             }
         ],
+    }
+
+
+def test_run_server_maps_labarchives_errors(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Resource handlers should expose LabArchives faults as structured MCP errors."""
+
+    mcp_module = cast(Any, mcp_server)
+    captured: dict[str, Any] = {}
+
+    class DummyCredentials:
+        akid = "AKID"
+        password = "secret"
+        region = "https://example.com"
+
+    monkeypatch.setattr(
+        mcp_module.Credentials,
+        "from_file",
+        classmethod(lambda cls: DummyCredentials()),
+    )
+
+    class DummyAsyncClient:
+        async def __aenter__(self) -> DummyAsyncClient:
+            return self
+
+        async def __aexit__(self, *exc_info: Any) -> None:
+            return None
+
+    monkeypatch.setattr(mcp_module.httpx, "AsyncClient", lambda **_: DummyAsyncClient())
+
+    class DummyLabArchivesClient:
+        def __init__(self, _client: DummyAsyncClient) -> None:
+            captured["eln_client_init"] = True
+
+        async def list_notebooks(self, _uid: str) -> list[Any]:
+            raise LabArchivesAPIError(code=4501, message="Invalid UID")
+
+    monkeypatch.setattr(mcp_module, "LabArchivesClient", DummyLabArchivesClient)
+
+    class DummyAuthenticationManager:
+        async def ensure_uid(self) -> str:
+            return "uid-789"
+
+    monkeypatch.setattr(
+        mcp_module, "AuthenticationManager", lambda *_: DummyAuthenticationManager()
+    )
+
+    class DummyFastMCP:
+        def __init__(self, *, server_id: str, name: str, version: str, description: str) -> None:
+            captured["fastmcp_init"] = {
+                "server_id": server_id,
+                "name": name,
+                "version": version,
+                "description": description,
+            }
+            self._resource_callbacks: dict[str, Callable[..., Any]] = {}
+            captured["resource_callbacks"] = self._resource_callbacks
+
+        def resource(self, uri: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+            def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+                self._resource_callbacks[uri] = func
+                return func
+
+            return decorator
+
+        async def serve(self) -> None:
+            captured["serve_invoked"] = True
+
+    monkeypatch.setattr(mcp_module, "FastMCP", DummyFastMCP)
+
+    asyncio.run(mcp_server.run_server())
+
+    handler = captured["resource_callbacks"]["labarchives:notebooks"]
+    outcome = asyncio.run(handler())
+
+    assert outcome == {
+        "resource": "labarchives:notebooks",
+        "error": {
+            "code": "labarchives:4501",
+            "message": "Invalid UID",
+            "retryable": False,
+            "domain": "labarchives",
+        },
     }
