@@ -60,6 +60,9 @@ def test_run_server_contract(monkeypatch: pytest.MonkeyPatch) -> None:
                         "name": "Example",
                         "owner": "user@example.com",
                         "created_at": "2025-01-01T00:00:00Z",
+                        "owner_email": "user@example.com",
+                        "owner_name": "Example User",
+                        "modified_at": "2025-01-05T13:45:09Z",
                     }
                 )
             ]
@@ -131,6 +134,9 @@ def test_run_server_contract(monkeypatch: pytest.MonkeyPatch) -> None:
                 "name": "Example",
                 "owner": "user@example.com",
                 "created_at": "2025-01-01T00:00:00Z",
+                "owner_email": "user@example.com",
+                "owner_name": "Example User",
+                "modified_at": "2025-01-05T13:45:09Z",
             }
         ],
     }

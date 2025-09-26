@@ -18,7 +18,10 @@ def test_notebook_transformer_parses_minimal_xml() -> None:
                     <nbid>123</nbid>
                     <name>Example</name>
                     <owner>user@example.com</owner>
-                    <created-at>2025-01-01T00:00:00Z</created-at>
+                    <owner-email>user@example.com</owner-email>
+                    <owner-name>Example User</owner-name>
+                    <created-at>2025-01-01 00:00:00</created-at>
+                    <modified-at>2025-01-05 13:45:09</modified-at>
                 </notebook>
             </notebooks>
         </response>
@@ -29,7 +32,10 @@ def test_notebook_transformer_parses_minimal_xml() -> None:
             "nbid": "123",
             "name": "Example",
             "owner": "user@example.com",
+            "owner_email": "user@example.com",
+            "owner_name": "Example User",
             "created_at": "2025-01-01T00:00:00Z",
+            "modified_at": "2025-01-05T13:45:09Z",
         }
     ]
 
@@ -46,6 +52,46 @@ def test_notebook_transformer_rejects_missing_fields() -> None:
         </response>
     """
     with pytest.raises(ValueError, match="nbid"):
+        NotebookTransformer.parse_notebook_list(xml_payload)
+
+
+def test_notebook_transformer_requires_owner_email() -> None:
+    """Given missing owner metadata, when parsing notebooks, then raise a validation error."""
+    xml_payload = """
+        <response status="success">
+            <notebooks>
+                <notebook>
+                    <nbid>123</nbid>
+                    <name>Example</name>
+                    <owner>user@example.com</owner>
+                    <created-at>2025-01-01 00:00:00</created-at>
+                    <modified-at>2025-01-05 13:45:09</modified-at>
+                </notebook>
+            </notebooks>
+        </response>
+    """
+    with pytest.raises(ValueError, match="owner-email"):
+        NotebookTransformer.parse_notebook_list(xml_payload)
+
+
+def test_notebook_transformer_rejects_invalid_timestamp() -> None:
+    """Given an invalid timestamp, when parsing notebooks, then raise a validation error."""
+    xml_payload = """
+        <response status="success">
+            <notebooks>
+                <notebook>
+                    <nbid>123</nbid>
+                    <name>Example</name>
+                    <owner>user@example.com</owner>
+                    <owner-email>user@example.com</owner-email>
+                    <owner-name>Example User</owner-name>
+                    <created-at>not-a-date</created-at>
+                    <modified-at>2025-01-05 13:45:09</modified-at>
+                </notebook>
+            </notebooks>
+        </response>
+    """
+    with pytest.raises(ValueError, match="created-at"):
         NotebookTransformer.parse_notebook_list(xml_payload)
 
 

@@ -16,7 +16,10 @@ class NotebookRecord(BaseModel):
     nbid: str
     name: str
     owner: str
+    owner_email: str
+    owner_name: str
     created_at: str = Field(alias="created_at")
+    modified_at: str = Field(alias="modified_at")
 
 
 class LabArchivesClient:
