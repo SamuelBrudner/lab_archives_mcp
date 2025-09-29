@@ -47,3 +47,8 @@ repos:
         args:
           - --fail-under=0
           - --quiet
+
+  - repo: https://github.com/kynan/nbstripout
+    rev: 0.6.1
+    hooks:
+      - id: nbstripout

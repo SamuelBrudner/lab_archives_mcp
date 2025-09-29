@@ -13,10 +13,10 @@
 version: 1
 metadata:
   content_hash:
-    linux-64: 73bbb1acb70a3cb612c8cd68f3f552b97231fb4e9a25eead91acb2be412e890f
-    osx-arm64: beda2899badda55bbdb1c7ef6aa60cfbd4c379f1801f35f44390befab25b160d
-    osx-64: dd057692eec9b39a4b38afb24f5f7fcd0c1869393486f33b6328fc475fba178f
-    win-64: efd10b2ead80861eb4e2a301fbbe90720e38583bc3c2c13202761c20554f7674
+    linux-64: 75f0fb3c2d60031b18667b682da0a9d0428524d52ec71019ee235550cb64718f
+    osx-arm64: ba0b2136e0d24adb8e1aecedaa36000e7cc67dd2ee2ca9560ef7355965b01a4c
+    osx-64: c516afc94499a3db2e89be4cdab63623762ebbc86c27c22a1f49baae4e8318d7
+    win-64: a09c21f6068a1522e899fb2b95aa08e68e088c25ed842d2d206d77edbc6e4080
   channels:
   - url: conda-forge
     used_env_vars: []
@@ -1505,6 +1505,242 @@ package:
     sha256: 0287e96f4d26d4149305414d4e3bc32f0dcd0862365a4bddea19d7a1ec38c4fc
   category: main
   optional: false
+- name: appnope
+  version: 0.1.4
+  manager: pip
+  platform: osx-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/81/29/5ecc3a15d5a33e31b26c11426c45c501e439cb865d0bff96315d86443b78/appnope-0.1.4-py2.py3-none-any.whl
+  hash:
+    sha256: 502575ee11cd7a28c0205f379b525beefebab9d161b7c964670864014ed7213c
+  category: main
+  optional: false
+- name: appnope
+  version: 0.1.4
+  manager: pip
+  platform: osx-arm64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/81/29/5ecc3a15d5a33e31b26c11426c45c501e439cb865d0bff96315d86443b78/appnope-0.1.4-py2.py3-none-any.whl
+  hash:
+    sha256: 502575ee11cd7a28c0205f379b525beefebab9d161b7c964670864014ed7213c
+  category: main
+  optional: false
+- name: argon2-cffi
+  version: 25.1.0
+  manager: pip
+  platform: linux-64
+  dependencies:
+    argon2-cffi-bindings: '*'
+  url: https://files.pythonhosted.org/packages/4f/d3/a8b22fa575b297cd6e3e3b0155c7e25db170edf1c74783d6a31a2490b8d9/argon2_cffi-25.1.0-py3-none-any.whl
+  hash:
+    sha256: fdc8b074db390fccb6eb4a3604ae7231f219aa669a2652e0f20e16ba513d5741
+  category: main
+  optional: false
+- name: argon2-cffi
+  version: 25.1.0
+  manager: pip
+  platform: osx-64
+  dependencies:
+    argon2-cffi-bindings: '*'
+  url: https://files.pythonhosted.org/packages/4f/d3/a8b22fa575b297cd6e3e3b0155c7e25db170edf1c74783d6a31a2490b8d9/argon2_cffi-25.1.0-py3-none-any.whl
+  hash:
+    sha256: fdc8b074db390fccb6eb4a3604ae7231f219aa669a2652e0f20e16ba513d5741
+  category: main
+  optional: false
+- name: argon2-cffi
+  version: 25.1.0
+  manager: pip
+  platform: osx-arm64
+  dependencies:
+    argon2-cffi-bindings: '*'
+  url: https://files.pythonhosted.org/packages/4f/d3/a8b22fa575b297cd6e3e3b0155c7e25db170edf1c74783d6a31a2490b8d9/argon2_cffi-25.1.0-py3-none-any.whl
+  hash:
+    sha256: fdc8b074db390fccb6eb4a3604ae7231f219aa669a2652e0f20e16ba513d5741
+  category: main
+  optional: false
+- name: argon2-cffi
+  version: 25.1.0
+  manager: pip
+  platform: win-64
+  dependencies:
+    argon2-cffi-bindings: '*'
+  url: https://files.pythonhosted.org/packages/4f/d3/a8b22fa575b297cd6e3e3b0155c7e25db170edf1c74783d6a31a2490b8d9/argon2_cffi-25.1.0-py3-none-any.whl
+  hash:
+    sha256: fdc8b074db390fccb6eb4a3604ae7231f219aa669a2652e0f20e16ba513d5741
+  category: main
+  optional: false
+- name: argon2-cffi-bindings
+  version: 25.1.0
+  manager: pip
+  platform: linux-64
+  dependencies:
+    cffi: '>=1.0.1'
+  url: https://files.pythonhosted.org/packages/09/52/94108adfdd6e2ddf58be64f959a0b9c7d4ef2fa71086c38356d22dc501ea/argon2_cffi_bindings-25.1.0-cp39-abi3-manylinux_2_26_x86_64.manylinux_2_28_x86_64.whl
+  hash:
+    sha256: d3e924cfc503018a714f94a49a149fdc0b644eaead5d1f089330399134fa028a
+  category: main
+  optional: false
+- name: argon2-cffi-bindings
+  version: 25.1.0
+  manager: pip
+  platform: osx-64
+  dependencies:
+    cffi: '>=1.0.1'
+  url: https://files.pythonhosted.org/packages/0a/08/a9bebdb2e0e602dde230bdde8021b29f71f7841bd54801bcfd514acb5dcf/argon2_cffi_bindings-25.1.0-cp39-abi3-macosx_10_9_x86_64.whl
+  hash:
+    sha256: 2630b6240b495dfab90aebe159ff784d08ea999aa4b0d17efa734055a07d2f44
+  category: main
+  optional: false
+- name: argon2-cffi-bindings
+  version: 25.1.0
+  manager: pip
+  platform: osx-arm64
+  dependencies:
+    cffi: '>=1.0.1'
+  url: https://files.pythonhosted.org/packages/b6/02/d297943bcacf05e4f2a94ab6f462831dc20158614e5d067c35d4e63b9acb/argon2_cffi_bindings-25.1.0-cp39-abi3-macosx_11_0_arm64.whl
+  hash:
+    sha256: 7aef0c91e2c0fbca6fc68e7555aa60ef7008a739cbe045541e438373bc54d2b0
+  category: main
+  optional: false
+- name: argon2-cffi-bindings
+  version: 25.1.0
+  manager: pip
+  platform: win-64
+  dependencies:
+    cffi: '>=1.0.1'
+  url: https://files.pythonhosted.org/packages/e2/c6/a759ece8f1829d1f162261226fbfd2c6832b3ff7657384045286d2afa384/argon2_cffi_bindings-25.1.0-cp39-abi3-win_amd64.whl
+  hash:
+    sha256: a98cd7d17e9f7ce244c0803cad3c23a7d379c301ba618a5fa76a67d116618b98
+  category: main
+  optional: false
+- name: arrow
+  version: 1.3.0
+  manager: pip
+  platform: linux-64
+  dependencies:
+    python-dateutil: '>=2.7.0'
+    types-python-dateutil: '>=2.8.10'
+  url: https://files.pythonhosted.org/packages/f8/ed/e97229a566617f2ae958a6b13e7cc0f585470eac730a73e9e82c32a3cdd2/arrow-1.3.0-py3-none-any.whl
+  hash:
+    sha256: c728b120ebc00eb84e01882a6f5e7927a53960aa990ce7dd2b10f39005a67f80
+  category: main
+  optional: false
+- name: arrow
+  version: 1.3.0
+  manager: pip
+  platform: osx-64
+  dependencies:
+    python-dateutil: '>=2.7.0'
+    types-python-dateutil: '>=2.8.10'
+  url: https://files.pythonhosted.org/packages/f8/ed/e97229a566617f2ae958a6b13e7cc0f585470eac730a73e9e82c32a3cdd2/arrow-1.3.0-py3-none-any.whl
+  hash:
+    sha256: c728b120ebc00eb84e01882a6f5e7927a53960aa990ce7dd2b10f39005a67f80
+  category: main
+  optional: false
+- name: arrow
+  version: 1.3.0
+  manager: pip
+  platform: osx-arm64
+  dependencies:
+    python-dateutil: '>=2.7.0'
+    types-python-dateutil: '>=2.8.10'
+  url: https://files.pythonhosted.org/packages/f8/ed/e97229a566617f2ae958a6b13e7cc0f585470eac730a73e9e82c32a3cdd2/arrow-1.3.0-py3-none-any.whl
+  hash:
+    sha256: c728b120ebc00eb84e01882a6f5e7927a53960aa990ce7dd2b10f39005a67f80
+  category: main
+  optional: false
+- name: arrow
+  version: 1.3.0
+  manager: pip
+  platform: win-64
+  dependencies:
+    python-dateutil: '>=2.7.0'
+    types-python-dateutil: '>=2.8.10'
+  url: https://files.pythonhosted.org/packages/f8/ed/e97229a566617f2ae958a6b13e7cc0f585470eac730a73e9e82c32a3cdd2/arrow-1.3.0-py3-none-any.whl
+  hash:
+    sha256: c728b120ebc00eb84e01882a6f5e7927a53960aa990ce7dd2b10f39005a67f80
+  category: main
+  optional: false
+- name: asttokens
+  version: 3.0.0
+  manager: pip
+  platform: linux-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/25/8a/c46dcc25341b5bce5472c718902eb3d38600a903b14fa6aeecef3f21a46f/asttokens-3.0.0-py3-none-any.whl
+  hash:
+    sha256: e3078351a059199dd5138cb1c706e6430c05eff2ff136af5eb4790f9d28932e2
+  category: main
+  optional: false
+- name: asttokens
+  version: 3.0.0
+  manager: pip
+  platform: osx-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/25/8a/c46dcc25341b5bce5472c718902eb3d38600a903b14fa6aeecef3f21a46f/asttokens-3.0.0-py3-none-any.whl
+  hash:
+    sha256: e3078351a059199dd5138cb1c706e6430c05eff2ff136af5eb4790f9d28932e2
+  category: main
+  optional: false
+- name: asttokens
+  version: 3.0.0
+  manager: pip
+  platform: osx-arm64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/25/8a/c46dcc25341b5bce5472c718902eb3d38600a903b14fa6aeecef3f21a46f/asttokens-3.0.0-py3-none-any.whl
+  hash:
+    sha256: e3078351a059199dd5138cb1c706e6430c05eff2ff136af5eb4790f9d28932e2
+  category: main
+  optional: false
+- name: asttokens
+  version: 3.0.0
+  manager: pip
+  platform: win-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/25/8a/c46dcc25341b5bce5472c718902eb3d38600a903b14fa6aeecef3f21a46f/asttokens-3.0.0-py3-none-any.whl
+  hash:
+    sha256: e3078351a059199dd5138cb1c706e6430c05eff2ff136af5eb4790f9d28932e2
+  category: main
+  optional: false
+- name: async-lru
+  version: 2.0.5
+  manager: pip
+  platform: linux-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/03/49/d10027df9fce941cb8184e78a02857af36360d33e1721df81c5ed2179a1a/async_lru-2.0.5-py3-none-any.whl
+  hash:
+    sha256: ab95404d8d2605310d345932697371a5f40def0487c03d6d0ad9138de52c9943
+  category: main
+  optional: false
+- name: async-lru
+  version: 2.0.5
+  manager: pip
+  platform: osx-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/03/49/d10027df9fce941cb8184e78a02857af36360d33e1721df81c5ed2179a1a/async_lru-2.0.5-py3-none-any.whl
+  hash:
+    sha256: ab95404d8d2605310d345932697371a5f40def0487c03d6d0ad9138de52c9943
+  category: main
+  optional: false
+- name: async-lru
+  version: 2.0.5
+  manager: pip
+  platform: osx-arm64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/03/49/d10027df9fce941cb8184e78a02857af36360d33e1721df81c5ed2179a1a/async_lru-2.0.5-py3-none-any.whl
+  hash:
+    sha256: ab95404d8d2605310d345932697371a5f40def0487c03d6d0ad9138de52c9943
+  category: main
+  optional: false
+- name: async-lru
+  version: 2.0.5
+  manager: pip
+  platform: win-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/03/49/d10027df9fce941cb8184e78a02857af36360d33e1721df81c5ed2179a1a/async_lru-2.0.5-py3-none-any.whl
+  hash:
+    sha256: ab95404d8d2605310d345932697371a5f40def0487c03d6d0ad9138de52c9943
+  category: main
+  optional: false
 - name: attrs
   version: 25.3.0
   manager: pip
@@ -1587,6 +1823,94 @@ package:
   url: https://files.pythonhosted.org/packages/0e/aa/91355b5f539caf1b94f0e66ff1e4ee39373b757fce08204981f7829ede51/authlib-1.6.4-py2.py3-none-any.whl
   hash:
     sha256: 39313d2a2caac3ecf6d8f95fbebdfd30ae6ea6ae6a6db794d976405fdd9aa796
+  category: main
+  optional: false
+- name: babel
+  version: 2.17.0
+  manager: pip
+  platform: linux-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/b7/b8/3fe70c75fe32afc4bb507f75563d39bc5642255d1d94f1f23604725780bf/babel-2.17.0-py3-none-any.whl
+  hash:
+    sha256: 4d0b53093fdfb4b21c92b5213dba5a1b23885afa8383709427046b21c366e5f2
+  category: main
+  optional: false
+- name: babel
+  version: 2.17.0
+  manager: pip
+  platform: osx-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/b7/b8/3fe70c75fe32afc4bb507f75563d39bc5642255d1d94f1f23604725780bf/babel-2.17.0-py3-none-any.whl
+  hash:
+    sha256: 4d0b53093fdfb4b21c92b5213dba5a1b23885afa8383709427046b21c366e5f2
+  category: main
+  optional: false
+- name: babel
+  version: 2.17.0
+  manager: pip
+  platform: osx-arm64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/b7/b8/3fe70c75fe32afc4bb507f75563d39bc5642255d1d94f1f23604725780bf/babel-2.17.0-py3-none-any.whl
+  hash:
+    sha256: 4d0b53093fdfb4b21c92b5213dba5a1b23885afa8383709427046b21c366e5f2
+  category: main
+  optional: false
+- name: babel
+  version: 2.17.0
+  manager: pip
+  platform: win-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/b7/b8/3fe70c75fe32afc4bb507f75563d39bc5642255d1d94f1f23604725780bf/babel-2.17.0-py3-none-any.whl
+  hash:
+    sha256: 4d0b53093fdfb4b21c92b5213dba5a1b23885afa8383709427046b21c366e5f2
+  category: main
+  optional: false
+- name: beautifulsoup4
+  version: 4.13.5
+  manager: pip
+  platform: linux-64
+  dependencies:
+    soupsieve: '>1.2'
+    typing-extensions: '>=4.0.0'
+  url: https://files.pythonhosted.org/packages/04/eb/f4151e0c7377a6e08a38108609ba5cede57986802757848688aeedd1b9e8/beautifulsoup4-4.13.5-py3-none-any.whl
+  hash:
+    sha256: 642085eaa22233aceadff9c69651bc51e8bf3f874fb6d7104ece2beb24b47c4a
+  category: main
+  optional: false
+- name: beautifulsoup4
+  version: 4.13.5
+  manager: pip
+  platform: osx-64
+  dependencies:
+    soupsieve: '>1.2'
+    typing-extensions: '>=4.0.0'
+  url: https://files.pythonhosted.org/packages/04/eb/f4151e0c7377a6e08a38108609ba5cede57986802757848688aeedd1b9e8/beautifulsoup4-4.13.5-py3-none-any.whl
+  hash:
+    sha256: 642085eaa22233aceadff9c69651bc51e8bf3f874fb6d7104ece2beb24b47c4a
+  category: main
+  optional: false
+- name: beautifulsoup4
+  version: 4.13.5
+  manager: pip
+  platform: osx-arm64
+  dependencies:
+    soupsieve: '>1.2'
+    typing-extensions: '>=4.0.0'
+  url: https://files.pythonhosted.org/packages/04/eb/f4151e0c7377a6e08a38108609ba5cede57986802757848688aeedd1b9e8/beautifulsoup4-4.13.5-py3-none-any.whl
+  hash:
+    sha256: 642085eaa22233aceadff9c69651bc51e8bf3f874fb6d7104ece2beb24b47c4a
+  category: main
+  optional: false
+- name: beautifulsoup4
+  version: 4.13.5
+  manager: pip
+  platform: win-64
+  dependencies:
+    soupsieve: '>1.2'
+    typing-extensions: '>=4.0.0'
+  url: https://files.pythonhosted.org/packages/04/eb/f4151e0c7377a6e08a38108609ba5cede57986802757848688aeedd1b9e8/beautifulsoup4-4.13.5-py3-none-any.whl
+  hash:
+    sha256: 642085eaa22233aceadff9c69651bc51e8bf3f874fb6d7104ece2beb24b47c4a
   category: main
   optional: false
 - name: black
@@ -1651,6 +1975,54 @@ package:
   url: https://files.pythonhosted.org/packages/7f/5b/20fd5c884d14550c911e4fb1b0dae00d4abb60a4f3876b449c4d3a9141d5/black-25.9.0-cp311-cp311-win_amd64.whl
   hash:
     sha256: c0372a93e16b3954208417bfe448e09b0de5cc721d521866cd9e0acac3c04a1f
+  category: main
+  optional: false
+- name: bleach
+  version: 6.2.0
+  manager: pip
+  platform: linux-64
+  dependencies:
+    tinycss2: '>=1.1.0,<1.5'
+    webencodings: '*'
+  url: https://files.pythonhosted.org/packages/fc/55/96142937f66150805c25c4d0f31ee4132fd33497753400734f9dfdcbdc66/bleach-6.2.0-py3-none-any.whl
+  hash:
+    sha256: 117d9c6097a7c3d22fd578fcd8d35ff1e125df6736f554da4e432fdd63f31e5e
+  category: main
+  optional: false
+- name: bleach
+  version: 6.2.0
+  manager: pip
+  platform: osx-64
+  dependencies:
+    tinycss2: '>=1.1.0,<1.5'
+    webencodings: '*'
+  url: https://files.pythonhosted.org/packages/fc/55/96142937f66150805c25c4d0f31ee4132fd33497753400734f9dfdcbdc66/bleach-6.2.0-py3-none-any.whl
+  hash:
+    sha256: 117d9c6097a7c3d22fd578fcd8d35ff1e125df6736f554da4e432fdd63f31e5e
+  category: main
+  optional: false
+- name: bleach
+  version: 6.2.0
+  manager: pip
+  platform: osx-arm64
+  dependencies:
+    tinycss2: '>=1.1.0,<1.5'
+    webencodings: '*'
+  url: https://files.pythonhosted.org/packages/fc/55/96142937f66150805c25c4d0f31ee4132fd33497753400734f9dfdcbdc66/bleach-6.2.0-py3-none-any.whl
+  hash:
+    sha256: 117d9c6097a7c3d22fd578fcd8d35ff1e125df6736f554da4e432fdd63f31e5e
+  category: main
+  optional: false
+- name: bleach
+  version: 6.2.0
+  manager: pip
+  platform: win-64
+  dependencies:
+    tinycss2: '>=1.1.0,<1.5'
+    webencodings: '*'
+  url: https://files.pythonhosted.org/packages/fc/55/96142937f66150805c25c4d0f31ee4132fd33497753400734f9dfdcbdc66/bleach-6.2.0-py3-none-any.whl
+  hash:
+    sha256: 117d9c6097a7c3d22fd578fcd8d35ff1e125df6736f554da4e432fdd63f31e5e
   category: main
   optional: false
 - name: certifi
@@ -1868,6 +2240,46 @@ package:
     sha256: 4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6
   category: main
   optional: false
+- name: comm
+  version: 0.2.3
+  manager: pip
+  platform: linux-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/60/97/891a0971e1e4a8c5d2b20bbe0e524dc04548d2307fee33cdeba148fd4fc7/comm-0.2.3-py3-none-any.whl
+  hash:
+    sha256: c615d91d75f7f04f095b30d1c1711babd43bdc6419c1be9886a85f2f4e489417
+  category: main
+  optional: false
+- name: comm
+  version: 0.2.3
+  manager: pip
+  platform: osx-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/60/97/891a0971e1e4a8c5d2b20bbe0e524dc04548d2307fee33cdeba148fd4fc7/comm-0.2.3-py3-none-any.whl
+  hash:
+    sha256: c615d91d75f7f04f095b30d1c1711babd43bdc6419c1be9886a85f2f4e489417
+  category: main
+  optional: false
+- name: comm
+  version: 0.2.3
+  manager: pip
+  platform: osx-arm64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/60/97/891a0971e1e4a8c5d2b20bbe0e524dc04548d2307fee33cdeba148fd4fc7/comm-0.2.3-py3-none-any.whl
+  hash:
+    sha256: c615d91d75f7f04f095b30d1c1711babd43bdc6419c1be9886a85f2f4e489417
+  category: main
+  optional: false
+- name: comm
+  version: 0.2.3
+  manager: pip
+  platform: win-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/60/97/891a0971e1e4a8c5d2b20bbe0e524dc04548d2307fee33cdeba148fd4fc7/comm-0.2.3-py3-none-any.whl
+  hash:
+    sha256: c615d91d75f7f04f095b30d1c1711babd43bdc6419c1be9886a85f2f4e489417
+  category: main
+  optional: false
 - name: cryptography
   version: 46.0.1
   manager: pip
@@ -1968,6 +2380,126 @@ package:
     sha256: 809d04cde9108617106091140c3964ee6fceb33cecdd537f7ffa360bde13ed71
   category: main
   optional: false
+- name: debugpy
+  version: 1.8.17
+  manager: pip
+  platform: linux-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/b0/d0/89247ec250369fc76db477720a26b2fce7ba079ff1380e4ab4529d2fe233/debugpy-1.8.17-py2.py3-none-any.whl
+  hash:
+    sha256: 60c7dca6571efe660ccb7a9508d73ca14b8796c4ed484c2002abba714226cfef
+  category: main
+  optional: false
+- name: debugpy
+  version: 1.8.17
+  manager: pip
+  platform: osx-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/b0/d0/89247ec250369fc76db477720a26b2fce7ba079ff1380e4ab4529d2fe233/debugpy-1.8.17-py2.py3-none-any.whl
+  hash:
+    sha256: 60c7dca6571efe660ccb7a9508d73ca14b8796c4ed484c2002abba714226cfef
+  category: main
+  optional: false
+- name: debugpy
+  version: 1.8.17
+  manager: pip
+  platform: osx-arm64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/b0/d0/89247ec250369fc76db477720a26b2fce7ba079ff1380e4ab4529d2fe233/debugpy-1.8.17-py2.py3-none-any.whl
+  hash:
+    sha256: 60c7dca6571efe660ccb7a9508d73ca14b8796c4ed484c2002abba714226cfef
+  category: main
+  optional: false
+- name: debugpy
+  version: 1.8.17
+  manager: pip
+  platform: win-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/c2/c5/c012c60a2922cc91caa9675d0ddfbb14ba59e1e36228355f41cab6483469/debugpy-1.8.17-cp311-cp311-win_amd64.whl
+  hash:
+    sha256: b532282ad4eca958b1b2d7dbcb2b7218e02cb934165859b918e3b6ba7772d3f4
+  category: main
+  optional: false
+- name: decorator
+  version: 5.2.1
+  manager: pip
+  platform: linux-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/4e/8c/f3147f5c4b73e7550fe5f9352eaa956ae838d5c51eb58e7a25b9f3e2643b/decorator-5.2.1-py3-none-any.whl
+  hash:
+    sha256: d316bb415a2d9e2d2b3abcc4084c6502fc09240e292cd76a76afc106a1c8e04a
+  category: main
+  optional: false
+- name: decorator
+  version: 5.2.1
+  manager: pip
+  platform: osx-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/4e/8c/f3147f5c4b73e7550fe5f9352eaa956ae838d5c51eb58e7a25b9f3e2643b/decorator-5.2.1-py3-none-any.whl
+  hash:
+    sha256: d316bb415a2d9e2d2b3abcc4084c6502fc09240e292cd76a76afc106a1c8e04a
+  category: main
+  optional: false
+- name: decorator
+  version: 5.2.1
+  manager: pip
+  platform: osx-arm64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/4e/8c/f3147f5c4b73e7550fe5f9352eaa956ae838d5c51eb58e7a25b9f3e2643b/decorator-5.2.1-py3-none-any.whl
+  hash:
+    sha256: d316bb415a2d9e2d2b3abcc4084c6502fc09240e292cd76a76afc106a1c8e04a
+  category: main
+  optional: false
+- name: decorator
+  version: 5.2.1
+  manager: pip
+  platform: win-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/4e/8c/f3147f5c4b73e7550fe5f9352eaa956ae838d5c51eb58e7a25b9f3e2643b/decorator-5.2.1-py3-none-any.whl
+  hash:
+    sha256: d316bb415a2d9e2d2b3abcc4084c6502fc09240e292cd76a76afc106a1c8e04a
+  category: main
+  optional: false
+- name: defusedxml
+  version: 0.7.1
+  manager: pip
+  platform: linux-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/07/6c/aa3f2f849e01cb6a001cd8554a88d4c77c5c1a31c95bdf1cf9301e6d9ef4/defusedxml-0.7.1-py2.py3-none-any.whl
+  hash:
+    sha256: a352e7e428770286cc899e2542b6cdaedb2b4953ff269a210103ec58f6198a61
+  category: main
+  optional: false
+- name: defusedxml
+  version: 0.7.1
+  manager: pip
+  platform: osx-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/07/6c/aa3f2f849e01cb6a001cd8554a88d4c77c5c1a31c95bdf1cf9301e6d9ef4/defusedxml-0.7.1-py2.py3-none-any.whl
+  hash:
+    sha256: a352e7e428770286cc899e2542b6cdaedb2b4953ff269a210103ec58f6198a61
+  category: main
+  optional: false
+- name: defusedxml
+  version: 0.7.1
+  manager: pip
+  platform: osx-arm64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/07/6c/aa3f2f849e01cb6a001cd8554a88d4c77c5c1a31c95bdf1cf9301e6d9ef4/defusedxml-0.7.1-py2.py3-none-any.whl
+  hash:
+    sha256: a352e7e428770286cc899e2542b6cdaedb2b4953ff269a210103ec58f6198a61
+  category: main
+  optional: false
+- name: defusedxml
+  version: 0.7.1
+  manager: pip
+  platform: win-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/07/6c/aa3f2f849e01cb6a001cd8554a88d4c77c5c1a31c95bdf1cf9301e6d9ef4/defusedxml-0.7.1-py2.py3-none-any.whl
+  hash:
+    sha256: a352e7e428770286cc899e2542b6cdaedb2b4953ff269a210103ec58f6198a61
+  category: main
+  optional: false
 - name: distlib
   version: 0.4.0
   manager: pip
@@ -2220,6 +2752,86 @@ package:
     sha256: 4d111e6e0c13d0644cad6ddaa7ed0261a0b36971f6d23e7ec9b4b9097da78a10
   category: main
   optional: false
+- name: executing
+  version: 2.2.1
+  manager: pip
+  platform: linux-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/c1/ea/53f2148663b321f21b5a606bd5f191517cf40b7072c0497d3c92c4a13b1e/executing-2.2.1-py2.py3-none-any.whl
+  hash:
+    sha256: 760643d3452b4d777d295bb167ccc74c64a81df23fb5e08eff250c425a4b2017
+  category: main
+  optional: false
+- name: executing
+  version: 2.2.1
+  manager: pip
+  platform: osx-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/c1/ea/53f2148663b321f21b5a606bd5f191517cf40b7072c0497d3c92c4a13b1e/executing-2.2.1-py2.py3-none-any.whl
+  hash:
+    sha256: 760643d3452b4d777d295bb167ccc74c64a81df23fb5e08eff250c425a4b2017
+  category: main
+  optional: false
+- name: executing
+  version: 2.2.1
+  manager: pip
+  platform: osx-arm64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/c1/ea/53f2148663b321f21b5a606bd5f191517cf40b7072c0497d3c92c4a13b1e/executing-2.2.1-py2.py3-none-any.whl
+  hash:
+    sha256: 760643d3452b4d777d295bb167ccc74c64a81df23fb5e08eff250c425a4b2017
+  category: main
+  optional: false
+- name: executing
+  version: 2.2.1
+  manager: pip
+  platform: win-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/c1/ea/53f2148663b321f21b5a606bd5f191517cf40b7072c0497d3c92c4a13b1e/executing-2.2.1-py2.py3-none-any.whl
+  hash:
+    sha256: 760643d3452b4d777d295bb167ccc74c64a81df23fb5e08eff250c425a4b2017
+  category: main
+  optional: false
+- name: fastjsonschema
+  version: 2.21.2
+  manager: pip
+  platform: linux-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/cb/a8/20d0723294217e47de6d9e2e40fd4a9d2f7c4b6ef974babd482a59743694/fastjsonschema-2.21.2-py3-none-any.whl
+  hash:
+    sha256: 1c797122d0a86c5cace2e54bf4e819c36223b552017172f32c5c024a6b77e463
+  category: main
+  optional: false
+- name: fastjsonschema
+  version: 2.21.2
+  manager: pip
+  platform: osx-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/cb/a8/20d0723294217e47de6d9e2e40fd4a9d2f7c4b6ef974babd482a59743694/fastjsonschema-2.21.2-py3-none-any.whl
+  hash:
+    sha256: 1c797122d0a86c5cace2e54bf4e819c36223b552017172f32c5c024a6b77e463
+  category: main
+  optional: false
+- name: fastjsonschema
+  version: 2.21.2
+  manager: pip
+  platform: osx-arm64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/cb/a8/20d0723294217e47de6d9e2e40fd4a9d2f7c4b6ef974babd482a59743694/fastjsonschema-2.21.2-py3-none-any.whl
+  hash:
+    sha256: 1c797122d0a86c5cace2e54bf4e819c36223b552017172f32c5c024a6b77e463
+  category: main
+  optional: false
+- name: fastjsonschema
+  version: 2.21.2
+  manager: pip
+  platform: win-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/cb/a8/20d0723294217e47de6d9e2e40fd4a9d2f7c4b6ef974babd482a59743694/fastjsonschema-2.21.2-py3-none-any.whl
+  hash:
+    sha256: 1c797122d0a86c5cace2e54bf4e819c36223b552017172f32c5c024a6b77e463
+  category: main
+  optional: false
 - name: fastmcp
   version: 2.12.3
   manager: pip
@@ -2342,6 +2954,46 @@ package:
   url: https://files.pythonhosted.org/packages/42/14/42b2651a2f46b022ccd948bca9f2d5af0fd8929c4eec235b8d6d844fbe67/filelock-3.19.1-py3-none-any.whl
   hash:
     sha256: d38e30481def20772f5baf097c122c3babc4fcdb7e14e57049eb9d88c6dc017d
+  category: main
+  optional: false
+- name: fqdn
+  version: 1.5.1
+  manager: pip
+  platform: linux-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/cf/58/8acf1b3e91c58313ce5cb67df61001fc9dcd21be4fadb76c1a2d540e09ed/fqdn-1.5.1-py3-none-any.whl
+  hash:
+    sha256: 3a179af3761e4df6eb2e026ff9e1a3033d3587bf980a0b1b2e1e5d08d7358014
+  category: main
+  optional: false
+- name: fqdn
+  version: 1.5.1
+  manager: pip
+  platform: osx-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/cf/58/8acf1b3e91c58313ce5cb67df61001fc9dcd21be4fadb76c1a2d540e09ed/fqdn-1.5.1-py3-none-any.whl
+  hash:
+    sha256: 3a179af3761e4df6eb2e026ff9e1a3033d3587bf980a0b1b2e1e5d08d7358014
+  category: main
+  optional: false
+- name: fqdn
+  version: 1.5.1
+  manager: pip
+  platform: osx-arm64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/cf/58/8acf1b3e91c58313ce5cb67df61001fc9dcd21be4fadb76c1a2d540e09ed/fqdn-1.5.1-py3-none-any.whl
+  hash:
+    sha256: 3a179af3761e4df6eb2e026ff9e1a3033d3587bf980a0b1b2e1e5d08d7358014
+  category: main
+  optional: false
+- name: fqdn
+  version: 1.5.1
+  manager: pip
+  platform: win-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/cf/58/8acf1b3e91c58313ce5cb67df61001fc9dcd21be4fadb76c1a2d540e09ed/fqdn-1.5.1-py3-none-any.whl
+  hash:
+    sha256: 3a179af3761e4df6eb2e026ff9e1a3033d3587bf980a0b1b2e1e5d08d7358014
   category: main
   optional: false
 - name: h11
@@ -2700,6 +3352,220 @@ package:
     sha256: 9deba5723312380e77435581c6bf4935c94cbfab9b1ed33ef8d238ea168eb760
   category: main
   optional: false
+- name: ipykernel
+  version: 6.30.1
+  manager: pip
+  platform: linux-64
+  dependencies:
+    comm: '>=0.1.1'
+    debugpy: '>=1.6.5'
+    ipython: '>=7.23.1'
+    jupyter-client: '>=8.0.0'
+    jupyter-core: '>=4.12,<5.0.dev0 || >=5.1.dev0'
+    matplotlib-inline: '>=0.1'
+    nest-asyncio: '>=1.4'
+    packaging: '>=22'
+    psutil: '>=5.7'
+    pyzmq: '>=25'
+    tornado: '>=6.2'
+    traitlets: '>=5.4.0'
+  url: https://files.pythonhosted.org/packages/fc/c7/b445faca8deb954fe536abebff4ece5b097b923de482b26e78448c89d1dd/ipykernel-6.30.1-py3-none-any.whl
+  hash:
+    sha256: aa6b9fb93dca949069d8b85b6c79b2518e32ac583ae9c7d37c51d119e18b3fb4
+  category: main
+  optional: false
+- name: ipykernel
+  version: 6.30.1
+  manager: pip
+  platform: osx-64
+  dependencies:
+    appnope: '>=0.1.2'
+    comm: '>=0.1.1'
+    debugpy: '>=1.6.5'
+    ipython: '>=7.23.1'
+    jupyter-client: '>=8.0.0'
+    jupyter-core: '>=4.12,<5.0.dev0 || >=5.1.dev0'
+    matplotlib-inline: '>=0.1'
+    nest-asyncio: '>=1.4'
+    packaging: '>=22'
+    psutil: '>=5.7'
+    pyzmq: '>=25'
+    tornado: '>=6.2'
+    traitlets: '>=5.4.0'
+  url: https://files.pythonhosted.org/packages/fc/c7/b445faca8deb954fe536abebff4ece5b097b923de482b26e78448c89d1dd/ipykernel-6.30.1-py3-none-any.whl
+  hash:
+    sha256: aa6b9fb93dca949069d8b85b6c79b2518e32ac583ae9c7d37c51d119e18b3fb4
+  category: main
+  optional: false
+- name: ipykernel
+  version: 6.30.1
+  manager: pip
+  platform: osx-arm64
+  dependencies:
+    appnope: '>=0.1.2'
+    comm: '>=0.1.1'
+    debugpy: '>=1.6.5'
+    ipython: '>=7.23.1'
+    jupyter-client: '>=8.0.0'
+    jupyter-core: '>=4.12,<5.0.dev0 || >=5.1.dev0'
+    matplotlib-inline: '>=0.1'
+    nest-asyncio: '>=1.4'
+    packaging: '>=22'
+    psutil: '>=5.7'
+    pyzmq: '>=25'
+    tornado: '>=6.2'
+    traitlets: '>=5.4.0'
+  url: https://files.pythonhosted.org/packages/fc/c7/b445faca8deb954fe536abebff4ece5b097b923de482b26e78448c89d1dd/ipykernel-6.30.1-py3-none-any.whl
+  hash:
+    sha256: aa6b9fb93dca949069d8b85b6c79b2518e32ac583ae9c7d37c51d119e18b3fb4
+  category: main
+  optional: false
+- name: ipykernel
+  version: 6.30.1
+  manager: pip
+  platform: win-64
+  dependencies:
+    comm: '>=0.1.1'
+    debugpy: '>=1.6.5'
+    ipython: '>=7.23.1'
+    jupyter-client: '>=8.0.0'
+    jupyter-core: '>=4.12,<5.0.dev0 || >=5.1.dev0'
+    matplotlib-inline: '>=0.1'
+    nest-asyncio: '>=1.4'
+    packaging: '>=22'
+    psutil: '>=5.7'
+    pyzmq: '>=25'
+    tornado: '>=6.2'
+    traitlets: '>=5.4.0'
+  url: https://files.pythonhosted.org/packages/fc/c7/b445faca8deb954fe536abebff4ece5b097b923de482b26e78448c89d1dd/ipykernel-6.30.1-py3-none-any.whl
+  hash:
+    sha256: aa6b9fb93dca949069d8b85b6c79b2518e32ac583ae9c7d37c51d119e18b3fb4
+  category: main
+  optional: false
+- name: ipython
+  version: 9.5.0
+  manager: pip
+  platform: linux-64
+  dependencies:
+    decorator: '*'
+    ipython-pygments-lexers: '*'
+    jedi: '>=0.16'
+    matplotlib-inline: '*'
+    pexpect: '>4.3'
+    prompt-toolkit: '>=3.0.41,<3.1.0'
+    pygments: '>=2.4.0'
+    stack-data: '*'
+    traitlets: '>=5.13.0'
+    typing-extensions: '>=4.6'
+  url: https://files.pythonhosted.org/packages/08/2a/5628a99d04acb2d2f2e749cdf4ea571d2575e898df0528a090948018b726/ipython-9.5.0-py3-none-any.whl
+  hash:
+    sha256: 88369ffa1d5817d609120daa523a6da06d02518e582347c29f8451732a9c5e72
+  category: main
+  optional: false
+- name: ipython
+  version: 9.5.0
+  manager: pip
+  platform: osx-64
+  dependencies:
+    decorator: '*'
+    ipython-pygments-lexers: '*'
+    jedi: '>=0.16'
+    matplotlib-inline: '*'
+    pexpect: '>4.3'
+    prompt-toolkit: '>=3.0.41,<3.1.0'
+    pygments: '>=2.4.0'
+    stack-data: '*'
+    traitlets: '>=5.13.0'
+    typing-extensions: '>=4.6'
+  url: https://files.pythonhosted.org/packages/08/2a/5628a99d04acb2d2f2e749cdf4ea571d2575e898df0528a090948018b726/ipython-9.5.0-py3-none-any.whl
+  hash:
+    sha256: 88369ffa1d5817d609120daa523a6da06d02518e582347c29f8451732a9c5e72
+  category: main
+  optional: false
+- name: ipython
+  version: 9.5.0
+  manager: pip
+  platform: osx-arm64
+  dependencies:
+    decorator: '*'
+    ipython-pygments-lexers: '*'
+    jedi: '>=0.16'
+    matplotlib-inline: '*'
+    pexpect: '>4.3'
+    prompt-toolkit: '>=3.0.41,<3.1.0'
+    pygments: '>=2.4.0'
+    stack-data: '*'
+    traitlets: '>=5.13.0'
+    typing-extensions: '>=4.6'
+  url: https://files.pythonhosted.org/packages/08/2a/5628a99d04acb2d2f2e749cdf4ea571d2575e898df0528a090948018b726/ipython-9.5.0-py3-none-any.whl
+  hash:
+    sha256: 88369ffa1d5817d609120daa523a6da06d02518e582347c29f8451732a9c5e72
+  category: main
+  optional: false
+- name: ipython
+  version: 9.5.0
+  manager: pip
+  platform: win-64
+  dependencies:
+    colorama: '*'
+    decorator: '*'
+    ipython-pygments-lexers: '*'
+    jedi: '>=0.16'
+    matplotlib-inline: '*'
+    prompt-toolkit: '>=3.0.41,<3.1.0'
+    pygments: '>=2.4.0'
+    stack-data: '*'
+    traitlets: '>=5.13.0'
+    typing-extensions: '>=4.6'
+  url: https://files.pythonhosted.org/packages/08/2a/5628a99d04acb2d2f2e749cdf4ea571d2575e898df0528a090948018b726/ipython-9.5.0-py3-none-any.whl
+  hash:
+    sha256: 88369ffa1d5817d609120daa523a6da06d02518e582347c29f8451732a9c5e72
+  category: main
+  optional: false
+- name: ipython-pygments-lexers
+  version: 1.1.1
+  manager: pip
+  platform: linux-64
+  dependencies:
+    pygments: '*'
+  url: https://files.pythonhosted.org/packages/d9/33/1f075bf72b0b747cb3288d011319aaf64083cf2efef8354174e3ed4540e2/ipython_pygments_lexers-1.1.1-py3-none-any.whl
+  hash:
+    sha256: a9462224a505ade19a605f71f8fa63c2048833ce50abc86768a0d81d876dc81c
+  category: main
+  optional: false
+- name: ipython-pygments-lexers
+  version: 1.1.1
+  manager: pip
+  platform: osx-64
+  dependencies:
+    pygments: '*'
+  url: https://files.pythonhosted.org/packages/d9/33/1f075bf72b0b747cb3288d011319aaf64083cf2efef8354174e3ed4540e2/ipython_pygments_lexers-1.1.1-py3-none-any.whl
+  hash:
+    sha256: a9462224a505ade19a605f71f8fa63c2048833ce50abc86768a0d81d876dc81c
+  category: main
+  optional: false
+- name: ipython-pygments-lexers
+  version: 1.1.1
+  manager: pip
+  platform: osx-arm64
+  dependencies:
+    pygments: '*'
+  url: https://files.pythonhosted.org/packages/d9/33/1f075bf72b0b747cb3288d011319aaf64083cf2efef8354174e3ed4540e2/ipython_pygments_lexers-1.1.1-py3-none-any.whl
+  hash:
+    sha256: a9462224a505ade19a605f71f8fa63c2048833ce50abc86768a0d81d876dc81c
+  category: main
+  optional: false
+- name: ipython-pygments-lexers
+  version: 1.1.1
+  manager: pip
+  platform: win-64
+  dependencies:
+    pygments: '*'
+  url: https://files.pythonhosted.org/packages/d9/33/1f075bf72b0b747cb3288d011319aaf64083cf2efef8354174e3ed4540e2/ipython_pygments_lexers-1.1.1-py3-none-any.whl
+  hash:
+    sha256: a9462224a505ade19a605f71f8fa63c2048833ce50abc86768a0d81d876dc81c
+  category: main
+  optional: false
 - name: isodate
   version: 0.7.2
   manager: pip
@@ -2740,6 +3606,50 @@ package:
     sha256: 28009937d8031054830160fce6d409ed342816b543597cece116d966c6d99e15
   category: main
   optional: false
+- name: isoduration
+  version: 20.11.0
+  manager: pip
+  platform: linux-64
+  dependencies:
+    arrow: '>=0.15.0'
+  url: https://files.pythonhosted.org/packages/7b/55/e5326141505c5d5e34c5e0935d2908a74e4561eca44108fbfb9c13d2911a/isoduration-20.11.0-py3-none-any.whl
+  hash:
+    sha256: b2904c2a4228c3d44f409c8ae8e2370eb21a26f7ac2ec5446df141dde3452042
+  category: main
+  optional: false
+- name: isoduration
+  version: 20.11.0
+  manager: pip
+  platform: osx-64
+  dependencies:
+    arrow: '>=0.15.0'
+  url: https://files.pythonhosted.org/packages/7b/55/e5326141505c5d5e34c5e0935d2908a74e4561eca44108fbfb9c13d2911a/isoduration-20.11.0-py3-none-any.whl
+  hash:
+    sha256: b2904c2a4228c3d44f409c8ae8e2370eb21a26f7ac2ec5446df141dde3452042
+  category: main
+  optional: false
+- name: isoduration
+  version: 20.11.0
+  manager: pip
+  platform: osx-arm64
+  dependencies:
+    arrow: '>=0.15.0'
+  url: https://files.pythonhosted.org/packages/7b/55/e5326141505c5d5e34c5e0935d2908a74e4561eca44108fbfb9c13d2911a/isoduration-20.11.0-py3-none-any.whl
+  hash:
+    sha256: b2904c2a4228c3d44f409c8ae8e2370eb21a26f7ac2ec5446df141dde3452042
+  category: main
+  optional: false
+- name: isoduration
+  version: 20.11.0
+  manager: pip
+  platform: win-64
+  dependencies:
+    arrow: '>=0.15.0'
+  url: https://files.pythonhosted.org/packages/7b/55/e5326141505c5d5e34c5e0935d2908a74e4561eca44108fbfb9c13d2911a/isoduration-20.11.0-py3-none-any.whl
+  hash:
+    sha256: b2904c2a4228c3d44f409c8ae8e2370eb21a26f7ac2ec5446df141dde3452042
+  category: main
+  optional: false
 - name: isort
   version: 6.0.1
   manager: pip
@@ -2780,15 +3690,192 @@ package:
     sha256: 2dc5d7f65c9678d94c88dfc29161a320eec67328bc97aad576874cb4be1e9615
   category: main
   optional: false
+- name: jedi
+  version: 0.19.2
+  manager: pip
+  platform: linux-64
+  dependencies:
+    parso: '>=0.8.4,<0.9.0'
+  url: https://files.pythonhosted.org/packages/c0/5a/9cac0c82afec3d09ccd97c8b6502d48f165f9124db81b4bcb90b4af974ee/jedi-0.19.2-py2.py3-none-any.whl
+  hash:
+    sha256: a8ef22bde8490f57fe5c7681a3c83cb58874daf72b4784de3cce5b6ef6edb5b9
+  category: main
+  optional: false
+- name: jedi
+  version: 0.19.2
+  manager: pip
+  platform: osx-64
+  dependencies:
+    parso: '>=0.8.4,<0.9.0'
+  url: https://files.pythonhosted.org/packages/c0/5a/9cac0c82afec3d09ccd97c8b6502d48f165f9124db81b4bcb90b4af974ee/jedi-0.19.2-py2.py3-none-any.whl
+  hash:
+    sha256: a8ef22bde8490f57fe5c7681a3c83cb58874daf72b4784de3cce5b6ef6edb5b9
+  category: main
+  optional: false
+- name: jedi
+  version: 0.19.2
+  manager: pip
+  platform: osx-arm64
+  dependencies:
+    parso: '>=0.8.4,<0.9.0'
+  url: https://files.pythonhosted.org/packages/c0/5a/9cac0c82afec3d09ccd97c8b6502d48f165f9124db81b4bcb90b4af974ee/jedi-0.19.2-py2.py3-none-any.whl
+  hash:
+    sha256: a8ef22bde8490f57fe5c7681a3c83cb58874daf72b4784de3cce5b6ef6edb5b9
+  category: main
+  optional: false
+- name: jedi
+  version: 0.19.2
+  manager: pip
+  platform: win-64
+  dependencies:
+    parso: '>=0.8.4,<0.9.0'
+  url: https://files.pythonhosted.org/packages/c0/5a/9cac0c82afec3d09ccd97c8b6502d48f165f9124db81b4bcb90b4af974ee/jedi-0.19.2-py2.py3-none-any.whl
+  hash:
+    sha256: a8ef22bde8490f57fe5c7681a3c83cb58874daf72b4784de3cce5b6ef6edb5b9
+  category: main
+  optional: false
+- name: jinja2
+  version: 3.1.6
+  manager: pip
+  platform: linux-64
+  dependencies:
+    markupsafe: '>=2.0'
+  url: https://files.pythonhosted.org/packages/62/a1/3d680cbfd5f4b8f15abc1d571870c5fc3e594bb582bc3b64ea099db13e56/jinja2-3.1.6-py3-none-any.whl
+  hash:
+    sha256: 85ece4451f492d0c13c5dd7c13a64681a86afae63a5f347908daf103ce6d2f67
+  category: main
+  optional: false
+- name: jinja2
+  version: 3.1.6
+  manager: pip
+  platform: osx-64
+  dependencies:
+    markupsafe: '>=2.0'
+  url: https://files.pythonhosted.org/packages/62/a1/3d680cbfd5f4b8f15abc1d571870c5fc3e594bb582bc3b64ea099db13e56/jinja2-3.1.6-py3-none-any.whl
+  hash:
+    sha256: 85ece4451f492d0c13c5dd7c13a64681a86afae63a5f347908daf103ce6d2f67
+  category: main
+  optional: false
+- name: jinja2
+  version: 3.1.6
+  manager: pip
+  platform: osx-arm64
+  dependencies:
+    markupsafe: '>=2.0'
+  url: https://files.pythonhosted.org/packages/62/a1/3d680cbfd5f4b8f15abc1d571870c5fc3e594bb582bc3b64ea099db13e56/jinja2-3.1.6-py3-none-any.whl
+  hash:
+    sha256: 85ece4451f492d0c13c5dd7c13a64681a86afae63a5f347908daf103ce6d2f67
+  category: main
+  optional: false
+- name: jinja2
+  version: 3.1.6
+  manager: pip
+  platform: win-64
+  dependencies:
+    markupsafe: '>=2.0'
+  url: https://files.pythonhosted.org/packages/62/a1/3d680cbfd5f4b8f15abc1d571870c5fc3e594bb582bc3b64ea099db13e56/jinja2-3.1.6-py3-none-any.whl
+  hash:
+    sha256: 85ece4451f492d0c13c5dd7c13a64681a86afae63a5f347908daf103ce6d2f67
+  category: main
+  optional: false
+- name: json5
+  version: 0.12.1
+  manager: pip
+  platform: linux-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/85/e2/05328bd2621be49a6fed9e3030b1e51a2d04537d3f816d211b9cc53c5262/json5-0.12.1-py3-none-any.whl
+  hash:
+    sha256: d9c9b3bc34a5f54d43c35e11ef7cb87d8bdd098c6ace87117a7b7e83e705c1d5
+  category: main
+  optional: false
+- name: json5
+  version: 0.12.1
+  manager: pip
+  platform: osx-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/85/e2/05328bd2621be49a6fed9e3030b1e51a2d04537d3f816d211b9cc53c5262/json5-0.12.1-py3-none-any.whl
+  hash:
+    sha256: d9c9b3bc34a5f54d43c35e11ef7cb87d8bdd098c6ace87117a7b7e83e705c1d5
+  category: main
+  optional: false
+- name: json5
+  version: 0.12.1
+  manager: pip
+  platform: osx-arm64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/85/e2/05328bd2621be49a6fed9e3030b1e51a2d04537d3f816d211b9cc53c5262/json5-0.12.1-py3-none-any.whl
+  hash:
+    sha256: d9c9b3bc34a5f54d43c35e11ef7cb87d8bdd098c6ace87117a7b7e83e705c1d5
+  category: main
+  optional: false
+- name: json5
+  version: 0.12.1
+  manager: pip
+  platform: win-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/85/e2/05328bd2621be49a6fed9e3030b1e51a2d04537d3f816d211b9cc53c5262/json5-0.12.1-py3-none-any.whl
+  hash:
+    sha256: d9c9b3bc34a5f54d43c35e11ef7cb87d8bdd098c6ace87117a7b7e83e705c1d5
+  category: main
+  optional: false
+- name: jsonpointer
+  version: 3.0.0
+  manager: pip
+  platform: linux-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/71/92/5e77f98553e9e75130c78900d000368476aed74276eb8ae8796f65f00918/jsonpointer-3.0.0-py2.py3-none-any.whl
+  hash:
+    sha256: 13e088adc14fca8b6aa8177c044e12701e6ad4b28ff10e65f2267a90109c9942
+  category: main
+  optional: false
+- name: jsonpointer
+  version: 3.0.0
+  manager: pip
+  platform: osx-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/71/92/5e77f98553e9e75130c78900d000368476aed74276eb8ae8796f65f00918/jsonpointer-3.0.0-py2.py3-none-any.whl
+  hash:
+    sha256: 13e088adc14fca8b6aa8177c044e12701e6ad4b28ff10e65f2267a90109c9942
+  category: main
+  optional: false
+- name: jsonpointer
+  version: 3.0.0
+  manager: pip
+  platform: osx-arm64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/71/92/5e77f98553e9e75130c78900d000368476aed74276eb8ae8796f65f00918/jsonpointer-3.0.0-py2.py3-none-any.whl
+  hash:
+    sha256: 13e088adc14fca8b6aa8177c044e12701e6ad4b28ff10e65f2267a90109c9942
+  category: main
+  optional: false
+- name: jsonpointer
+  version: 3.0.0
+  manager: pip
+  platform: win-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/71/92/5e77f98553e9e75130c78900d000368476aed74276eb8ae8796f65f00918/jsonpointer-3.0.0-py2.py3-none-any.whl
+  hash:
+    sha256: 13e088adc14fca8b6aa8177c044e12701e6ad4b28ff10e65f2267a90109c9942
+  category: main
+  optional: false
 - name: jsonschema
   version: 4.25.1
   manager: pip
   platform: linux-64
   dependencies:
     attrs: '>=22.2.0'
+    fqdn: '*'
+    idna: '*'
+    isoduration: '*'
+    jsonpointer: '>1.13'
     jsonschema-specifications: '>=2023.03.6'
     referencing: '>=0.28.4'
+    rfc3339-validator: '*'
+    rfc3986-validator: '>0.1.0'
+    rfc3987-syntax: '>=1.1.0'
     rpds-py: '>=0.7.1'
+    uri-template: '*'
+    webcolors: '>=24.6.0'
   url: https://files.pythonhosted.org/packages/bf/9c/8c95d856233c1f82500c2450b8c68576b4cf1c871db3afac5c34ff84e6fd/jsonschema-4.25.1-py3-none-any.whl
   hash:
     sha256: 3fba0169e345c7175110351d456342c364814cfcf3b964ba4587f22915230a63
@@ -2800,9 +3887,18 @@ package:
   platform: osx-64
   dependencies:
     attrs: '>=22.2.0'
+    fqdn: '*'
+    idna: '*'
+    isoduration: '*'
+    jsonpointer: '>1.13'
     jsonschema-specifications: '>=2023.03.6'
     referencing: '>=0.28.4'
+    rfc3339-validator: '*'
+    rfc3986-validator: '>0.1.0'
+    rfc3987-syntax: '>=1.1.0'
     rpds-py: '>=0.7.1'
+    uri-template: '*'
+    webcolors: '>=24.6.0'
   url: https://files.pythonhosted.org/packages/bf/9c/8c95d856233c1f82500c2450b8c68576b4cf1c871db3afac5c34ff84e6fd/jsonschema-4.25.1-py3-none-any.whl
   hash:
     sha256: 3fba0169e345c7175110351d456342c364814cfcf3b964ba4587f22915230a63
@@ -2814,9 +3910,18 @@ package:
   platform: osx-arm64
   dependencies:
     attrs: '>=22.2.0'
+    fqdn: '*'
+    idna: '*'
+    isoduration: '*'
+    jsonpointer: '>1.13'
     jsonschema-specifications: '>=2023.03.6'
     referencing: '>=0.28.4'
+    rfc3339-validator: '*'
+    rfc3986-validator: '>0.1.0'
+    rfc3987-syntax: '>=1.1.0'
     rpds-py: '>=0.7.1'
+    uri-template: '*'
+    webcolors: '>=24.6.0'
   url: https://files.pythonhosted.org/packages/bf/9c/8c95d856233c1f82500c2450b8c68576b4cf1c871db3afac5c34ff84e6fd/jsonschema-4.25.1-py3-none-any.whl
   hash:
     sha256: 3fba0169e345c7175110351d456342c364814cfcf3b964ba4587f22915230a63
@@ -2828,9 +3933,18 @@ package:
   platform: win-64
   dependencies:
     attrs: '>=22.2.0'
+    fqdn: '*'
+    idna: '*'
+    isoduration: '*'
+    jsonpointer: '>1.13'
     jsonschema-specifications: '>=2023.03.6'
     referencing: '>=0.28.4'
+    rfc3339-validator: '*'
+    rfc3986-validator: '>0.1.0'
+    rfc3987-syntax: '>=1.1.0'
     rpds-py: '>=0.7.1'
+    uri-template: '*'
+    webcolors: '>=24.6.0'
   url: https://files.pythonhosted.org/packages/bf/9c/8c95d856233c1f82500c2450b8c68576b4cf1c871db3afac5c34ff84e6fd/jsonschema-4.25.1-py3-none-any.whl
   hash:
     sha256: 3fba0169e345c7175110351d456342c364814cfcf3b964ba4587f22915230a63
@@ -2934,6 +4048,629 @@ package:
   url: https://files.pythonhosted.org/packages/41/45/1a4ed80516f02155c51f51e8cedb3c1902296743db0bbc66608a0db2814f/jsonschema_specifications-2025.9.1-py3-none-any.whl
   hash:
     sha256: 98802fee3a11ee76ecaca44429fda8a41bff98b00a0f2838151b113f210cc6fe
+  category: main
+  optional: false
+- name: jupyter-client
+  version: 8.6.3
+  manager: pip
+  platform: linux-64
+  dependencies:
+    jupyter-core: '>=4.12,<5.0.dev0 || >=5.1.dev0'
+    python-dateutil: '>=2.8.2'
+    pyzmq: '>=23.0'
+    tornado: '>=6.2'
+    traitlets: '>=5.3'
+  url: https://files.pythonhosted.org/packages/11/85/b0394e0b6fcccd2c1eeefc230978a6f8cb0c5df1e4cd3e7625735a0d7d1e/jupyter_client-8.6.3-py3-none-any.whl
+  hash:
+    sha256: e8a19cc986cc45905ac3362915f410f3af85424b4c0905e94fa5f2cb08e8f23f
+  category: main
+  optional: false
+- name: jupyter-client
+  version: 8.6.3
+  manager: pip
+  platform: osx-64
+  dependencies:
+    jupyter-core: '>=4.12,<5.0.dev0 || >=5.1.dev0'
+    python-dateutil: '>=2.8.2'
+    pyzmq: '>=23.0'
+    tornado: '>=6.2'
+    traitlets: '>=5.3'
+  url: https://files.pythonhosted.org/packages/11/85/b0394e0b6fcccd2c1eeefc230978a6f8cb0c5df1e4cd3e7625735a0d7d1e/jupyter_client-8.6.3-py3-none-any.whl
+  hash:
+    sha256: e8a19cc986cc45905ac3362915f410f3af85424b4c0905e94fa5f2cb08e8f23f
+  category: main
+  optional: false
+- name: jupyter-client
+  version: 8.6.3
+  manager: pip
+  platform: osx-arm64
+  dependencies:
+    jupyter-core: '>=4.12,<5.0.dev0 || >=5.1.dev0'
+    python-dateutil: '>=2.8.2'
+    pyzmq: '>=23.0'
+    tornado: '>=6.2'
+    traitlets: '>=5.3'
+  url: https://files.pythonhosted.org/packages/11/85/b0394e0b6fcccd2c1eeefc230978a6f8cb0c5df1e4cd3e7625735a0d7d1e/jupyter_client-8.6.3-py3-none-any.whl
+  hash:
+    sha256: e8a19cc986cc45905ac3362915f410f3af85424b4c0905e94fa5f2cb08e8f23f
+  category: main
+  optional: false
+- name: jupyter-client
+  version: 8.6.3
+  manager: pip
+  platform: win-64
+  dependencies:
+    jupyter-core: '>=4.12,<5.0.dev0 || >=5.1.dev0'
+    python-dateutil: '>=2.8.2'
+    pyzmq: '>=23.0'
+    tornado: '>=6.2'
+    traitlets: '>=5.3'
+  url: https://files.pythonhosted.org/packages/11/85/b0394e0b6fcccd2c1eeefc230978a6f8cb0c5df1e4cd3e7625735a0d7d1e/jupyter_client-8.6.3-py3-none-any.whl
+  hash:
+    sha256: e8a19cc986cc45905ac3362915f410f3af85424b4c0905e94fa5f2cb08e8f23f
+  category: main
+  optional: false
+- name: jupyter-core
+  version: 5.8.1
+  manager: pip
+  platform: linux-64
+  dependencies:
+    platformdirs: '>=2.5'
+    traitlets: '>=5.3'
+  url: https://files.pythonhosted.org/packages/2f/57/6bffd4b20b88da3800c5d691e0337761576ee688eb01299eae865689d2df/jupyter_core-5.8.1-py3-none-any.whl
+  hash:
+    sha256: c28d268fc90fb53f1338ded2eb410704c5449a358406e8a948b75706e24863d0
+  category: main
+  optional: false
+- name: jupyter-core
+  version: 5.8.1
+  manager: pip
+  platform: osx-64
+  dependencies:
+    platformdirs: '>=2.5'
+    traitlets: '>=5.3'
+  url: https://files.pythonhosted.org/packages/2f/57/6bffd4b20b88da3800c5d691e0337761576ee688eb01299eae865689d2df/jupyter_core-5.8.1-py3-none-any.whl
+  hash:
+    sha256: c28d268fc90fb53f1338ded2eb410704c5449a358406e8a948b75706e24863d0
+  category: main
+  optional: false
+- name: jupyter-core
+  version: 5.8.1
+  manager: pip
+  platform: osx-arm64
+  dependencies:
+    platformdirs: '>=2.5'
+    traitlets: '>=5.3'
+  url: https://files.pythonhosted.org/packages/2f/57/6bffd4b20b88da3800c5d691e0337761576ee688eb01299eae865689d2df/jupyter_core-5.8.1-py3-none-any.whl
+  hash:
+    sha256: c28d268fc90fb53f1338ded2eb410704c5449a358406e8a948b75706e24863d0
+  category: main
+  optional: false
+- name: jupyter-core
+  version: 5.8.1
+  manager: pip
+  platform: win-64
+  dependencies:
+    platformdirs: '>=2.5'
+    pywin32: '>=300'
+    traitlets: '>=5.3'
+  url: https://files.pythonhosted.org/packages/2f/57/6bffd4b20b88da3800c5d691e0337761576ee688eb01299eae865689d2df/jupyter_core-5.8.1-py3-none-any.whl
+  hash:
+    sha256: c28d268fc90fb53f1338ded2eb410704c5449a358406e8a948b75706e24863d0
+  category: main
+  optional: false
+- name: jupyter-events
+  version: 0.12.0
+  manager: pip
+  platform: linux-64
+  dependencies:
+    jsonschema: '>=4.18.0'
+    packaging: '*'
+    python-json-logger: '>=2.0.4'
+    pyyaml: '>=5.3'
+    referencing: '*'
+    rfc3339-validator: '*'
+    rfc3986-validator: '>=0.1.1'
+    traitlets: '>=5.3'
+  url: https://files.pythonhosted.org/packages/e2/48/577993f1f99c552f18a0428731a755e06171f9902fa118c379eb7c04ea22/jupyter_events-0.12.0-py3-none-any.whl
+  hash:
+    sha256: 6464b2fa5ad10451c3d35fabc75eab39556ae1e2853ad0c0cc31b656731a97fb
+  category: main
+  optional: false
+- name: jupyter-events
+  version: 0.12.0
+  manager: pip
+  platform: osx-64
+  dependencies:
+    jsonschema: '>=4.18.0'
+    packaging: '*'
+    python-json-logger: '>=2.0.4'
+    pyyaml: '>=5.3'
+    referencing: '*'
+    rfc3339-validator: '*'
+    rfc3986-validator: '>=0.1.1'
+    traitlets: '>=5.3'
+  url: https://files.pythonhosted.org/packages/e2/48/577993f1f99c552f18a0428731a755e06171f9902fa118c379eb7c04ea22/jupyter_events-0.12.0-py3-none-any.whl
+  hash:
+    sha256: 6464b2fa5ad10451c3d35fabc75eab39556ae1e2853ad0c0cc31b656731a97fb
+  category: main
+  optional: false
+- name: jupyter-events
+  version: 0.12.0
+  manager: pip
+  platform: osx-arm64
+  dependencies:
+    jsonschema: '>=4.18.0'
+    packaging: '*'
+    python-json-logger: '>=2.0.4'
+    pyyaml: '>=5.3'
+    referencing: '*'
+    rfc3339-validator: '*'
+    rfc3986-validator: '>=0.1.1'
+    traitlets: '>=5.3'
+  url: https://files.pythonhosted.org/packages/e2/48/577993f1f99c552f18a0428731a755e06171f9902fa118c379eb7c04ea22/jupyter_events-0.12.0-py3-none-any.whl
+  hash:
+    sha256: 6464b2fa5ad10451c3d35fabc75eab39556ae1e2853ad0c0cc31b656731a97fb
+  category: main
+  optional: false
+- name: jupyter-events
+  version: 0.12.0
+  manager: pip
+  platform: win-64
+  dependencies:
+    jsonschema: '>=4.18.0'
+    packaging: '*'
+    python-json-logger: '>=2.0.4'
+    pyyaml: '>=5.3'
+    referencing: '*'
+    rfc3339-validator: '*'
+    rfc3986-validator: '>=0.1.1'
+    traitlets: '>=5.3'
+  url: https://files.pythonhosted.org/packages/e2/48/577993f1f99c552f18a0428731a755e06171f9902fa118c379eb7c04ea22/jupyter_events-0.12.0-py3-none-any.whl
+  hash:
+    sha256: 6464b2fa5ad10451c3d35fabc75eab39556ae1e2853ad0c0cc31b656731a97fb
+  category: main
+  optional: false
+- name: jupyter-lsp
+  version: 2.3.0
+  manager: pip
+  platform: linux-64
+  dependencies:
+    jupyter-server: '>=1.1.2'
+  url: https://files.pythonhosted.org/packages/1a/60/1f6cee0c46263de1173894f0fafcb3475ded276c472c14d25e0280c18d6d/jupyter_lsp-2.3.0-py3-none-any.whl
+  hash:
+    sha256: e914a3cb2addf48b1c7710914771aaf1819d46b2e5a79b0f917b5478ec93f34f
+  category: main
+  optional: false
+- name: jupyter-lsp
+  version: 2.3.0
+  manager: pip
+  platform: osx-64
+  dependencies:
+    jupyter-server: '>=1.1.2'
+  url: https://files.pythonhosted.org/packages/1a/60/1f6cee0c46263de1173894f0fafcb3475ded276c472c14d25e0280c18d6d/jupyter_lsp-2.3.0-py3-none-any.whl
+  hash:
+    sha256: e914a3cb2addf48b1c7710914771aaf1819d46b2e5a79b0f917b5478ec93f34f
+  category: main
+  optional: false
+- name: jupyter-lsp
+  version: 2.3.0
+  manager: pip
+  platform: osx-arm64
+  dependencies:
+    jupyter-server: '>=1.1.2'
+  url: https://files.pythonhosted.org/packages/1a/60/1f6cee0c46263de1173894f0fafcb3475ded276c472c14d25e0280c18d6d/jupyter_lsp-2.3.0-py3-none-any.whl
+  hash:
+    sha256: e914a3cb2addf48b1c7710914771aaf1819d46b2e5a79b0f917b5478ec93f34f
+  category: main
+  optional: false
+- name: jupyter-lsp
+  version: 2.3.0
+  manager: pip
+  platform: win-64
+  dependencies:
+    jupyter-server: '>=1.1.2'
+  url: https://files.pythonhosted.org/packages/1a/60/1f6cee0c46263de1173894f0fafcb3475ded276c472c14d25e0280c18d6d/jupyter_lsp-2.3.0-py3-none-any.whl
+  hash:
+    sha256: e914a3cb2addf48b1c7710914771aaf1819d46b2e5a79b0f917b5478ec93f34f
+  category: main
+  optional: false
+- name: jupyter-server
+  version: 2.17.0
+  manager: pip
+  platform: linux-64
+  dependencies:
+    anyio: '>=3.1.0'
+    argon2-cffi: '>=21.1'
+    jinja2: '>=3.0.3'
+    jupyter-client: '>=7.4.4'
+    jupyter-core: '>=4.12,<5.0.dev0 || >=5.1.dev0'
+    jupyter-events: '>=0.11.0'
+    jupyter-server-terminals: '>=0.4.4'
+    nbconvert: '>=6.4.4'
+    nbformat: '>=5.3.0'
+    overrides: '>=5.0'
+    packaging: '>=22.0'
+    prometheus-client: '>=0.9'
+    pyzmq: '>=24'
+    send2trash: '>=1.8.2'
+    terminado: '>=0.8.3'
+    tornado: '>=6.2.0'
+    traitlets: '>=5.6.0'
+    websocket-client: '>=1.7'
+  url: https://files.pythonhosted.org/packages/92/80/a24767e6ca280f5a49525d987bf3e4d7552bf67c8be07e8ccf20271f8568/jupyter_server-2.17.0-py3-none-any.whl
+  hash:
+    sha256: e8cb9c7db4251f51ed307e329b81b72ccf2056ff82d50524debde1ee1870e13f
+  category: main
+  optional: false
+- name: jupyter-server
+  version: 2.17.0
+  manager: pip
+  platform: osx-64
+  dependencies:
+    anyio: '>=3.1.0'
+    argon2-cffi: '>=21.1'
+    jinja2: '>=3.0.3'
+    jupyter-client: '>=7.4.4'
+    jupyter-core: '>=4.12,<5.0.dev0 || >=5.1.dev0'
+    jupyter-events: '>=0.11.0'
+    jupyter-server-terminals: '>=0.4.4'
+    nbconvert: '>=6.4.4'
+    nbformat: '>=5.3.0'
+    overrides: '>=5.0'
+    packaging: '>=22.0'
+    prometheus-client: '>=0.9'
+    pyzmq: '>=24'
+    send2trash: '>=1.8.2'
+    terminado: '>=0.8.3'
+    tornado: '>=6.2.0'
+    traitlets: '>=5.6.0'
+    websocket-client: '>=1.7'
+  url: https://files.pythonhosted.org/packages/92/80/a24767e6ca280f5a49525d987bf3e4d7552bf67c8be07e8ccf20271f8568/jupyter_server-2.17.0-py3-none-any.whl
+  hash:
+    sha256: e8cb9c7db4251f51ed307e329b81b72ccf2056ff82d50524debde1ee1870e13f
+  category: main
+  optional: false
+- name: jupyter-server
+  version: 2.17.0
+  manager: pip
+  platform: osx-arm64
+  dependencies:
+    anyio: '>=3.1.0'
+    argon2-cffi: '>=21.1'
+    jinja2: '>=3.0.3'
+    jupyter-client: '>=7.4.4'
+    jupyter-core: '>=4.12,<5.0.dev0 || >=5.1.dev0'
+    jupyter-events: '>=0.11.0'
+    jupyter-server-terminals: '>=0.4.4'
+    nbconvert: '>=6.4.4'
+    nbformat: '>=5.3.0'
+    overrides: '>=5.0'
+    packaging: '>=22.0'
+    prometheus-client: '>=0.9'
+    pyzmq: '>=24'
+    send2trash: '>=1.8.2'
+    terminado: '>=0.8.3'
+    tornado: '>=6.2.0'
+    traitlets: '>=5.6.0'
+    websocket-client: '>=1.7'
+  url: https://files.pythonhosted.org/packages/92/80/a24767e6ca280f5a49525d987bf3e4d7552bf67c8be07e8ccf20271f8568/jupyter_server-2.17.0-py3-none-any.whl
+  hash:
+    sha256: e8cb9c7db4251f51ed307e329b81b72ccf2056ff82d50524debde1ee1870e13f
+  category: main
+  optional: false
+- name: jupyter-server
+  version: 2.17.0
+  manager: pip
+  platform: win-64
+  dependencies:
+    anyio: '>=3.1.0'
+    argon2-cffi: '>=21.1'
+    jinja2: '>=3.0.3'
+    jupyter-client: '>=7.4.4'
+    jupyter-core: '>=4.12,<5.0.dev0 || >=5.1.dev0'
+    jupyter-events: '>=0.11.0'
+    jupyter-server-terminals: '>=0.4.4'
+    nbconvert: '>=6.4.4'
+    nbformat: '>=5.3.0'
+    overrides: '>=5.0'
+    packaging: '>=22.0'
+    prometheus-client: '>=0.9'
+    pywinpty: '>=2.0.1'
+    pyzmq: '>=24'
+    send2trash: '>=1.8.2'
+    terminado: '>=0.8.3'
+    tornado: '>=6.2.0'
+    traitlets: '>=5.6.0'
+    websocket-client: '>=1.7'
+  url: https://files.pythonhosted.org/packages/92/80/a24767e6ca280f5a49525d987bf3e4d7552bf67c8be07e8ccf20271f8568/jupyter_server-2.17.0-py3-none-any.whl
+  hash:
+    sha256: e8cb9c7db4251f51ed307e329b81b72ccf2056ff82d50524debde1ee1870e13f
+  category: main
+  optional: false
+- name: jupyter-server-terminals
+  version: 0.5.3
+  manager: pip
+  platform: linux-64
+  dependencies:
+    terminado: '>=0.8.3'
+  url: https://files.pythonhosted.org/packages/07/2d/2b32cdbe8d2a602f697a649798554e4f072115438e92249624e532e8aca6/jupyter_server_terminals-0.5.3-py3-none-any.whl
+  hash:
+    sha256: 41ee0d7dc0ebf2809c668e0fc726dfaf258fcd3e769568996ca731b6194ae9aa
+  category: main
+  optional: false
+- name: jupyter-server-terminals
+  version: 0.5.3
+  manager: pip
+  platform: osx-64
+  dependencies:
+    terminado: '>=0.8.3'
+  url: https://files.pythonhosted.org/packages/07/2d/2b32cdbe8d2a602f697a649798554e4f072115438e92249624e532e8aca6/jupyter_server_terminals-0.5.3-py3-none-any.whl
+  hash:
+    sha256: 41ee0d7dc0ebf2809c668e0fc726dfaf258fcd3e769568996ca731b6194ae9aa
+  category: main
+  optional: false
+- name: jupyter-server-terminals
+  version: 0.5.3
+  manager: pip
+  platform: osx-arm64
+  dependencies:
+    terminado: '>=0.8.3'
+  url: https://files.pythonhosted.org/packages/07/2d/2b32cdbe8d2a602f697a649798554e4f072115438e92249624e532e8aca6/jupyter_server_terminals-0.5.3-py3-none-any.whl
+  hash:
+    sha256: 41ee0d7dc0ebf2809c668e0fc726dfaf258fcd3e769568996ca731b6194ae9aa
+  category: main
+  optional: false
+- name: jupyter-server-terminals
+  version: 0.5.3
+  manager: pip
+  platform: win-64
+  dependencies:
+    pywinpty: '>=2.0.3'
+    terminado: '>=0.8.3'
+  url: https://files.pythonhosted.org/packages/07/2d/2b32cdbe8d2a602f697a649798554e4f072115438e92249624e532e8aca6/jupyter_server_terminals-0.5.3-py3-none-any.whl
+  hash:
+    sha256: 41ee0d7dc0ebf2809c668e0fc726dfaf258fcd3e769568996ca731b6194ae9aa
+  category: main
+  optional: false
+- name: jupyterlab
+  version: 4.4.9
+  manager: pip
+  platform: linux-64
+  dependencies:
+    async-lru: '>=1.0.0'
+    httpx: '>=0.25.0,<1'
+    ipykernel: '>=6.5.0,<6.30.0 || >6.30.0'
+    jinja2: '>=3.0.3'
+    jupyter-core: '*'
+    jupyter-lsp: '>=2.0.0'
+    jupyter-server: '>=2.4.0,<3'
+    jupyterlab-server: '>=2.27.1,<3'
+    notebook-shim: '>=0.2'
+    packaging: '*'
+    setuptools: '>=41.1.0'
+    tornado: '>=6.2.0'
+    traitlets: '*'
+  url: https://files.pythonhosted.org/packages/1f/fd/ac0979ebd1b1975c266c99b96930b0a66609c3f6e5d76979ca6eb3073896/jupyterlab-4.4.9-py3-none-any.whl
+  hash:
+    sha256: 394c902827350c017430a8370b9f40c03c098773084bc53930145c146d3d2cb2
+  category: main
+  optional: false
+- name: jupyterlab
+  version: 4.4.9
+  manager: pip
+  platform: osx-64
+  dependencies:
+    async-lru: '>=1.0.0'
+    httpx: '>=0.25.0,<1'
+    ipykernel: '>=6.5.0,<6.30.0 || >6.30.0'
+    jinja2: '>=3.0.3'
+    jupyter-core: '*'
+    jupyter-lsp: '>=2.0.0'
+    jupyter-server: '>=2.4.0,<3'
+    jupyterlab-server: '>=2.27.1,<3'
+    notebook-shim: '>=0.2'
+    packaging: '*'
+    setuptools: '>=41.1.0'
+    tornado: '>=6.2.0'
+    traitlets: '*'
+  url: https://files.pythonhosted.org/packages/1f/fd/ac0979ebd1b1975c266c99b96930b0a66609c3f6e5d76979ca6eb3073896/jupyterlab-4.4.9-py3-none-any.whl
+  hash:
+    sha256: 394c902827350c017430a8370b9f40c03c098773084bc53930145c146d3d2cb2
+  category: main
+  optional: false
+- name: jupyterlab
+  version: 4.4.9
+  manager: pip
+  platform: osx-arm64
+  dependencies:
+    async-lru: '>=1.0.0'
+    httpx: '>=0.25.0,<1'
+    ipykernel: '>=6.5.0,<6.30.0 || >6.30.0'
+    jinja2: '>=3.0.3'
+    jupyter-core: '*'
+    jupyter-lsp: '>=2.0.0'
+    jupyter-server: '>=2.4.0,<3'
+    jupyterlab-server: '>=2.27.1,<3'
+    notebook-shim: '>=0.2'
+    packaging: '*'
+    setuptools: '>=41.1.0'
+    tornado: '>=6.2.0'
+    traitlets: '*'
+  url: https://files.pythonhosted.org/packages/1f/fd/ac0979ebd1b1975c266c99b96930b0a66609c3f6e5d76979ca6eb3073896/jupyterlab-4.4.9-py3-none-any.whl
+  hash:
+    sha256: 394c902827350c017430a8370b9f40c03c098773084bc53930145c146d3d2cb2
+  category: main
+  optional: false
+- name: jupyterlab
+  version: 4.4.9
+  manager: pip
+  platform: win-64
+  dependencies:
+    async-lru: '>=1.0.0'
+    httpx: '>=0.25.0,<1'
+    ipykernel: '>=6.5.0,<6.30.0 || >6.30.0'
+    jinja2: '>=3.0.3'
+    jupyter-core: '*'
+    jupyter-lsp: '>=2.0.0'
+    jupyter-server: '>=2.4.0,<3'
+    jupyterlab-server: '>=2.27.1,<3'
+    notebook-shim: '>=0.2'
+    packaging: '*'
+    setuptools: '>=41.1.0'
+    tornado: '>=6.2.0'
+    traitlets: '*'
+  url: https://files.pythonhosted.org/packages/1f/fd/ac0979ebd1b1975c266c99b96930b0a66609c3f6e5d76979ca6eb3073896/jupyterlab-4.4.9-py3-none-any.whl
+  hash:
+    sha256: 394c902827350c017430a8370b9f40c03c098773084bc53930145c146d3d2cb2
+  category: main
+  optional: false
+- name: jupyterlab-pygments
+  version: 0.3.0
+  manager: pip
+  platform: linux-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/b1/dd/ead9d8ea85bf202d90cc513b533f9c363121c7792674f78e0d8a854b63b4/jupyterlab_pygments-0.3.0-py3-none-any.whl
+  hash:
+    sha256: 841a89020971da1d8693f1a99997aefc5dc424bb1b251fd6322462a1b8842780
+  category: main
+  optional: false
+- name: jupyterlab-pygments
+  version: 0.3.0
+  manager: pip
+  platform: osx-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/b1/dd/ead9d8ea85bf202d90cc513b533f9c363121c7792674f78e0d8a854b63b4/jupyterlab_pygments-0.3.0-py3-none-any.whl
+  hash:
+    sha256: 841a89020971da1d8693f1a99997aefc5dc424bb1b251fd6322462a1b8842780
+  category: main
+  optional: false
+- name: jupyterlab-pygments
+  version: 0.3.0
+  manager: pip
+  platform: osx-arm64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/b1/dd/ead9d8ea85bf202d90cc513b533f9c363121c7792674f78e0d8a854b63b4/jupyterlab_pygments-0.3.0-py3-none-any.whl
+  hash:
+    sha256: 841a89020971da1d8693f1a99997aefc5dc424bb1b251fd6322462a1b8842780
+  category: main
+  optional: false
+- name: jupyterlab-pygments
+  version: 0.3.0
+  manager: pip
+  platform: win-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/b1/dd/ead9d8ea85bf202d90cc513b533f9c363121c7792674f78e0d8a854b63b4/jupyterlab_pygments-0.3.0-py3-none-any.whl
+  hash:
+    sha256: 841a89020971da1d8693f1a99997aefc5dc424bb1b251fd6322462a1b8842780
+  category: main
+  optional: false
+- name: jupyterlab-server
+  version: 2.27.3
+  manager: pip
+  platform: linux-64
+  dependencies:
+    babel: '>=2.10'
+    jinja2: '>=3.0.3'
+    json5: '>=0.9.0'
+    jsonschema: '>=4.18.0'
+    jupyter-server: '>=1.21,<3'
+    packaging: '>=21.3'
+    requests: '>=2.31'
+  url: https://files.pythonhosted.org/packages/54/09/2032e7d15c544a0e3cd831c51d77a8ca57f7555b2e1b2922142eddb02a84/jupyterlab_server-2.27.3-py3-none-any.whl
+  hash:
+    sha256: e697488f66c3db49df675158a77b3b017520d772c6e1548c7d9bcc5df7944ee4
+  category: main
+  optional: false
+- name: jupyterlab-server
+  version: 2.27.3
+  manager: pip
+  platform: osx-64
+  dependencies:
+    babel: '>=2.10'
+    jinja2: '>=3.0.3'
+    json5: '>=0.9.0'
+    jsonschema: '>=4.18.0'
+    jupyter-server: '>=1.21,<3'
+    packaging: '>=21.3'
+    requests: '>=2.31'
+  url: https://files.pythonhosted.org/packages/54/09/2032e7d15c544a0e3cd831c51d77a8ca57f7555b2e1b2922142eddb02a84/jupyterlab_server-2.27.3-py3-none-any.whl
+  hash:
+    sha256: e697488f66c3db49df675158a77b3b017520d772c6e1548c7d9bcc5df7944ee4
+  category: main
+  optional: false
+- name: jupyterlab-server
+  version: 2.27.3
+  manager: pip
+  platform: osx-arm64
+  dependencies:
+    babel: '>=2.10'
+    jinja2: '>=3.0.3'
+    json5: '>=0.9.0'
+    jsonschema: '>=4.18.0'
+    jupyter-server: '>=1.21,<3'
+    packaging: '>=21.3'
+    requests: '>=2.31'
+  url: https://files.pythonhosted.org/packages/54/09/2032e7d15c544a0e3cd831c51d77a8ca57f7555b2e1b2922142eddb02a84/jupyterlab_server-2.27.3-py3-none-any.whl
+  hash:
+    sha256: e697488f66c3db49df675158a77b3b017520d772c6e1548c7d9bcc5df7944ee4
+  category: main
+  optional: false
+- name: jupyterlab-server
+  version: 2.27.3
+  manager: pip
+  platform: win-64
+  dependencies:
+    babel: '>=2.10'
+    jinja2: '>=3.0.3'
+    json5: '>=0.9.0'
+    jsonschema: '>=4.18.0'
+    jupyter-server: '>=1.21,<3'
+    packaging: '>=21.3'
+    requests: '>=2.31'
+  url: https://files.pythonhosted.org/packages/54/09/2032e7d15c544a0e3cd831c51d77a8ca57f7555b2e1b2922142eddb02a84/jupyterlab_server-2.27.3-py3-none-any.whl
+  hash:
+    sha256: e697488f66c3db49df675158a77b3b017520d772c6e1548c7d9bcc5df7944ee4
+  category: main
+  optional: false
+- name: lark
+  version: 1.3.0
+  manager: pip
+  platform: linux-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/a8/3e/1c6b43277de64fc3c0333b0e72ab7b52ddaaea205210d60d9b9f83c3d0c7/lark-1.3.0-py3-none-any.whl
+  hash:
+    sha256: 80661f261fb2584a9828a097a2432efd575af27d20be0fd35d17f0fe37253831
+  category: main
+  optional: false
+- name: lark
+  version: 1.3.0
+  manager: pip
+  platform: osx-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/a8/3e/1c6b43277de64fc3c0333b0e72ab7b52ddaaea205210d60d9b9f83c3d0c7/lark-1.3.0-py3-none-any.whl
+  hash:
+    sha256: 80661f261fb2584a9828a097a2432efd575af27d20be0fd35d17f0fe37253831
+  category: main
+  optional: false
+- name: lark
+  version: 1.3.0
+  manager: pip
+  platform: osx-arm64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/a8/3e/1c6b43277de64fc3c0333b0e72ab7b52ddaaea205210d60d9b9f83c3d0c7/lark-1.3.0-py3-none-any.whl
+  hash:
+    sha256: 80661f261fb2584a9828a097a2432efd575af27d20be0fd35d17f0fe37253831
+  category: main
+  optional: false
+- name: lark
+  version: 1.3.0
+  manager: pip
+  platform: win-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/a8/3e/1c6b43277de64fc3c0333b0e72ab7b52ddaaea205210d60d9b9f83c3d0c7/lark-1.3.0-py3-none-any.whl
+  hash:
+    sha256: 80661f261fb2584a9828a097a2432efd575af27d20be0fd35d17f0fe37253831
   category: main
   optional: false
 - name: lazy-object-proxy
@@ -3142,6 +4879,50 @@ package:
     sha256: 70a87b411535ccad5ef2f1df5136506a10775d267e197e4cf531ced10537bd6b
   category: main
   optional: false
+- name: matplotlib-inline
+  version: 0.1.7
+  manager: pip
+  platform: linux-64
+  dependencies:
+    traitlets: '*'
+  url: https://files.pythonhosted.org/packages/8f/8e/9ad090d3553c280a8060fbf6e24dc1c0c29704ee7d1c372f0c174aa59285/matplotlib_inline-0.1.7-py3-none-any.whl
+  hash:
+    sha256: df192d39a4ff8f21b1895d72e6a13f5fcc5099f00fa84384e0ea28c2cc0653ca
+  category: main
+  optional: false
+- name: matplotlib-inline
+  version: 0.1.7
+  manager: pip
+  platform: osx-64
+  dependencies:
+    traitlets: '*'
+  url: https://files.pythonhosted.org/packages/8f/8e/9ad090d3553c280a8060fbf6e24dc1c0c29704ee7d1c372f0c174aa59285/matplotlib_inline-0.1.7-py3-none-any.whl
+  hash:
+    sha256: df192d39a4ff8f21b1895d72e6a13f5fcc5099f00fa84384e0ea28c2cc0653ca
+  category: main
+  optional: false
+- name: matplotlib-inline
+  version: 0.1.7
+  manager: pip
+  platform: osx-arm64
+  dependencies:
+    traitlets: '*'
+  url: https://files.pythonhosted.org/packages/8f/8e/9ad090d3553c280a8060fbf6e24dc1c0c29704ee7d1c372f0c174aa59285/matplotlib_inline-0.1.7-py3-none-any.whl
+  hash:
+    sha256: df192d39a4ff8f21b1895d72e6a13f5fcc5099f00fa84384e0ea28c2cc0653ca
+  category: main
+  optional: false
+- name: matplotlib-inline
+  version: 0.1.7
+  manager: pip
+  platform: win-64
+  dependencies:
+    traitlets: '*'
+  url: https://files.pythonhosted.org/packages/8f/8e/9ad090d3553c280a8060fbf6e24dc1c0c29704ee7d1c372f0c174aa59285/matplotlib_inline-0.1.7-py3-none-any.whl
+  hash:
+    sha256: df192d39a4ff8f21b1895d72e6a13f5fcc5099f00fa84384e0ea28c2cc0653ca
+  category: main
+  optional: false
 - name: mcp
   version: 1.15.0
   manager: pip
@@ -3261,6 +5042,46 @@ package:
   url: https://files.pythonhosted.org/packages/b3/38/89ba8ad64ae25be8de66a6d463314cf1eb366222074cfda9ee839c56a4b4/mdurl-0.1.2-py3-none-any.whl
   hash:
     sha256: 84008a41e51615a49fc9966191ff91509e3c40b939176e643fd50a5c2196b8f8
+  category: main
+  optional: false
+- name: mistune
+  version: 3.1.4
+  manager: pip
+  platform: linux-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/7a/f0/8282d9641415e9e33df173516226b404d367a0fc55e1a60424a152913abc/mistune-3.1.4-py3-none-any.whl
+  hash:
+    sha256: 93691da911e5d9d2e23bc54472892aff676df27a75274962ff9edc210364266d
+  category: main
+  optional: false
+- name: mistune
+  version: 3.1.4
+  manager: pip
+  platform: osx-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/7a/f0/8282d9641415e9e33df173516226b404d367a0fc55e1a60424a152913abc/mistune-3.1.4-py3-none-any.whl
+  hash:
+    sha256: 93691da911e5d9d2e23bc54472892aff676df27a75274962ff9edc210364266d
+  category: main
+  optional: false
+- name: mistune
+  version: 3.1.4
+  manager: pip
+  platform: osx-arm64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/7a/f0/8282d9641415e9e33df173516226b404d367a0fc55e1a60424a152913abc/mistune-3.1.4-py3-none-any.whl
+  hash:
+    sha256: 93691da911e5d9d2e23bc54472892aff676df27a75274962ff9edc210364266d
+  category: main
+  optional: false
+- name: mistune
+  version: 3.1.4
+  manager: pip
+  platform: win-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/7a/f0/8282d9641415e9e33df173516226b404d367a0fc55e1a60424a152913abc/mistune-3.1.4-py3-none-any.whl
+  hash:
+    sha256: 93691da911e5d9d2e23bc54472892aff676df27a75274962ff9edc210364266d
   category: main
   optional: false
 - name: more-itertools
@@ -3395,6 +5216,254 @@ package:
     sha256: 1be4cccdb0f2482337c4743e60421de3a356cd97508abadd57d47403e94f5505
   category: main
   optional: false
+- name: nbclient
+  version: 0.10.2
+  manager: pip
+  platform: linux-64
+  dependencies:
+    jupyter-client: '>=6.1.12'
+    jupyter-core: '>=4.12,<5.0.dev0 || >=5.1.dev0'
+    nbformat: '>=5.1'
+    traitlets: '>=5.4'
+  url: https://files.pythonhosted.org/packages/34/6d/e7fa07f03a4a7b221d94b4d586edb754a9b0dc3c9e2c93353e9fa4e0d117/nbclient-0.10.2-py3-none-any.whl
+  hash:
+    sha256: 4ffee11e788b4a27fabeb7955547e4318a5298f34342a4bfd01f2e1faaeadc3d
+  category: main
+  optional: false
+- name: nbclient
+  version: 0.10.2
+  manager: pip
+  platform: osx-64
+  dependencies:
+    jupyter-client: '>=6.1.12'
+    jupyter-core: '>=4.12,<5.0.dev0 || >=5.1.dev0'
+    nbformat: '>=5.1'
+    traitlets: '>=5.4'
+  url: https://files.pythonhosted.org/packages/34/6d/e7fa07f03a4a7b221d94b4d586edb754a9b0dc3c9e2c93353e9fa4e0d117/nbclient-0.10.2-py3-none-any.whl
+  hash:
+    sha256: 4ffee11e788b4a27fabeb7955547e4318a5298f34342a4bfd01f2e1faaeadc3d
+  category: main
+  optional: false
+- name: nbclient
+  version: 0.10.2
+  manager: pip
+  platform: osx-arm64
+  dependencies:
+    jupyter-client: '>=6.1.12'
+    jupyter-core: '>=4.12,<5.0.dev0 || >=5.1.dev0'
+    nbformat: '>=5.1'
+    traitlets: '>=5.4'
+  url: https://files.pythonhosted.org/packages/34/6d/e7fa07f03a4a7b221d94b4d586edb754a9b0dc3c9e2c93353e9fa4e0d117/nbclient-0.10.2-py3-none-any.whl
+  hash:
+    sha256: 4ffee11e788b4a27fabeb7955547e4318a5298f34342a4bfd01f2e1faaeadc3d
+  category: main
+  optional: false
+- name: nbclient
+  version: 0.10.2
+  manager: pip
+  platform: win-64
+  dependencies:
+    jupyter-client: '>=6.1.12'
+    jupyter-core: '>=4.12,<5.0.dev0 || >=5.1.dev0'
+    nbformat: '>=5.1'
+    traitlets: '>=5.4'
+  url: https://files.pythonhosted.org/packages/34/6d/e7fa07f03a4a7b221d94b4d586edb754a9b0dc3c9e2c93353e9fa4e0d117/nbclient-0.10.2-py3-none-any.whl
+  hash:
+    sha256: 4ffee11e788b4a27fabeb7955547e4318a5298f34342a4bfd01f2e1faaeadc3d
+  category: main
+  optional: false
+- name: nbconvert
+  version: 7.16.6
+  manager: pip
+  platform: linux-64
+  dependencies:
+    beautifulsoup4: '*'
+    bleach: '!=5.0.0'
+    defusedxml: '*'
+    jinja2: '>=3.0'
+    jupyter-core: '>=4.7'
+    jupyterlab-pygments: '*'
+    markupsafe: '>=2.0'
+    mistune: '>=2.0.3,<4'
+    nbclient: '>=0.5.0'
+    nbformat: '>=5.7'
+    packaging: '*'
+    pandocfilters: '>=1.4.1'
+    pygments: '>=2.4.1'
+    traitlets: '>=5.1'
+  url: https://files.pythonhosted.org/packages/cc/9a/cd673b2f773a12c992f41309ef81b99da1690426bd2f96957a7ade0d3ed7/nbconvert-7.16.6-py3-none-any.whl
+  hash:
+    sha256: 1375a7b67e0c2883678c48e506dc320febb57685e5ee67faa51b18a90f3a712b
+  category: main
+  optional: false
+- name: nbconvert
+  version: 7.16.6
+  manager: pip
+  platform: osx-64
+  dependencies:
+    beautifulsoup4: '*'
+    bleach: '!=5.0.0'
+    defusedxml: '*'
+    jinja2: '>=3.0'
+    jupyter-core: '>=4.7'
+    jupyterlab-pygments: '*'
+    markupsafe: '>=2.0'
+    mistune: '>=2.0.3,<4'
+    nbclient: '>=0.5.0'
+    nbformat: '>=5.7'
+    packaging: '*'
+    pandocfilters: '>=1.4.1'
+    pygments: '>=2.4.1'
+    traitlets: '>=5.1'
+  url: https://files.pythonhosted.org/packages/cc/9a/cd673b2f773a12c992f41309ef81b99da1690426bd2f96957a7ade0d3ed7/nbconvert-7.16.6-py3-none-any.whl
+  hash:
+    sha256: 1375a7b67e0c2883678c48e506dc320febb57685e5ee67faa51b18a90f3a712b
+  category: main
+  optional: false
+- name: nbconvert
+  version: 7.16.6
+  manager: pip
+  platform: osx-arm64
+  dependencies:
+    beautifulsoup4: '*'
+    bleach: '!=5.0.0'
+    defusedxml: '*'
+    jinja2: '>=3.0'
+    jupyter-core: '>=4.7'
+    jupyterlab-pygments: '*'
+    markupsafe: '>=2.0'
+    mistune: '>=2.0.3,<4'
+    nbclient: '>=0.5.0'
+    nbformat: '>=5.7'
+    packaging: '*'
+    pandocfilters: '>=1.4.1'
+    pygments: '>=2.4.1'
+    traitlets: '>=5.1'
+  url: https://files.pythonhosted.org/packages/cc/9a/cd673b2f773a12c992f41309ef81b99da1690426bd2f96957a7ade0d3ed7/nbconvert-7.16.6-py3-none-any.whl
+  hash:
+    sha256: 1375a7b67e0c2883678c48e506dc320febb57685e5ee67faa51b18a90f3a712b
+  category: main
+  optional: false
+- name: nbconvert
+  version: 7.16.6
+  manager: pip
+  platform: win-64
+  dependencies:
+    beautifulsoup4: '*'
+    bleach: '!=5.0.0'
+    defusedxml: '*'
+    jinja2: '>=3.0'
+    jupyter-core: '>=4.7'
+    jupyterlab-pygments: '*'
+    markupsafe: '>=2.0'
+    mistune: '>=2.0.3,<4'
+    nbclient: '>=0.5.0'
+    nbformat: '>=5.7'
+    packaging: '*'
+    pandocfilters: '>=1.4.1'
+    pygments: '>=2.4.1'
+    traitlets: '>=5.1'
+  url: https://files.pythonhosted.org/packages/cc/9a/cd673b2f773a12c992f41309ef81b99da1690426bd2f96957a7ade0d3ed7/nbconvert-7.16.6-py3-none-any.whl
+  hash:
+    sha256: 1375a7b67e0c2883678c48e506dc320febb57685e5ee67faa51b18a90f3a712b
+  category: main
+  optional: false
+- name: nbformat
+  version: 5.10.4
+  manager: pip
+  platform: linux-64
+  dependencies:
+    fastjsonschema: '>=2.15'
+    jsonschema: '>=2.6'
+    jupyter-core: '>=4.12,<5.0.dev0 || >=5.1.dev0'
+    traitlets: '>=5.1'
+  url: https://files.pythonhosted.org/packages/a9/82/0340caa499416c78e5d8f5f05947ae4bc3cba53c9f038ab6e9ed964e22f1/nbformat-5.10.4-py3-none-any.whl
+  hash:
+    sha256: 3b48d6c8fbca4b299bf3982ea7db1af21580e4fec269ad087b9e81588891200b
+  category: main
+  optional: false
+- name: nbformat
+  version: 5.10.4
+  manager: pip
+  platform: osx-64
+  dependencies:
+    fastjsonschema: '>=2.15'
+    jsonschema: '>=2.6'
+    jupyter-core: '>=4.12,<5.0.dev0 || >=5.1.dev0'
+    traitlets: '>=5.1'
+  url: https://files.pythonhosted.org/packages/a9/82/0340caa499416c78e5d8f5f05947ae4bc3cba53c9f038ab6e9ed964e22f1/nbformat-5.10.4-py3-none-any.whl
+  hash:
+    sha256: 3b48d6c8fbca4b299bf3982ea7db1af21580e4fec269ad087b9e81588891200b
+  category: main
+  optional: false
+- name: nbformat
+  version: 5.10.4
+  manager: pip
+  platform: osx-arm64
+  dependencies:
+    fastjsonschema: '>=2.15'
+    jsonschema: '>=2.6'
+    jupyter-core: '>=4.12,<5.0.dev0 || >=5.1.dev0'
+    traitlets: '>=5.1'
+  url: https://files.pythonhosted.org/packages/a9/82/0340caa499416c78e5d8f5f05947ae4bc3cba53c9f038ab6e9ed964e22f1/nbformat-5.10.4-py3-none-any.whl
+  hash:
+    sha256: 3b48d6c8fbca4b299bf3982ea7db1af21580e4fec269ad087b9e81588891200b
+  category: main
+  optional: false
+- name: nbformat
+  version: 5.10.4
+  manager: pip
+  platform: win-64
+  dependencies:
+    fastjsonschema: '>=2.15'
+    jsonschema: '>=2.6'
+    jupyter-core: '>=4.12,<5.0.dev0 || >=5.1.dev0'
+    traitlets: '>=5.1'
+  url: https://files.pythonhosted.org/packages/a9/82/0340caa499416c78e5d8f5f05947ae4bc3cba53c9f038ab6e9ed964e22f1/nbformat-5.10.4-py3-none-any.whl
+  hash:
+    sha256: 3b48d6c8fbca4b299bf3982ea7db1af21580e4fec269ad087b9e81588891200b
+  category: main
+  optional: false
+- name: nest-asyncio
+  version: 1.6.0
+  manager: pip
+  platform: linux-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/a0/c4/c2971a3ba4c6103a3d10c4b0f24f461ddc027f0f09763220cf35ca1401b3/nest_asyncio-1.6.0-py3-none-any.whl
+  hash:
+    sha256: 87af6efd6b5e897c81050477ef65c62e2b2f35d51703cae01aff2905b1852e1c
+  category: main
+  optional: false
+- name: nest-asyncio
+  version: 1.6.0
+  manager: pip
+  platform: osx-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/a0/c4/c2971a3ba4c6103a3d10c4b0f24f461ddc027f0f09763220cf35ca1401b3/nest_asyncio-1.6.0-py3-none-any.whl
+  hash:
+    sha256: 87af6efd6b5e897c81050477ef65c62e2b2f35d51703cae01aff2905b1852e1c
+  category: main
+  optional: false
+- name: nest-asyncio
+  version: 1.6.0
+  manager: pip
+  platform: osx-arm64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/a0/c4/c2971a3ba4c6103a3d10c4b0f24f461ddc027f0f09763220cf35ca1401b3/nest_asyncio-1.6.0-py3-none-any.whl
+  hash:
+    sha256: 87af6efd6b5e897c81050477ef65c62e2b2f35d51703cae01aff2905b1852e1c
+  category: main
+  optional: false
+- name: nest-asyncio
+  version: 1.6.0
+  manager: pip
+  platform: win-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/a0/c4/c2971a3ba4c6103a3d10c4b0f24f461ddc027f0f09763220cf35ca1401b3/nest_asyncio-1.6.0-py3-none-any.whl
+  hash:
+    sha256: 87af6efd6b5e897c81050477ef65c62e2b2f35d51703cae01aff2905b1852e1c
+  category: main
+  optional: false
 - name: nodeenv
   version: 1.9.1
   manager: pip
@@ -3433,6 +5502,110 @@ package:
   url: https://files.pythonhosted.org/packages/d2/1d/1b658dbd2b9fa9c4c9f32accbfc0205d532c8c6194dc0f2a4c0428e7128a/nodeenv-1.9.1-py2.py3-none-any.whl
   hash:
     sha256: ba11c9782d29c27c70ffbdda2d7415098754709be8a7056d79a737cd901155c9
+  category: main
+  optional: false
+- name: notebook
+  version: 7.4.6
+  manager: pip
+  platform: linux-64
+  dependencies:
+    jupyter-server: '>=2.4.0,<3'
+    jupyterlab: '>=4.4.8,<4.5'
+    jupyterlab-server: '>=2.27.1,<3'
+    notebook-shim: '>=0.2,<0.3'
+    tornado: '>=6.2.0'
+  url: https://files.pythonhosted.org/packages/dd/33/8cfe8678444c52173b4f490e2f72b8eca30d99ddc1e0dcc6e1aea63d48c4/notebook-7.4.6-py3-none-any.whl
+  hash:
+    sha256: 75d931582bc26c42257084b75bcf9d51e43fb8e6d3cf779cb17a5c6561867341
+  category: main
+  optional: false
+- name: notebook
+  version: 7.4.6
+  manager: pip
+  platform: osx-64
+  dependencies:
+    jupyter-server: '>=2.4.0,<3'
+    jupyterlab: '>=4.4.8,<4.5'
+    jupyterlab-server: '>=2.27.1,<3'
+    notebook-shim: '>=0.2,<0.3'
+    tornado: '>=6.2.0'
+  url: https://files.pythonhosted.org/packages/dd/33/8cfe8678444c52173b4f490e2f72b8eca30d99ddc1e0dcc6e1aea63d48c4/notebook-7.4.6-py3-none-any.whl
+  hash:
+    sha256: 75d931582bc26c42257084b75bcf9d51e43fb8e6d3cf779cb17a5c6561867341
+  category: main
+  optional: false
+- name: notebook
+  version: 7.4.6
+  manager: pip
+  platform: osx-arm64
+  dependencies:
+    jupyter-server: '>=2.4.0,<3'
+    jupyterlab: '>=4.4.8,<4.5'
+    jupyterlab-server: '>=2.27.1,<3'
+    notebook-shim: '>=0.2,<0.3'
+    tornado: '>=6.2.0'
+  url: https://files.pythonhosted.org/packages/dd/33/8cfe8678444c52173b4f490e2f72b8eca30d99ddc1e0dcc6e1aea63d48c4/notebook-7.4.6-py3-none-any.whl
+  hash:
+    sha256: 75d931582bc26c42257084b75bcf9d51e43fb8e6d3cf779cb17a5c6561867341
+  category: main
+  optional: false
+- name: notebook
+  version: 7.4.6
+  manager: pip
+  platform: win-64
+  dependencies:
+    jupyter-server: '>=2.4.0,<3'
+    jupyterlab: '>=4.4.8,<4.5'
+    jupyterlab-server: '>=2.27.1,<3'
+    notebook-shim: '>=0.2,<0.3'
+    tornado: '>=6.2.0'
+  url: https://files.pythonhosted.org/packages/dd/33/8cfe8678444c52173b4f490e2f72b8eca30d99ddc1e0dcc6e1aea63d48c4/notebook-7.4.6-py3-none-any.whl
+  hash:
+    sha256: 75d931582bc26c42257084b75bcf9d51e43fb8e6d3cf779cb17a5c6561867341
+  category: main
+  optional: false
+- name: notebook-shim
+  version: 0.2.4
+  manager: pip
+  platform: linux-64
+  dependencies:
+    jupyter-server: '>=1.8,<3'
+  url: https://files.pythonhosted.org/packages/f9/33/bd5b9137445ea4b680023eb0469b2bb969d61303dedb2aac6560ff3d14a1/notebook_shim-0.2.4-py3-none-any.whl
+  hash:
+    sha256: 411a5be4e9dc882a074ccbcae671eda64cceb068767e9a3419096986560e1cef
+  category: main
+  optional: false
+- name: notebook-shim
+  version: 0.2.4
+  manager: pip
+  platform: osx-64
+  dependencies:
+    jupyter-server: '>=1.8,<3'
+  url: https://files.pythonhosted.org/packages/f9/33/bd5b9137445ea4b680023eb0469b2bb969d61303dedb2aac6560ff3d14a1/notebook_shim-0.2.4-py3-none-any.whl
+  hash:
+    sha256: 411a5be4e9dc882a074ccbcae671eda64cceb068767e9a3419096986560e1cef
+  category: main
+  optional: false
+- name: notebook-shim
+  version: 0.2.4
+  manager: pip
+  platform: osx-arm64
+  dependencies:
+    jupyter-server: '>=1.8,<3'
+  url: https://files.pythonhosted.org/packages/f9/33/bd5b9137445ea4b680023eb0469b2bb969d61303dedb2aac6560ff3d14a1/notebook_shim-0.2.4-py3-none-any.whl
+  hash:
+    sha256: 411a5be4e9dc882a074ccbcae671eda64cceb068767e9a3419096986560e1cef
+  category: main
+  optional: false
+- name: notebook-shim
+  version: 0.2.4
+  manager: pip
+  platform: win-64
+  dependencies:
+    jupyter-server: '>=1.8,<3'
+  url: https://files.pythonhosted.org/packages/f9/33/bd5b9137445ea4b680023eb0469b2bb969d61303dedb2aac6560ff3d14a1/notebook_shim-0.2.4-py3-none-any.whl
+  hash:
+    sha256: 411a5be4e9dc882a074ccbcae671eda64cceb068767e9a3419096986560e1cef
   category: main
   optional: false
 - name: omegaconf
@@ -3711,6 +5884,46 @@ package:
     sha256: 4bbdc0894ec85f1d1bea1d6d9c8b2c3c8d7ccaa13577ef40da9c006c9fd0eb60
   category: main
   optional: false
+- name: overrides
+  version: 7.7.0
+  manager: pip
+  platform: linux-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/2c/ab/fc8290c6a4c722e5514d80f62b2dc4c4df1a68a41d1364e625c35990fcf3/overrides-7.7.0-py3-none-any.whl
+  hash:
+    sha256: c7ed9d062f78b8e4c1a7b70bd8796b35ead4d9f510227ef9c5dc7626c60d7e49
+  category: main
+  optional: false
+- name: overrides
+  version: 7.7.0
+  manager: pip
+  platform: osx-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/2c/ab/fc8290c6a4c722e5514d80f62b2dc4c4df1a68a41d1364e625c35990fcf3/overrides-7.7.0-py3-none-any.whl
+  hash:
+    sha256: c7ed9d062f78b8e4c1a7b70bd8796b35ead4d9f510227ef9c5dc7626c60d7e49
+  category: main
+  optional: false
+- name: overrides
+  version: 7.7.0
+  manager: pip
+  platform: osx-arm64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/2c/ab/fc8290c6a4c722e5514d80f62b2dc4c4df1a68a41d1364e625c35990fcf3/overrides-7.7.0-py3-none-any.whl
+  hash:
+    sha256: c7ed9d062f78b8e4c1a7b70bd8796b35ead4d9f510227ef9c5dc7626c60d7e49
+  category: main
+  optional: false
+- name: overrides
+  version: 7.7.0
+  manager: pip
+  platform: win-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/2c/ab/fc8290c6a4c722e5514d80f62b2dc4c4df1a68a41d1364e625c35990fcf3/overrides-7.7.0-py3-none-any.whl
+  hash:
+    sha256: c7ed9d062f78b8e4c1a7b70bd8796b35ead4d9f510227ef9c5dc7626c60d7e49
+  category: main
+  optional: false
 - name: packaging
   version: '25.0'
   manager: pip
@@ -3751,6 +5964,46 @@ package:
     sha256: 29572ef2b1f17581046b3a2227d5c611fb25ec70ca1ba8554b24b0e69331a484
   category: main
   optional: false
+- name: pandocfilters
+  version: 1.5.1
+  manager: pip
+  platform: linux-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/ef/af/4fbc8cab944db5d21b7e2a5b8e9211a03a79852b1157e2c102fcc61ac440/pandocfilters-1.5.1-py2.py3-none-any.whl
+  hash:
+    sha256: 93be382804a9cdb0a7267585f157e5d1731bbe5545a85b268d6f5fe6232de2bc
+  category: main
+  optional: false
+- name: pandocfilters
+  version: 1.5.1
+  manager: pip
+  platform: osx-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/ef/af/4fbc8cab944db5d21b7e2a5b8e9211a03a79852b1157e2c102fcc61ac440/pandocfilters-1.5.1-py2.py3-none-any.whl
+  hash:
+    sha256: 93be382804a9cdb0a7267585f157e5d1731bbe5545a85b268d6f5fe6232de2bc
+  category: main
+  optional: false
+- name: pandocfilters
+  version: 1.5.1
+  manager: pip
+  platform: osx-arm64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/ef/af/4fbc8cab944db5d21b7e2a5b8e9211a03a79852b1157e2c102fcc61ac440/pandocfilters-1.5.1-py2.py3-none-any.whl
+  hash:
+    sha256: 93be382804a9cdb0a7267585f157e5d1731bbe5545a85b268d6f5fe6232de2bc
+  category: main
+  optional: false
+- name: pandocfilters
+  version: 1.5.1
+  manager: pip
+  platform: win-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/ef/af/4fbc8cab944db5d21b7e2a5b8e9211a03a79852b1157e2c102fcc61ac440/pandocfilters-1.5.1-py2.py3-none-any.whl
+  hash:
+    sha256: 93be382804a9cdb0a7267585f157e5d1731bbe5545a85b268d6f5fe6232de2bc
+  category: main
+  optional: false
 - name: parse
   version: 1.20.2
   manager: pip
@@ -3789,6 +6042,46 @@ package:
   url: https://files.pythonhosted.org/packages/d0/31/ba45bf0b2aa7898d81cbbfac0e88c267befb59ad91a19e36e1bc5578ddb1/parse-1.20.2-py2.py3-none-any.whl
   hash:
     sha256: 967095588cb802add9177d0c0b6133b5ba33b1ea9007ca800e526f42a85af558
+  category: main
+  optional: false
+- name: parso
+  version: 0.8.5
+  manager: pip
+  platform: linux-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/16/32/f8e3c85d1d5250232a5d3477a2a28cc291968ff175caeadaf3cc19ce0e4a/parso-0.8.5-py2.py3-none-any.whl
+  hash:
+    sha256: 646204b5ee239c396d040b90f9e272e9a8017c630092bf59980beb62fd033887
+  category: main
+  optional: false
+- name: parso
+  version: 0.8.5
+  manager: pip
+  platform: osx-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/16/32/f8e3c85d1d5250232a5d3477a2a28cc291968ff175caeadaf3cc19ce0e4a/parso-0.8.5-py2.py3-none-any.whl
+  hash:
+    sha256: 646204b5ee239c396d040b90f9e272e9a8017c630092bf59980beb62fd033887
+  category: main
+  optional: false
+- name: parso
+  version: 0.8.5
+  manager: pip
+  platform: osx-arm64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/16/32/f8e3c85d1d5250232a5d3477a2a28cc291968ff175caeadaf3cc19ce0e4a/parso-0.8.5-py2.py3-none-any.whl
+  hash:
+    sha256: 646204b5ee239c396d040b90f9e272e9a8017c630092bf59980beb62fd033887
+  category: main
+  optional: false
+- name: parso
+  version: 0.8.5
+  manager: pip
+  platform: win-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/16/32/f8e3c85d1d5250232a5d3477a2a28cc291968ff175caeadaf3cc19ce0e4a/parso-0.8.5-py2.py3-none-any.whl
+  hash:
+    sha256: 646204b5ee239c396d040b90f9e272e9a8017c630092bf59980beb62fd033887
   category: main
   optional: false
 - name: pathable
@@ -3869,6 +6162,39 @@ package:
   url: https://files.pythonhosted.org/packages/cc/20/ff623b09d963f88bfde16306a54e12ee5ea43e9b597108672ff3a408aad6/pathspec-0.12.1-py3-none-any.whl
   hash:
     sha256: a0d503e138a4c123b27490a4f7beda6a01c6f288df0e4a8b79c7eb0dc7b4cc08
+  category: main
+  optional: false
+- name: pexpect
+  version: 4.9.0
+  manager: pip
+  platform: linux-64
+  dependencies:
+    ptyprocess: '>=0.5'
+  url: https://files.pythonhosted.org/packages/9e/c3/059298687310d527a58bb01f3b1965787ee3b40dce76752eda8b44e9a2c5/pexpect-4.9.0-py2.py3-none-any.whl
+  hash:
+    sha256: 7236d1e080e4936be2dc3e326cec0af72acf9212a7e1d060210e70a47e253523
+  category: main
+  optional: false
+- name: pexpect
+  version: 4.9.0
+  manager: pip
+  platform: osx-64
+  dependencies:
+    ptyprocess: '>=0.5'
+  url: https://files.pythonhosted.org/packages/9e/c3/059298687310d527a58bb01f3b1965787ee3b40dce76752eda8b44e9a2c5/pexpect-4.9.0-py2.py3-none-any.whl
+  hash:
+    sha256: 7236d1e080e4936be2dc3e326cec0af72acf9212a7e1d060210e70a47e253523
+  category: main
+  optional: false
+- name: pexpect
+  version: 4.9.0
+  manager: pip
+  platform: osx-arm64
+  dependencies:
+    ptyprocess: '>=0.5'
+  url: https://files.pythonhosted.org/packages/9e/c3/059298687310d527a58bb01f3b1965787ee3b40dce76752eda8b44e9a2c5/pexpect-4.9.0-py2.py3-none-any.whl
+  hash:
+    sha256: 7236d1e080e4936be2dc3e326cec0af72acf9212a7e1d060210e70a47e253523
   category: main
   optional: false
 - name: platformdirs
@@ -4009,6 +6335,200 @@ package:
   url: https://files.pythonhosted.org/packages/5b/a5/987a405322d78a73b66e39e4a90e4ef156fd7141bf71df987e50717c321b/pre_commit-4.3.0-py2.py3-none-any.whl
   hash:
     sha256: 2b0747ad7e6e967169136edffee14c16e148a778a54e4f967921aa1ebf2308d8
+  category: main
+  optional: false
+- name: prometheus-client
+  version: 0.23.1
+  manager: pip
+  platform: linux-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/b8/db/14bafcb4af2139e046d03fd00dea7873e48eafe18b7d2797e73d6681f210/prometheus_client-0.23.1-py3-none-any.whl
+  hash:
+    sha256: dd1913e6e76b59cfe44e7a4b83e01afc9873c1bdfd2ed8739f1e76aeca115f99
+  category: main
+  optional: false
+- name: prometheus-client
+  version: 0.23.1
+  manager: pip
+  platform: osx-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/b8/db/14bafcb4af2139e046d03fd00dea7873e48eafe18b7d2797e73d6681f210/prometheus_client-0.23.1-py3-none-any.whl
+  hash:
+    sha256: dd1913e6e76b59cfe44e7a4b83e01afc9873c1bdfd2ed8739f1e76aeca115f99
+  category: main
+  optional: false
+- name: prometheus-client
+  version: 0.23.1
+  manager: pip
+  platform: osx-arm64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/b8/db/14bafcb4af2139e046d03fd00dea7873e48eafe18b7d2797e73d6681f210/prometheus_client-0.23.1-py3-none-any.whl
+  hash:
+    sha256: dd1913e6e76b59cfe44e7a4b83e01afc9873c1bdfd2ed8739f1e76aeca115f99
+  category: main
+  optional: false
+- name: prometheus-client
+  version: 0.23.1
+  manager: pip
+  platform: win-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/b8/db/14bafcb4af2139e046d03fd00dea7873e48eafe18b7d2797e73d6681f210/prometheus_client-0.23.1-py3-none-any.whl
+  hash:
+    sha256: dd1913e6e76b59cfe44e7a4b83e01afc9873c1bdfd2ed8739f1e76aeca115f99
+  category: main
+  optional: false
+- name: prompt-toolkit
+  version: 3.0.52
+  manager: pip
+  platform: linux-64
+  dependencies:
+    wcwidth: '*'
+  url: https://files.pythonhosted.org/packages/84/03/0d3ce49e2505ae70cf43bc5bb3033955d2fc9f932163e84dc0779cc47f48/prompt_toolkit-3.0.52-py3-none-any.whl
+  hash:
+    sha256: 9aac639a3bbd33284347de5ad8d68ecc044b91a762dc39b7c21095fcd6a19955
+  category: main
+  optional: false
+- name: prompt-toolkit
+  version: 3.0.52
+  manager: pip
+  platform: osx-64
+  dependencies:
+    wcwidth: '*'
+  url: https://files.pythonhosted.org/packages/84/03/0d3ce49e2505ae70cf43bc5bb3033955d2fc9f932163e84dc0779cc47f48/prompt_toolkit-3.0.52-py3-none-any.whl
+  hash:
+    sha256: 9aac639a3bbd33284347de5ad8d68ecc044b91a762dc39b7c21095fcd6a19955
+  category: main
+  optional: false
+- name: prompt-toolkit
+  version: 3.0.52
+  manager: pip
+  platform: osx-arm64
+  dependencies:
+    wcwidth: '*'
+  url: https://files.pythonhosted.org/packages/84/03/0d3ce49e2505ae70cf43bc5bb3033955d2fc9f932163e84dc0779cc47f48/prompt_toolkit-3.0.52-py3-none-any.whl
+  hash:
+    sha256: 9aac639a3bbd33284347de5ad8d68ecc044b91a762dc39b7c21095fcd6a19955
+  category: main
+  optional: false
+- name: prompt-toolkit
+  version: 3.0.52
+  manager: pip
+  platform: win-64
+  dependencies:
+    wcwidth: '*'
+  url: https://files.pythonhosted.org/packages/84/03/0d3ce49e2505ae70cf43bc5bb3033955d2fc9f932163e84dc0779cc47f48/prompt_toolkit-3.0.52-py3-none-any.whl
+  hash:
+    sha256: 9aac639a3bbd33284347de5ad8d68ecc044b91a762dc39b7c21095fcd6a19955
+  category: main
+  optional: false
+- name: psutil
+  version: 7.1.0
+  manager: pip
+  platform: linux-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/9d/de/04c8c61232f7244aa0a4b9a9fbd63a89d5aeaf94b2fc9d1d16e2faa5cbb0/psutil-7.1.0-cp36-abi3-manylinux_2_12_x86_64.manylinux2010_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+  hash:
+    sha256: 8c70e113920d51e89f212dd7be06219a9b88014e63a4cec69b684c327bc474e3
+  category: main
+  optional: false
+- name: psutil
+  version: 7.1.0
+  manager: pip
+  platform: osx-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/46/62/ce4051019ee20ce0ed74432dd73a5bb087a6704284a470bb8adff69a0932/psutil-7.1.0-cp36-abi3-macosx_10_9_x86_64.whl
+  hash:
+    sha256: 76168cef4397494250e9f4e73eb3752b146de1dd950040b29186d0cce1d5ca13
+  category: main
+  optional: false
+- name: psutil
+  version: 7.1.0
+  manager: pip
+  platform: osx-arm64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/38/61/f76959fba841bf5b61123fbf4b650886dc4094c6858008b5bf73d9057216/psutil-7.1.0-cp36-abi3-macosx_11_0_arm64.whl
+  hash:
+    sha256: 5d007560c8c372efdff9e4579c2846d71de737e4605f611437255e81efcca2c5
+  category: main
+  optional: false
+- name: psutil
+  version: 7.1.0
+  manager: pip
+  platform: win-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/bf/e9/b44c4f697276a7a95b8e94d0e320a7bf7f3318521b23de69035540b39838/psutil-7.1.0-cp37-abi3-win_amd64.whl
+  hash:
+    sha256: 57f5e987c36d3146c0dd2528cd42151cf96cd359b9d67cfff836995cc5df9a3d
+  category: main
+  optional: false
+- name: ptyprocess
+  version: 0.7.0
+  manager: pip
+  platform: linux-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/22/a6/858897256d0deac81a172289110f31629fc4cee19b6f01283303e18c8db3/ptyprocess-0.7.0-py2.py3-none-any.whl
+  hash:
+    sha256: 4b41f3967fce3af57cc7e94b888626c18bf37a083e3651ca8feeb66d492fef35
+  category: main
+  optional: false
+- name: ptyprocess
+  version: 0.7.0
+  manager: pip
+  platform: osx-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/22/a6/858897256d0deac81a172289110f31629fc4cee19b6f01283303e18c8db3/ptyprocess-0.7.0-py2.py3-none-any.whl
+  hash:
+    sha256: 4b41f3967fce3af57cc7e94b888626c18bf37a083e3651ca8feeb66d492fef35
+  category: main
+  optional: false
+- name: ptyprocess
+  version: 0.7.0
+  manager: pip
+  platform: osx-arm64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/22/a6/858897256d0deac81a172289110f31629fc4cee19b6f01283303e18c8db3/ptyprocess-0.7.0-py2.py3-none-any.whl
+  hash:
+    sha256: 4b41f3967fce3af57cc7e94b888626c18bf37a083e3651ca8feeb66d492fef35
+  category: main
+  optional: false
+- name: pure-eval
+  version: 0.2.3
+  manager: pip
+  platform: linux-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/8e/37/efad0257dc6e593a18957422533ff0f87ede7c9c6ea010a2177d738fb82f/pure_eval-0.2.3-py3-none-any.whl
+  hash:
+    sha256: 1db8e35b67b3d218d818ae653e27f06c3aa420901fa7b081ca98cbedc874e0d0
+  category: main
+  optional: false
+- name: pure-eval
+  version: 0.2.3
+  manager: pip
+  platform: osx-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/8e/37/efad0257dc6e593a18957422533ff0f87ede7c9c6ea010a2177d738fb82f/pure_eval-0.2.3-py3-none-any.whl
+  hash:
+    sha256: 1db8e35b67b3d218d818ae653e27f06c3aa420901fa7b081ca98cbedc874e0d0
+  category: main
+  optional: false
+- name: pure-eval
+  version: 0.2.3
+  manager: pip
+  platform: osx-arm64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/8e/37/efad0257dc6e593a18957422533ff0f87ede7c9c6ea010a2177d738fb82f/pure_eval-0.2.3-py3-none-any.whl
+  hash:
+    sha256: 1db8e35b67b3d218d818ae653e27f06c3aa420901fa7b081ca98cbedc874e0d0
+  category: main
+  optional: false
+- name: pure-eval
+  version: 0.2.3
+  manager: pip
+  platform: win-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/8e/37/efad0257dc6e593a18957422533ff0f87ede7c9c6ea010a2177d738fb82f/pure_eval-0.2.3-py3-none-any.whl
+  hash:
+    sha256: 1db8e35b67b3d218d818ae653e27f06c3aa420901fa7b081ca98cbedc874e0d0
   category: main
   optional: false
 - name: pycparser
@@ -4392,6 +6912,50 @@ package:
     sha256: 8e17ae5e46d8e7efe51ab6494dd2010f4ca8dae51652aa3c8d55acf50bfb2e99
   category: main
   optional: false
+- name: python-dateutil
+  version: 2.9.0.post0
+  manager: pip
+  platform: linux-64
+  dependencies:
+    six: '>=1.5'
+  url: https://files.pythonhosted.org/packages/ec/57/56b9bcc3c9c6a792fcbaf139543cee77261f3651ca9da0c93f5c1221264b/python_dateutil-2.9.0.post0-py2.py3-none-any.whl
+  hash:
+    sha256: a8b2bc7bffae282281c8140a97d3aa9c14da0b136dfe83f850eea9a5f7470427
+  category: main
+  optional: false
+- name: python-dateutil
+  version: 2.9.0.post0
+  manager: pip
+  platform: osx-64
+  dependencies:
+    six: '>=1.5'
+  url: https://files.pythonhosted.org/packages/ec/57/56b9bcc3c9c6a792fcbaf139543cee77261f3651ca9da0c93f5c1221264b/python_dateutil-2.9.0.post0-py2.py3-none-any.whl
+  hash:
+    sha256: a8b2bc7bffae282281c8140a97d3aa9c14da0b136dfe83f850eea9a5f7470427
+  category: main
+  optional: false
+- name: python-dateutil
+  version: 2.9.0.post0
+  manager: pip
+  platform: osx-arm64
+  dependencies:
+    six: '>=1.5'
+  url: https://files.pythonhosted.org/packages/ec/57/56b9bcc3c9c6a792fcbaf139543cee77261f3651ca9da0c93f5c1221264b/python_dateutil-2.9.0.post0-py2.py3-none-any.whl
+  hash:
+    sha256: a8b2bc7bffae282281c8140a97d3aa9c14da0b136dfe83f850eea9a5f7470427
+  category: main
+  optional: false
+- name: python-dateutil
+  version: 2.9.0.post0
+  manager: pip
+  platform: win-64
+  dependencies:
+    six: '>=1.5'
+  url: https://files.pythonhosted.org/packages/ec/57/56b9bcc3c9c6a792fcbaf139543cee77261f3651ca9da0c93f5c1221264b/python_dateutil-2.9.0.post0-py2.py3-none-any.whl
+  hash:
+    sha256: a8b2bc7bffae282281c8140a97d3aa9c14da0b136dfe83f850eea9a5f7470427
+  category: main
+  optional: false
 - name: python-dotenv
   version: 1.1.1
   manager: pip
@@ -4430,6 +6994,46 @@ package:
   url: https://files.pythonhosted.org/packages/5f/ed/539768cf28c661b5b068d66d96a2f155c4971a5d55684a514c1a0e0dec2f/python_dotenv-1.1.1-py3-none-any.whl
   hash:
     sha256: 31f23644fe2602f88ff55e1f5c79ba497e01224ee7737937930c448e4d0e24dc
+  category: main
+  optional: false
+- name: python-json-logger
+  version: 3.3.0
+  manager: pip
+  platform: linux-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/08/20/0f2523b9e50a8052bc6a8b732dfc8568abbdc42010aef03a2d750bdab3b2/python_json_logger-3.3.0-py3-none-any.whl
+  hash:
+    sha256: dd980fae8cffb24c13caf6e158d3d61c0d6d22342f932cb6e9deedab3d35eec7
+  category: main
+  optional: false
+- name: python-json-logger
+  version: 3.3.0
+  manager: pip
+  platform: osx-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/08/20/0f2523b9e50a8052bc6a8b732dfc8568abbdc42010aef03a2d750bdab3b2/python_json_logger-3.3.0-py3-none-any.whl
+  hash:
+    sha256: dd980fae8cffb24c13caf6e158d3d61c0d6d22342f932cb6e9deedab3d35eec7
+  category: main
+  optional: false
+- name: python-json-logger
+  version: 3.3.0
+  manager: pip
+  platform: osx-arm64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/08/20/0f2523b9e50a8052bc6a8b732dfc8568abbdc42010aef03a2d750bdab3b2/python_json_logger-3.3.0-py3-none-any.whl
+  hash:
+    sha256: dd980fae8cffb24c13caf6e158d3d61c0d6d22342f932cb6e9deedab3d35eec7
+  category: main
+  optional: false
+- name: python-json-logger
+  version: 3.3.0
+  manager: pip
+  platform: win-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/08/20/0f2523b9e50a8052bc6a8b732dfc8568abbdc42010aef03a2d750bdab3b2/python_json_logger-3.3.0-py3-none-any.whl
+  hash:
+    sha256: dd980fae8cffb24c13caf6e158d3d61c0d6d22342f932cb6e9deedab3d35eec7
   category: main
   optional: false
 - name: python-multipart
@@ -4522,6 +7126,16 @@ package:
     sha256: 3ce80b34b22b17ccbd937a6e78e7225d80c52f5ab9940fe0506a1a16f3dab503
   category: main
   optional: false
+- name: pywinpty
+  version: 3.0.0
+  manager: pip
+  platform: win-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/d6/34/30727e8a97709f5033277457df9a293ccddf34d6eb7528e6a1e910265307/pywinpty-3.0.0-cp311-cp311-win_amd64.whl
+  hash:
+    sha256: 29daa71ac5dcbe1496ef99f4cde85a732b1f0a3b71405d42177dbcf9ee405e5a
+  category: main
+  optional: false
 - name: pyyaml
   version: 6.0.2
   manager: pip
@@ -4562,6 +7176,50 @@ package:
     sha256: e10ce637b18caea04431ce14fabcf5c64a1c61ec9c56b071a4b7ca131ca52d44
   category: main
   optional: false
+- name: pyzmq
+  version: 27.1.0
+  manager: pip
+  platform: linux-64
+  dependencies:
+    cffi: '*'
+  url: https://files.pythonhosted.org/packages/b1/c4/2a6fe5111a01005fc7af3878259ce17684fabb8852815eda6225620f3c59/pyzmq-27.1.0-cp311-cp311-manylinux_2_26_x86_64.manylinux_2_28_x86_64.whl
+  hash:
+    sha256: 5bbf8d3630bf96550b3be8e1fc0fea5cbdc8d5466c1192887bd94869da17a63e
+  category: main
+  optional: false
+- name: pyzmq
+  version: 27.1.0
+  manager: pip
+  platform: osx-64
+  dependencies:
+    cffi: '*'
+  url: https://files.pythonhosted.org/packages/06/5d/305323ba86b284e6fcb0d842d6adaa2999035f70f8c38a9b6d21ad28c3d4/pyzmq-27.1.0-cp311-cp311-macosx_10_15_universal2.whl
+  hash:
+    sha256: 226b091818d461a3bef763805e75685e478ac17e9008f49fce2d3e52b3d58b86
+  category: main
+  optional: false
+- name: pyzmq
+  version: 27.1.0
+  manager: pip
+  platform: osx-arm64
+  dependencies:
+    cffi: '*'
+  url: https://files.pythonhosted.org/packages/06/5d/305323ba86b284e6fcb0d842d6adaa2999035f70f8c38a9b6d21ad28c3d4/pyzmq-27.1.0-cp311-cp311-macosx_10_15_universal2.whl
+  hash:
+    sha256: 226b091818d461a3bef763805e75685e478ac17e9008f49fce2d3e52b3d58b86
+  category: main
+  optional: false
+- name: pyzmq
+  version: 27.1.0
+  manager: pip
+  platform: win-64
+  dependencies:
+    cffi: '*'
+  url: https://files.pythonhosted.org/packages/23/6d/d8d92a0eb270a925c9b4dd039c0b4dc10abc2fcbc48331788824ef113935/pyzmq-27.1.0-cp311-cp311-win_amd64.whl
+  hash:
+    sha256: 190cbf120fbc0fc4957b56866830def56628934a9d112aec0e2507aa6a032b97
+  category: main
+  optional: false
 - name: referencing
   version: 0.36.2
   manager: pip
@@ -4712,6 +7370,90 @@ package:
   url: https://files.pythonhosted.org/packages/7b/44/4e421b96b67b2daff264473f7465db72fbdf36a07e05494f50300cc7b0c6/rfc3339_validator-0.1.4-py2.py3-none-any.whl
   hash:
     sha256: 24f6ec1eda14ef823da9e36ec7113124b39c04d50a4d3d3a3c2859577e7791fa
+  category: main
+  optional: false
+- name: rfc3986-validator
+  version: 0.1.1
+  manager: pip
+  platform: linux-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/9e/51/17023c0f8f1869d8806b979a2bffa3f861f26a3f1a66b094288323fba52f/rfc3986_validator-0.1.1-py2.py3-none-any.whl
+  hash:
+    sha256: 2f235c432ef459970b4306369336b9d5dbdda31b510ca1e327636e01f528bfa9
+  category: main
+  optional: false
+- name: rfc3986-validator
+  version: 0.1.1
+  manager: pip
+  platform: osx-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/9e/51/17023c0f8f1869d8806b979a2bffa3f861f26a3f1a66b094288323fba52f/rfc3986_validator-0.1.1-py2.py3-none-any.whl
+  hash:
+    sha256: 2f235c432ef459970b4306369336b9d5dbdda31b510ca1e327636e01f528bfa9
+  category: main
+  optional: false
+- name: rfc3986-validator
+  version: 0.1.1
+  manager: pip
+  platform: osx-arm64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/9e/51/17023c0f8f1869d8806b979a2bffa3f861f26a3f1a66b094288323fba52f/rfc3986_validator-0.1.1-py2.py3-none-any.whl
+  hash:
+    sha256: 2f235c432ef459970b4306369336b9d5dbdda31b510ca1e327636e01f528bfa9
+  category: main
+  optional: false
+- name: rfc3986-validator
+  version: 0.1.1
+  manager: pip
+  platform: win-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/9e/51/17023c0f8f1869d8806b979a2bffa3f861f26a3f1a66b094288323fba52f/rfc3986_validator-0.1.1-py2.py3-none-any.whl
+  hash:
+    sha256: 2f235c432ef459970b4306369336b9d5dbdda31b510ca1e327636e01f528bfa9
+  category: main
+  optional: false
+- name: rfc3987-syntax
+  version: 1.1.0
+  manager: pip
+  platform: linux-64
+  dependencies:
+    lark: '>=1.2.2'
+  url: https://files.pythonhosted.org/packages/7e/71/44ce230e1b7fadd372515a97e32a83011f906ddded8d03e3c6aafbdedbb7/rfc3987_syntax-1.1.0-py3-none-any.whl
+  hash:
+    sha256: 6c3d97604e4c5ce9f714898e05401a0445a641cfa276432b0a648c80856f6a3f
+  category: main
+  optional: false
+- name: rfc3987-syntax
+  version: 1.1.0
+  manager: pip
+  platform: osx-64
+  dependencies:
+    lark: '>=1.2.2'
+  url: https://files.pythonhosted.org/packages/7e/71/44ce230e1b7fadd372515a97e32a83011f906ddded8d03e3c6aafbdedbb7/rfc3987_syntax-1.1.0-py3-none-any.whl
+  hash:
+    sha256: 6c3d97604e4c5ce9f714898e05401a0445a641cfa276432b0a648c80856f6a3f
+  category: main
+  optional: false
+- name: rfc3987-syntax
+  version: 1.1.0
+  manager: pip
+  platform: osx-arm64
+  dependencies:
+    lark: '>=1.2.2'
+  url: https://files.pythonhosted.org/packages/7e/71/44ce230e1b7fadd372515a97e32a83011f906ddded8d03e3c6aafbdedbb7/rfc3987_syntax-1.1.0-py3-none-any.whl
+  hash:
+    sha256: 6c3d97604e4c5ce9f714898e05401a0445a641cfa276432b0a648c80856f6a3f
+  category: main
+  optional: false
+- name: rfc3987-syntax
+  version: 1.1.0
+  manager: pip
+  platform: win-64
+  dependencies:
+    lark: '>=1.2.2'
+  url: https://files.pythonhosted.org/packages/7e/71/44ce230e1b7fadd372515a97e32a83011f906ddded8d03e3c6aafbdedbb7/rfc3987_syntax-1.1.0-py3-none-any.whl
+  hash:
+    sha256: 6c3d97604e4c5ce9f714898e05401a0445a641cfa276432b0a648c80856f6a3f
   category: main
   optional: false
 - name: rich
@@ -4890,6 +7632,46 @@ package:
     sha256: 17d95fb32218357c89355f6f6f9a804133e404fc1f65694372e02a557edf8585
   category: main
   optional: false
+- name: send2trash
+  version: 1.8.3
+  manager: pip
+  platform: linux-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/40/b0/4562db6223154aa4e22f939003cb92514c79f3d4dccca3444253fd17f902/Send2Trash-1.8.3-py3-none-any.whl
+  hash:
+    sha256: 0c31227e0bd08961c7665474a3d1ef7193929fedda4233843689baa056be46c9
+  category: main
+  optional: false
+- name: send2trash
+  version: 1.8.3
+  manager: pip
+  platform: osx-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/40/b0/4562db6223154aa4e22f939003cb92514c79f3d4dccca3444253fd17f902/Send2Trash-1.8.3-py3-none-any.whl
+  hash:
+    sha256: 0c31227e0bd08961c7665474a3d1ef7193929fedda4233843689baa056be46c9
+  category: main
+  optional: false
+- name: send2trash
+  version: 1.8.3
+  manager: pip
+  platform: osx-arm64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/40/b0/4562db6223154aa4e22f939003cb92514c79f3d4dccca3444253fd17f902/Send2Trash-1.8.3-py3-none-any.whl
+  hash:
+    sha256: 0c31227e0bd08961c7665474a3d1ef7193929fedda4233843689baa056be46c9
+  category: main
+  optional: false
+- name: send2trash
+  version: 1.8.3
+  manager: pip
+  platform: win-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/40/b0/4562db6223154aa4e22f939003cb92514c79f3d4dccca3444253fd17f902/Send2Trash-1.8.3-py3-none-any.whl
+  hash:
+    sha256: 0c31227e0bd08961c7665474a3d1ef7193929fedda4233843689baa056be46c9
+  category: main
+  optional: false
 - name: six
   version: 1.17.0
   manager: pip
@@ -4970,6 +7752,46 @@ package:
     sha256: 2f6da418d1f1e0fddd844478f41680e794e6051915791a034ff65e5f100525a2
   category: main
   optional: false
+- name: soupsieve
+  version: '2.8'
+  manager: pip
+  platform: linux-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/14/a0/bb38d3b76b8cae341dad93a2dd83ab7462e6dbcdd84d43f54ee60a8dc167/soupsieve-2.8-py3-none-any.whl
+  hash:
+    sha256: 0cc76456a30e20f5d7f2e14a98a4ae2ee4e5abdc7c5ea0aafe795f344bc7984c
+  category: main
+  optional: false
+- name: soupsieve
+  version: '2.8'
+  manager: pip
+  platform: osx-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/14/a0/bb38d3b76b8cae341dad93a2dd83ab7462e6dbcdd84d43f54ee60a8dc167/soupsieve-2.8-py3-none-any.whl
+  hash:
+    sha256: 0cc76456a30e20f5d7f2e14a98a4ae2ee4e5abdc7c5ea0aafe795f344bc7984c
+  category: main
+  optional: false
+- name: soupsieve
+  version: '2.8'
+  manager: pip
+  platform: osx-arm64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/14/a0/bb38d3b76b8cae341dad93a2dd83ab7462e6dbcdd84d43f54ee60a8dc167/soupsieve-2.8-py3-none-any.whl
+  hash:
+    sha256: 0cc76456a30e20f5d7f2e14a98a4ae2ee4e5abdc7c5ea0aafe795f344bc7984c
+  category: main
+  optional: false
+- name: soupsieve
+  version: '2.8'
+  manager: pip
+  platform: win-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/14/a0/bb38d3b76b8cae341dad93a2dd83ab7462e6dbcdd84d43f54ee60a8dc167/soupsieve-2.8-py3-none-any.whl
+  hash:
+    sha256: 0cc76456a30e20f5d7f2e14a98a4ae2ee4e5abdc7c5ea0aafe795f344bc7984c
+  category: main
+  optional: false
 - name: sse-starlette
   version: 3.0.2
   manager: pip
@@ -5012,6 +7834,58 @@ package:
   url: https://files.pythonhosted.org/packages/ef/10/c78f463b4ef22eef8491f218f692be838282cd65480f6e423d7730dfd1fb/sse_starlette-3.0.2-py3-none-any.whl
   hash:
     sha256: 16b7cbfddbcd4eaca11f7b586f3b8a080f1afe952c15813455b162edea619e5a
+  category: main
+  optional: false
+- name: stack-data
+  version: 0.6.3
+  manager: pip
+  platform: linux-64
+  dependencies:
+    asttokens: '>=2.1.0'
+    executing: '>=1.2.0'
+    pure-eval: '*'
+  url: https://files.pythonhosted.org/packages/f1/7b/ce1eafaf1a76852e2ec9b22edecf1daa58175c090266e9f6c64afcd81d91/stack_data-0.6.3-py3-none-any.whl
+  hash:
+    sha256: d5558e0c25a4cb0853cddad3d77da9891a08cb85dd9f9f91b9f8cd66e511e695
+  category: main
+  optional: false
+- name: stack-data
+  version: 0.6.3
+  manager: pip
+  platform: osx-64
+  dependencies:
+    asttokens: '>=2.1.0'
+    executing: '>=1.2.0'
+    pure-eval: '*'
+  url: https://files.pythonhosted.org/packages/f1/7b/ce1eafaf1a76852e2ec9b22edecf1daa58175c090266e9f6c64afcd81d91/stack_data-0.6.3-py3-none-any.whl
+  hash:
+    sha256: d5558e0c25a4cb0853cddad3d77da9891a08cb85dd9f9f91b9f8cd66e511e695
+  category: main
+  optional: false
+- name: stack-data
+  version: 0.6.3
+  manager: pip
+  platform: osx-arm64
+  dependencies:
+    asttokens: '>=2.1.0'
+    executing: '>=1.2.0'
+    pure-eval: '*'
+  url: https://files.pythonhosted.org/packages/f1/7b/ce1eafaf1a76852e2ec9b22edecf1daa58175c090266e9f6c64afcd81d91/stack_data-0.6.3-py3-none-any.whl
+  hash:
+    sha256: d5558e0c25a4cb0853cddad3d77da9891a08cb85dd9f9f91b9f8cd66e511e695
+  category: main
+  optional: false
+- name: stack-data
+  version: 0.6.3
+  manager: pip
+  platform: win-64
+  dependencies:
+    asttokens: '>=2.1.0'
+    executing: '>=1.2.0'
+    pure-eval: '*'
+  url: https://files.pythonhosted.org/packages/f1/7b/ce1eafaf1a76852e2ec9b22edecf1daa58175c090266e9f6c64afcd81d91/stack_data-0.6.3-py3-none-any.whl
+  hash:
+    sha256: d5558e0c25a4cb0853cddad3d77da9891a08cb85dd9f9f91b9f8cd66e511e695
   category: main
   optional: false
 - name: starlette
@@ -5102,6 +7976,218 @@ package:
     sha256: f77bf36710d8b73a50b2dd155c97b870017ad21afe6ab300326b0371b3b05138
   category: main
   optional: false
+- name: terminado
+  version: 0.18.1
+  manager: pip
+  platform: linux-64
+  dependencies:
+    ptyprocess: '*'
+    tornado: '>=6.1.0'
+  url: https://files.pythonhosted.org/packages/6a/9e/2064975477fdc887e47ad42157e214526dcad8f317a948dee17e1659a62f/terminado-0.18.1-py3-none-any.whl
+  hash:
+    sha256: a4468e1b37bb318f8a86514f65814e1afc977cf29b3992a4500d9dd305dcceb0
+  category: main
+  optional: false
+- name: terminado
+  version: 0.18.1
+  manager: pip
+  platform: osx-64
+  dependencies:
+    ptyprocess: '*'
+    tornado: '>=6.1.0'
+  url: https://files.pythonhosted.org/packages/6a/9e/2064975477fdc887e47ad42157e214526dcad8f317a948dee17e1659a62f/terminado-0.18.1-py3-none-any.whl
+  hash:
+    sha256: a4468e1b37bb318f8a86514f65814e1afc977cf29b3992a4500d9dd305dcceb0
+  category: main
+  optional: false
+- name: terminado
+  version: 0.18.1
+  manager: pip
+  platform: osx-arm64
+  dependencies:
+    ptyprocess: '*'
+    tornado: '>=6.1.0'
+  url: https://files.pythonhosted.org/packages/6a/9e/2064975477fdc887e47ad42157e214526dcad8f317a948dee17e1659a62f/terminado-0.18.1-py3-none-any.whl
+  hash:
+    sha256: a4468e1b37bb318f8a86514f65814e1afc977cf29b3992a4500d9dd305dcceb0
+  category: main
+  optional: false
+- name: terminado
+  version: 0.18.1
+  manager: pip
+  platform: win-64
+  dependencies:
+    pywinpty: '>=1.1.0'
+    tornado: '>=6.1.0'
+  url: https://files.pythonhosted.org/packages/6a/9e/2064975477fdc887e47ad42157e214526dcad8f317a948dee17e1659a62f/terminado-0.18.1-py3-none-any.whl
+  hash:
+    sha256: a4468e1b37bb318f8a86514f65814e1afc977cf29b3992a4500d9dd305dcceb0
+  category: main
+  optional: false
+- name: tinycss2
+  version: 1.4.0
+  manager: pip
+  platform: linux-64
+  dependencies:
+    webencodings: '>=0.4'
+  url: https://files.pythonhosted.org/packages/e6/34/ebdc18bae6aa14fbee1a08b63c015c72b64868ff7dae68808ab500c492e2/tinycss2-1.4.0-py3-none-any.whl
+  hash:
+    sha256: 3a49cf47b7675da0b15d0c6e1df8df4ebd96e9394bb905a5775adb0d884c5289
+  category: main
+  optional: false
+- name: tinycss2
+  version: 1.4.0
+  manager: pip
+  platform: osx-64
+  dependencies:
+    webencodings: '>=0.4'
+  url: https://files.pythonhosted.org/packages/e6/34/ebdc18bae6aa14fbee1a08b63c015c72b64868ff7dae68808ab500c492e2/tinycss2-1.4.0-py3-none-any.whl
+  hash:
+    sha256: 3a49cf47b7675da0b15d0c6e1df8df4ebd96e9394bb905a5775adb0d884c5289
+  category: main
+  optional: false
+- name: tinycss2
+  version: 1.4.0
+  manager: pip
+  platform: osx-arm64
+  dependencies:
+    webencodings: '>=0.4'
+  url: https://files.pythonhosted.org/packages/e6/34/ebdc18bae6aa14fbee1a08b63c015c72b64868ff7dae68808ab500c492e2/tinycss2-1.4.0-py3-none-any.whl
+  hash:
+    sha256: 3a49cf47b7675da0b15d0c6e1df8df4ebd96e9394bb905a5775adb0d884c5289
+  category: main
+  optional: false
+- name: tinycss2
+  version: 1.4.0
+  manager: pip
+  platform: win-64
+  dependencies:
+    webencodings: '>=0.4'
+  url: https://files.pythonhosted.org/packages/e6/34/ebdc18bae6aa14fbee1a08b63c015c72b64868ff7dae68808ab500c492e2/tinycss2-1.4.0-py3-none-any.whl
+  hash:
+    sha256: 3a49cf47b7675da0b15d0c6e1df8df4ebd96e9394bb905a5775adb0d884c5289
+  category: main
+  optional: false
+- name: tornado
+  version: 6.5.2
+  manager: pip
+  platform: linux-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/f9/41/fb15f06e33d7430ca89420283a8762a4e6b8025b800ea51796ab5e6d9559/tornado-6.5.2-cp39-abi3-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+  hash:
+    sha256: e792706668c87709709c18b353da1f7662317b563ff69f00bab83595940c7108
+  category: main
+  optional: false
+- name: tornado
+  version: 6.5.2
+  manager: pip
+  platform: osx-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/f2/b5/9b575a0ed3e50b00c40b08cbce82eb618229091d09f6d14bce80fc01cb0b/tornado-6.5.2-cp39-abi3-macosx_10_9_x86_64.whl
+  hash:
+    sha256: 583a52c7aa94ee046854ba81d9ebb6c81ec0fd30386d96f7640c96dad45a03ef
+  category: main
+  optional: false
+- name: tornado
+  version: 6.5.2
+  manager: pip
+  platform: osx-arm64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/f6/48/6a7529df2c9cc12efd2e8f5dd219516184d703b34c06786809670df5b3bd/tornado-6.5.2-cp39-abi3-macosx_10_9_universal2.whl
+  hash:
+    sha256: 2436822940d37cde62771cff8774f4f00b3c8024fe482e16ca8387b8a2724db6
+  category: main
+  optional: false
+- name: tornado
+  version: 6.5.2
+  manager: pip
+  platform: win-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/c7/2a/f609b420c2f564a748a2d80ebfb2ee02a73ca80223af712fca591386cafb/tornado-6.5.2-cp39-abi3-win_amd64.whl
+  hash:
+    sha256: e56a5af51cc30dd2cae649429af65ca2f6571da29504a07995175df14c18f35f
+  category: main
+  optional: false
+- name: traitlets
+  version: 5.14.3
+  manager: pip
+  platform: linux-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/00/c0/8f5d070730d7836adc9c9b6408dec68c6ced86b304a9b26a14df072a6e8c/traitlets-5.14.3-py3-none-any.whl
+  hash:
+    sha256: b74e89e397b1ed28cc831db7aea759ba6640cb3de13090ca145426688ff1ac4f
+  category: main
+  optional: false
+- name: traitlets
+  version: 5.14.3
+  manager: pip
+  platform: osx-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/00/c0/8f5d070730d7836adc9c9b6408dec68c6ced86b304a9b26a14df072a6e8c/traitlets-5.14.3-py3-none-any.whl
+  hash:
+    sha256: b74e89e397b1ed28cc831db7aea759ba6640cb3de13090ca145426688ff1ac4f
+  category: main
+  optional: false
+- name: traitlets
+  version: 5.14.3
+  manager: pip
+  platform: osx-arm64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/00/c0/8f5d070730d7836adc9c9b6408dec68c6ced86b304a9b26a14df072a6e8c/traitlets-5.14.3-py3-none-any.whl
+  hash:
+    sha256: b74e89e397b1ed28cc831db7aea759ba6640cb3de13090ca145426688ff1ac4f
+  category: main
+  optional: false
+- name: traitlets
+  version: 5.14.3
+  manager: pip
+  platform: win-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/00/c0/8f5d070730d7836adc9c9b6408dec68c6ced86b304a9b26a14df072a6e8c/traitlets-5.14.3-py3-none-any.whl
+  hash:
+    sha256: b74e89e397b1ed28cc831db7aea759ba6640cb3de13090ca145426688ff1ac4f
+  category: main
+  optional: false
+- name: types-python-dateutil
+  version: 2.9.0.20250822
+  manager: pip
+  platform: linux-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/ab/d9/a29dfa84363e88b053bf85a8b7f212a04f0d7343a4d24933baa45c06e08b/types_python_dateutil-2.9.0.20250822-py3-none-any.whl
+  hash:
+    sha256: 849d52b737e10a6dc6621d2bd7940ec7c65fcb69e6aa2882acf4e56b2b508ddc
+  category: main
+  optional: false
+- name: types-python-dateutil
+  version: 2.9.0.20250822
+  manager: pip
+  platform: osx-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/ab/d9/a29dfa84363e88b053bf85a8b7f212a04f0d7343a4d24933baa45c06e08b/types_python_dateutil-2.9.0.20250822-py3-none-any.whl
+  hash:
+    sha256: 849d52b737e10a6dc6621d2bd7940ec7c65fcb69e6aa2882acf4e56b2b508ddc
+  category: main
+  optional: false
+- name: types-python-dateutil
+  version: 2.9.0.20250822
+  manager: pip
+  platform: osx-arm64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/ab/d9/a29dfa84363e88b053bf85a8b7f212a04f0d7343a4d24933baa45c06e08b/types_python_dateutil-2.9.0.20250822-py3-none-any.whl
+  hash:
+    sha256: 849d52b737e10a6dc6621d2bd7940ec7c65fcb69e6aa2882acf4e56b2b508ddc
+  category: main
+  optional: false
+- name: types-python-dateutil
+  version: 2.9.0.20250822
+  manager: pip
+  platform: win-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/ab/d9/a29dfa84363e88b053bf85a8b7f212a04f0d7343a4d24933baa45c06e08b/types_python_dateutil-2.9.0.20250822-py3-none-any.whl
+  hash:
+    sha256: 849d52b737e10a6dc6621d2bd7940ec7c65fcb69e6aa2882acf4e56b2b508ddc
+  category: main
+  optional: false
 - name: typing-extensions
   version: 4.15.0
   manager: pip
@@ -5184,6 +8270,46 @@ package:
   url: https://files.pythonhosted.org/packages/17/69/cd203477f944c353c31bade965f880aa1061fd6bf05ded0726ca845b6ff7/typing_inspection-0.4.1-py3-none-any.whl
   hash:
     sha256: 389055682238f53b04f7badcb49b989835495a96700ced5dab2d8feae4b26f51
+  category: main
+  optional: false
+- name: uri-template
+  version: 1.3.0
+  manager: pip
+  platform: linux-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/e7/00/3fca040d7cf8a32776d3d81a00c8ee7457e00f80c649f1e4a863c8321ae9/uri_template-1.3.0-py3-none-any.whl
+  hash:
+    sha256: a44a133ea12d44a0c0f06d7d42a52d71282e77e2f937d8abd5655b8d56fc1363
+  category: main
+  optional: false
+- name: uri-template
+  version: 1.3.0
+  manager: pip
+  platform: osx-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/e7/00/3fca040d7cf8a32776d3d81a00c8ee7457e00f80c649f1e4a863c8321ae9/uri_template-1.3.0-py3-none-any.whl
+  hash:
+    sha256: a44a133ea12d44a0c0f06d7d42a52d71282e77e2f937d8abd5655b8d56fc1363
+  category: main
+  optional: false
+- name: uri-template
+  version: 1.3.0
+  manager: pip
+  platform: osx-arm64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/e7/00/3fca040d7cf8a32776d3d81a00c8ee7457e00f80c649f1e4a863c8321ae9/uri_template-1.3.0-py3-none-any.whl
+  hash:
+    sha256: a44a133ea12d44a0c0f06d7d42a52d71282e77e2f937d8abd5655b8d56fc1363
+  category: main
+  optional: false
+- name: uri-template
+  version: 1.3.0
+  manager: pip
+  platform: win-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/e7/00/3fca040d7cf8a32776d3d81a00c8ee7457e00f80c649f1e4a863c8321ae9/uri_template-1.3.0-py3-none-any.whl
+  hash:
+    sha256: a44a133ea12d44a0c0f06d7d42a52d71282e77e2f937d8abd5655b8d56fc1363
   category: main
   optional: false
 - name: urllib3
@@ -5324,6 +8450,166 @@ package:
   url: https://files.pythonhosted.org/packages/76/06/04c8e804f813cf972e3262f3f8584c232de64f0cde9f703b46cf53a45090/virtualenv-20.34.0-py3-none-any.whl
   hash:
     sha256: 341f5afa7eee943e4984a9207c025feedd768baff6753cd660c857ceb3e36026
+  category: main
+  optional: false
+- name: wcwidth
+  version: 0.2.14
+  manager: pip
+  platform: linux-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/af/b5/123f13c975e9f27ab9c0770f514345bd406d0e8d3b7a0723af9d43f710af/wcwidth-0.2.14-py2.py3-none-any.whl
+  hash:
+    sha256: a7bb560c8aee30f9957e5f9895805edd20602f2d7f720186dfd906e82b4982e1
+  category: main
+  optional: false
+- name: wcwidth
+  version: 0.2.14
+  manager: pip
+  platform: osx-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/af/b5/123f13c975e9f27ab9c0770f514345bd406d0e8d3b7a0723af9d43f710af/wcwidth-0.2.14-py2.py3-none-any.whl
+  hash:
+    sha256: a7bb560c8aee30f9957e5f9895805edd20602f2d7f720186dfd906e82b4982e1
+  category: main
+  optional: false
+- name: wcwidth
+  version: 0.2.14
+  manager: pip
+  platform: osx-arm64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/af/b5/123f13c975e9f27ab9c0770f514345bd406d0e8d3b7a0723af9d43f710af/wcwidth-0.2.14-py2.py3-none-any.whl
+  hash:
+    sha256: a7bb560c8aee30f9957e5f9895805edd20602f2d7f720186dfd906e82b4982e1
+  category: main
+  optional: false
+- name: wcwidth
+  version: 0.2.14
+  manager: pip
+  platform: win-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/af/b5/123f13c975e9f27ab9c0770f514345bd406d0e8d3b7a0723af9d43f710af/wcwidth-0.2.14-py2.py3-none-any.whl
+  hash:
+    sha256: a7bb560c8aee30f9957e5f9895805edd20602f2d7f720186dfd906e82b4982e1
+  category: main
+  optional: false
+- name: webcolors
+  version: 24.11.1
+  manager: pip
+  platform: linux-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/60/e8/c0e05e4684d13459f93d312077a9a2efbe04d59c393bc2b8802248c908d4/webcolors-24.11.1-py3-none-any.whl
+  hash:
+    sha256: 515291393b4cdf0eb19c155749a096f779f7d909f7cceea072791cb9095b92e9
+  category: main
+  optional: false
+- name: webcolors
+  version: 24.11.1
+  manager: pip
+  platform: osx-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/60/e8/c0e05e4684d13459f93d312077a9a2efbe04d59c393bc2b8802248c908d4/webcolors-24.11.1-py3-none-any.whl
+  hash:
+    sha256: 515291393b4cdf0eb19c155749a096f779f7d909f7cceea072791cb9095b92e9
+  category: main
+  optional: false
+- name: webcolors
+  version: 24.11.1
+  manager: pip
+  platform: osx-arm64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/60/e8/c0e05e4684d13459f93d312077a9a2efbe04d59c393bc2b8802248c908d4/webcolors-24.11.1-py3-none-any.whl
+  hash:
+    sha256: 515291393b4cdf0eb19c155749a096f779f7d909f7cceea072791cb9095b92e9
+  category: main
+  optional: false
+- name: webcolors
+  version: 24.11.1
+  manager: pip
+  platform: win-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/60/e8/c0e05e4684d13459f93d312077a9a2efbe04d59c393bc2b8802248c908d4/webcolors-24.11.1-py3-none-any.whl
+  hash:
+    sha256: 515291393b4cdf0eb19c155749a096f779f7d909f7cceea072791cb9095b92e9
+  category: main
+  optional: false
+- name: webencodings
+  version: 0.5.1
+  manager: pip
+  platform: linux-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/f4/24/2a3e3df732393fed8b3ebf2ec078f05546de641fe1b667ee316ec1dcf3b7/webencodings-0.5.1-py2.py3-none-any.whl
+  hash:
+    sha256: a0af1213f3c2226497a97e2b3aa01a7e4bee4f403f95be16fc9acd2947514a78
+  category: main
+  optional: false
+- name: webencodings
+  version: 0.5.1
+  manager: pip
+  platform: osx-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/f4/24/2a3e3df732393fed8b3ebf2ec078f05546de641fe1b667ee316ec1dcf3b7/webencodings-0.5.1-py2.py3-none-any.whl
+  hash:
+    sha256: a0af1213f3c2226497a97e2b3aa01a7e4bee4f403f95be16fc9acd2947514a78
+  category: main
+  optional: false
+- name: webencodings
+  version: 0.5.1
+  manager: pip
+  platform: osx-arm64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/f4/24/2a3e3df732393fed8b3ebf2ec078f05546de641fe1b667ee316ec1dcf3b7/webencodings-0.5.1-py2.py3-none-any.whl
+  hash:
+    sha256: a0af1213f3c2226497a97e2b3aa01a7e4bee4f403f95be16fc9acd2947514a78
+  category: main
+  optional: false
+- name: webencodings
+  version: 0.5.1
+  manager: pip
+  platform: win-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/f4/24/2a3e3df732393fed8b3ebf2ec078f05546de641fe1b667ee316ec1dcf3b7/webencodings-0.5.1-py2.py3-none-any.whl
+  hash:
+    sha256: a0af1213f3c2226497a97e2b3aa01a7e4bee4f403f95be16fc9acd2947514a78
+  category: main
+  optional: false
+- name: websocket-client
+  version: 1.8.0
+  manager: pip
+  platform: linux-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/5a/84/44687a29792a70e111c5c477230a72c4b957d88d16141199bf9acb7537a3/websocket_client-1.8.0-py3-none-any.whl
+  hash:
+    sha256: 17b44cc997f5c498e809b22cdf2d9c7a9e71c02c8cc2b6c56e7c2d1239bfa526
+  category: main
+  optional: false
+- name: websocket-client
+  version: 1.8.0
+  manager: pip
+  platform: osx-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/5a/84/44687a29792a70e111c5c477230a72c4b957d88d16141199bf9acb7537a3/websocket_client-1.8.0-py3-none-any.whl
+  hash:
+    sha256: 17b44cc997f5c498e809b22cdf2d9c7a9e71c02c8cc2b6c56e7c2d1239bfa526
+  category: main
+  optional: false
+- name: websocket-client
+  version: 1.8.0
+  manager: pip
+  platform: osx-arm64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/5a/84/44687a29792a70e111c5c477230a72c4b957d88d16141199bf9acb7537a3/websocket_client-1.8.0-py3-none-any.whl
+  hash:
+    sha256: 17b44cc997f5c498e809b22cdf2d9c7a9e71c02c8cc2b6c56e7c2d1239bfa526
+  category: main
+  optional: false
+- name: websocket-client
+  version: 1.8.0
+  manager: pip
+  platform: win-64
+  dependencies: {}
+  url: https://files.pythonhosted.org/packages/5a/84/44687a29792a70e111c5c477230a72c4b957d88d16141199bf9acb7537a3/websocket_client-1.8.0-py3-none-any.whl
+  hash:
+    sha256: 17b44cc997f5c498e809b22cdf2d9c7a9e71c02c8cc2b6c56e7c2d1239bfa526
   category: main
   optional: false
 - name: werkzeug

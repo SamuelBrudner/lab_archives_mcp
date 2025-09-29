@@ -26,3 +26,6 @@ dependencies:
       - black>=24.4
       - isort>=5.13
       - pre-commit>=3.7
+      - notebook>=7.2
+      - nbstripout>=0.6
+      - nbdime>=4.0

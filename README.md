@@ -72,6 +72,9 @@ The purpose is to verify end-to-end connectivity, authentication, and data retri
    ```bash
    pre-commit install
    ```
+
+   The configured hooks automatically strip notebook outputs (via `nbstripout`) and
+   format `.ipynb` diffs using `nbdime`, keeping commits reviewable even as notebooks evolve.
 6. Run the MCP server (stub implementation for now):
 
    ```bash
