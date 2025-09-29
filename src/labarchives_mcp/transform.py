@@ -71,16 +71,28 @@ class NotebookTransformer:
 
     @staticmethod
     def _normalize_timestamp(raw_value: str, field: str) -> str:
+        candidate = raw_value.strip()
+        if candidate.endswith("Z"):
+            candidate = f"{candidate[:-1]}+00:00"
+
+        parsed: datetime
         try:
-            parsed = datetime.strptime(raw_value, "%Y-%m-%d %H:%M:%S")
+            parsed = datetime.fromisoformat(candidate)
         except ValueError:
             try:
-                parsed = datetime.strptime(raw_value, "%Y-%m-%dT%H:%M:%S")
-            except ValueError as exc:
-                raise ValueError(f"Notebook record has invalid `{field}` value") from exc
+                parsed = datetime.strptime(candidate, "%Y-%m-%d %H:%M:%S")
+            except ValueError:
+                try:
+                    parsed = datetime.strptime(candidate, "%Y-%m-%dT%H:%M:%S")
+                except ValueError as exc:
+                    raise ValueError(f"Notebook record has invalid `{field}` value") from exc
 
-        parsed = parsed.replace(tzinfo=UTC)
-        return parsed.isoformat().replace("+00:00", "Z")
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=UTC)
+        else:
+            parsed = parsed.astimezone(UTC)
+
+        return parsed.replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 def translate_labarchives_fault(error: LabArchivesAPIError) -> dict[str, Any]:

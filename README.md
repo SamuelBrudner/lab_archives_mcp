@@ -57,6 +57,19 @@ The purpose is to verify end-to-end connectivity, authentication, and data retri
    cp conf/secrets.example.yml conf/secrets.yml
    $EDITOR conf/secrets.yml
    ```
+
+   Required keys:
+
+   - `LABARCHIVES_AKID`
+   - `LABARCHIVES_PASSWORD`
+   - `LABARCHIVES_REGION` (e.g., `https://api.labarchives.com`)
+
+   Optional helpers for non-interactive workflows:
+
+   - `LABARCHIVES_UID`: reuse a known uid instead of re-authenticating.
+   - `LABARCHIVES_AUTH_EMAIL` + `LABARCHIVES_AUTH_CODE`: supply the email and temporary token returned from LabArchives so the PoL client can call `users:user_access_info` and resolve the uid automatically.
+
+   If none of the optional values are provided, the MCP server will raise an error prompting you to obtain either a uid or temporary token. See **Authentication workflow** below for details.
 3. Create the pinned Conda environment (local prefix):
 
    ```bash
@@ -77,9 +90,17 @@ The purpose is to verify end-to-end connectivity, authentication, and data retri
    format `.ipynb` diffs using `nbdime`, keeping commits reviewable even as notebooks evolve.
 6. Run the MCP server (stub implementation for now):
 
-   ```bash
    python -m labarchives_mcp.mcp_server
    ```
+
+---
+
+## Authentication workflow
+
+- **Obtain a uid once**: follow the LabArchives `api_user_login` flow in a browser, then call `users:user_access_info` (or request a temporary token from LabArchives support). Record the uid in `conf/secrets.yml` as `LABARCHIVES_UID` for subsequent runs.
+- **Or use temporary tokens**: populate `LABARCHIVES_AUTH_EMAIL` and `LABARCHIVES_AUTH_CODE`. On start-up the PoL server exchanges the token via `users:user_access_info` and caches the resulting uid. Tokens are short-lived; replace them when LabArchives issues a new value.
+- **Signature details**: every API call includes an HMAC-SHA512 signature over `<akid> + <method> + <expires>` using millisecond precision and UTC. Clock drift should be mitigated by calling the LabArchives `epoch_time` utility before long sessions.
+- **Rate limiting**: respect LabArchives guidance—pause ≥1 s between calls and back off on errors (`tenacity` handles this when we wire up retry policies in future work).
 
 ---
 
@@ -95,13 +116,13 @@ The purpose is to verify end-to-end connectivity, authentication, and data retri
       "nbid": "12345",
       "name": "Fly Behavior Study",
       "owner": "samuel.brudner@yale.edu",
-      "created_at": "2025-01-01T12:00:00Z"
+      "owner_email": "samuel.brudner@yale.edu",
+      "owner_name": "Samuel Brudner",
+      "created_at": "2025-01-01T12:00:00Z",
+      "modified_at": "2025-01-02T08:30:00Z"
     }
   ]
 }
-```
-
----
 
 ## Development Notes
 

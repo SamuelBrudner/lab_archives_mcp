@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import hmac
 import time
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
+from urllib.parse import quote
 
 import httpx
 from omegaconf import OmegaConf
@@ -19,6 +21,9 @@ class Credentials(BaseModel):
     akid: str
     password: str
     region: HttpUrl
+    uid: str | None = None
+    auth_email: str | None = None
+    auth_code: str | None = None
 
     @classmethod
     def from_file(cls, path: Path | str | None = None) -> Credentials:
@@ -43,59 +48,98 @@ class Credentials(BaseModel):
             akid=str(normalized["LABARCHIVES_AKID"]),
             password=str(normalized["LABARCHIVES_PASSWORD"]),
             region=cast(HttpUrl, str(normalized["LABARCHIVES_REGION"])),
+            uid=(
+                str(normalized.get("LABARCHIVES_UID"))
+                if normalized.get("LABARCHIVES_UID")
+                else None
+            ),
+            auth_email=(
+                str(normalized.get("LABARCHIVES_AUTH_EMAIL"))
+                if normalized.get("LABARCHIVES_AUTH_EMAIL")
+                else None
+            ),
+            auth_code=(
+                str(normalized.get("LABARCHIVES_AUTH_CODE"))
+                if normalized.get("LABARCHIVES_AUTH_CODE")
+                else None
+            ),
         )
 
 
 class AuthenticationManager:
     """Coordinate authentication flows against the LabArchives API."""
 
+    USER_ACCESS_METHOD = "users:user_access_info"
+
     def __init__(self, client: httpx.AsyncClient, credentials: Credentials) -> None:
         self._client = client
         self._credentials = credentials
-        self._uid: str | None = None
+        self._uid: str | None = credentials.uid
 
     async def ensure_uid(self) -> str:
-        """Return a cached uid or trigger the LabArchives login handshake."""
+        """Return a cached uid or resolve it through the documented user access flow."""
         if self._uid:
             return self._uid
 
-        response = await self._client.post(
-            self._login_url,
-            params=self._build_auth_params(),
+        if self._credentials.auth_email and self._credentials.auth_code:
+            self._uid = await self._fetch_uid_via_user_access_info()
+            return self._uid
+
+        raise RuntimeError(
+            "LabArchives credentials require either LABARCHIVES_UID or both "
+            "LABARCHIVES_AUTH_EMAIL and LABARCHIVES_AUTH_CODE."
         )
-
-        try:
-            response.raise_for_status()
-        except httpx.HTTPStatusError as exc:  # pragma: no cover - exercised in tests
-            raise RuntimeError("LabArchives login failed") from exc
-
-        payload = response.json()
-        if payload.get("status") != "success" or not payload.get("uid"):
-            raise RuntimeError("LabArchives login failed: unexpected response payload")
-
-        self._uid = str(payload["uid"])
-        return self._uid
 
     def clear_uid(self) -> None:
         """Forget cached uid, forcing the next call to re-authenticate."""
         self._uid = None
 
     @property
-    def _login_url(self) -> str:
-        region = str(self._credentials.region).rstrip("/")
-        return f"{region}/api/v1/login"
+    def _api_base(self) -> str:
+        return f"{str(self._credentials.region).rstrip('/')}/apiv1"
 
-    def _build_auth_params(self) -> dict[str, str]:
-        expires = str(int(time.time()) + 300)
-        message = f"{self._credentials.akid}{expires}".encode()
-        signature = hmac.new(
+    async def _fetch_uid_via_user_access_info(self) -> str:
+        params = self._build_auth_params(self.USER_ACCESS_METHOD)
+        params.update(
+            {
+                "email": cast(str, self._credentials.auth_email),
+                "password": cast(str, self._credentials.auth_code),
+            }
+        )
+
+        url = f"{self._api_base}/users/user_access_info"
+        response = await self._client.get(url, params=params)
+        try:
+            response.raise_for_status()
+        except httpx.HTTPStatusError as exc:  # pragma: no cover - exercised in tests
+            raise RuntimeError("LabArchives user_access_info failed") from exc
+
+        payload = self._parse_response_json(response)
+        uid = payload.get("uid")
+        if not uid:
+            raise RuntimeError("LabArchives user_access_info failed: missing uid")
+
+        return str(uid)
+
+    def _build_auth_params(self, method: str) -> dict[str, str]:
+        expires = str(int(time.time() * 1000) + 120_000)
+        message = f"{self._credentials.akid}{method}{expires}".encode()
+        digest = hmac.new(
             self._credentials.password.encode("utf-8"),
             message,
-            hashlib.sha256,
-        ).hexdigest()
+            hashlib.sha512,
+        ).digest()
+        signature = quote(base64.b64encode(digest).decode("ascii"), safe="")
 
         return {
             "akid": self._credentials.akid,
             "expires": expires,
             "sig": signature,
         }
+
+    @staticmethod
+    def _parse_response_json(response: httpx.Response) -> dict[str, Any]:
+        payload = response.json()
+        if not isinstance(payload, dict):
+            raise RuntimeError("LabArchives returned malformed JSON payload")
+        return payload

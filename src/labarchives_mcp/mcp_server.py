@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 from collections.abc import Awaitable, Callable, Coroutine
 from importlib import metadata
 from typing import Any, cast
@@ -71,7 +72,8 @@ async def run_server() -> None:
         auth_manager = AuthenticationManager(http_client, credentials)
         notebook_client = LabArchivesClient(http_client)
 
-        server = fastmcp_class(
+        server = _instantiate_fastmcp(
+            fastmcp_class,
             server_id="labarchives-mcp-pol",
             name="LabArchives PoL Server",
             version=__version__,
@@ -97,7 +99,10 @@ async def run_server() -> None:
                 "list": [notebook.model_dump(by_alias=True) for notebook in notebooks],
             }
 
-        await server.serve()
+        if hasattr(server, "serve"):
+            await server.serve()
+        else:
+            raise NotImplementedError("FastMCP serve loop not implemented in PoL stub.")
 
 
 def run(main: Callable[[], Coroutine[Any, Any, None]] | None = None) -> None:
@@ -110,3 +115,20 @@ def run(main: Callable[[], Coroutine[Any, Any, None]] | None = None) -> None:
     except Exception as exc:  # noqa: BLE001
         logger.exception("Unhandled MCP server failure: {}", exc)
         raise
+
+
+def _instantiate_fastmcp(class_: type[Any], **metadata: Any) -> Any:
+    signature = inspect.signature(class_.__init__)
+    parameters = signature.parameters
+
+    filtered: dict[str, Any] = {key: value for key, value in metadata.items() if key in parameters}
+
+    if "server_id" in metadata and "server_id" not in filtered and "id" in parameters:
+        filtered["id"] = metadata["server_id"]
+
+    if not filtered and any(
+        param.kind == inspect.Parameter.VAR_KEYWORD for param in parameters.values()
+    ):
+        filtered = metadata
+
+    return class_(**filtered)

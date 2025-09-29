@@ -38,7 +38,10 @@ def test_notebook_record_model() -> None:
             "nbid": "12345",
             "name": "Fly Behavior Study",
             "owner": "samuel.brudner@yale.edu",
+            "owner_email": "samuel.brudner@yale.edu",
+            "owner_name": "Samuel Brudner",
             "created_at": "2025-01-01T12:00:00Z",
+            "modified_at": "2025-01-02T08:30:00Z",
         }
     )
 
@@ -46,6 +49,7 @@ def test_notebook_record_model() -> None:
     assert record.name == "Fly Behavior Study"
     assert record.owner == "samuel.brudner@yale.edu"
     assert record.created_at == "2025-01-01T12:00:00Z"
+    assert record.modified_at == "2025-01-02T08:30:00Z"
 
 
 def test_parse_xml_hydrates_records() -> None:
@@ -57,13 +61,19 @@ def test_parse_xml_hydrates_records() -> None:
         "    <nbid>123</nbid>"
         "    <name>Fly Behavior Study</name>"
         "    <owner>samuel.brudner@yale.edu</owner>"
+        "    <owner-email>samuel.brudner@yale.edu</owner-email>"
+        "    <owner-name>Samuel Brudner</owner-name>"
         "    <created-at>2025-01-01T12:00:00Z</created-at>"
+        "    <modified-at>2025-01-02T08:30:00Z</modified-at>"
         "  </notebook>"
         "  <notebook>"
         "    <nbid>456</nbid>"
         "    <name>Optogenetics</name>"
         "    <owner>pi@example.edu</owner>"
+        "    <owner-email>pi@example.edu</owner-email>"
+        "    <owner-name>Principal Investigator</owner-name>"
         "    <created-at>2025-02-02T08:30:00Z</created-at>"
+        "    <modified-at>2025-02-02T10:45:00Z</modified-at>"
         "  </notebook>"
         "</notebooks>"
     )
@@ -75,13 +85,19 @@ def test_parse_xml_hydrates_records() -> None:
             "nbid": "123",
             "name": "Fly Behavior Study",
             "owner": "samuel.brudner@yale.edu",
+            "owner_email": "samuel.brudner@yale.edu",
+            "owner_name": "Samuel Brudner",
             "created_at": "2025-01-01T12:00:00Z",
+            "modified_at": "2025-01-02T08:30:00Z",
         },
         {
             "nbid": "456",
             "name": "Optogenetics",
             "owner": "pi@example.edu",
+            "owner_email": "pi@example.edu",
+            "owner_name": "Principal Investigator",
             "created_at": "2025-02-02T08:30:00Z",
+            "modified_at": "2025-02-02T10:45:00Z",
         },
     ]
 
@@ -115,14 +131,16 @@ def test_list_notebooks_returns_notebook_records(monkeypatch: pytest.MonkeyPatch
                     request=request,
                 )
 
-            monkeypatch.setattr(async_client, "get", fake_get)
-
             def fake_parse_xml(payload: str) -> list[dict[str, Any]]:
                 return [
                     {
                         "nbid": "123",
+                        "name": "Fly Behavior Study",
                         "owner": "samuel.brudner@yale.edu",
+                        "owner_email": "samuel.brudner@yale.edu",
+                        "owner_name": "Samuel Brudner",
                         "created_at": "2025-01-01T12:00:00Z",
+                        "modified_at": "2025-01-02T08:30:00Z",
                     }
                 ]
 
@@ -135,6 +153,9 @@ def test_list_notebooks_returns_notebook_records(monkeypatch: pytest.MonkeyPatch
                     nbid="123",
                     name="Fly Behavior Study",
                     owner="samuel.brudner@yale.edu",
+                    owner_email="samuel.brudner@yale.edu",
+                    owner_name="Samuel Brudner",
                     created_at="2025-01-01T12:00:00Z",
+                    modified_at="2025-01-02T08:30:00Z",
                 )
             ]
