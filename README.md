@@ -75,6 +75,7 @@ Install git hooks and tooling:
 
 ```bash
 pre-commit install
+pre-commit install --hook-type commit-msg
 ```
 
 ### 3. Configure LabArchives Credentials
@@ -252,6 +253,77 @@ All field descriptions, examples, and validation rules are in the Pydantic model
 * No silent fallbacks—errors must propagate as structured MCP errors.
 * Enforce backoff and ≥1s delay between API requests.
 * Cache `epoch_time` and `api_base_urls` to reduce load.
+
+---
+
+## Versioning & Release Management
+
+This project follows [**Semantic Versioning**](https://semver.org/) with automated version bumping via [Commitizen](https://commitizen-tools.github.io/commitizen/).
+
+### Commit Message Format
+
+All commits **must** follow the [Conventional Commits](https://www.conventionalcommits.org/) specification. The pre-commit hook enforces this format:
+
+```
+<type>[optional scope]: <description>
+
+[optional body]
+
+[optional footer]
+```
+
+**Common types**:
+- `feat`: New feature (triggers MINOR version bump)
+- `fix`: Bug fix (triggers PATCH version bump)
+- `docs`: Documentation changes
+- `style`: Code style/formatting changes
+- `refactor`: Code refactoring without behavior change
+- `test`: Adding or updating tests
+- `chore`: Build process, tooling, dependencies
+- `ci`: CI/CD pipeline changes
+- `perf`: Performance improvements
+- `BREAKING CHANGE`: (footer or `!` after type) triggers MAJOR version bump
+
+**Examples**:
+```bash
+git commit -m "feat(auth): add OAuth token refresh"
+git commit -m "fix: handle expired UID gracefully"
+git commit -m "docs: update API usage examples"
+git commit -m "chore(deps): bump pydantic to 2.7.1"
+```
+
+### Version Bumping
+
+To create a new release:
+
+```bash
+# Automated version bump (examines commit history)
+conda run -p ./conda_envs/pol-dev cz bump              # Auto-detect: patch/minor/major
+conda run -p ./conda_envs/pol-dev cz bump --patch      # Force patch: 0.1.0 → 0.1.1
+conda run -p ./conda_envs/pol-dev cz bump --minor      # Force minor: 0.1.0 → 0.2.0
+conda run -p ./conda_envs/pol-dev cz bump --major      # Force major: 0.1.0 → 1.0.0
+```
+
+This will:
+1. Analyze commit messages since last tag
+2. Determine appropriate version increment
+3. Update version in `pyproject.toml`
+4. Generate/update `CHANGELOG.md`
+5. Create a git commit with the changes
+6. Create a git tag `v<version>`
+
+**Push the release**:
+```bash
+git push && git push --tags
+```
+
+### Version Configuration
+
+Version is managed in:
+- **Source of truth**: `pyproject.toml` (`version = "0.1.0"`)
+- **Commitizen config**: `[tool.commitizen]` section in `pyproject.toml`
+
+The configuration is set to automatically update `CHANGELOG.md` and use `v` prefix for git tags (e.g., `v0.1.0`).
 
 ---
 
