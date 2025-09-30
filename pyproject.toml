@@ -35,7 +35,9 @@ dependencies = [
   "langchain>=0.2",
   "openai>=1.40",
   "pandas>=2.2",
-  "pyarrow>=16.0"
+  "pyarrow>=16.0",
+  "beautifulsoup4>=4.12",
+  "click>=8.1"
 ]
 
 [project.scripts]
