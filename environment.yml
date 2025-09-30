@@ -29,3 +29,4 @@ dependencies:
       - notebook>=7.2
       - nbstripout>=0.6
       - nbdime>=4.0
+      - commitizen>=3.12

@@ -42,7 +42,8 @@ dev = [
   "isort>=5.13",
   "pre-commit>=3.7",
   "nbstripout>=0.6",
-  "nbdime>=4.0"
+  "nbdime>=4.0",
+  "commitizen>=3.12"
 ]
 
 [tool.setuptools]
@@ -87,3 +88,12 @@ markers = [
   "integration: marks tests that hit external services",
   "slow: marks tests that take longer than expected"
 ]
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+version = "0.1.0"
+version_files = [
+  "pyproject.toml:^version"
+]
+update_changelog_on_bump = true
+tag_format = "v$version"
