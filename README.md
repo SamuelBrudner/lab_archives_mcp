@@ -164,9 +164,57 @@ asyncio.run(test())
 
 ### 6. Run the MCP Server
 
+The server can be started in several ways:
+
 ```bash
+# Method 1: As a Python module
 conda run -p ./conda_envs/pol-dev python -m labarchives_mcp.mcp_server
+
+# Method 2: Using the console script (after pip install -e .[dev])
+conda run -p ./conda_envs/pol-dev labarchives-mcp
+
+# Method 3: Direct Python (if environment is activated)
+conda activate ./conda_envs/pol-dev
+labarchives-mcp
 ```
+
+The server runs in stdio mode and waits for MCP protocol messages. Press `Ctrl+C` to stop.
+
+---
+
+## Connecting to AI Agents
+
+The MCP server is designed to be used by AI agents like Claude Desktop. See **[Agent Configuration Guide](docs/agent_configuration.md)** for:
+
+- Claude Desktop configuration
+- Generic MCP client setup
+- Available resources and schemas
+- Troubleshooting connection issues
+
+**Quick Start for Claude Desktop**:
+
+1. Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "labarchives": {
+      "command": "conda",
+      "args": [
+        "run",
+        "-p",
+        "/absolute/path/to/lab_archives_mcp/conda_envs/pol-dev",
+        "python",
+        "-m",
+        "labarchives_mcp.mcp_server"
+      ]
+    }
+  }
+}
+```
+
+2. Restart Claude Desktop
+3. The `labarchives:notebooks` resource will be available to the agent
 
 ---
 
