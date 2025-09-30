@@ -312,6 +312,33 @@ list_notebook_pages(notebook_id, folder_id="67890")
 }
 ```
 
+**`upload_to_labarchives(...)`** ⭐ NEW
+```python
+# Upload a file with code provenance metadata
+# MANDATORY parameters:
+upload_to_labarchives(
+  notebook_id="MTU2MTI4NS43...",
+  page_title="Analysis - 2025-09-30",
+  file_path="/path/to/analysis.ipynb",
+  git_commit_sha="a1b2c3d4...",  # Full 40-char SHA
+  git_branch="main",
+  git_repo_url="https://github.com/user/repo",
+  python_version="3.11.8",
+  executed_at="2025-09-30T12:00:00Z",
+  dependencies={"numpy": "1.26.0", "pandas": "2.1.0"}
+)
+
+# Returns:
+{
+  "page_tree_id": "NEW_PAGE_ID",
+  "entry_id": "ATTACHMENT_ID",
+  "page_url": "https://mynotebook.labarchives.com/...",
+  "created_at": "2025-09-30T12:00:00Z",
+  "file_size_bytes": 12345,
+  "filename": "analysis.ipynb"
+}
+```
+
 #### Example Agent Workflow
 
 ```
