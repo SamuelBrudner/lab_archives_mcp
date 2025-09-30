@@ -50,75 +50,151 @@ The purpose is to verify end-to-end connectivity, authentication, and data retri
 
 ## Setup
 
-1. Clone this repo.
-2. Copy the secrets template and fill in LabArchives credentials:
+### 1. Clone and Install
+
+```bash
+git clone https://github.com/SamuelBrudner/lab_archives_mcp.git
+cd lab_archives_mcp
+```
+
+### 2. Create Environment
+
+Create the pinned Conda environment (local prefix):
+
+```bash
+conda-lock install --prefix ./conda_envs/pol-dev conda-lock.yml
+```
+
+Activate it:
+
+```bash
+conda activate ./conda_envs/pol-dev
+```
+
+Install git hooks and tooling:
+
+```bash
+pre-commit install
+```
+
+### 3. Configure LabArchives Credentials
+
+Copy the secrets template:
+
+```bash
+cp conf/secrets.example.yml conf/secrets.yml
+```
+
+Contact LabArchives support to request API access credentials. You'll need:
+- **Access Key ID** (`akid`)
+- **Access Password** (used for HMAC-SHA512 signature)
+- **API Region** (e.g., `https://api.labarchives.com`)
+
+Edit `conf/secrets.yml` and add your credentials:
+
+```yaml
+LABARCHIVES_AKID: 'your_access_key_id'
+LABARCHIVES_PASSWORD: 'your_api_password'
+LABARCHIVES_REGION: 'https://api.labarchives.com'
+```
+
+### 4. Obtain Your User ID (UID)
+
+The LabArchives API requires a user-specific ID (`uid`) for all operations. You have two options:
+
+#### Option A: Use Temporary Password Token (Recommended)
+
+1. Log into your LabArchives notebook in the web browser
+2. Navigate to **Account Settings** → **Password Token for External Applications**
+3. Click to generate a temporary token (valid for 1 hour)
+4. Copy the email and password token displayed
+5. Run the helper script:
 
    ```bash
-   cp conf/secrets.example.yml conf/secrets.yml
-   $EDITOR conf/secrets.yml
+   conda run -p ./conda_envs/pol-dev python scripts/resolve_uid.py redeem \
+       --email your.email@institution.edu \
+       --auth-code <paste_token_here>
    ```
 
-   Required keys:
+6. The script will print your UID. Copy it into `conf/secrets.yml`:
 
-   - `LABARCHIVES_AKID`
-   - `LABARCHIVES_PASSWORD`
-   - `LABARCHIVES_REGION` (e.g., `https://api.labarchives.com`)
+   ```yaml
+   LABARCHIVES_UID: 'your_uid_value'
+   ```
 
-   Optional helpers for non-interactive workflows:
+#### Option B: Browser-Based Login Flow
 
-   - `LABARCHIVES_UID`: reuse a known uid instead of re-authenticating.
-   - `LABARCHIVES_AUTH_EMAIL` + `LABARCHIVES_AUTH_CODE`: supply the email and temporary token returned from LabArchives so the PoL client can call `users:user_access_info` and resolve the uid automatically.
+If you prefer the browser flow (or temporary tokens aren't working):
 
-   If none of the optional values are provided, the MCP server will raise an error prompting you to obtain either a uid or temporary token. See **Authentication workflow** below for details.
-3. Create the pinned Conda environment (local prefix):
+1. Generate a login URL:
 
    ```bash
-   conda-lock install --prefix ./conda_envs/pol-dev conda-lock.yml
-   ```
-4. Activate the environment:
-
-   ```bash
-   conda activate ./conda_envs/pol-dev
-   ```
-5. Install git hooks and tooling:
-
-   ```bash
-   pre-commit install
+   conda run -p ./conda_envs/pol-dev python scripts/resolve_uid.py login-url
    ```
 
-   The configured hooks automatically strip notebook outputs (via `nbstripout`) and
-   format `.ipynb` diffs using `nbdime`, keeping commits reviewable even as notebooks evolve.
-6. Run the MCP server (stub implementation for now):
+2. Open the URL in your browser and complete the LabArchives sign-in
+3. After redirect, extract the `auth_code` from the URL
+4. Run the redeem command (same as Option A step 5)
 
-   python -m labarchives_mcp.mcp_server
-   ```
+**Note**: The UID is permanent for your account—once obtained, store it in `conf/secrets.yml` and you won't need to retrieve it again unless your LabArchives password changes.
+
+### 5. Verify Setup
+
+Test that everything works:
+
+```bash
+conda run -p ./conda_envs/pol-dev python -c "
+from labarchives_mcp.auth import Credentials
+from labarchives_mcp.eln_client import LabArchivesClient, AuthenticationManager
+import httpx, asyncio
+
+async def test():
+    creds = Credentials.from_file()
+    async with httpx.AsyncClient() as client:
+        auth = AuthenticationManager(client, creds)
+        uid = await auth.ensure_uid()
+        print(f'✓ UID verified: {uid}')
+        notebooks = await LabArchivesClient(client, auth).list_notebooks(uid)
+        print(f'✓ Retrieved {len(notebooks)} notebooks')
+
+asyncio.run(test())
+"
+```
+
+### 6. Run the MCP Server
+
+```bash
+conda run -p ./conda_envs/pol-dev python -m labarchives_mcp.mcp_server
+```
 
 ---
 
-## Authentication workflow
+## Troubleshooting
 
-- **Obtain a uid once**: follow the LabArchives `api_user_login` flow in a browser, then call `users:user_access_info` (or request a temporary token from LabArchives support). Record the uid in `conf/secrets.yml` as `LABARCHIVES_UID` for subsequent runs.
-- **Or use temporary tokens**: populate `LABARCHIVES_AUTH_EMAIL` and `LABARCHIVES_AUTH_CODE`. On start-up the PoL server exchanges the token via `users:user_access_info` and caches the resulting uid. Tokens are short-lived; replace them when LabArchives issues a new value.
-- **Signature details**: every API call includes an HMAC-SHA512 signature over `<akid> + <method> + <expires>` using millisecond precision and UTC. Clock drift should be mitigated by calling the LabArchives `epoch_time` utility before long sessions.
-- **Rate limiting**: respect LabArchives guidance—pause ≥1 s between calls and back off on errors (`tenacity` handles this when we wire up retry policies in future work).
+### "The supplied signature parameter was invalid" (Error 4520)
 
-### UID helper script
+This means the API signature computation failed. Common causes:
+- Wrong `LABARCHIVES_PASSWORD` in secrets file
+- Incorrect method name (should omit class prefix, e.g., `user_access_info` not `users:user_access_info`)
+- Clock skew between your machine and LabArchives servers
 
-- **Generate login URL**:
+### "404 Not Found" on API endpoints
 
-  ```bash
-  python scripts/resolve_uid.py login-url --redirect-uri https://127.0.0.1/callback
-  ```
+- Verify `LABARCHIVES_REGION` is correct for your institution
+- Confirm with LabArchives support that your access key has the required API methods enabled
+- Check that you're using `/api/` paths (not `/apiv1/` or `/api/v1/`)
 
-  Open the printed URL, complete the LabArchives sign-in, and copy the `auth_code` and `email` query parameters from the redirect target.
+### Cannot generate or redeem UID
 
-- **Redeem for uid**:
+- Ensure you have API access credentials from LabArchives support
+- Try the temporary password token method (Option A) first
+- If browser-based flow fails with 404, contact LabArchives to enable callback URLs for your key
 
-  ```bash
-  python scripts/resolve_uid.py redeem --email user@example.edu --auth-code <auth_code>
-  ```
+### MCP Server Won't Start
 
-  The script reads `conf/secrets.yml`, signs the `users:user_access_info` call, and prints the uid. Store that value in `conf/secrets.yml` as `LABARCHIVES_UID`.
+- Verify `LABARCHIVES_UID` is set in `conf/secrets.yml`
+- Run the verification script (step 5 of setup) to test credentials
+- Check logs in `logs/` directory for detailed error messages
 
 ---
 
@@ -151,9 +227,19 @@ The purpose is to verify end-to-end connectivity, authentication, and data retri
 
 ---
 
-## Next Steps
+## Implementation Status
 
-* Implement XML→JSON parser for notebook list.
-* Implement `list_notebooks` endpoint.
-* Verify round-trip with real LabArchives instance.
-* Add logging of requests/responses for debugging.
+✅ **Completed**
+- XML→JSON parser for notebook list
+- `list_notebooks` endpoint via `user_info_via_id`
+- Full authentication flow with UID resolution
+- Request signing (HMAC-SHA512)
+- Integration tests (7/7 passing)
+- Verified with live LabArchives API
+
+🚧 **Future Enhancements**
+- Additional read operations (entries, tree traversal, search)
+- Write operations (add/update entry, notebooks)
+- Binary streaming (attachments, thumbnails)
+- Rate limiting and retry policies
+- Comprehensive error handling for all API error codes
