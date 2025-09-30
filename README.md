@@ -184,16 +184,11 @@ The server runs in stdio mode and waits for MCP protocol messages. Press `Ctrl+C
 
 ## Connecting to AI Agents
 
-The MCP server is designed to be used by AI agents like Claude Desktop. See **[Agent Configuration Guide](docs/agent_configuration.md)** for:
+The MCP server exposes LabArchives notebooks to AI agents via the MCP protocol.
 
-- Claude Desktop configuration
-- Generic MCP client setup
-- Available resources and schemas
-- Troubleshooting connection issues
+### Windsurf (Codeium) - Verified Working ✅
 
-**Quick Start for Claude Desktop**:
-
-1. Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+**Config file**: `~/.codeium/windsurf/mcp_config.json`
 
 ```json
 {
@@ -202,20 +197,71 @@ The MCP server is designed to be used by AI agents like Claude Desktop. See **[A
       "command": "conda",
       "args": [
         "run",
+        "--no-capture-output",
         "-p",
         "/absolute/path/to/lab_archives_mcp/conda_envs/pol-dev",
         "python",
         "-m",
         "labarchives_mcp"
       ],
-      "cwd": "/absolute/path/to/lab_archives_mcp"
+      "env": {
+        "LABARCHIVES_CONFIG_PATH": "/absolute/path/to/lab_archives_mcp/conf/secrets.yml",
+        "FASTMCP_SHOW_CLI_BANNER": "false"
+      }
     }
   }
 }
 ```
 
-2. Restart Claude Desktop
-3. The `labarchives:notebooks` resource will be available to the agent
+**Steps**:
+1. Replace both `/absolute/path/to/lab_archives_mcp` with your actual repository path
+2. Save the config file
+3. **Completely restart Windsurf** (Cmd+Q, then reopen)
+4. Test by asking: "List my LabArchives notebooks"
+
+### Claude Desktop
+
+**Config file**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+
+```json
+{
+  "mcpServers": {
+    "labarchives": {
+      "command": "conda",
+      "args": [
+        "run",
+        "--no-capture-output",
+        "-p",
+        "/absolute/path/to/lab_archives_mcp/conda_envs/pol-dev",
+        "python",
+        "-m",
+        "labarchives_mcp"
+      ],
+      "env": {
+        "LABARCHIVES_CONFIG_PATH": "/absolute/path/to/lab_archives_mcp/conf/secrets.yml",
+        "FASTMCP_SHOW_CLI_BANNER": "false"
+      }
+    }
+  }
+}
+```
+
+**Steps**:
+1. Replace `/absolute/path/to/lab_archives_mcp` with your repository path
+2. Save and restart Claude Desktop
+3. The server provides:
+   - **Tool**: `list_labarchives_notebooks()` - List all notebooks
+   - **Resource**: `labarchives://notebooks` - Read notebooks resource
+
+### Available Capabilities
+
+- **`list_labarchives_notebooks()`** - Returns list of all notebooks with:
+  - `nbid`: Notebook ID (base64-encoded)
+  - `name`: Notebook name
+  - `owner`: Owner email
+  - `owner_name`: Owner full name
+  - `created_at`: Creation timestamp (ISO 8601)
+  - `modified_at`: Last modification timestamp (ISO 8601)
 
 ---
 

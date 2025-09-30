@@ -15,7 +15,7 @@ labarchives-mcp
 
 ## Agent Configuration
 
-### Windsurf (Codeium)
+### Windsurf (Codeium) - ✅ Verified Working
 
 **File**: `~/.codeium/windsurf/mcp_config.json`
 
@@ -26,19 +26,27 @@ labarchives-mcp
       "command": "conda",
       "args": [
         "run",
+        "--no-capture-output",
         "-p",
         "/Users/samuelbrudner/Yale University Dropbox/Samuel Brudner/lab_archives_mcp/conda_envs/pol-dev",
         "python",
         "-m",
         "labarchives_mcp"
       ],
-      "cwd": "/Users/samuelbrudner/Yale University Dropbox/Samuel Brudner/lab_archives_mcp"
+      "env": {
+        "LABARCHIVES_CONFIG_PATH": "/Users/samuelbrudner/Yale University Dropbox/Samuel Brudner/lab_archives_mcp/conf/secrets.yml",
+        "FASTMCP_SHOW_CLI_BANNER": "false"
+      }
     }
   }
 }
 ```
 
-**Important**: Update the path to match your system.
+**Setup Steps**:
+1. Update both paths to match your repository location
+2. Save the file
+3. **Completely restart Windsurf** (Cmd+Q → Reopen)
+4. Test: Ask "List my LabArchives notebooks"
 
 ### Claude Desktop
 
