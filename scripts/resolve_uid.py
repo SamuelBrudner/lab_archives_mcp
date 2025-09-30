@@ -49,8 +49,8 @@ class UIDResolver:
         expires = str(int(time.time() * 1000) + 120_000)
         sig = self._signature(method, expires)
         base = str(self._credentials.region).rstrip("/")
-        encoded_sig = urllib.parse.quote(sig, safe='')
-        encoded_redirect = urllib.parse.quote(redirect_uri, safe='')
+        encoded_sig = urllib.parse.quote(sig, safe="")
+        encoded_redirect = urllib.parse.quote(redirect_uri, safe="")
         return (
             f"{base}/apiv1/users/api_user_login?"
             f"akid={self._credentials.akid}&expires={expires}"
