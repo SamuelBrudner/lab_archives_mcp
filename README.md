@@ -277,7 +277,7 @@ The MCP server exposes LabArchives notebooks to AI agents via the MCP protocol.
 }]
 ```
 
-**`list_notebook_pages(notebook_id)`**
+**`list_notebook_pages(notebook_id, folder_id=None)`**
 ```python
 # Returns pages and folders:
 [{
@@ -289,8 +289,11 @@ The MCP server exposes LabArchives notebooks to AI agents via the MCP protocol.
   "tree_id": "67890",
   "title": "Methods",
   "is_page": false,
-  "is_folder": true     # Contains sub-pages
+  "is_folder": true     # Contains sub-pages - use tree_id as folder_id to navigate
 }]
+
+# Navigate into a folder by passing its tree_id as folder_id:
+list_notebook_pages(notebook_id, folder_id="67890")
 ```
 
 **`read_notebook_page(notebook_id, page_id)`**
@@ -318,11 +321,15 @@ Agent: calls list_labarchives_notebooks()
 
 User: "What's in my Mosquito Navigation notebook?"
 Agent: calls list_notebook_pages("MTU2MTI4NS43...")
-→ Shows: Introduction, Methods, Results, etc.
+→ Shows: Protocols (folder), Sample Log (folder), Experiment Data (folder), etc.
 
-User: "Show me the Introduction page"
+User: "What's in the Protocols folder?"
+Agent: calls list_notebook_pages("MTU2MTI4NS43...", folder_id="MS4z...")
+→ Shows: Pages and sub-folders inside Protocols
+
+User: "Show me the first page"
 Agent: calls read_notebook_page("MTU2MTI4NS43...", "12345")
-→ Returns: All text entries, headings, and attachment info
+→ Returns: All text entries, headings, and attachment info from that page
 ```
 
 ---

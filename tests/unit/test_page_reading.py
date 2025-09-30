@@ -43,18 +43,16 @@ class TestGetNotebookTree:
         """Given tree XML, when parsing, then returns structured nodes."""
         xml_response = """<?xml version="1.0"?>
         <tree-tools>
-            <node>
+            <level-node>
                 <tree-id>123</tree-id>
                 <display-text>Introduction</display-text>
                 <is-page>true</is-page>
-                <is-folder>false</is-folder>
-            </node>
-            <node>
+            </level-node>
+            <level-node>
                 <tree-id>456</tree-id>
                 <display-text>Methods</display-text>
                 <is-page>false</is-page>
-                <is-folder>true</is-folder>
-            </node>
+            </level-node>
         </tree-tools>
         """
 
@@ -93,6 +91,34 @@ class TestGetNotebookTree:
         assert call_args[1]["params"]["uid"] == "uid123"
         assert call_args[1]["params"]["nbid"] == "nbid456"
         assert call_args[1]["params"]["parent_tree_id"] == "5"
+
+    def test_navigates_into_folders(
+        self, lab_client: LabArchivesClient, mock_client: MagicMock
+    ) -> None:
+        """Given non-zero parent_tree_id, when calling API, then navigates into folder."""
+        mock_response = MagicMock()
+        mock_response.content = b"""<?xml version='1.0'?>
+        <tree-tools>
+            <level-node>
+                <tree-id>sub123</tree-id>
+                <display-text>Sub-page 1</display-text>
+                <is-page>true</is-page>
+            </level-node>
+        </tree-tools>
+        """
+        mock_response.raise_for_status = MagicMock()
+        mock_client.get.return_value = mock_response
+
+        # Simulate navigating into folder with parent_tree_id=100
+        result = asyncio.run(lab_client.get_notebook_tree("uid123", "nbid456", 100))
+
+        assert len(result) == 1
+        assert result[0]["display_text"] == "Sub-page 1"
+        assert result[0]["is_page"] is True
+
+        # Verify API was called with correct parent_tree_id
+        call_args = mock_client.get.call_args
+        assert call_args[1]["params"]["parent_tree_id"] == "100"
 
 
 class TestGetPageEntries:
