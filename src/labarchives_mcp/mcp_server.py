@@ -122,30 +122,53 @@ async def run_server() -> None:
             return [notebook.model_dump(by_alias=True) for notebook in notebooks]
 
         @server.tool()  # type: ignore[misc]
-        async def list_notebook_pages(notebook_id: str) -> list[dict[str, Any]]:
-            """List all pages in a LabArchives notebook.
+        async def list_notebook_pages(
+            notebook_id: str, folder_id: str | None = None
+        ) -> list[dict[str, Any]]:
+            """List all pages and folders in a LabArchives notebook.
 
-            Shows the notebook's table of contents - all pages and folders at the root level.
+            Shows the table of contents at the specified level. Pass folder_id to navigate
+            into folders and see their contents.
 
             Args:
                 notebook_id: The notebook ID (nbid) from list_labarchives_notebooks
+                folder_id: Optional tree_id of a folder to list its contents.
+                          If None, lists root level of notebook.
 
             Returns:
                 List of pages and folders, each with:
-                - tree_id: Unique identifier for the page/folder
+                - tree_id: Unique identifier (use this as folder_id to navigate deeper)
                 - title: Page or folder name
-                - is_page: True if this is a page (can contain entries)
-                - is_folder: True if this is a folder (contains sub-pages)
+                - is_page: True if this is a page (can be read with read_notebook_page)
+                - is_folder: True if this is a folder (can be navigated with folder_id)
             """
-            logger.info(f"list_notebook_pages called with notebook_id={notebook_id}")
+            logger.info(
+                f"list_notebook_pages called with notebook_id={notebook_id}, "
+                f"folder_id={folder_id}"
+            )
 
             try:
                 uid = await auth_manager.ensure_uid()
                 logger.debug(f"Obtained UID: {uid[:20]}...")
 
-                logger.debug(f"Fetching tree for notebook {notebook_id}, parent_tree_id=0")
+                # Decode folder_id to get integer parent_tree_id
+                if folder_id:
+                    import base64
+
+                    decoded = base64.b64decode(folder_id).decode()
+                    # Format is like: "1.3|1200989/1/TreeNode/4081949640|3.3"
+                    # Extract the TreeNode ID (the number after TreeNode/)
+                    parts = decoded.split("/")
+                    parent_tree_id = int(parts[-2])  # Get TreeNode ID
+                    logger.debug(f"Decoded folder_id to parent_tree_id={parent_tree_id}")
+                else:
+                    parent_tree_id = 0
+
+                logger.debug(
+                    f"Fetching tree for notebook {notebook_id}, parent_tree_id={parent_tree_id}"
+                )
                 tree_nodes = await notebook_client.get_notebook_tree(
-                    uid, notebook_id, parent_tree_id=0
+                    uid, notebook_id, parent_tree_id=parent_tree_id
                 )
                 logger.info(f"Retrieved {len(tree_nodes)} nodes from notebook tree")
 
