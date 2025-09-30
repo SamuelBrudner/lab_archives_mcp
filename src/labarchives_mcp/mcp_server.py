@@ -99,10 +99,7 @@ async def run_server() -> None:
                 "list": [notebook.model_dump(by_alias=True) for notebook in notebooks],
             }
 
-        if hasattr(server, "serve"):
-            await server.serve()
-        else:
-            raise NotImplementedError("FastMCP serve loop not implemented in PoL stub.")
+        await server.run_async()
 
 
 def run(main: Callable[[], Coroutine[Any, Any, None]] | None = None) -> None:
