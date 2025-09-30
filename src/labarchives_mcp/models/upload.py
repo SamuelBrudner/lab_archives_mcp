@@ -57,7 +57,7 @@ class ProvenanceMetadata(BaseModel):
 **Execution Context**
 - Executed: {self.executed_at.strftime('%Y-%m-%d %H:%M:%S UTC')}
 - Python: {self.python_version}
-- Key Packages: {deps_str if deps_str else 'None'}
+- Key Packages: {deps_str or 'None'}
 
 **System**
 - OS: {self.os_name}
@@ -102,7 +102,7 @@ class UploadRequest(BaseModel):
             raise FileNotFoundError(f"File not found: {v}")
         if not v.is_file():
             raise ValueError(f"Path is not a file: {v}")
-        if not v.stat().st_size > 0:
+        if v.stat().st_size <= 0:
             raise ValueError(f"File is empty: {v}")
         return v
 
