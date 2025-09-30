@@ -84,7 +84,8 @@ async def run_server() -> None:
             description="Proof-of-life MCP server exposing LabArchives notebooks.",
         )
 
-        resource_decorator = cast(ResourceDecorator, server.resource("labarchives:notebooks"))
+        # Define resource
+        resource_decorator = cast(ResourceDecorator, server.resource("labarchives://notebooks"))
 
         @resource_decorator
         async def list_notebooks_resource() -> dict[str, Any]:
@@ -94,14 +95,31 @@ async def run_server() -> None:
             except LabArchivesAPIError as error:
                 translated = translate_labarchives_fault(error)
                 return {
-                    "resource": "labarchives:notebooks",
+                    "resource": "labarchives://notebooks",
                     "error": translated,
                 }
 
             return {
-                "resource": "labarchives:notebooks",
+                "resource": "labarchives://notebooks",
                 "list": [notebook.model_dump(by_alias=True) for notebook in notebooks],
             }
+
+        # Also expose as a tool for better discovery
+        @server.tool()  # type: ignore[misc]
+        async def list_labarchives_notebooks() -> list[dict[str, Any]]:
+            """List all LabArchives notebooks for the authenticated user.
+
+            Returns a list of notebooks with metadata including:
+            - nbid: Notebook ID
+            - name: Notebook name
+            - owner: Owner email
+            - owner_name: Owner full name
+            - created_at: Creation timestamp (ISO 8601)
+            - modified_at: Last modification timestamp (ISO 8601)
+            """
+            uid = await auth_manager.ensure_uid()
+            notebooks = await notebook_client.list_notebooks(uid)
+            return [notebook.model_dump(by_alias=True) for notebook in notebooks]
 
         await server.run_async()
 
