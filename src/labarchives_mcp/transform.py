@@ -44,9 +44,7 @@ class NotebookTransformer:
 
         # LabArchives responses may wrap notebooks under <response>, <users>,
         # or top-level <notebooks>
-        if root.tag == "response":
-            notebooks_parent = root.find("notebooks")
-        elif root.tag == "users":
+        if root.tag in ["response", "users"]:
             notebooks_parent = root.find("notebooks")
         else:
             notebooks_parent = root
@@ -64,20 +62,18 @@ class NotebookTransformer:
 
             # Required fields
             for tag, field_name in NotebookTransformer.REQUIRED_FIELDS.items():
-                value = NotebookTransformer._text_or_empty(notebook_node, tag)
-                if not value:
-                    raise ValueError(f"Notebook record missing `{tag}` field")
-                record[field_name] = value
+                if value := NotebookTransformer._text_or_empty(notebook_node, tag):
+                    record[field_name] = value
 
+                else:
+                    raise ValueError(f"Notebook record missing `{tag}` field")
             # Optional fields with fallbacks
             for tag, field_name in NotebookTransformer.OPTIONAL_FIELDS.items():
                 value = NotebookTransformer._text_or_empty(notebook_node, tag)
 
                 # Provide sensible defaults for missing owner/timestamp fields
                 if not value:
-                    if field_name == "owner":
-                        value = owner_email
-                    elif field_name == "owner_email":
+                    if field_name in ["owner", "owner_email"]:
                         value = owner_email
                     elif field_name == "owner_name":
                         value = owner_name
