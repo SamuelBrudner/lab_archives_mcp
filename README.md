@@ -297,8 +297,11 @@ git commit -m "chore(deps): bump pydantic to 2.7.1"
 To create a new release:
 
 ```bash
+# Dry run (preview changes without committing)
+conda run -p ./conda_envs/pol-dev cz bump --dry-run --yes
+
 # Automated version bump (examines commit history)
-conda run -p ./conda_envs/pol-dev cz bump              # Auto-detect: patch/minor/major
+conda run -p ./conda_envs/pol-dev cz bump --yes        # Auto-detect: patch/minor/major
 conda run -p ./conda_envs/pol-dev cz bump --patch      # Force patch: 0.1.0 → 0.1.1
 conda run -p ./conda_envs/pol-dev cz bump --minor      # Force minor: 0.1.0 → 0.2.0
 conda run -p ./conda_envs/pol-dev cz bump --major      # Force major: 0.1.0 → 1.0.0
