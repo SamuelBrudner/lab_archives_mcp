@@ -55,8 +55,15 @@ class Credentials(BaseModel):
     @classmethod
     def from_file(cls, path: Path | str | None = None) -> Credentials:
         """Create credentials from a YAML secrets file located under ``conf/`` by default."""
+        import os
 
-        location = Path(path) if path is not None else Path("conf/secrets.yml")
+        # Check environment variable first, then parameter, then default
+        env_path = os.environ.get("LABARCHIVES_CONFIG_PATH")
+        location = (
+            Path(env_path)
+            if env_path
+            else (Path(path) if path is not None else Path("conf/secrets.yml"))
+        )
         if not location.exists():
             raise FileNotFoundError(f"Secrets file not found: {location}")
 

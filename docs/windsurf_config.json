@@ -10,7 +10,9 @@
         "-m",
         "labarchives_mcp"
       ],
-      "cwd": "/Users/samuelbrudner/Yale University Dropbox/Samuel Brudner/lab_archives_mcp"
+      "env": {
+        "LABARCHIVES_CONFIG_PATH": "/Users/samuelbrudner/Yale University Dropbox/Samuel Brudner/lab_archives_mcp/conf/secrets.yml"
+      }
     }
   }
 }
