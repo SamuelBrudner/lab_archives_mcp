@@ -98,9 +98,10 @@ class NotebookIndexer:
                 indexable_entries.append((indexable_entry, entry_dict))
             else:
                 skipped_count += 1
-                logger.debug(
-                    f"Skipped entry {entry_dict.get('eid')} "
-                    f"(type: {entry_dict.get('part_type')})"
+                entry_type = entry_dict.get("part_type", "unknown")
+                logger.info(
+                    f"  Skipped entry {entry_dict.get('eid', 'unknown')[:20]} "
+                    f"(type: {entry_type})"
                 )
 
         # If no indexable content, return early

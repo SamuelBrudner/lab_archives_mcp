@@ -73,8 +73,10 @@ def should_index_entry(entry_type: str) -> bool:
     Returns:
         True if entry should be indexed, False otherwise
     """
+    # Normalize: API returns "text entry" with space, but we use underscore internally
+    normalized_type = entry_type.lower().replace(" ", "_")
     indexable_types = {"text_entry", "heading", "plain_text"}
-    return entry_type in indexable_types
+    return normalized_type in indexable_types
 
 
 def extract_text_from_entry(entry_data: dict) -> IndexableEntry | None:
