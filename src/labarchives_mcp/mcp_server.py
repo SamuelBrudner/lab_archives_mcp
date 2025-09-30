@@ -70,7 +70,7 @@ async def run_server() -> None:
 
     async with httpx.AsyncClient(base_url=str(credentials.region)) as http_client:
         auth_manager = AuthenticationManager(http_client, credentials)
-        notebook_client = LabArchivesClient(http_client)
+        notebook_client = LabArchivesClient(http_client, auth_manager)
 
         server = _instantiate_fastmcp(
             fastmcp_class,

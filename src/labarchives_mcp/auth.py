@@ -8,9 +8,9 @@ import hmac
 import time
 from pathlib import Path
 from typing import Any, cast
-from urllib.parse import quote
 
 import httpx
+from lxml import etree
 from omegaconf import OmegaConf
 from pydantic import BaseModel, HttpUrl
 
@@ -69,7 +69,7 @@ class Credentials(BaseModel):
 class AuthenticationManager:
     """Coordinate authentication flows against the LabArchives API."""
 
-    USER_ACCESS_METHOD = "users:user_access_info"
+    USER_ACCESS_METHOD = "user_access_info"
 
     def __init__(self, client: httpx.AsyncClient, credentials: Credentials) -> None:
         self._client = client
@@ -91,35 +91,57 @@ class AuthenticationManager:
         )
 
     def clear_uid(self) -> None:
-        """Forget cached uid, forcing the next call to re-authenticate."""
         self._uid = None
-
-    @property
-    def _api_base(self) -> str:
-        return f"{str(self._credentials.region).rstrip('/')}/apiv1"
 
     async def _fetch_uid_via_user_access_info(self) -> str:
         params = self._build_auth_params(self.USER_ACCESS_METHOD)
-        params.update(
-            {
-                "email": cast(str, self._credentials.auth_email),
-                "password": cast(str, self._credentials.auth_code),
-            }
-        )
+        payload = {
+            "login_or_email": cast(str, self._credentials.auth_email),
+            "password": cast(str, self._credentials.auth_code),
+        }
 
-        url = f"{self._api_base}/users/user_access_info"
-        response = await self._client.get(url, params=params)
-        try:
-            response.raise_for_status()
-        except httpx.HTTPStatusError as exc:  # pragma: no cover - exercised in tests
-            raise RuntimeError("LabArchives user_access_info failed") from exc
+        root = str(self._credentials.region).rstrip("/")
+        attempts: list[tuple[str, str, dict[str, str], dict[str, str] | None]] = [
+            ("GET", f"{root}/api/users/user_access_info", params | payload, None),
+        ]
 
-        payload = self._parse_response_json(response)
-        uid = payload.get("uid")
-        if not uid:
+        last_not_found: tuple[str, str, str] | None = None
+        response: httpx.Response | None = None
+        for method, url, query, form_data in attempts:
+            request_kwargs: dict[str, Any] = {"params": query}
+            if form_data is not None:
+                request_kwargs["data"] = form_data
+
+            response = await self._client.request(method, url, **request_kwargs)
+            if response.status_code == httpx.codes.NOT_FOUND:
+                last_not_found = (method, url, response.text)
+                continue
+
+            try:
+                response.raise_for_status()
+            except httpx.HTTPStatusError as exc:  # pragma: no cover - exercised in tests
+                raise RuntimeError(
+                    "LabArchives user_access_info failed "
+                    f"({method} {url} -> {response.status_code}): {response.text}"
+                ) from exc
+
+            break
+        else:
+            detail = (
+                f"last attempt {last_not_found[0]} {last_not_found[1]} responded 404:"
+                f" {last_not_found[2]}"
+                if last_not_found
+                else "no HTTP response recorded"
+            )
+            raise RuntimeError(
+                "LabArchives user_access_info returned 404 for all endpoint variants. " f"{detail}"
+            )
+
+        body = self._parse_response_json(response)
+        if uid := body.get("uid"):
+            return str(uid)
+        else:
             raise RuntimeError("LabArchives user_access_info failed: missing uid")
-
-        return str(uid)
 
     def _build_auth_params(self, method: str) -> dict[str, str]:
         expires = str(int(time.time() * 1000) + 120_000)
@@ -129,7 +151,7 @@ class AuthenticationManager:
             message,
             hashlib.sha512,
         ).digest()
-        signature = quote(base64.b64encode(digest).decode("ascii"), safe="")
+        signature = base64.b64encode(digest).decode("ascii")
 
         return {
             "akid": self._credentials.akid,
@@ -139,7 +161,12 @@ class AuthenticationManager:
 
     @staticmethod
     def _parse_response_json(response: httpx.Response) -> dict[str, Any]:
-        payload = response.json()
-        if not isinstance(payload, dict):
-            raise RuntimeError("LabArchives returned malformed JSON payload")
-        return payload
+        """Parse XML response from user_access_info and extract user ID."""
+        try:
+            root = etree.fromstring(response.content)
+            uid_elem = root.find(".//id")
+            if uid_elem is not None and uid_elem.text:
+                return {"uid": uid_elem.text}
+            raise RuntimeError("LabArchives response missing <id> element")
+        except etree.XMLSyntaxError as exc:
+            raise RuntimeError(f"Invalid XML response: {response.text[:200]}") from exc

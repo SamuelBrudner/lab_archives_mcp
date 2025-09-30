@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any
+from typing import cast
 
 import httpx
 import pytest
+from pydantic import HttpUrl
 
+from labarchives_mcp.auth import AuthenticationManager, Credentials
 from labarchives_mcp.eln_client import LabArchivesClient, NotebookRecord
 
 
@@ -16,8 +18,14 @@ def test_list_notebooks_handles_http_errors(monkeypatch: pytest.MonkeyPatch) -> 
     called, then an `HTTPStatusError` is raised."""
 
     async def scenario() -> None:
+        credentials = Credentials(
+            akid="test",
+            password="test",
+            region=cast(HttpUrl, "https://example.com"),
+        )
         async with httpx.AsyncClient(base_url="https://example.com") as async_client:
-            client = LabArchivesClient(async_client)
+            auth_manager = AuthenticationManager(async_client, credentials)
+            client = LabArchivesClient(async_client, auth_manager)
 
             async def fake_get(url: str, params: dict[str, str]) -> httpx.Response:
                 return httpx.Response(404, request=httpx.Request("GET", url, params=params))
@@ -53,29 +61,31 @@ def test_notebook_record_model() -> None:
 
 
 def test_parse_xml_hydrates_records() -> None:
-    """Given LabArchives notebook XML, when `parse_xml()` runs, then it
-    yields normalized dictionaries."""
+    """Given LabArchives notebook XML from user_info_via_id, when `parse_xml()` runs,
+    then it yields normalized dictionaries."""
     xml_payload = (
-        "<notebooks>"
-        "  <notebook>"
-        "    <nbid>123</nbid>"
-        "    <name>Fly Behavior Study</name>"
-        "    <owner>samuel.brudner@yale.edu</owner>"
-        "    <owner-email>samuel.brudner@yale.edu</owner-email>"
-        "    <owner-name>Samuel Brudner</owner-name>"
-        "    <created-at>2025-01-01T12:00:00Z</created-at>"
-        "    <modified-at>2025-01-02T08:30:00Z</modified-at>"
-        "  </notebook>"
-        "  <notebook>"
-        "    <nbid>456</nbid>"
-        "    <name>Optogenetics</name>"
-        "    <owner>pi@example.edu</owner>"
-        "    <owner-email>pi@example.edu</owner-email>"
-        "    <owner-name>Principal Investigator</owner-name>"
-        "    <created-at>2025-02-02T08:30:00Z</created-at>"
-        "    <modified-at>2025-02-02T10:45:00Z</modified-at>"
-        "  </notebook>"
-        "</notebooks>"
+        "<users>"
+        "  <email>samuel.brudner@yale.edu</email>"
+        "  <fullname>Samuel Brudner</fullname>"
+        "  <notebooks>"
+        "    <notebook>"
+        "      <id>123</id>"
+        "      <name>Fly Behavior Study</name>"
+        "      <owner-email>samuel.brudner@yale.edu</owner-email>"
+        "      <owner-name>Samuel Brudner</owner-name>"
+        "      <created-at>2025-01-01T12:00:00Z</created-at>"
+        "      <modified-at>2025-01-02T08:30:00Z</modified-at>"
+        "    </notebook>"
+        "    <notebook>"
+        "      <id>456</id>"
+        "      <name>Optogenetics</name>"
+        "      <owner-email>pi@example.edu</owner-email>"
+        "      <owner-name>Principal Investigator</owner-name>"
+        "      <created-at>2025-02-02T08:30:00Z</created-at>"
+        "      <modified-at>2025-02-02T10:45:00Z</modified-at>"
+        "    </notebook>"
+        "  </notebooks>"
+        "</users>"
     )
 
     records = LabArchivesClient.parse_xml(xml_payload)
@@ -93,7 +103,7 @@ def test_parse_xml_hydrates_records() -> None:
         {
             "nbid": "456",
             "name": "Optogenetics",
-            "owner": "pi@example.edu",
+            "owner": "samuel.brudner@yale.edu",  # Falls back to root user email
             "owner_email": "pi@example.edu",
             "owner_name": "Principal Investigator",
             "created_at": "2025-02-02T08:30:00Z",
@@ -107,21 +117,29 @@ def test_list_notebooks_returns_notebook_records(monkeypatch: pytest.MonkeyPatch
     then it returns validated notebook records."""
 
     async def scenario() -> None:
+        credentials = Credentials(
+            akid="test",
+            password="test",
+            region=cast(HttpUrl, "https://example.com"),
+        )
         async with httpx.AsyncClient(base_url="https://example.com") as async_client:
-            client = LabArchivesClient(async_client)
+            auth_manager = AuthenticationManager(async_client, credentials)
+            client = LabArchivesClient(async_client, auth_manager)
 
             async def fake_get(url: str, params: dict[str, str]) -> httpx.Response:
-                assert url.endswith("/apiv1/notebooks/list")
+                assert url.endswith("/api/users/user_info_via_id")
                 assert params["uid"] == "example-uid"
                 payload = (
-                    "<notebooks>"
-                    "  <notebook>"
-                    "    <nbid>123</nbid>"
-                    "    <name>Fly Behavior Study</name>"
-                    "    <owner>samuel.brudner@yale.edu</owner>"
-                    "    <created-at>2025-01-01T12:00:00Z</created-at>"
-                    "  </notebook>"
-                    "</notebooks>"
+                    "<users>"
+                    "  <email>samuel.brudner@yale.edu</email>"
+                    "  <fullname>Samuel Brudner</fullname>"
+                    "  <notebooks>"
+                    "    <notebook>"
+                    "      <id>123</id>"
+                    "      <name>Fly Behavior Study</name>"
+                    "    </notebook>"
+                    "  </notebooks>"
+                    "</users>"
                 )
                 request = httpx.Request("GET", url, params=params)
                 return httpx.Response(
@@ -131,20 +149,7 @@ def test_list_notebooks_returns_notebook_records(monkeypatch: pytest.MonkeyPatch
                     request=request,
                 )
 
-            def fake_parse_xml(payload: str) -> list[dict[str, Any]]:
-                return [
-                    {
-                        "nbid": "123",
-                        "name": "Fly Behavior Study",
-                        "owner": "samuel.brudner@yale.edu",
-                        "owner_email": "samuel.brudner@yale.edu",
-                        "owner_name": "Samuel Brudner",
-                        "created_at": "2025-01-01T12:00:00Z",
-                        "modified_at": "2025-01-02T08:30:00Z",
-                    }
-                ]
-
-            monkeypatch.setattr(LabArchivesClient, "parse_xml", staticmethod(fake_parse_xml))
+            monkeypatch.setattr(async_client, "get", fake_get)
 
             notebooks = await client.list_notebooks("example-uid")
 

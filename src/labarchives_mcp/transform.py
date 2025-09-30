@@ -21,8 +21,11 @@ class NotebookTransformer:
     """Translate LabArchives notebook XML payloads into normalized JSON records."""
 
     REQUIRED_FIELDS: dict[str, str] = {
-        "nbid": "nbid",
+        "id": "nbid",  # user_info_via_id returns <id>, not <nbid>
         "name": "name",
+    }
+
+    OPTIONAL_FIELDS: dict[str, str] = {
         "owner": "owner",
         "owner-email": "owner_email",
         "owner-name": "owner_name",
@@ -39,21 +42,49 @@ class NotebookTransformer:
         except etree.XMLSyntaxError as exc:  # pragma: no cover - defensive guard
             raise ValueError("Invalid LabArchives notebook XML payload") from exc
 
-        # LabArchives responses may wrap notebooks under <response> or top-level <notebooks>
-        notebooks_parent = root.find("notebooks") if root.tag == "response" else root
+        # LabArchives responses may wrap notebooks under <response>, <users>,
+        # or top-level <notebooks>
+        if root.tag == "response":
+            notebooks_parent = root.find("notebooks")
+        elif root.tag == "users":
+            notebooks_parent = root.find("notebooks")
+        else:
+            notebooks_parent = root
+
         if notebooks_parent is None:
             return []
+
+        # Extract user info for fallback owner data
+        owner_email = NotebookTransformer._text_or_empty(root, "email")
+        owner_name = NotebookTransformer._text_or_empty(root, "fullname")
 
         records: list[dict[str, Any]] = []
         for notebook_node in notebooks_parent.findall("notebook"):
             record: dict[str, Any] = {}
 
+            # Required fields
             for tag, field_name in NotebookTransformer.REQUIRED_FIELDS.items():
                 value = NotebookTransformer._text_or_empty(notebook_node, tag)
                 if not value:
                     raise ValueError(f"Notebook record missing `{tag}` field")
+                record[field_name] = value
 
-                if tag in {"created-at", "modified-at"}:
+            # Optional fields with fallbacks
+            for tag, field_name in NotebookTransformer.OPTIONAL_FIELDS.items():
+                value = NotebookTransformer._text_or_empty(notebook_node, tag)
+
+                # Provide sensible defaults for missing owner/timestamp fields
+                if not value:
+                    if field_name == "owner":
+                        value = owner_email
+                    elif field_name == "owner_email":
+                        value = owner_email
+                    elif field_name == "owner_name":
+                        value = owner_name
+                    elif field_name in {"created_at", "modified_at"}:
+                        value = "1970-01-01T00:00:00Z"
+
+                if tag in {"created-at", "modified-at"} and value != "1970-01-01T00:00:00Z":
                     value = NotebookTransformer._normalize_timestamp(value, tag)
 
                 record[field_name] = value

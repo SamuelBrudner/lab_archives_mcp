@@ -102,6 +102,24 @@ The purpose is to verify end-to-end connectivity, authentication, and data retri
 - **Signature details**: every API call includes an HMAC-SHA512 signature over `<akid> + <method> + <expires>` using millisecond precision and UTC. Clock drift should be mitigated by calling the LabArchives `epoch_time` utility before long sessions.
 - **Rate limiting**: respect LabArchives guidance—pause ≥1 s between calls and back off on errors (`tenacity` handles this when we wire up retry policies in future work).
 
+### UID helper script
+
+- **Generate login URL**:
+
+  ```bash
+  python scripts/resolve_uid.py login-url --redirect-uri https://127.0.0.1/callback
+  ```
+
+  Open the printed URL, complete the LabArchives sign-in, and copy the `auth_code` and `email` query parameters from the redirect target.
+
+- **Redeem for uid**:
+
+  ```bash
+  python scripts/resolve_uid.py redeem --email user@example.edu --auth-code <auth_code>
+  ```
+
+  The script reads `conf/secrets.yml`, signs the `users:user_access_info` call, and prints the uid. Store that value in `conf/secrets.yml` as `LABARCHIVES_UID`.
+
 ---
 
 ## Usage (Example)
