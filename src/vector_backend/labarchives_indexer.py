@@ -102,8 +102,11 @@ def extract_text_from_entry(entry_data: dict) -> IndexableEntry | None:
     if not should_index_entry(part_type):
         return None
 
+    # Normalize entry type (API returns "text entry" with space)
+    normalized_type = part_type.lower().replace(" ", "_")
+
     # Clean HTML if present
-    if part_type == "text_entry":
+    if normalized_type == "text_entry":
         text = clean_html(content)
     else:
         # Plain text or heading
@@ -113,9 +116,9 @@ def extract_text_from_entry(entry_data: dict) -> IndexableEntry | None:
     if not text:
         return None
 
-    # Map to EntryType enum
+    # Map to EntryType enum (using normalized type)
     try:
-        entry_type = EntryType(part_type)
+        entry_type = EntryType(normalized_type)
     except ValueError:
         # Unknown indexable type, default to text_entry
         entry_type = EntryType.TEXT_ENTRY
