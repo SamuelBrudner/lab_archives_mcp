@@ -90,18 +90,24 @@ class LabArchivesClient:
         self, uid: str, nbid: str, parent_tree_id: int = 0
     ) -> list[dict[str, Any]]:
         """Get one level of the notebook tree structure."""
+        logger.debug(f"get_notebook_tree: nbid={nbid}, parent_tree_id={parent_tree_id}")
+
         auth_params = self._auth_manager._build_auth_params("get_tree_level")
         params = {"uid": uid, "nbid": nbid, "parent_tree_id": str(parent_tree_id), **auth_params}
 
-        response = await self._client.get(
-            "https://api.labarchives.com/api/tree_tools/get_tree_level",
-            params=params,
-        )
+        url = "https://api.labarchives.com/api/tree_tools/get_tree_level"
+        logger.debug(f"Making API request to {url}")
+
+        response = await self._client.get(url, params=params)
+        logger.debug(f"API response status: {response.status_code}")
         response.raise_for_status()
 
         from lxml import etree
 
         root = etree.fromstring(response.content)
+        nodes = root.findall(".//node")
+        logger.debug(f"Parsed {len(nodes)} nodes from XML response")
+
         return [
             {
                 "tree_id": node.findtext("tree-id"),
@@ -109,13 +115,18 @@ class LabArchivesClient:
                 "is_page": node.findtext("is-page") == "true",
                 "is_folder": node.findtext("is-folder") == "true",
             }
-            for node in root.findall(".//node")
+            for node in nodes
         ]
 
     async def get_page_entries(
         self, uid: str, nbid: str, page_tree_id: int, include_data: bool = True
     ) -> list[dict[str, Any]]:
         """Get all entries for a specific page with their content."""
+        logger.debug(
+            f"get_page_entries: nbid={nbid}, page_tree_id={page_tree_id}, "
+            f"include_data={include_data}"
+        )
+
         auth_params = self._auth_manager._build_auth_params("get_entries_for_page")
         params = {
             "uid": uid,
@@ -125,17 +136,21 @@ class LabArchivesClient:
             **auth_params,
         }
 
-        response = await self._client.get(
-            "https://api.labarchives.com/api/tree_tools/get_entries_for_page",
-            params=params,
-        )
+        url = "https://api.labarchives.com/api/tree_tools/get_entries_for_page"
+        logger.debug(f"Making API request to {url}")
+
+        response = await self._client.get(url, params=params)
+        logger.debug(f"API response status: {response.status_code}")
         response.raise_for_status()
 
         from lxml import etree
 
         root = etree.fromstring(response.content)
+        entry_elements = root.findall(".//entry")
+        logger.debug(f"Parsed {len(entry_elements)} entries from XML response")
+
         entries = []
-        for entry in root.findall(".//entry"):
+        for entry in entry_elements:
             entry_dict = {
                 "eid": entry.findtext("eid"),
                 "part_type": entry.findtext("part-type"),
@@ -147,4 +162,5 @@ class LabArchivesClient:
                 if entry_data is not None and entry_data.text:
                     entry_dict["content"] = entry_data.text
             entries.append(entry_dict)
+
         return entries

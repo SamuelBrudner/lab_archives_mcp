@@ -137,18 +137,33 @@ async def run_server() -> None:
                 - is_page: True if this is a page (can contain entries)
                 - is_folder: True if this is a folder (contains sub-pages)
             """
-            uid = await auth_manager.ensure_uid()
-            tree_nodes = await notebook_client.get_notebook_tree(uid, notebook_id, parent_tree_id=0)
+            logger.info(f"list_notebook_pages called with notebook_id={notebook_id}")
 
-            return [
-                {
-                    "tree_id": node["tree_id"],
-                    "title": node["display_text"],
-                    "is_page": node["is_page"],
-                    "is_folder": node["is_folder"],
-                }
-                for node in tree_nodes
-            ]
+            try:
+                uid = await auth_manager.ensure_uid()
+                logger.debug(f"Obtained UID: {uid[:20]}...")
+
+                logger.debug(f"Fetching tree for notebook {notebook_id}, parent_tree_id=0")
+                tree_nodes = await notebook_client.get_notebook_tree(
+                    uid, notebook_id, parent_tree_id=0
+                )
+                logger.info(f"Retrieved {len(tree_nodes)} nodes from notebook tree")
+
+                result = [
+                    {
+                        "tree_id": node["tree_id"],
+                        "title": node["display_text"],
+                        "is_page": node["is_page"],
+                        "is_folder": node["is_folder"],
+                    }
+                    for node in tree_nodes
+                ]
+                logger.success(f"Successfully listed {len(result)} pages/folders")
+                return result
+
+            except Exception as exc:
+                logger.error(f"Failed to list notebook pages: {exc}", exc_info=True)
+                raise
 
         @server.tool()  # type: ignore[misc]
         async def read_notebook_page(notebook_id: str, page_id: str) -> dict[str, Any]:
@@ -172,12 +187,36 @@ async def run_server() -> None:
                   - created_at: Creation timestamp
                   - updated_at: Last modification timestamp
             """
-            uid = await auth_manager.ensure_uid()
-            entries = await notebook_client.get_page_entries(
-                uid, notebook_id, int(page_id), include_data=True
+            logger.info(
+                f"read_notebook_page called with notebook_id={notebook_id}, page_id={page_id}"
             )
 
-            return {"notebook_id": notebook_id, "page_id": page_id, "entries": entries}
+            try:
+                uid = await auth_manager.ensure_uid()
+                logger.debug(f"Obtained UID: {uid[:20]}...")
+
+                page_id_int = int(page_id)
+                logger.debug(f"Fetching entries for page {page_id_int} in notebook {notebook_id}")
+
+                entries = await notebook_client.get_page_entries(
+                    uid, notebook_id, page_id_int, include_data=True
+                )
+                logger.info(f"Retrieved {len(entries)} entries from page")
+
+                for i, entry in enumerate(entries[:3]):  # Log first 3 entries
+                    logger.debug(
+                        f"Entry {i}: type={entry.get('part_type')}, "
+                        f"eid={entry.get('eid')}, "
+                        f"has_content={bool(entry.get('content'))}"
+                    )
+
+                result = {"notebook_id": notebook_id, "page_id": page_id, "entries": entries}
+                logger.success(f"Successfully read page with {len(entries)} entries")
+                return result
+
+            except Exception as exc:
+                logger.error(f"Failed to read notebook page: {exc}", exc_info=True)
+                raise
 
         await server.run_async()
 
