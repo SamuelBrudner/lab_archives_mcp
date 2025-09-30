@@ -68,6 +68,14 @@ async def run_server() -> None:
     credentials = Credentials.from_file()
     fastmcp_class = _import_fastmcp()
 
+    # Disable banner for stdio transport compatibility
+    try:
+        import fastmcp
+
+        fastmcp.settings.show_cli_banner = False
+    except Exception:
+        pass  # Ignore if settings aren't accessible
+
     async with httpx.AsyncClient(base_url=str(credentials.region)) as http_client:
         auth_manager = AuthenticationManager(http_client, credentials)
         notebook_client = LabArchivesClient(http_client, auth_manager)
