@@ -113,7 +113,7 @@ class LabArchivesClient:
                 "tree_id": node.findtext("tree-id"),
                 "display_text": node.findtext("display-text"),
                 "is_page": node.findtext("is-page") == "true",
-                "is_folder": not (node.findtext("is-page") == "true"),
+                "is_folder": node.findtext("is-page") != "true",
             }
             for node in nodes
         ]
