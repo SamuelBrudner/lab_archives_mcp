@@ -105,7 +105,7 @@ class LabArchivesClient:
         from lxml import etree
 
         root = etree.fromstring(response.content)
-        nodes = root.findall(".//node")
+        nodes = root.findall(".//level-node")
         logger.debug(f"Parsed {len(nodes)} nodes from XML response")
 
         return [
@@ -113,7 +113,7 @@ class LabArchivesClient:
                 "tree_id": node.findtext("tree-id"),
                 "display_text": node.findtext("display-text"),
                 "is_page": node.findtext("is-page") == "true",
-                "is_folder": node.findtext("is-folder") == "true",
+                "is_folder": not (node.findtext("is-page") == "true"),
             }
             for node in nodes
         ]
