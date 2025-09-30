@@ -87,9 +87,15 @@ class LabArchivesClient:
         return NotebookTransformer.parse_notebook_list(payload)
 
     async def get_notebook_tree(
-        self, uid: str, nbid: str, parent_tree_id: int = 0
+        self, uid: str, nbid: str, parent_tree_id: int | str = 0
     ) -> list[dict[str, Any]]:
-        """Get one level of the notebook tree structure."""
+        """Get one level of the notebook tree structure.
+
+        Args:
+            uid: User ID
+            nbid: Notebook ID
+            parent_tree_id: Either 0 for root, or a base64-encoded tree_id string
+        """
         logger.debug(f"get_notebook_tree: nbid={nbid}, parent_tree_id={parent_tree_id}")
 
         auth_params = self._auth_manager._build_auth_params("get_tree_level")
