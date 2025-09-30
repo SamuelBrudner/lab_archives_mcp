@@ -85,3 +85,66 @@ class LabArchivesClient:
         """Parse LabArchives notebook XML into dictionaries."""
 
         return NotebookTransformer.parse_notebook_list(payload)
+
+    async def get_notebook_tree(
+        self, uid: str, nbid: str, parent_tree_id: int = 0
+    ) -> list[dict[str, Any]]:
+        """Get one level of the notebook tree structure."""
+        auth_params = self._auth_manager._build_auth_params("get_tree_level")
+        params = {"uid": uid, "nbid": nbid, "parent_tree_id": str(parent_tree_id), **auth_params}
+
+        response = await self._client.get(
+            "https://api.labarchives.com/api/tree_tools/get_tree_level",
+            params=params,
+        )
+        response.raise_for_status()
+
+        from lxml import etree
+
+        root = etree.fromstring(response.content)
+        return [
+            {
+                "tree_id": node.findtext("tree-id"),
+                "display_text": node.findtext("display-text"),
+                "is_page": node.findtext("is-page") == "true",
+                "is_folder": node.findtext("is-folder") == "true",
+            }
+            for node in root.findall(".//node")
+        ]
+
+    async def get_page_entries(
+        self, uid: str, nbid: str, page_tree_id: int, include_data: bool = True
+    ) -> list[dict[str, Any]]:
+        """Get all entries for a specific page with their content."""
+        auth_params = self._auth_manager._build_auth_params("get_entries_for_page")
+        params = {
+            "uid": uid,
+            "nbid": nbid,
+            "page_tree_id": str(page_tree_id),
+            "entry_data": "true" if include_data else "false",
+            **auth_params,
+        }
+
+        response = await self._client.get(
+            "https://api.labarchives.com/api/tree_tools/get_entries_for_page",
+            params=params,
+        )
+        response.raise_for_status()
+
+        from lxml import etree
+
+        root = etree.fromstring(response.content)
+        entries = []
+        for entry in root.findall(".//entry"):
+            entry_dict = {
+                "eid": entry.findtext("eid"),
+                "part_type": entry.findtext("part-type"),
+                "created_at": entry.findtext("created-at"),
+                "updated_at": entry.findtext("updated-at"),
+            }
+            if include_data:
+                entry_data = entry.find("entry-data")
+                if entry_data is not None and entry_data.text:
+                    entry_dict["content"] = entry_data.text
+            entries.append(entry_dict)
+        return entries

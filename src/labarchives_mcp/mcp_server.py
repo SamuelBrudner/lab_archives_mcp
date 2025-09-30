@@ -121,6 +121,64 @@ async def run_server() -> None:
             notebooks = await notebook_client.list_notebooks(uid)
             return [notebook.model_dump(by_alias=True) for notebook in notebooks]
 
+        @server.tool()  # type: ignore[misc]
+        async def list_notebook_pages(notebook_id: str) -> list[dict[str, Any]]:
+            """List all pages in a LabArchives notebook.
+
+            Shows the notebook's table of contents - all pages and folders at the root level.
+
+            Args:
+                notebook_id: The notebook ID (nbid) from list_labarchives_notebooks
+
+            Returns:
+                List of pages and folders, each with:
+                - tree_id: Unique identifier for the page/folder
+                - title: Page or folder name
+                - is_page: True if this is a page (can contain entries)
+                - is_folder: True if this is a folder (contains sub-pages)
+            """
+            uid = await auth_manager.ensure_uid()
+            tree_nodes = await notebook_client.get_notebook_tree(uid, notebook_id, parent_tree_id=0)
+
+            return [
+                {
+                    "tree_id": node["tree_id"],
+                    "title": node["display_text"],
+                    "is_page": node["is_page"],
+                    "is_folder": node["is_folder"],
+                }
+                for node in tree_nodes
+            ]
+
+        @server.tool()  # type: ignore[misc]
+        async def read_notebook_page(notebook_id: str, page_id: str) -> dict[str, Any]:
+            """Read all entries from a specific page in a LabArchives notebook.
+
+            Returns the actual content: text entries, headings, and attachments from one page.
+            Use list_notebook_pages first to find the page_id.
+
+            Args:
+                notebook_id: The notebook ID (nbid)
+                page_id: The page tree_id from list_notebook_pages
+
+            Returns:
+                Dictionary with:
+                - notebook_id: The notebook ID
+                - page_id: The page ID
+                - entries: List of entries, each containing:
+                  - eid: Entry ID
+                  - part_type: Type (text_entry, heading, plain_text, attachment, etc.)
+                  - content: The entry content (for text entries and headings)
+                  - created_at: Creation timestamp
+                  - updated_at: Last modification timestamp
+            """
+            uid = await auth_manager.ensure_uid()
+            entries = await notebook_client.get_page_entries(
+                uid, notebook_id, int(page_id), include_data=True
+            )
+
+            return {"notebook_id": notebook_id, "page_id": page_id, "entries": entries}
+
         await server.run_async()
 
 
