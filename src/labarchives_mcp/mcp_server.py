@@ -237,6 +237,143 @@ async def run_server() -> None:
                 raise
 
         @server.tool()  # type: ignore[misc]
+        async def search_labarchives(query: str, limit: int = 5) -> list[dict[str, Any]]:
+            """Search your indexed LabArchives notebooks semantically.
+
+            Uses vector search to find relevant pages based on natural language queries.
+            Returns full page content with metadata for each match.
+
+            Args:
+                query: Natural language search query (e.g., "fly lines used in experiments")
+                limit: Maximum number of results to return (default 5)
+
+            Returns:
+                List of search results, each containing:
+                - score: Similarity score (0-1, higher is better)
+                - notebook_name: Name of the notebook
+                - page_title: Title of the page
+                - page_id: Page identifier (tree_id)
+                - notebook_id: Notebook identifier
+                - url: Direct link to the page in LabArchives
+                - author: Page author
+                - date: Last modified date
+                - content: Full page text content (cleaned HTML)
+            """
+            import os
+
+            import yaml
+
+            from vector_backend.config import load_config
+            from vector_backend.embedding import create_embedding_client
+            from vector_backend.index import PineconeIndex
+            from vector_backend.labarchives_indexer import clean_html
+            from vector_backend.models import SearchRequest
+
+            logger.info(f"search_labarchives called: query='{query}', limit={limit}")
+
+            try:
+                # Load secrets using same logic as Credentials.from_file()
+                from pathlib import Path
+
+                import aiofiles
+
+                env_path = os.environ.get("LABARCHIVES_CONFIG_PATH")
+                secrets_path = Path(env_path) if env_path else Path("conf/secrets.yml")
+
+                async with aiofiles.open(secrets_path) as f:
+                    content = await f.read()
+                    secrets = yaml.safe_load(content)
+
+                os.environ["OPENAI_API_KEY"] = secrets["OPENAI_API_KEY"]
+                os.environ["PINECONE_API_KEY"] = secrets["PINECONE_API_KEY"]
+
+                # Load configuration
+                config = load_config("default")
+
+                # Create embedding client
+                embedding_client = create_embedding_client(config.embedding)
+
+                # Create Pinecone index
+                index = PineconeIndex(
+                    index_name="labarchives-test",
+                    api_key=secrets["PINECONE_API_KEY"],
+                    environment=secrets.get("PINECONE_ENVIRONMENT", "us-east-1"),
+                    namespace=None,
+                )
+
+                # Generate query embedding
+                logger.debug("Generating query embedding...")
+                query_vector = await embedding_client.embed_single(query)
+
+                # Search
+                search_request = SearchRequest(query=query, limit=limit, filters=None)
+                results = await index.search(request=search_request, query_vector=query_vector)
+
+                if not results:
+                    logger.info("No results found")
+                    return []
+
+                logger.info(f"Found {len(results)} results")
+
+                # Fetch full page content for each result
+                uid = await auth_manager.ensure_uid()
+                output = []
+
+                for result in results:
+                    chunk = result.chunk
+                    metadata = chunk.metadata
+
+                    # Fetch full page content
+                    try:
+                        entries = await notebook_client.get_page_entries(
+                            uid, metadata.notebook_id, metadata.page_id
+                        )
+
+                        # Combine all text entries
+                        full_text = []
+                        for entry in entries:
+                            entry_type = entry.get("part_type", "").lower().replace(" ", "_")
+                            content = entry.get("content", "")
+
+                            if entry_type == "text_entry" and content:
+                                cleaned = clean_html(content)
+                                if cleaned:
+                                    full_text.append(cleaned)
+                            elif entry_type in ["heading", "plain_text"] and content:
+                                full_text.append(content.strip())
+
+                        page_content = (
+                            "\n\n".join(full_text)
+                            if full_text
+                            else "(No text content on this page)"
+                        )
+
+                    except Exception as e:
+                        logger.warning(f"Failed to fetch full page content: {e}")
+                        page_content = f"(Error fetching page: {e})"
+
+                    output.append(
+                        {
+                            "score": result.score,
+                            "notebook_name": metadata.notebook_name,
+                            "page_title": metadata.page_title,
+                            "page_id": metadata.page_id,
+                            "notebook_id": metadata.notebook_id,
+                            "url": metadata.labarchives_url,
+                            "author": metadata.author,
+                            "date": str(metadata.date),
+                            "content": page_content,
+                        }
+                    )
+
+                logger.success(f"Successfully returned {len(output)} search results")
+                return output
+
+            except Exception as exc:
+                logger.error(f"Failed to search LabArchives: {exc}", exc_info=True)
+                raise
+
+        @server.tool()  # type: ignore[misc]
         async def upload_to_labarchives(
             notebook_id: str,
             page_title: str,
