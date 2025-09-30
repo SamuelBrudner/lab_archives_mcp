@@ -13,7 +13,34 @@ python -m labarchives_mcp
 labarchives-mcp
 ```
 
-## Claude Desktop Configuration
+## Agent Configuration
+
+### Windsurf (Codeium)
+
+**File**: `~/.codeium/windsurf/mcp_config.json`
+
+```json
+{
+  "mcpServers": {
+    "labarchives": {
+      "command": "conda",
+      "args": [
+        "run",
+        "-p",
+        "/Users/samuelbrudner/Yale University Dropbox/Samuel Brudner/lab_archives_mcp/conda_envs/pol-dev",
+        "python",
+        "-m",
+        "labarchives_mcp"
+      ],
+      "cwd": "/Users/samuelbrudner/Yale University Dropbox/Samuel Brudner/lab_archives_mcp"
+    }
+  }
+}
+```
+
+**Important**: Update the path to match your system.
+
+### Claude Desktop
 
 **File**: `~/Library/Application Support/Claude/claude_desktop_config.json`
 

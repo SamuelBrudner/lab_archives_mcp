@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "labarchives": {
+      "command": "conda",
+      "args": [
+        "run",
+        "-p",
+        "/Users/samuelbrudner/Yale University Dropbox/Samuel Brudner/lab_archives_mcp/conda_envs/pol-dev",
+        "python",
+        "-m",
+        "labarchives_mcp"
+      ],
+      "cwd": "/Users/samuelbrudner/Yale University Dropbox/Samuel Brudner/lab_archives_mcp"
+    }
+  }
+}
