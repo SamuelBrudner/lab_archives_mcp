@@ -34,7 +34,7 @@ Claude Desktop is the primary client for MCP servers. Add this configuration to 
         "/absolute/path/to/lab_archives_mcp/conda_envs/pol-dev",
         "python",
         "-m",
-        "labarchives_mcp.mcp_server"
+        "labarchives_mcp"
       ],
       "env": {
         "LABARCHIVES_CONFIG_PATH": "/absolute/path/to/lab_archives_mcp/conf/secrets.yml"
@@ -55,7 +55,7 @@ If you don't want to use conda in the configuration:
   "mcpServers": {
     "labarchives": {
       "command": "/absolute/path/to/lab_archives_mcp/conda_envs/pol-dev/bin/python",
-      "args": ["-m", "labarchives_mcp.mcp_server"],
+      "args": ["-m", "labarchives_mcp"],
       "cwd": "/absolute/path/to/lab_archives_mcp"
     }
   }
@@ -85,7 +85,7 @@ from mcp.client.stdio import stdio_client
 
 server_params = StdioServerParameters(
     command="python",
-    args=["-m", "labarchives_mcp.mcp_server"],
+    args=["-m", "labarchives_mcp"],
     cwd="/absolute/path/to/lab_archives_mcp",
     env={"PATH": "/absolute/path/to/conda_envs/pol-dev/bin"}
 )
@@ -153,7 +153,7 @@ Run the server directly to verify it starts:
 ```bash
 cd /path/to/lab_archives_mcp
 conda activate ./conda_envs/pol-dev
-python -m labarchives_mcp.mcp_server
+python -m labarchives_mcp
 ```
 
 The server will start and wait for MCP protocol messages on stdin. Press `Ctrl+C` to stop.
@@ -163,7 +163,7 @@ The server will start and wait for MCP protocol messages on stdin. Press `Ctrl+C
 Use the official MCP Inspector tool:
 
 ```bash
-npx @modelcontextprotocol/inspector python -m labarchives_mcp.mcp_server
+npx @modelcontextprotocol/inspector python -m labarchives_mcp
 ```
 
 This opens a web UI where you can:

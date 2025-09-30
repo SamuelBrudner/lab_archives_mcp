@@ -168,7 +168,7 @@ The server can be started in several ways:
 
 ```bash
 # Method 1: As a Python module
-conda run -p ./conda_envs/pol-dev python -m labarchives_mcp.mcp_server
+conda run -p ./conda_envs/pol-dev python -m labarchives_mcp
 
 # Method 2: Using the console script (after pip install -e .[dev])
 conda run -p ./conda_envs/pol-dev labarchives-mcp
@@ -206,7 +206,7 @@ The MCP server is designed to be used by AI agents like Claude Desktop. See **[A
         "/absolute/path/to/lab_archives_mcp/conda_envs/pol-dev",
         "python",
         "-m",
-        "labarchives_mcp.mcp_server"
+        "labarchives_mcp"
       ]
     }
   }
