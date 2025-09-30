@@ -154,13 +154,13 @@ async def run_server() -> None:
                 # Decode folder_id to get integer parent_tree_id
                 if folder_id:
                     import base64
+                    import math
 
                     decoded = base64.b64decode(folder_id).decode()
                     # Format is like: "1.3|1200989/1/TreeNode/4081949640|3.3"
-                    # Extract the TreeNode ID (the number after TreeNode/)
-                    parts = decoded.split("/")
-                    tree_node_part = parts[-1].split("|")[0]  # "4081949640|3.3" -> "4081949640"
-                    parent_tree_id = int(tree_node_part)
+                    # The parent_tree_id is the first number (before first pipe)
+                    first_part = decoded.split("|")[0]
+                    parent_tree_id = math.floor(float(first_part))
                     logger.debug(
                         f"Decoded folder_id '{folder_id}' -> '{decoded}' -> "
                         f"parent_tree_id={parent_tree_id}"
