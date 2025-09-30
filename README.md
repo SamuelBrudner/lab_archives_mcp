@@ -207,7 +207,8 @@ The MCP server is designed to be used by AI agents like Claude Desktop. See **[A
         "python",
         "-m",
         "labarchives_mcp"
-      ]
+      ],
+      "cwd": "/absolute/path/to/lab_archives_mcp"
     }
   }
 }

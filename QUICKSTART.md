@@ -29,7 +29,8 @@ labarchives-mcp
         "python",
         "-m",
         "labarchives_mcp"
-      ]
+      ],
+      "cwd": "/Users/samuelbrudner/Yale University Dropbox/Samuel Brudner/lab_archives_mcp"
     }
   }
 }

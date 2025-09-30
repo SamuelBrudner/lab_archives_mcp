@@ -36,15 +36,15 @@ Claude Desktop is the primary client for MCP servers. Add this configuration to 
         "-m",
         "labarchives_mcp"
       ],
-      "env": {
-        "LABARCHIVES_CONFIG_PATH": "/absolute/path/to/lab_archives_mcp/conf/secrets.yml"
-      }
+      "cwd": "/absolute/path/to/lab_archives_mcp"
     }
   }
 }
 ```
 
-**Important**: Replace `/absolute/path/to/lab_archives_mcp` with your actual repository path.
+**Important**:
+- Replace `/absolute/path/to/lab_archives_mcp` with your actual repository path.
+- The `cwd` parameter ensures the server finds `conf/secrets.yml` in the working directory.
 
 ### Alternative: Using Python Directly
 
