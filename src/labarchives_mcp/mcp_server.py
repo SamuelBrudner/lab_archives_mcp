@@ -214,11 +214,10 @@ async def run_server() -> None:
                 uid = await auth_manager.ensure_uid()
                 logger.debug(f"Obtained UID: {uid[:20]}...")
 
-                page_id_int = int(page_id)
-                logger.debug(f"Fetching entries for page {page_id_int} in notebook {notebook_id}")
+                logger.debug(f"Fetching entries for page {page_id} in notebook {notebook_id}")
 
                 entries = await notebook_client.get_page_entries(
-                    uid, notebook_id, page_id_int, include_data=True
+                    uid, notebook_id, page_id, include_data=True
                 )
                 logger.info(f"Retrieved {len(entries)} entries from page")
 

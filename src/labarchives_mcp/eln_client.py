@@ -125,9 +125,16 @@ class LabArchivesClient:
         ]
 
     async def get_page_entries(
-        self, uid: str, nbid: str, page_tree_id: int, include_data: bool = True
+        self, uid: str, nbid: str, page_tree_id: int | str, include_data: bool = True
     ) -> list[dict[str, Any]]:
-        """Get all entries for a specific page with their content."""
+        """Get all entries for a specific page with their content.
+
+        Args:
+            uid: User ID
+            nbid: Notebook ID
+            page_tree_id: Either an integer or base64-encoded tree_id string
+            include_data: Whether to include entry content
+        """
         logger.debug(
             f"get_page_entries: nbid={nbid}, page_tree_id={page_tree_id}, "
             f"include_data={include_data}"
