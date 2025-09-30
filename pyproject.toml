@@ -29,7 +29,13 @@ dependencies = [
   "tenacity>=8.3",
   "omegaconf>=2.3",
   "fastmcp>=2.1",
-  "notebook>=7.2"
+  "notebook>=7.2",
+  # Vector backend dependencies
+  "tiktoken>=0.7",
+  "langchain>=0.2",
+  "openai>=1.40",
+  "pandas>=2.2",
+  "pyarrow>=16.0"
 ]
 
 [project.scripts]
@@ -39,6 +45,12 @@ labarchives-mcp = "labarchives_mcp.mcp_server:run"
 dev = [
   "pytest>=8.3",
   "pytest-asyncio>=0.23",
+  "pytest-cov>=5.0",
+  "pytest-benchmark>=4.0",
+  "hypothesis>=6.100",
+  "vcrpy>=6.0",
+  "respx>=0.21",
+  "mutmut>=2.4",
   "mypy>=1.9",
   "ruff>=0.5",
   "black>=24.4",
@@ -48,12 +60,17 @@ dev = [
   "nbdime>=4.0",
   "commitizen>=3.12"
 ]
+vector = [
+  "pinecone-client>=4.1",
+  "qdrant-client>=1.9"
+]
 
 [tool.setuptools]
 package-dir = { "" = "src" }
 
 [tool.setuptools.packages.find]
 where = ["src"]
+include = ["labarchives_mcp*", "vector_backend*"]
 
 [tool.black]
 line-length = 100
@@ -62,7 +79,7 @@ target-version = ["py311", "py312"]
 [tool.isort]
 profile = "black"
 line_length = 100
-known_first_party = ["labarchives_mcp"]
+known_first_party = ["labarchives_mcp", "vector_backend"]
 
 [tool.ruff]
 line-length = 100
@@ -78,6 +95,7 @@ warn_redundant_casts = true
 warn_no_return = true
 warn_unreachable = true
 plugins = []
+exclude = ["tests/", "scripts/"]
 
 [tool.pytest.ini_options]
 minversion = "8.0"
@@ -88,9 +106,10 @@ filterwarnings = [
   "error::PendingDeprecationWarning"
 ]
 markers = [
-  "integration: marks tests that hit external services",
+  "integration: marks tests that hit external services (deselect with '-m \"not integration\"')",
   "slow: marks tests that take longer than expected"
 ]
+asyncio_mode = "auto"
 
 [tool.commitizen]
 name = "cz_conventional_commits"

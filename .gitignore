@@ -47,3 +47,6 @@ docs/.cache/
 
 # Secrets
 conf/secrets.yml
+
+# Hypothesis
+.hypothesis/
