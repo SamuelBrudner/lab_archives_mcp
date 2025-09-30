@@ -218,6 +218,34 @@ This means the API signature computation failed. Common causes:
   ]
 }
 
+## API Schema
+
+The API contract is defined by **Pydantic models** (single source of truth):
+- **Configuration**: `Credentials` in `src/labarchives_mcp/auth.py`
+- **Resources**: `NotebookRecord` in `src/labarchives_mcp/eln_client.py`
+
+Generate JSON Schema for API documentation:
+
+```bash
+# Notebook resource schema
+conda run -p ./conda_envs/pol-dev python -c "
+from labarchives_mcp.eln_client import NotebookRecord
+import json
+print(json.dumps(NotebookRecord.model_json_schema(), indent=2))
+"
+
+# Configuration schema
+conda run -p ./conda_envs/pol-dev python -c "
+from labarchives_mcp.auth import Credentials
+import json
+print(json.dumps(Credentials.model_json_schema(), indent=2))
+"
+```
+
+All field descriptions, examples, and validation rules are in the Pydantic models. No separate YAML/JSON schema files—code is the source of truth.
+
+---
+
 ## Development Notes
 
 * Fail loud and fast on errors (invalid signature, uid expired, etc.).

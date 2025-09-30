@@ -12,18 +12,45 @@ from typing import Any, cast
 import httpx
 from lxml import etree
 from omegaconf import OmegaConf
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel, Field, HttpUrl
 
 
 class Credentials(BaseModel):
-    """Validated LabArchives API credentials."""
+    """Validated LabArchives API credentials.
 
-    akid: str
-    password: str
-    region: HttpUrl
-    uid: str | None = None
-    auth_email: str | None = None
-    auth_code: str | None = None
+    This is the source of truth for required configuration.
+    All credentials are read from conf/secrets.yml at runtime.
+    """
+
+    akid: str = Field(
+        description="LabArchives Access Key ID (obtain from LabArchives support)",
+        examples=["Yale_Brudner_6gbfoL"],
+    )
+    password: str = Field(
+        description="LabArchives Access Password (HMAC-SHA512 signing key)",
+        examples=["super-secret-password"],
+    )
+    region: HttpUrl = Field(
+        description="LabArchives API base URL",
+        examples=["https://api.labarchives.com"],
+    )
+    uid: str | None = Field(
+        default=None,
+        description=(
+            "User ID (obtain via scripts/resolve_uid.py). " "Permanent per-account identifier."
+        ),
+        examples=["233106187ler2,bix5417615158751911759198414"],
+    )
+    auth_email: str | None = Field(
+        default=None,
+        description="Email for temporary token authentication (alternative to uid)",
+    )
+    auth_code: str | None = Field(
+        default=None,
+        description=(
+            "Temporary password token from LabArchives " "(alternative to uid, expires in 1 hour)"
+        ),
+    )
 
     @classmethod
     def from_file(cls, path: Path | str | None = None) -> Credentials:
