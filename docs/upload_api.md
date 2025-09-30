@@ -1,0 +1,282 @@
+# LabArchives Upload API Documentation
+
+## Overview
+
+The upload functionality enables programmatic creation of notebook pages and uploading of files to LabArchives. This supports automated workflows for:
+
+- Archiving analysis notebooks (`.ipynb`)
+- Documenting code (`.py`, `.R`)
+- Storing markdown documentation (`.md`)
+- Uploading data files and results
+
+## Architecture
+
+```
+┌─────────────────────────────────────┐
+│   MCP Tool: upload_to_labarchives   │
+│   - Validates inputs                │
+│   - Orchestrates page creation      │
+│   - Uploads file as attachment      │
+└──────────────┬──────────────────────┘
+               │
+               ↓
+┌─────────────────────────────────────┐
+│  LabArchivesClient                  │
+│  - insert_node()                    │
+│  - add_attachment()                 │
+│  - add_entry()                      │
+└──────────────┬──────────────────────┘
+               │
+               ↓
+┌─────────────────────────────────────┐
+│  LabArchives REST API               │
+│  POST /tree_tools/insert_node       │
+│  POST /entries/add_attachment       │
+│  POST /entries/add_entry            │
+└─────────────────────────────────────┘
+```
+
+## Use Cases
+
+### UC1: Upload Analysis Notebook
+**Actor**: Data Analyst
+**Goal**: Archive a Jupyter notebook with analysis results
+**Preconditions**:
+- User has write access to notebook
+- File exists on filesystem
+- File size ≤ max upload limit
+
+**Flow**:
+1. User specifies notebook ID and target folder
+2. Tool creates new page with descriptive title
+3. Tool uploads `.ipynb` file as attachment
+4. Tool returns page URL and entry ID
+
+**Postconditions**:
+- New page exists in notebook
+- File is accessible via LabArchives web UI
+- Audit trail records upload event
+
+### UC2: Sync Markdown Documentation
+**Actor**: Software Developer
+**Goal**: Keep protocol documentation synchronized with Git repo
+**Preconditions**: Same as UC1
+
+**Flow**:
+1. CI/CD pipeline triggers on commit
+2. Tool uploads `protocol.md` to "Protocols" folder
+3. Tool optionally converts markdown to HTML entry
+4. Tool returns entry ID for tracking
+
+**Postconditions**:
+- Markdown file uploaded as attachment
+- Optional: Rendered HTML entry for readability
+
+### UC3: Archive Python Scripts
+**Actor**: Researcher
+**Goal**: Document analysis code alongside results
+**Preconditions**: Same as UC1
+
+**Flow**:
+1. User uploads `.py` script after running analysis
+2. Tool creates page titled with script name + date
+3. Tool uploads script as attachment
+4. Optional: Add text entry with execution summary
+
+**Postconditions**:
+- Script archived for reproducibility
+- Associated with experiment data
+
+## API Endpoints
+
+### 1. `insert_node`
+Creates a new page or folder in the notebook hierarchy.
+
+**Method**: POST
+**Endpoint**: `/api/tree_tools/insert_node`
+
+**Parameters**:
+- `uid` (required): User ID
+- `nbid` (required): Notebook ID
+- `parent_tree_id` (required): Parent folder tree_id, or "0" for root
+- `display_text` (required): Page/folder title
+- `is_folder` (required): "true" for folder, "false" for page
+- `akid`, `expires`, `sig`: HMAC authentication
+
+**Response**:
+```xml
+<tree-tools>
+  <node>
+    <tree-id>BASE64_ENCODED_ID</tree-id>
+    <display-text>My Analysis Page</display-text>
+    <is-page type="boolean">true</is-page>
+  </node>
+</tree-tools>
+```
+
+**Returns**:
+- `tree_id`: New page/folder identifier (used as `pid` for uploads)
+
+### 2. `add_attachment`
+Uploads a file to a notebook page.
+
+**Method**: POST
+**Endpoint**: `/api/entries/add_attachment`
+**Content-Type**: `application/octet-stream`
+
+**Parameters**:
+- `uid` (required): User ID
+- `nbid` (required): Notebook ID
+- `pid` (required): Page tree_id (from insert_node)
+- `filename` (required): Original filename with extension
+- `caption` (optional): Display caption
+- `change_description` (optional): Audit log message
+- `client_ip` (optional): Client IP for audit
+- `akid`, `expires`, `sig`: HMAC authentication
+
+**Request Body**: Binary file content
+
+**Response**:
+```xml
+<entries>
+  <entry>
+    <eid>ENTRY_ID</eid>
+    <part-type>attachment</part-type>
+    <filename>analysis.ipynb</filename>
+    <caption>Analysis results for experiment 123</caption>
+    <created-at>2025-09-30T12:00:00Z</created-at>
+  </entry>
+</entries>
+```
+
+### 3. `add_entry` (Optional)
+Adds text content to a page.
+
+**Method**: POST
+**Endpoint**: `/api/entries/add_entry`
+
+**Parameters**:
+- `uid` (required): User ID
+- `nbid` (required): Notebook ID
+- `pid` (required): Page tree_id
+- `part_type` (required): "text entry", "plain text entry", or "heading"
+- `entry_data` (required): Content (HTML or UTF-8 text)
+- `caption` (optional): Display caption
+- `change_description` (optional): Audit log message
+- `akid`, `expires`, `sig`: HMAC authentication
+
+**Response**: Similar to add_attachment
+
+## Data Contracts
+
+### UploadRequest
+```python
+class UploadRequest(BaseModel):
+    notebook_id: str  # nbid
+    parent_folder_id: str | None  # tree_id or None for root
+    page_title: str  # display_text for new page
+    file_path: Path  # Local file to upload
+    caption: str | None = None
+    change_description: str | None = None
+```
+
+### UploadResponse
+```python
+class UploadResponse(BaseModel):
+    page_tree_id: str  # tree_id of created page
+    entry_id: str  # eid of uploaded attachment
+    page_url: str  # LabArchives web URL
+    created_at: datetime
+    file_size_bytes: int
+```
+
+### PageCreationResult
+```python
+class PageCreationResult(BaseModel):
+    tree_id: str
+    display_text: str
+    is_page: bool
+```
+
+### AttachmentUploadResult
+```python
+class AttachmentUploadResult(BaseModel):
+    eid: str
+    part_type: Literal["attachment"]
+    filename: str
+    caption: str | None
+    created_at: datetime
+```
+
+## Error Handling
+
+### Validation Errors
+- `FileNotFoundError`: file_path does not exist
+- `ValueError`: file_size exceeds limit
+- `PermissionError`: no write access to notebook
+
+### API Errors
+- `400 Bad Request`: Invalid parameters
+- `403 Forbidden`: Insufficient permissions
+- `413 Payload Too Large`: File exceeds upload limit
+- `500 Internal Server Error`: LabArchives service error
+
+## Configuration
+
+### File Size Limits
+- Default: Check via `users/max_upload_size` API
+- Fallback: 100 MB
+- Validation: Fail fast if file exceeds limit
+
+### Supported File Types
+- Notebooks: `.ipynb`
+- Code: `.py`, `.R`, `.jl`, `.m`
+- Documentation: `.md`, `.txt`, `.rst`
+- Data: `.csv`, `.parquet`, `.h5`, `.npz`
+- Binary: Any file type (uploaded as-is)
+
+### Page Title Generation
+- User-provided: Use as-is
+- Auto-generated: `{filename} - {YYYY-MM-DD HH:MM}`
+- Sanitization: Remove/escape invalid XML characters
+
+## Security Considerations
+
+1. **Authentication**: All requests use HMAC-SHA512 signatures
+2. **Authorization**: Verify write access before upload
+3. **Input Validation**:
+   - Sanitize filenames (prevent path traversal)
+   - Validate file extensions
+   - Check file sizes
+4. **Audit Trail**: Include `change_description` for provenance
+5. **Rate Limiting**: Respect LabArchives API limits
+
+## Testing Strategy
+
+### Specification Tests
+- Page creation with valid parameters
+- File upload with various types
+- Error handling for missing files
+- Permission validation
+
+### Unit Tests
+- Mock HTTP client responses
+- Test HMAC signature generation
+- Validate Pydantic models
+- Test file reading and streaming
+
+### Integration Tests
+- Create page in test notebook
+- Upload small test file
+- Verify via read API
+- Clean up test data
+
+## Future Enhancements
+
+1. **Batch Upload**: Upload multiple files to one page
+2. **Markdown Rendering**: Convert `.md` to HTML entry
+3. **Notebook Rendering**: Extract cells from `.ipynb` as entries
+4. **Version Control**: Link to Git commit SHA
+5. **Metadata Extraction**: Parse frontmatter from markdown
+6. **Progress Reporting**: Callback for upload progress
+7. **Retry Logic**: Exponential backoff for transient failures
