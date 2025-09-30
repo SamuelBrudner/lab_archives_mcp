@@ -33,9 +33,6 @@ The upload functionality enables programmatic creation of notebook pages and upl
 │  POST /tree_tools/insert_node       │
 │  POST /entries/add_attachment       │
 │  POST /entries/add_entry            │
-└─────────────────────────────────────┘
-```
-
 ## Use Cases
 
 ### UC1: Upload Analysis Notebook
@@ -45,17 +42,21 @@ The upload functionality enables programmatic creation of notebook pages and upl
 - User has write access to notebook
 - File exists on filesystem
 - File size ≤ max upload limit
+- **Git repository is clean or metadata is explicitly provided**
 
 **Flow**:
 1. User specifies notebook ID and target folder
-2. Tool creates new page with descriptive title
-3. Tool uploads `.ipynb` file as attachment
-4. Tool returns page URL and entry ID
+2. **Tool extracts code provenance metadata** (Git SHA, branch, repo URL)
+3. Tool creates new page with descriptive title
+4. Tool uploads `.ipynb` file as attachment
+5. **Tool adds text entry with structured metadata** (commit SHA, versions, execution time)
+6. Tool returns page URL and entry ID
 
 **Postconditions**:
 - New page exists in notebook
 - File is accessible via LabArchives web UI
-- Audit trail records upload event
+- **Metadata entry documents code version and execution context**
+- Audit trail records upload event with full provenance
 
 ### UC2: Sync Markdown Documentation
 **Actor**: Software Developer
@@ -167,6 +168,65 @@ Adds text content to a page.
 
 **Response**: Similar to add_attachment
 
+## Code Provenance & Metadata (MANDATORY)
+
+All uploads of code, notebooks, or figures **MUST** include provenance metadata to ensure reproducibility and comply with FAIR data principles.
+
+### Required Metadata Fields
+
+```python
+class ProvenanceMetadata(BaseModel):
+    """Code execution and environment metadata (MANDATORY for notebooks/figures)."""
+
+    # Git provenance
+    git_commit_sha: str  # Full 40-char SHA
+    git_branch: str  # e.g., "main", "analysis-2025-09"
+    git_repo_url: str  # e.g., "https://github.com/user/repo"
+    git_is_dirty: bool  # True if uncommitted changes exist
+
+    # Code version
+    code_version: str | None  # Git tag or semantic version
+
+    # Execution context
+    executed_at: datetime  # When code was run
+    python_version: str  # e.g., "3.11.8"
+
+    # Key dependencies (for notebooks)
+    dependencies: dict[str, str]  # {"numpy": "1.26.0", "pandas": "2.1.0"}
+
+    # System info
+    os_name: str  # e.g., "Darwin", "Linux"
+    hostname: str | None  # Execution machine
+```
+
+### Metadata Capture Strategy
+
+1. **Automatic extraction** from Git repository
+2. **Fail-fast validation**: Refuse upload if Git is dirty (unless override flag set)
+3. **Structured storage**: Metadata added as plain-text entry on page
+4. **Human-readable format**: Markdown table for easy viewing
+
+### Example Metadata Entry
+
+```markdown
+## Code Provenance
+
+**Git Information**
+- Commit: `a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0`
+- Branch: `analysis-temporal-integration`
+- Repository: https://github.com/SamuelBrudner/temporal-integration-analysis
+- Status: ✅ Clean (no uncommitted changes)
+
+**Execution Context**
+- Executed: 2025-09-30 12:19:03 UTC
+- Python: 3.11.8
+- Key Packages: numpy==1.26.0, pandas==2.1.0, matplotlib==3.8.0
+
+**System**
+- OS: Darwin (macOS)
+- Hostname: sam-macbook-pro.local
+```
+
 ## Data Contracts
 
 ### UploadRequest
@@ -178,6 +238,12 @@ class UploadRequest(BaseModel):
     file_path: Path  # Local file to upload
     caption: str | None = None
     change_description: str | None = None
+
+    # MANDATORY for .ipynb, .py, figures
+    metadata: ProvenanceMetadata | None = None
+
+    # Allow upload despite dirty Git state (use with caution)
+    allow_dirty_git: bool = False
 ```
 
 ### UploadResponse

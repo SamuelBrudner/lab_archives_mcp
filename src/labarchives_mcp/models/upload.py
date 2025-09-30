@@ -2,6 +2,9 @@
 
 These Pydantic models define the semantic contracts for uploading files to LabArchives.
 All models enforce validation at construction time to fail fast.
+
+CRITICAL: All uploads of code, notebooks, or figures MUST include ProvenanceMetadata
+to ensure reproducibility and FAIR data compliance.
 """
 
 from datetime import datetime
@@ -9,6 +12,57 @@ from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel, Field, ValidationInfo, field_validator
+
+
+class ProvenanceMetadata(BaseModel):
+    """Code execution and environment metadata (MANDATORY for notebooks/figures).
+
+    Attributes:
+        git_commit_sha: Full 40-character Git commit SHA
+        git_branch: Git branch name
+        git_repo_url: Git repository URL
+        git_is_dirty: True if uncommitted changes exist
+        code_version: Optional Git tag or semantic version
+        executed_at: Timestamp when code was executed
+        python_version: Python version string (e.g., "3.11.8")
+        dependencies: Key package versions {"numpy": "1.26.0"}
+        os_name: Operating system name
+        hostname: Execution machine hostname (optional)
+    """
+
+    git_commit_sha: str = Field(..., min_length=40, max_length=40, pattern=r"^[0-9a-f]{40}$")
+    git_branch: str = Field(..., min_length=1, max_length=255)
+    git_repo_url: str = Field(..., min_length=1)
+    git_is_dirty: bool = Field(..., description="Uncommitted changes exist")
+    code_version: str | None = Field(None, max_length=100)
+    executed_at: datetime
+    python_version: str = Field(..., pattern=r"^\d+\.\d+\.\d+$")
+    dependencies: dict[str, str] = Field(default_factory=dict)
+    os_name: str = Field(..., min_length=1)
+    hostname: str | None = Field(None, max_length=255)
+
+    def to_markdown(self) -> str:
+        """Render metadata as human-readable markdown."""
+        status = "⚠️ Dirty (uncommitted changes)" if self.git_is_dirty else "✅ Clean"
+        deps_str = ", ".join(f"{k}=={v}" for k, v in self.dependencies.items())
+
+        return f"""## Code Provenance
+
+**Git Information**
+- Commit: `{self.git_commit_sha}`
+- Branch: `{self.git_branch}`
+- Repository: {self.git_repo_url}
+- Status: {status}
+
+**Execution Context**
+- Executed: {self.executed_at.strftime('%Y-%m-%d %H:%M:%S UTC')}
+- Python: {self.python_version}
+- Key Packages: {deps_str if deps_str else 'None'}
+
+**System**
+- OS: {self.os_name}
+- Hostname: {self.hostname or 'N/A'}
+"""
 
 
 class UploadRequest(BaseModel):
@@ -21,6 +75,8 @@ class UploadRequest(BaseModel):
         file_path: Path to local file to upload
         caption: Optional caption for the attachment
         change_description: Optional audit log message
+        metadata: MANDATORY for .ipynb, .py, figures - code provenance
+        allow_dirty_git: Allow upload despite uncommitted changes (use with caution)
     """
 
     notebook_id: str = Field(..., min_length=1, description="LabArchives notebook ID")
@@ -31,6 +87,12 @@ class UploadRequest(BaseModel):
     file_path: Path = Field(..., description="Path to file to upload")
     caption: str | None = Field(None, max_length=500, description="Attachment caption")
     change_description: str | None = Field(None, max_length=1000, description="Audit log message")
+    metadata: ProvenanceMetadata | None = Field(
+        None, description="MANDATORY for code/notebooks/figures"
+    )
+    allow_dirty_git: bool = Field(
+        False, description="Allow upload with dirty Git state (not recommended)"
+    )
 
     @field_validator("file_path")
     @classmethod
