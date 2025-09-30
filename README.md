@@ -253,15 +253,77 @@ The MCP server exposes LabArchives notebooks to AI agents via the MCP protocol.
    - **Tool**: `list_labarchives_notebooks()` - List all notebooks
    - **Resource**: `labarchives://notebooks` - Read notebooks resource
 
-### Available Capabilities
+### Available Tools
 
-- **`list_labarchives_notebooks()`** - Returns list of all notebooks with:
-  - `nbid`: Notebook ID (base64-encoded)
-  - `name`: Notebook name
-  - `owner`: Owner email
-  - `owner_name`: Owner full name
-  - `created_at`: Creation timestamp (ISO 8601)
-  - `modified_at`: Last modification timestamp (ISO 8601)
+**Discovery**:
+- **`list_labarchives_notebooks()`** - List all your notebooks
+- **`list_notebook_pages(notebook_id)`** - Show table of contents for a notebook
+
+**Reading**:
+- **`read_notebook_page(notebook_id, page_id)`** - Read content from a specific page
+
+#### Tool Schemas
+
+**`list_labarchives_notebooks()`**
+```python
+# Returns list of notebooks:
+[{
+  "nbid": "MTU2MTI4NS43...",  # Notebook ID
+  "name": "Mosquito Navigation",
+  "owner": "samuel.brudner@yale.edu",
+  "owner_name": "Sam snb6@yale.edu",
+  "created_at": "1970-01-01T00:00:00Z",
+  "modified_at": "1970-01-01T00:00:00Z"
+}]
+```
+
+**`list_notebook_pages(notebook_id)`**
+```python
+# Returns pages and folders:
+[{
+  "tree_id": "12345",
+  "title": "Introduction",
+  "is_page": true,      # Can contain entries
+  "is_folder": false
+}, {
+  "tree_id": "67890",
+  "title": "Methods",
+  "is_page": false,
+  "is_folder": true     # Contains sub-pages
+}]
+```
+
+**`read_notebook_page(notebook_id, page_id)`**
+```python
+# Returns page content:
+{
+  "notebook_id": "MTU2MTI4NS43...",
+  "page_id": "12345",
+  "entries": [{
+    "eid": "e789",
+    "part_type": "text_entry",  # or "heading", "plain_text", "attachment"
+    "content": "<p>Entry text content...</p>",
+    "created_at": "2025-01-01T00:00:00Z",
+    "updated_at": "2025-01-02T08:30:00Z"
+  }]
+}
+```
+
+#### Example Agent Workflow
+
+```
+User: "What notebooks do I have?"
+Agent: calls list_labarchives_notebooks()
+→ Shows: Mosquito Navigation, Odor motion PNAS, etc.
+
+User: "What's in my Mosquito Navigation notebook?"
+Agent: calls list_notebook_pages("MTU2MTI4NS43...")
+→ Shows: Introduction, Methods, Results, etc.
+
+User: "Show me the Introduction page"
+Agent: calls read_notebook_page("MTU2MTI4NS43...", "12345")
+→ Returns: All text entries, headings, and attachment info
+```
 
 ---
 
