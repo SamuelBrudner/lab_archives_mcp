@@ -159,8 +159,12 @@ async def run_server() -> None:
                     # Format is like: "1.3|1200989/1/TreeNode/4081949640|3.3"
                     # Extract the TreeNode ID (the number after TreeNode/)
                     parts = decoded.split("/")
-                    parent_tree_id = int(parts[-2])  # Get TreeNode ID
-                    logger.debug(f"Decoded folder_id to parent_tree_id={parent_tree_id}")
+                    tree_node_part = parts[-1].split("|")[0]  # "4081949640|3.3" -> "4081949640"
+                    parent_tree_id = int(tree_node_part)
+                    logger.debug(
+                        f"Decoded folder_id '{folder_id}' -> '{decoded}' -> "
+                        f"parent_tree_id={parent_tree_id}"
+                    )
                 else:
                     parent_tree_id = 0
 
