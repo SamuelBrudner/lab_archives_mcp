@@ -200,9 +200,9 @@ def test_upload_tool_not_registered_when_disabled(monkeypatch: pytest.MonkeyPatc
 
     asyncio.run(mcp_server.run_server())
 
-    assert "upload_to_labarchives" not in fastmcp_instance.tool_callbacks, (
-        "upload_to_labarchives should not be registered when LABARCHIVES_ENABLE_UPLOAD=false"
-    )
+    assert (
+        "upload_to_labarchives" not in fastmcp_instance.tool_callbacks
+    ), "upload_to_labarchives should not be registered when LABARCHIVES_ENABLE_UPLOAD=false"
 
 
 def test_upload_tool_registered_when_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -247,9 +247,9 @@ def test_upload_tool_registered_when_enabled(monkeypatch: pytest.MonkeyPatch) ->
 
     asyncio.run(mcp_server.run_server())
 
-    assert "upload_to_labarchives" in fastmcp_instance.tool_callbacks, (
-        "upload_to_labarchives should be registered when LABARCHIVES_ENABLE_UPLOAD=true"
-    )
+    assert (
+        "upload_to_labarchives" in fastmcp_instance.tool_callbacks
+    ), "upload_to_labarchives should be registered when LABARCHIVES_ENABLE_UPLOAD=true"
 
 
 def test_upload_tool_registered_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -295,6 +295,6 @@ def test_upload_tool_registered_by_default(monkeypatch: pytest.MonkeyPatch) -> N
 
     asyncio.run(mcp_server.run_server())
 
-    assert "upload_to_labarchives" in fastmcp_instance.tool_callbacks, (
-        "upload_to_labarchives should be registered by default when env var is not set"
-    )
+    assert (
+        "upload_to_labarchives" in fastmcp_instance.tool_callbacks
+    ), "upload_to_labarchives should be registered by default when env var is not set"

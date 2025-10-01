@@ -502,6 +502,7 @@ async def run_server() -> None:
                 except Exception as exc:
                     logger.error(f"Failed to upload to LabArchives: {exc}", exc_info=True)
                     raise
+
         else:
             logger.info("Upload functionality is DISABLED (LABARCHIVES_ENABLE_UPLOAD=false)")
 
