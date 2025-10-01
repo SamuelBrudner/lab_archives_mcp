@@ -8,6 +8,7 @@ Run with: pytest tests/test_vector_backend/integration/test_local_persistence.py
 
 # mypy: disable-error-code="no-untyped-def,import-untyped"
 
+import importlib.util
 import shutil
 from datetime import datetime
 
@@ -15,6 +16,8 @@ import pytest
 
 from vector_backend.index import LocalPersistence
 from vector_backend.models import ChunkMetadata, EmbeddedChunk
+
+DVC_AVAILABLE = importlib.util.find_spec("dvc") is not None
 
 
 # Worker functions for concurrent write tests (module-level for pickling)
@@ -341,6 +344,10 @@ class TestRoundTripFidelity:
 class TestDVCIntegration:
     """Test DVC tracking integration."""
 
+    pytestmark = pytest.mark.skipif(
+        not DVC_AVAILABLE, reason="DVC package not installed; skipping DVC integration tests"
+    )
+
     def test_dvc_disabled_by_default(self, temp_persistence_dir):
         """DVC tracking should be disabled by default."""
         persistence = LocalPersistence(temp_persistence_dir, version="v1")
@@ -539,6 +546,8 @@ class TestConcurrentWrites:
         import multiprocessing
 
         # Launch 3 workers with DVC tracking
+        if not DVC_AVAILABLE:
+            pytest.skip("DVC package not installed; skipping concurrent DVC tracking test")
         with multiprocessing.Pool(3) as pool:
             results = pool.starmap(
                 _dvc_write_worker,
