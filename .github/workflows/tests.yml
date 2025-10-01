@@ -23,7 +23,7 @@ jobs:
       with:
         auto-update-conda: true
         python-version: ${{ matrix.python-version }}
-        miniforge-variant: Mambaforge
+        miniforge-variant: Miniforge3
         use-mamba: true
 
     - name: Install conda-lock
@@ -105,7 +105,7 @@ jobs:
       with:
         auto-update-conda: true
         python-version: '3.11'
-        miniforge-variant: Mambaforge
+        miniforge-variant: Miniforge3
         use-mamba: true
 
     - name: Install conda-lock

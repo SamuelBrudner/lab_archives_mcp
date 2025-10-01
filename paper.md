@@ -12,7 +12,7 @@ authors:
     orcid: 0000-0000-0000-0000
     affiliation: 1
 affiliations:
- - name: Department of Neuroscience, Yale University, USA
+ - name: Molecular, Cellular, and Developmental Biology, Yale University, USA
    index: 1
 date: 30 September 2025
 bibliography: paper.bib
@@ -20,7 +20,7 @@ bibliography: paper.bib
 
 # Summary
 
-Electronic lab notebooks (ELNs) are essential tools for modern research data management, providing digital alternatives to traditional paper notebooks. However, researchers often struggle to efficiently search, retrieve, and integrate historical experimental data into ongoing analyses. `lab_archives_mcp` bridges this gap by connecting AI assistants to LabArchives—a widely adopted commercial ELN platform—through the Model Context Protocol (MCP). This integration enables researchers to conversationally query their lab notebooks, perform semantic searches across experimental records, and seamlessly incorporate lab data into AI-assisted research workflows.
+Electronic lab notebooks (ELNs) are essential tools for modern research data management, providing digital alternatives to traditional paper notebooks. However, researchers often struggle to efficiently search, retrieve, and integrate historical experimental data into ongoing analyses. `lab_archives_mcp` bridges this gap through two complementary components: (1) a Model Context Protocol (MCP) server that connects AI assistants to LabArchives—a widely adopted commercial ELN platform—and (2) a modular, backend-agnostic vector database framework for semantic search. This dual architecture enables researchers to conversationally query their lab notebooks, perform semantic searches across experimental records using configurable embedding models and vector indices, and seamlessly incorporate lab data into AI-assisted research workflows. The vector backend is designed as a standalone library, usable independently of the MCP server for custom search pipelines.
 
 # Statement of Need
 
@@ -44,13 +44,12 @@ Recent advances in large language models (LLMs) and AI assistants have demonstra
 
 ## Architecture
 
-`lab_archives_mcp` consists of three primary components:
+`lab_archives_mcp` consists of four primary components:
 
 1. **Authentication Layer** (`auth.py`): Implements HMAC-SHA512 request signing for the LabArchives REST API, OAuth-based user ID resolution, and secure credential management
 2. **API Client** (`eln_client.py`): Provides async HTTP methods for listing notebooks, navigating page hierarchies, and reading entry content, with automatic XML→JSON transformation using Pydantic models [@pydantic]
 3. **MCP Server** (`mcp_server.py`): Exposes notebook operations as MCP tools using the FastMCP framework [@fastmcp], enabling AI assistants to invoke API methods through natural language
-
-An optional **vector backend** (`vector_backend/`) implements semantic search using OpenAI embeddings [@openai2022embeddings] and Pinecone vector database [@pinecone], allowing researchers to find conceptually related content beyond keyword matching.
+4. **Vector Backend** (`vector_backend/`): A modular semantic search framework with configurable text chunking strategies, embedding model abstraction (OpenAI, extensible to local models), and backend-agnostic vector index operations supporting Pinecone [@pinecone] and Qdrant. This component is designed as a standalone library with Hydra-based configuration management [@hydra], enabling researchers to find conceptually related content beyond keyword matching and integrate semantic search into custom pipelines independent of the MCP server.
 
 ## Key Features
 
@@ -60,7 +59,7 @@ An optional **vector backend** (`vector_backend/`) implements semantic search us
 
 **Reproducible Environments**: The project uses conda-lock to pin all dependencies, ensuring bit-for-bit reproducibility across development, testing, and production environments. This approach aligns with FAIR data principles [@wilkinson2016fair] for computational research.
 
-**Semantic Search**: Vector embeddings enable researchers to search notebooks by concept rather than exact keywords. For example, querying "olfactory navigation behavior" can retrieve relevant pages even if they use terminology like "odor-guided flight" or "chemotaxis assays."
+**Modular Semantic Search Framework**: The vector backend provides a flexible, configuration-driven pipeline for semantic search with pluggable components—text chunking (token-aware with configurable overlap), embedding generation (OpenAI API with retry logic, extensible to sentence-transformers), and vector storage (Pinecone, Qdrant, or local Parquet). Researchers can search notebooks by concept rather than exact keywords; for example, querying "olfactory navigation behavior" retrieves relevant pages using terminology like "odor-guided flight" or "chemotaxis assays." The framework is usable as a standalone library for custom search implementations beyond the MCP integration.
 
 **Experimental Upload Support**: An experimental upload API allows researchers to archive computational outputs (notebooks, figures, analysis scripts) directly to LabArchives with Git provenance metadata, supporting reproducible research workflows.
 
@@ -68,7 +67,7 @@ An optional **vector backend** (`vector_backend/`) implements semantic search us
 
 The codebase maintains comprehensive test coverage with unit tests for all API methods, integration tests against live LabArchives instances (skipped in CI without credentials), and property-based tests using Hypothesis [@hypothesis] for numeric operations. Pre-commit hooks enforce code quality through Ruff linting, Black formatting, isort import sorting, and mypy type checking.
 
-Continuous integration via GitHub Actions runs the test suite on Ubuntu and macOS across Python 3.11 and 3.12, ensuring cross-platform compatibility.
+Continuous integration via GitHub Actions runs the test suite on macOS across Python 3.11 and 3.12. The package is developed and tested primarily on macOS, though the use of Conda for environment management and platform-agnostic dependencies should facilitate portability to Linux systems.
 
 # Usage Example
 
@@ -92,12 +91,15 @@ This conversational interface reduces the cognitive overhead of manual search an
 
 # Comparison to Existing Tools
 
-While commercial ELN platforms (LabArchives, Benchling, eLabFTW) provide web APIs, no existing open-source tools expose these systems to AI assistants through standardized protocols. Previous academic efforts have focused on ELN data export [@elabjournalapi] or laboratory information management systems (LIMS) integration [@openlims], but not on AI-native interfaces.
+While commercial ELN platforms (LabArchives, Benchling, eLabFTW) provide web APIs, existing open-source tools have focused primarily on ELN data export [@elabjournalapi] or laboratory information management systems (LIMS) integration [@openlims]. To our knowledge, no publicly available tools expose commercial ELN platforms to AI assistants through standardized protocols like MCP.
 
-The Model Context Protocol is a recently introduced standard for connecting AI systems to external data sources [@anthropic2024mcp]. `lab_archives_mcp` represents one of the first academic applications of this protocol for research data management, demonstrating a reusable pattern for integrating institutional data systems with AI assistants.
+The Model Context Protocol is a recently introduced standard for connecting AI systems to external data sources [@anthropic2024mcp]. `lab_archives_mcp` represents an early academic application of this protocol for research data management, demonstrating a reusable pattern for integrating institutional data systems with AI assistants through both standardized MCP interfaces and modular vector search infrastructure.
 
 # Acknowledgements
 
-This work was supported by the Department of Neuroscience at Yale University. The author thanks LabArchives for API documentation and technical support, and the FastMCP and Anthropic teams for the Model Context Protocol specification.
+This work was performed independently by the author, and validated against a LabArchives account at Yale University. The author thanks LabArchives for API documentation and technical support, and the FastMCP and Anthropic teams for the Model Context Protocol specification.
 
 # References
+
+[1] Anthropic, Inc. (2024). Model Context Protocol. https://www.anthropic.com/mcp
+[2] LabArchives. (2024). LabArchives API Documentation. https://www.labarchives.com/api
