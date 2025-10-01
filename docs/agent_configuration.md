@@ -221,7 +221,7 @@ export LABARCHIVES_CONFIG_PATH=/absolute/path/to/conf/secrets.yml
    ```bash
    export LABARCHIVES_ENABLE_UPLOAD=false
    ```
-   
+
    Add this to your agent configuration:
    ```json
    {

@@ -28,6 +28,8 @@ dependencies:
       - pyarrow>=16.0
       - pinecone-client>=4.1
       - qdrant-client>=1.9
+      - dvc>=3.0
+      - filelock>=3.13
       # Dev/testing dependencies
       - pytest>=8.3
       - pytest-asyncio>=0.23

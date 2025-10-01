@@ -47,7 +47,7 @@ IDE shows warnings for:
 # Completely valid GitHub Actions
 env:
   LABARCHIVES_AKID: ${{ secrets.LABARCHIVES_AKID }}
-  
+
 # If secret doesn't exist:
 # - Variable is set to empty string ""
 # - Tests gracefully skip (they check for env vars)

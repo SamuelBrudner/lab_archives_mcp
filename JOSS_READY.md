@@ -7,7 +7,7 @@
 - ✅ **pyproject.toml** - Updated to MIT, added bio-informatics classifier
 - ✅ **README.md** - License badge and statement added
 
-### 2. Documentation  
+### 2. Documentation
 - ✅ **README.md** - Enhanced with:
   - Installation instructions (conda-lock)
   - API configuration steps
@@ -32,7 +32,7 @@
 - ✅ **pytest suite** - Comprehensive tests (118+ passing unit tests)
   - Unit tests work without credentials
   - Integration tests properly marked
-  
+
 ### 4. Release Management
 - ✅ **CHANGELOG.md** - v0.1.0 release notes with:
   - All features documented
@@ -150,7 +150,7 @@ The following test failures should be fixed but don't block JOSS submission:
 
 1. **Mock signature mismatches** (8 tests) - Tests need `auth_manager` parameter
    - `tests/spec/test_mcp_server_contract.py` - ✅ Fixed
-   - `tests/unit/test_mcp_server.py` - ✅ Fixed  
+   - `tests/unit/test_mcp_server.py` - ✅ Fixed
    - Similar updates needed in vector backend tests
 
 2. **Transform tests** (4 tests) - XML tag name mismatch (`id` vs `nbid`)

@@ -35,7 +35,8 @@ labarchives-mcp
       ],
       "env": {
         "LABARCHIVES_CONFIG_PATH": "/Users/samuelbrudner/Yale University Dropbox/Samuel Brudner/lab_archives_mcp/conf/secrets.yml",
-        "FASTMCP_SHOW_CLI_BANNER": "false"
+        "FASTMCP_SHOW_CLI_BANNER": "false",
+        "LABARCHIVES_ENABLE_UPLOAD": "true"
       }
     }
   }
@@ -65,13 +66,17 @@ labarchives-mcp
         "-m",
         "labarchives_mcp"
       ],
-      "cwd": "/Users/samuelbrudner/Yale University Dropbox/Samuel Brudner/lab_archives_mcp"
+      "cwd": "/Users/samuelbrudner/Yale University Dropbox/Samuel Brudner/lab_archives_mcp",
+      "env": {
+        "LABARCHIVES_CONFIG_PATH": "/Users/samuelbrudner/Yale University Dropbox/Samuel Brudner/lab_archives_mcp/conf/secrets.yml",
+        "LABARCHIVES_ENABLE_UPLOAD": "true"
+      }
     }
   }
 }
 ```
 
-**Important**: Update the path to match your system.
+**Important**: Update the paths to match your system.
 
 ## Verify Setup
 
@@ -83,9 +88,15 @@ python scripts/test_baseline.py
 cat conf/secrets.yml
 ```
 
-## Available Resource
+## Available Tools
 
-- **`labarchives:notebooks`** — List all notebooks for authenticated user
+- **`list_labarchives_notebooks()`** — List all your notebooks
+- **`list_notebook_pages(notebook_id, folder_id?)`** — Navigate notebook pages and folders
+- **`read_notebook_page(notebook_id, page_id)`** — Read page content with entries
+- **`search_labarchives(query, limit=5)`** — Semantic search across indexed notebooks
+- **`upload_to_labarchives(...)`** — Upload files with Git provenance (see README for details)
+
+**Resource**: `labarchives://notebooks` (same as list_labarchives_notebooks tool)
 
 ## Troubleshooting
 
