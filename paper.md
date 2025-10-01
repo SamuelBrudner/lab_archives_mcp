@@ -33,12 +33,12 @@ Research laboratories generate vast amounts of structured and unstructured data 
 
 Recent advances in large language models (LLMs) and AI assistants have demonstrated powerful capabilities for natural language interaction with structured data [@brown2020language; @openai2023gpt4]. However, ELN platforms have remained largely isolated from these AI tools, requiring researchers to manually copy-paste content between systems.
 
-`lab_archives_mcp` addresses this gap by implementing a read-only MCP server [@anthropic2024mcp] that exposes LabArchives notebooks to AI assistants like Claude Desktop and Windsurf. The software enables researchers to:
+`lab_archives_mcp` addresses this gap by implementing an MCP server [@anthropic2024mcp] that exposes LabArchives notebooks to AI assistants like Claude Desktop and Windsurf. The Model Context Protocol enables AI assistants to discover and invoke tools through self-describing schemas—each tool provides its name, purpose, and parameter specifications, allowing the AI to autonomously determine when and how to call appropriate functions based on user queries. By connecting AI assistants to laboratory notebooks, researchers can:
 
-- Query notebooks using natural language (e.g., "Which fly lines did I use in navigation experiments last summer?")
-- Perform semantic searches across all notebook content using vector embeddings
-- Navigate notebook hierarchies programmatically through structured API access
-- Maintain reproducible research workflows with proper authentication and error handling
+- Query their experimental history using natural language—the AI assistant automatically navigates notebook hierarchies, retrieves relevant pages, and synthesizes answers (e.g., "Which fly lines did I use in navigation experiments last summer?")
+- Ask the AI to perform semantic searches across all notebook content using vector embeddings to find conceptually related experiments
+- Request cross-notebook analyses where the AI assistant autonomously aggregates data from multiple experimental records
+- Archive computational outputs with Git provenance metadata through AI-directed uploads
 
 # Design and Implementation
 
@@ -107,7 +107,7 @@ This conversational interface reduces the cognitive overhead of manual search an
 
 # Comparison to Existing Tools
 
-While commercial ELN platforms (LabArchives, Benchling, eLabFTW) provide web APIs, existing open-source tools have focused primarily on ELN data export [@elabjournalapi] or laboratory information management systems (LIMS) integration [@openlims]. To our knowledge, no publicly available tools expose commercial ELN platforms to AI assistants through standardized protocols like MCP.
+While commercial ELN platforms (LabArchives, Benchling, eLabFTW) provide web APIs, existing open-source tools have focused primarily on ELN data export [@elabjournalapi] or laboratory information management systems (LIMS) integration. To our knowledge, no publicly available tools expose commercial ELN platforms to AI assistants through standardized protocols like MCP.
 
 The Model Context Protocol is a recently introduced standard for connecting AI systems to external data sources [@anthropic2024mcp]. `lab_archives_mcp` represents an early academic application of this protocol for research data management, demonstrating a reusable pattern for integrating institutional data systems with AI assistants through both standardized MCP interfaces and modular vector search infrastructure.
 
@@ -116,6 +116,3 @@ The Model Context Protocol is a recently introduced standard for connecting AI s
 This work was performed independently by the author, and validated against a LabArchives account at Yale University. The author thanks LabArchives for API documentation and technical support, and the FastMCP and Anthropic teams for the Model Context Protocol specification.
 
 # References
-
-[1] Anthropic, Inc. (2024). Model Context Protocol. https://www.anthropic.com/mcp
-[2] LabArchives. (2024). LabArchives API Documentation. https://www.labarchives.com/api
