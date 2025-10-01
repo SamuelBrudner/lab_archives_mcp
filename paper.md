@@ -1,5 +1,5 @@
 ---
-title: 'LabArchives MCP Server: AI Integration for Electronic Lab Notebooks'
+title: Integrating AI Assistants with Electronic Lab Notebooks using the LabArchives Model Context Protocol Server
 tags:
   - Python
   - electronic lab notebook
