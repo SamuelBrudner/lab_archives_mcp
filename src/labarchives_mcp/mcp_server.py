@@ -69,7 +69,7 @@ def _import_fastmcp() -> type[Any]:
 
 def _is_upload_enabled() -> bool:
     """Check if upload functionality should be enabled.
-    
+
     Returns:
         True if LABARCHIVES_ENABLE_UPLOAD is not set or is "true" (case-insensitive).
         False if LABARCHIVES_ENABLE_UPLOAD is set to "false" (case-insensitive).

@@ -140,14 +140,13 @@ class TestOpenAIEmbedding:
     @respx.mock
     async def test_exhausted_retries_raises(self, embedding_config):
         """Exhausting retries should raise error."""
-        # All calls fail with rate limit
+        # All calls fail with rate limit (need enough for all retry attempts)
         respx.post("https://api.openai.com/v1/embeddings").mock(
+            return_value=Response(429, json={"error": {"message": "Rate limit exceeded"}})
         )
 
         embedding_config.max_retries = 2
         client = OpenAIEmbedding(embedding_config)
-
-        # OpenAI SDK may wrap the error
         with pytest.raises((httpx.HTTPStatusError, RateLimitError)):
             await client.embed_single("Test")
 
