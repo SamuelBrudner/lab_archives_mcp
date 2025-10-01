@@ -51,9 +51,25 @@ LABARCHIVES_REGION: https://api.labarchives.com
     assert str(creds.region) == "https://api.labarchives.com/"
 
 
-@pytest.mark.asyncio()  # type: ignore[misc]
-async def test_run_server_not_implemented() -> None:
-    """Given the PoL state, when `run_server()` is awaited,
-    then a `NotImplementedError` surfaces."""
-    with pytest.raises(NotImplementedError):
-        await run_server()
+def test_run_server_requires_secrets(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Given missing secrets file, when `run_server()` is awaited,
+    then a `FileNotFoundError` surfaces."""
+    import asyncio
+    from typing import Any, cast
+
+    from labarchives_mcp import mcp_server
+
+    mcp_module = cast(Any, mcp_server)
+
+    # Ensure Credentials.from_file() raises FileNotFoundError
+    def mock_from_file(path: Path | None = None) -> None:
+        raise FileNotFoundError("Secrets file not found: conf/secrets.yml")
+
+    monkeypatch.setattr(
+        mcp_module.Credentials,
+        "from_file",
+        staticmethod(mock_from_file),
+    )
+
+    with pytest.raises(FileNotFoundError, match="Secrets file not found"):
+        asyncio.run(run_server())

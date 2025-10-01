@@ -4,6 +4,7 @@ import httpx
 import pytest
 import respx
 from httpx import Response
+from openai import RateLimitError
 
 from vector_backend.embedding import EmbeddingConfig, OpenAIEmbedding, create_embedding_client
 
@@ -147,7 +148,7 @@ class TestOpenAIEmbedding:
         embedding_config.max_retries = 2
         client = OpenAIEmbedding(embedding_config)
 
-        with pytest.raises(httpx.HTTPStatusError):  # Should raise after retries exhausted
+        with pytest.raises((httpx.HTTPStatusError, RateLimitError)):  # OpenAI SDK may wrap the error
             await client.embed_single("Test")
 
     @pytest.mark.asyncio

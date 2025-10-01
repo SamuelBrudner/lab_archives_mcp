@@ -94,7 +94,9 @@ def test_run_server_contract(monkeypatch: pytest.MonkeyPatch) -> None:
                 "description": description,
             }
             self._resource_callbacks: dict[str, Callable[..., Any]] = {}
+            self._tool_callbacks: dict[str, Callable[..., Any]] = {}
             captured["resource_callbacks"] = self._resource_callbacks
+            captured["tool_callbacks"] = self._tool_callbacks
 
         def resource(self, uri: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
             def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
@@ -103,8 +105,18 @@ def test_run_server_contract(monkeypatch: pytest.MonkeyPatch) -> None:
 
             return decorator
 
+        def tool(self) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+            def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+                self._tool_callbacks[func.__name__] = func
+                return func
+
+            return decorator
+
         async def serve(self) -> None:
             captured["serve_invoked"] = True
+
+        async def run_async(self) -> None:
+            await self.serve()
 
     monkeypatch.setattr(mcp_module, "FastMCP", DummyFastMCP)
 
@@ -119,7 +131,7 @@ def test_run_server_contract(monkeypatch: pytest.MonkeyPatch) -> None:
 
     assert captured.get("serve_invoked"), "run_server should await FastMCP.serve()"
 
-    notebooks_handler = captured["resource_callbacks"].get("labarchives:notebooks")
+    notebooks_handler = captured["resource_callbacks"].get("labarchives://notebooks")
     assert notebooks_handler is not None, "Notebooks resource must be registered"
 
     result = asyncio.run(notebooks_handler())
@@ -128,7 +140,7 @@ def test_run_server_contract(monkeypatch: pytest.MonkeyPatch) -> None:
     assert captured.get("list_notebooks_uid") == "uid-456"
 
     assert result == {
-        "resource": "labarchives:notebooks",
+        "resource": "labarchives://notebooks",
         "list": [
             {
                 "nbid": "123",
@@ -195,7 +207,9 @@ def test_run_server_maps_labarchives_errors(monkeypatch: pytest.MonkeyPatch) -> 
                 "description": description,
             }
             self._resource_callbacks: dict[str, Callable[..., Any]] = {}
+            self._tool_callbacks: dict[str, Callable[..., Any]] = {}
             captured["resource_callbacks"] = self._resource_callbacks
+            captured["tool_callbacks"] = self._tool_callbacks
 
         def resource(self, uri: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
             def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
@@ -204,18 +218,28 @@ def test_run_server_maps_labarchives_errors(monkeypatch: pytest.MonkeyPatch) -> 
 
             return decorator
 
+        def tool(self) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+            def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+                self._tool_callbacks[func.__name__] = func
+                return func
+
+            return decorator
+
         async def serve(self) -> None:
             captured["serve_invoked"] = True
+
+        async def run_async(self) -> None:
+            await self.serve()
 
     monkeypatch.setattr(mcp_module, "FastMCP", DummyFastMCP)
 
     asyncio.run(mcp_server.run_server())
 
-    handler = captured["resource_callbacks"]["labarchives:notebooks"]
+    handler = captured["resource_callbacks"]["labarchives://notebooks"]
     outcome = asyncio.run(handler())
 
     assert outcome == {
-        "resource": "labarchives:notebooks",
+        "resource": "labarchives://notebooks",
         "error": {
             "code": "labarchives:4501",
             "message": "Invalid UID",

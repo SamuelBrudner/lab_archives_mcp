@@ -35,6 +35,7 @@ class DummyFastMCP:
             "description": description,
         }
         self.resource_callbacks: dict[str, Callable[..., Any]] = {}
+        self.tool_callbacks: dict[str, Callable[..., Any]] = {}
 
     def resource(self, uri: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
@@ -43,8 +44,18 @@ class DummyFastMCP:
 
         return decorator
 
+    def tool(self) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+        def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+            self.tool_callbacks[func.__name__] = func
+            return func
+
+        return decorator
+
     async def serve(self) -> None:
         return None
+
+    async def run_async(self) -> None:
+        await self.serve()
 
 
 def test_notebooks_handler_propagates_errors(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -72,7 +83,7 @@ def test_notebooks_handler_propagates_errors(monkeypatch: pytest.MonkeyPatch) ->
             return "uid-1"
 
     monkeypatch.setattr(mcp_module, "AuthenticationManager", DummyAuthenticationManager)
-    monkeypatch.setattr(mcp_module, "LabArchivesClient", lambda client: ExplodingClient())
+    monkeypatch.setattr(mcp_module, "LabArchivesClient", lambda client, auth_manager: ExplodingClient())
 
     fastmcp_instance = DummyFastMCP(
         server_id="labarchives-mcp-pol",
@@ -84,7 +95,7 @@ def test_notebooks_handler_propagates_errors(monkeypatch: pytest.MonkeyPatch) ->
 
     asyncio.run(mcp_server.run_server())
 
-    handler = fastmcp_instance.resource_callbacks.get("labarchives:notebooks")
+    handler = fastmcp_instance.resource_callbacks.get("labarchives://notebooks")
     assert handler is not None, "Resource should be registered"
 
     with pytest.raises(RuntimeError, match="boom"):

@@ -142,6 +142,7 @@ class TestNotebookIndexer:
             vector_index=mock_index,
             embedding_version="v1",
             chunk_size=50,  # Small chunk size to force chunking
+            chunk_overlap=10,  # Must be less than chunk_size
         )
 
         # Long text that will be chunked

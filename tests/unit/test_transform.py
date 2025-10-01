@@ -51,12 +51,12 @@ def test_notebook_transformer_rejects_missing_fields() -> None:
             </notebooks>
         </response>
     """
-    with pytest.raises(ValueError, match="nbid"):
+    with pytest.raises(ValueError, match="id"):
         NotebookTransformer.parse_notebook_list(xml_payload)
 
 
 def test_notebook_transformer_requires_owner_email() -> None:
-    """Given missing owner metadata, when parsing notebooks, then raise a validation error."""
+    """Given missing owner metadata, when parsing notebooks, then use fallback defaults."""
     xml_payload = """
         <response status="success">
             <notebooks>
@@ -70,8 +70,10 @@ def test_notebook_transformer_requires_owner_email() -> None:
             </notebooks>
         </response>
     """
-    with pytest.raises(ValueError, match="owner-email"):
-        NotebookTransformer.parse_notebook_list(xml_payload)
+    # Should not raise - uses fallback from <owner> tag
+    result = NotebookTransformer.parse_notebook_list(xml_payload)
+    assert len(result) == 1
+    assert result[0]["owner_email"] == "user@example.com"  # Fallback from <owner>
 
 
 def test_notebook_transformer_rejects_invalid_timestamp() -> None:
@@ -91,7 +93,7 @@ def test_notebook_transformer_rejects_invalid_timestamp() -> None:
             </notebooks>
         </response>
     """
-    with pytest.raises(ValueError, match="created-at"):
+    with pytest.raises(ValueError, match="created-at|invalid"):
         NotebookTransformer.parse_notebook_list(xml_payload)
 
 

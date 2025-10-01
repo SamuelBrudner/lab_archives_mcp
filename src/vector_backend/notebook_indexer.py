@@ -30,8 +30,7 @@ class NotebookIndexer:
         embedding_client: EmbeddingClient,
         vector_index: VectorIndex,
         embedding_version: str,
-        chunk_size: int = 400,
-        chunk_overlap: int = 50,
+        chunking_config: ChunkingConfig | None = None,
     ):
         """Initialize notebook indexer.
 
@@ -39,20 +38,14 @@ class NotebookIndexer:
             embedding_client: Client for generating embeddings
             vector_index: Vector index for storage
             embedding_version: Version identifier for embeddings
-            chunk_size: Maximum tokens per chunk
-            chunk_overlap: Overlap between chunks in tokens
+            chunking_config: Configuration for text chunking (uses defaults if None)
         """
         self.embedding_client = embedding_client
         self.vector_index = vector_index
         self.embedding_version = embedding_version
 
-        # Initialize chunker
-        self.chunker = RecursiveTokenChunker(
-            ChunkingConfig(
-                chunk_size=chunk_size,
-                overlap=chunk_overlap,
-            )
-        )
+        # Initialize chunker with provided config or defaults
+        self.chunker = RecursiveTokenChunker(chunking_config or ChunkingConfig())
 
     async def index_page(
         self,
@@ -113,51 +106,56 @@ class NotebookIndexer:
                 "page_id": page_id,
             }
 
-        # Chunk and embed all entries
-        embedded_chunks = []
+        # Chunk all entries first
+        all_chunks_with_metadata = []
 
         for indexable_entry, entry_dict in indexable_entries:
             # Chunk the text
             chunks = self.chunker.chunk(indexable_entry.text)
 
-            # Get all chunk texts for batch embedding
-            chunk_texts = [chunk.text for chunk in chunks]
+            # Store chunks with their entry metadata for later
+            for chunk in chunks:
+                all_chunks_with_metadata.append((chunk, indexable_entry, entry_dict))
 
-            # Generate embeddings
-            vectors = await self.embedding_client.embed_batch(chunk_texts)
+        # Batch embed all chunks at once
+        all_chunk_texts = [chunk.text for chunk, _, _ in all_chunks_with_metadata]
+        all_vectors = await self.embedding_client.embed_batch(all_chunk_texts)
 
-            # Create embedded chunks
-            for chunk, vector in zip(chunks, vectors, strict=False):
-                # Parse entry date
-                created_at_str = entry_dict.get("created_at", "")
-                try:
-                    entry_date = datetime.fromisoformat(created_at_str.replace("Z", "+00:00"))
-                except (ValueError, AttributeError):
-                    entry_date = datetime.now()
+        # Create embedded chunks
+        embedded_chunks = []
+        for (chunk, indexable_entry, entry_dict), vector in zip(
+            all_chunks_with_metadata, all_vectors, strict=False
+        ):
+            # Parse entry date
+            created_at_str = entry_dict.get("created_at", "")
+            try:
+                entry_date = datetime.fromisoformat(created_at_str.replace("Z", "+00:00"))
+            except (ValueError, AttributeError):
+                entry_date = datetime.now()
 
-                # Create metadata
-                metadata = ChunkMetadata(
-                    notebook_id=notebook_id,
-                    notebook_name=notebook_name,
-                    page_id=page_id,
-                    page_title=page_title,
-                    entry_id=indexable_entry.entry_id,
-                    entry_type=indexable_entry.entry_type.value,
-                    author=author,
-                    date=entry_date,
-                    labarchives_url=labarchives_url,
-                    embedding_version=self.embedding_version,
-                )
+            # Create metadata
+            metadata = ChunkMetadata(
+                notebook_id=notebook_id,
+                notebook_name=notebook_name,
+                page_id=page_id,
+                page_title=page_title,
+                entry_id=indexable_entry.entry_id,
+                entry_type=indexable_entry.entry_type.value,
+                author=author,
+                date=entry_date,
+                labarchives_url=labarchives_url,
+                embedding_version=self.embedding_version,
+            )
 
-                # Create embedded chunk
-                chunk_id = f"{notebook_id}_{page_id}_{indexable_entry.entry_id}_{chunk.chunk_index}"
-                embedded_chunk = EmbeddedChunk(
-                    id=chunk_id,
-                    text=chunk.text,
-                    vector=vector,
-                    metadata=metadata,
-                )
-                embedded_chunks.append(embedded_chunk)
+            # Create embedded chunk
+            chunk_id = f"{notebook_id}_{page_id}_{indexable_entry.entry_id}_{chunk.chunk_index}"
+            embedded_chunk = EmbeddedChunk(
+                id=chunk_id,
+                text=chunk.text,
+                vector=vector,
+                metadata=metadata,
+            )
+            embedded_chunks.append(embedded_chunk)
 
         # Upsert to vector index
         if embedded_chunks:
