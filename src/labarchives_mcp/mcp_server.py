@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import os
 from collections.abc import Awaitable, Callable, Coroutine
 from importlib import metadata
 from typing import Any, cast
@@ -64,6 +65,17 @@ def _import_fastmcp() -> type[Any]:
 
     FastMCP = cast(type[Any], FastMCPClass)
     return FastMCP
+
+
+def _is_upload_enabled() -> bool:
+    """Check if upload functionality should be enabled.
+    
+    Returns:
+        True if LABARCHIVES_ENABLE_UPLOAD is not set or is "true" (case-insensitive).
+        False if LABARCHIVES_ENABLE_UPLOAD is set to "false" (case-insensitive).
+    """
+    env_value = os.environ.get("LABARCHIVES_ENABLE_UPLOAD", "true")
+    return env_value.lower() != "false"
 
 
 async def run_server() -> None:
@@ -373,119 +385,125 @@ async def run_server() -> None:
                 logger.error(f"Failed to search LabArchives: {exc}", exc_info=True)
                 raise
 
-        @server.tool()  # type: ignore[misc]
-        async def upload_to_labarchives(
-            notebook_id: str,
-            page_title: str,
-            file_path: str,
-            git_commit_sha: str,
-            git_branch: str,
-            git_repo_url: str,
-            python_version: str,
-            executed_at: str,
-            parent_folder_id: str | None = None,
-            caption: str | None = None,
-            git_is_dirty: bool = False,
-            allow_dirty_git: bool = False,
-            dependencies: dict[str, str] | None = None,
-        ) -> dict[str, Any]:
-            """Upload a file to LabArchives with code provenance metadata.
+        # Conditionally register upload tool based on environment variable
+        if _is_upload_enabled():
+            logger.info("Upload functionality is ENABLED (LABARCHIVES_ENABLE_UPLOAD)")
 
-            Creates a new page, uploads the file as an attachment, and adds
-            metadata about code version, execution context, and dependencies.
+            @server.tool()  # type: ignore[misc]
+            async def upload_to_labarchives(
+                notebook_id: str,
+                page_title: str,
+                file_path: str,
+                git_commit_sha: str,
+                git_branch: str,
+                git_repo_url: str,
+                python_version: str,
+                executed_at: str,
+                parent_folder_id: str | None = None,
+                caption: str | None = None,
+                git_is_dirty: bool = False,
+                allow_dirty_git: bool = False,
+                dependencies: dict[str, str] | None = None,
+            ) -> dict[str, Any]:
+                """Upload a file to LabArchives with code provenance metadata.
 
-            Args:
-                notebook_id: LabArchives notebook ID
-                page_title: Title for the new page
-                file_path: Path to file to upload (e.g., analysis.ipynb)
-                git_commit_sha: Full 40-character Git commit SHA
-                git_branch: Git branch name (e.g., "main")
-                git_repo_url: Git repository URL
-                python_version: Python version (e.g., "3.11.8")
-                executed_at: Execution timestamp (ISO 8601, e.g., "2025-09-30T12:00:00Z")
-                parent_folder_id: Optional folder tree_id to upload into
-                caption: Optional caption for the attachment
-                git_is_dirty: True if uncommitted changes exist
-                allow_dirty_git: Allow upload despite dirty Git (not recommended)
-                dependencies: Key package versions (e.g., {"numpy": "1.26.0"})
+                Creates a new page, uploads the file as an attachment, and adds
+                metadata about code version, execution context, and dependencies.
 
-            Returns:
-                Dictionary with:
-                - page_tree_id: Created page ID
-                - entry_id: Attachment entry ID
-                - page_url: LabArchives web URL
-                - created_at: Upload timestamp
-                - file_size_bytes: File size
-                - filename: Uploaded filename
-            """
-            from datetime import datetime
-            from pathlib import Path
+                Args:
+                    notebook_id: LabArchives notebook ID
+                    page_title: Title for the new page
+                    file_path: Path to file to upload (e.g., analysis.ipynb)
+                    git_commit_sha: Full 40-character Git commit SHA
+                    git_branch: Git branch name (e.g., "main")
+                    git_repo_url: Git repository URL
+                    python_version: Python version (e.g., "3.11.8")
+                    executed_at: Execution timestamp (ISO 8601, e.g., "2025-09-30T12:00:00Z")
+                    parent_folder_id: Optional folder tree_id to upload into
+                    caption: Optional caption for the attachment
+                    git_is_dirty: True if uncommitted changes exist
+                    allow_dirty_git: Allow upload despite dirty Git (not recommended)
+                    dependencies: Key package versions (e.g., {"numpy": "1.26.0"})
 
-            from labarchives_mcp.models.upload import ProvenanceMetadata, UploadRequest
+                Returns:
+                    Dictionary with:
+                    - page_tree_id: Created page ID
+                    - entry_id: Attachment entry ID
+                    - page_url: LabArchives web URL
+                    - created_at: Upload timestamp
+                    - file_size_bytes: File size
+                    - filename: Uploaded filename
+                """
+                from datetime import datetime
+                from pathlib import Path
 
-            logger.info(
-                f"upload_to_labarchives called: file={file_path}, "
-                f"notebook={notebook_id}, title={page_title}"
-            )
+                from labarchives_mcp.models.upload import ProvenanceMetadata, UploadRequest
 
-            try:
-                uid = await auth_manager.ensure_uid()
-                logger.debug(f"Obtained UID: {uid[:20]}...")
-
-                # Validate file exists
-                file_path_obj = Path(file_path)
-                if not file_path_obj.exists():
-                    raise FileNotFoundError(f"File not found: {file_path}")
-
-                # Parse execution timestamp
-                executed_at_dt = datetime.fromisoformat(executed_at.replace("Z", "+00:00"))
-
-                # Build metadata
-                import platform
-
-                metadata = ProvenanceMetadata(
-                    git_commit_sha=git_commit_sha,
-                    git_branch=git_branch,
-                    git_repo_url=git_repo_url,
-                    git_is_dirty=git_is_dirty,
-                    code_version=None,
-                    executed_at=executed_at_dt,
-                    python_version=python_version,
-                    dependencies=dependencies or {},
-                    os_name=platform.system(),
-                    hostname=platform.node(),
+                logger.info(
+                    f"upload_to_labarchives called: file={file_path}, "
+                    f"notebook={notebook_id}, title={page_title}"
                 )
 
-                # Build upload request
-                upload_request = UploadRequest(
-                    notebook_id=notebook_id,
-                    parent_folder_id=parent_folder_id,
-                    page_title=page_title,
-                    file_path=file_path_obj,
-                    caption=caption,
-                    change_description=None,
-                    metadata=metadata,
-                    allow_dirty_git=allow_dirty_git,
-                )
+                try:
+                    uid = await auth_manager.ensure_uid()
+                    logger.debug(f"Obtained UID: {uid[:20]}...")
 
-                # Execute upload
-                result = await notebook_client.upload_to_labarchives(uid, upload_request)
-                logger.success(
-                    f"Successfully uploaded {result.filename} to page {result.page_tree_id}"
-                )
+                    # Validate file exists
+                    file_path_obj = Path(file_path)
+                    if not file_path_obj.exists():
+                        raise FileNotFoundError(f"File not found: {file_path}")
 
-                return {
-                    "page_tree_id": result.page_tree_id,
-                    "entry_id": result.entry_id,
-                    "page_url": result.page_url,
-                    "created_at": result.created_at.isoformat(),
-                    "file_size_bytes": result.file_size_bytes,
-                    "filename": result.filename,
-                }
+                    # Parse execution timestamp
+                    executed_at_dt = datetime.fromisoformat(executed_at.replace("Z", "+00:00"))
 
-            except Exception as exc:
-                logger.error(f"Failed to upload to LabArchives: {exc}", exc_info=True)
-                raise
+                    # Build metadata
+                    import platform
+
+                    metadata = ProvenanceMetadata(
+                        git_commit_sha=git_commit_sha,
+                        git_branch=git_branch,
+                        git_repo_url=git_repo_url,
+                        git_is_dirty=git_is_dirty,
+                        code_version=None,
+                        executed_at=executed_at_dt,
+                        python_version=python_version,
+                        dependencies=dependencies or {},
+                        os_name=platform.system(),
+                        hostname=platform.node(),
+                    )
+
+                    # Build upload request
+                    upload_request = UploadRequest(
+                        notebook_id=notebook_id,
+                        parent_folder_id=parent_folder_id,
+                        page_title=page_title,
+                        file_path=file_path_obj,
+                        caption=caption,
+                        change_description=None,
+                        metadata=metadata,
+                        allow_dirty_git=allow_dirty_git,
+                    )
+
+                    # Execute upload
+                    result = await notebook_client.upload_to_labarchives(uid, upload_request)
+                    logger.success(
+                        f"Successfully uploaded {result.filename} to page {result.page_tree_id}"
+                    )
+
+                    return {
+                        "page_tree_id": result.page_tree_id,
+                        "entry_id": result.entry_id,
+                        "page_url": result.page_url,
+                        "created_at": result.created_at.isoformat(),
+                        "file_size_bytes": result.file_size_bytes,
+                        "filename": result.filename,
+                    }
+
+                except Exception as exc:
+                    logger.error(f"Failed to upload to LabArchives: {exc}", exc_info=True)
+                    raise
+        else:
+            logger.info("Upload functionality is DISABLED (LABARCHIVES_ENABLE_UPLOAD=false)")
 
         await server.run_async()
 

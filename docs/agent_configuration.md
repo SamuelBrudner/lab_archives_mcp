@@ -212,11 +212,31 @@ export LABARCHIVES_CONFIG_PATH=/absolute/path/to/conf/secrets.yml
 
 2. **Agent Access**: When an agent connects to this server, it can:
    - Read all notebooks for the authenticated user
+   - Upload files to notebooks (if enabled)
    - The agent inherits your LabArchives permissions
 
 3. **Fail-Fast**: The server will refuse to start if credentials are missing or invalid. No silent fallbacks.
 
-4. **Read-Only**: This proof-of-life server is read-only. No write operations are supported.
+4. **Write Capabilities**: The server includes an experimental `upload_to_labarchives` tool that allows AI assistants to upload files with Git provenance metadata. To disable this for production deployments, set the environment variable:
+   ```bash
+   export LABARCHIVES_ENABLE_UPLOAD=false
+   ```
+   
+   Add this to your agent configuration:
+   ```json
+   {
+     "mcpServers": {
+       "labarchives": {
+         "command": "conda",
+         "args": ["run", "-p", "/path/to/conda_envs/pol-dev", "python", "-m", "labarchives_mcp"],
+         "cwd": "/path/to/lab_archives_mcp",
+         "env": {
+           "LABARCHIVES_ENABLE_UPLOAD": "false"
+         }
+       }
+     }
+   }
+   ```
 
 ---
 

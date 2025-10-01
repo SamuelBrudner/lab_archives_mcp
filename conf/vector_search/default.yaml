@@ -1,24 +1,29 @@
 # Vector Search Default Configuration
 # See: docs/vector_approach.md for detailed documentation
 #
+# All chunking and embedding parameters are fully configurable through this YAML file.
+# This enables reproducible semantic search configurations across environments.
+#
 # API keys can be set via environment variables:
 #   export OPENAI_API_KEY="sk-..."
 #   export PINECONE_API_KEY="..."
 #   export PINECONE_ENVIRONMENT="us-east-1"
 
+# Text Chunking Strategy - All parameters configurable
 chunking:
-  chunk_size: 400                    # tokens
-  overlap: 50                        # tokens
-  tokenizer: "cl100k_base"          # OpenAI tiktoken encoding
+  chunk_size: 400                    # tokens per chunk
+  overlap: 50                        # overlapping tokens between chunks
+  tokenizer: "cl100k_base"          # OpenAI tiktoken encoding (cl100k_base, p50k_base, etc.)
   preserve_boundaries: true          # respect sentence/paragraph breaks
 
+# Embedding Model Configuration - Fully configurable
 embedding:
-  model: "openai/text-embedding-3-small"
+  model: "openai/text-embedding-3-small"  # Model identifier (openai/*, local/*)
   version: "v1"                      # increment to trigger reindexing
-  dimensions: 1536
-  batch_size: 100
-  max_retries: 3
-  timeout_seconds: 30.0
+  dimensions: 1536                   # embedding dimensionality
+  batch_size: 100                    # texts per API call
+  max_retries: 3                     # retry attempts for transient failures
+  timeout_seconds: 30.0              # API request timeout
   api_key: "${oc.env:OPENAI_API_KEY,}"  # Leave empty if env var not set
 
 index:

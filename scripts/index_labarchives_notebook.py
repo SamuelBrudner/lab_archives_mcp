@@ -116,8 +116,7 @@ async def main(notebook_id: str, author: str | None = None):
         embedding_client=embedding_client,
         vector_index=index,
         embedding_version=config.embedding.version,
-        chunk_size=config.chunking.chunk_size,
-        chunk_overlap=config.chunking.overlap,
+        chunking_config=config.chunking,
     )
     logger.info("Created notebook indexer")
 

@@ -4,7 +4,6 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from vector_backend.chunking import ChunkingConfig
 from vector_backend.notebook_indexer import NotebookIndexer, index_notebook
 
 

@@ -1,0 +1,39 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: "LabArchives MCP Server: AI Integration for Electronic Lab Notebooks"
+version: 0.1.0
+date-released: "2025-01-01"
+authors:
+  - family-names: "Brudner"
+    given-names: "Samuel N."
+    orcid: "https://orcid.org/0000-0002-6043-9328"
+    affiliation: "Molecular, Cellular, and Developmental Biology, Yale University"
+repository-code: "https://github.com/SamuelBrudner/lab_archives_mcp"
+url: "https://github.com/SamuelBrudner/lab_archives_mcp"
+abstract: >-
+  A Model Context Protocol (MCP) server that connects AI assistants to
+  LabArchives electronic lab notebooks. Enables researchers to chat with
+  their lab data, search notebooks semantically using vector embeddings,
+  and integrate lab work into AI-assisted workflows. Includes a modular,
+  backend-agnostic vector database framework for semantic search.
+keywords:
+  - electronic-lab-notebook
+  - model-context-protocol
+  - AI-assistants
+  - research-data-management
+  - semantic-search
+  - LabArchives
+  - vector-database
+  - Python
+license: MIT
+preferred-citation:
+  type: software
+  title: "LabArchives MCP Server: AI Integration for Electronic Lab Notebooks"
+  authors:
+    - family-names: "Brudner"
+      given-names: "Samuel N."
+      orcid: "https://orcid.org/0000-0002-6043-9328"
+  year: 2025
+  version: 0.1.0
+  repository-code: "https://github.com/SamuelBrudner/lab_archives_mcp"

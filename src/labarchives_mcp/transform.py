@@ -63,11 +63,9 @@ class NotebookTransformer:
             # Required fields - try all possible XML tag names
             for field_name, possible_tags in NotebookTransformer.REQUIRED_FIELDS.items():
                 value = ""
-                found_tag = None
                 for tag in possible_tags:
                     value = NotebookTransformer._text_or_empty(notebook_node, tag)
                     if value:
-                        found_tag = tag
                         break
 
                 if not value:

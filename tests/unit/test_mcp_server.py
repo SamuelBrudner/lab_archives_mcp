@@ -83,7 +83,9 @@ def test_notebooks_handler_propagates_errors(monkeypatch: pytest.MonkeyPatch) ->
             return "uid-1"
 
     monkeypatch.setattr(mcp_module, "AuthenticationManager", DummyAuthenticationManager)
-    monkeypatch.setattr(mcp_module, "LabArchivesClient", lambda client, auth_manager: ExplodingClient())
+    monkeypatch.setattr(
+        mcp_module, "LabArchivesClient", lambda client, auth_manager: ExplodingClient()
+    )
 
     fastmcp_instance = DummyFastMCP(
         server_id="labarchives-mcp-pol",
@@ -154,3 +156,145 @@ def test_run_server_uses_region_as_base_url(monkeypatch: pytest.MonkeyPatch) -> 
     assert created_clients, "AsyncClient should be constructed"
     client = created_clients[0]
     assert client.kwargs.get("base_url") == DummyCredentials.region
+
+
+def test_upload_tool_not_registered_when_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Given LABARCHIVES_ENABLE_UPLOAD=false, when the server initializes,
+    then the upload_to_labarchives tool should not be registered."""
+
+    mcp_module = cast(Any, mcp_server)
+    monkeypatch.setenv("LABARCHIVES_ENABLE_UPLOAD", "false")
+    monkeypatch.setattr(
+        mcp_module.Credentials,
+        "from_file",
+        classmethod(lambda cls: DummyCredentials()),
+    )
+    monkeypatch.setattr(mcp_module.httpx, "AsyncClient", DummyAsyncClient)
+
+    class DummyAuthenticationManager:
+        def __init__(self, client: DummyAsyncClient, credentials: DummyCredentials) -> None:
+            self._client = client
+            self._credentials = credentials
+
+        async def ensure_uid(self) -> str:
+            return "uid-1"
+
+    class DummyLabArchivesClient:
+        def __init__(self, client: DummyAsyncClient, auth_manager: Any) -> None:
+            self._client = client
+            self._auth_manager = auth_manager
+
+        async def list_notebooks(self, _uid: str) -> list[Any]:
+            return []
+
+    monkeypatch.setattr(mcp_module, "AuthenticationManager", DummyAuthenticationManager)
+    monkeypatch.setattr(mcp_module, "LabArchivesClient", DummyLabArchivesClient)
+
+    fastmcp_instance = DummyFastMCP(
+        server_id="labarchives-mcp-pol",
+        name="",
+        version="",
+        description="",
+    )
+    monkeypatch.setattr(mcp_module, "FastMCP", lambda **kwargs: fastmcp_instance)
+
+    asyncio.run(mcp_server.run_server())
+
+    assert "upload_to_labarchives" not in fastmcp_instance.tool_callbacks, (
+        "upload_to_labarchives should not be registered when LABARCHIVES_ENABLE_UPLOAD=false"
+    )
+
+
+def test_upload_tool_registered_when_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Given LABARCHIVES_ENABLE_UPLOAD=true, when the server initializes,
+    then the upload_to_labarchives tool should be registered."""
+
+    mcp_module = cast(Any, mcp_server)
+    monkeypatch.setenv("LABARCHIVES_ENABLE_UPLOAD", "true")
+    monkeypatch.setattr(
+        mcp_module.Credentials,
+        "from_file",
+        classmethod(lambda cls: DummyCredentials()),
+    )
+    monkeypatch.setattr(mcp_module.httpx, "AsyncClient", DummyAsyncClient)
+
+    class DummyAuthenticationManager:
+        def __init__(self, client: DummyAsyncClient, credentials: DummyCredentials) -> None:
+            self._client = client
+            self._credentials = credentials
+
+        async def ensure_uid(self) -> str:
+            return "uid-1"
+
+    class DummyLabArchivesClient:
+        def __init__(self, client: DummyAsyncClient, auth_manager: Any) -> None:
+            self._client = client
+            self._auth_manager = auth_manager
+
+        async def list_notebooks(self, _uid: str) -> list[Any]:
+            return []
+
+    monkeypatch.setattr(mcp_module, "AuthenticationManager", DummyAuthenticationManager)
+    monkeypatch.setattr(mcp_module, "LabArchivesClient", DummyLabArchivesClient)
+
+    fastmcp_instance = DummyFastMCP(
+        server_id="labarchives-mcp-pol",
+        name="",
+        version="",
+        description="",
+    )
+    monkeypatch.setattr(mcp_module, "FastMCP", lambda **kwargs: fastmcp_instance)
+
+    asyncio.run(mcp_server.run_server())
+
+    assert "upload_to_labarchives" in fastmcp_instance.tool_callbacks, (
+        "upload_to_labarchives should be registered when LABARCHIVES_ENABLE_UPLOAD=true"
+    )
+
+
+def test_upload_tool_registered_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Given no LABARCHIVES_ENABLE_UPLOAD env var, when the server initializes,
+    then the upload_to_labarchives tool should be registered (enabled by default)."""
+
+    mcp_module = cast(Any, mcp_server)
+    # Ensure env var is not set
+    monkeypatch.delenv("LABARCHIVES_ENABLE_UPLOAD", raising=False)
+    monkeypatch.setattr(
+        mcp_module.Credentials,
+        "from_file",
+        classmethod(lambda cls: DummyCredentials()),
+    )
+    monkeypatch.setattr(mcp_module.httpx, "AsyncClient", DummyAsyncClient)
+
+    class DummyAuthenticationManager:
+        def __init__(self, client: DummyAsyncClient, credentials: DummyCredentials) -> None:
+            self._client = client
+            self._credentials = credentials
+
+        async def ensure_uid(self) -> str:
+            return "uid-1"
+
+    class DummyLabArchivesClient:
+        def __init__(self, client: DummyAsyncClient, auth_manager: Any) -> None:
+            self._client = client
+            self._auth_manager = auth_manager
+
+        async def list_notebooks(self, _uid: str) -> list[Any]:
+            return []
+
+    monkeypatch.setattr(mcp_module, "AuthenticationManager", DummyAuthenticationManager)
+    monkeypatch.setattr(mcp_module, "LabArchivesClient", DummyLabArchivesClient)
+
+    fastmcp_instance = DummyFastMCP(
+        server_id="labarchives-mcp-pol",
+        name="",
+        version="",
+        description="",
+    )
+    monkeypatch.setattr(mcp_module, "FastMCP", lambda **kwargs: fastmcp_instance)
+
+    asyncio.run(mcp_server.run_server())
+
+    assert "upload_to_labarchives" in fastmcp_instance.tool_callbacks, (
+        "upload_to_labarchives should be registered by default when env var is not set"
+    )

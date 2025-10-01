@@ -207,7 +207,8 @@ The MCP server exposes LabArchives notebooks to AI agents via the MCP protocol.
       ],
       "env": {
         "LABARCHIVES_CONFIG_PATH": "/absolute/path/to/lab_archives_mcp/conf/secrets.yml",
-        "FASTMCP_SHOW_CLI_BANNER": "false"
+        "FASTMCP_SHOW_CLI_BANNER": "false",
+        "LABARCHIVES_ENABLE_UPLOAD": "true"
       }
     }
   }
@@ -240,7 +241,8 @@ The MCP server exposes LabArchives notebooks to AI agents via the MCP protocol.
       ],
       "env": {
         "LABARCHIVES_CONFIG_PATH": "/absolute/path/to/lab_archives_mcp/conf/secrets.yml",
-        "FASTMCP_SHOW_CLI_BANNER": "false"
+        "FASTMCP_SHOW_CLI_BANNER": "false",
+        "LABARCHIVES_ENABLE_UPLOAD": "true"
       }
     }
   }
@@ -339,6 +341,8 @@ upload_to_labarchives(
   "filename": "analysis.ipynb"
 }
 ```
+
+> **🔒 Security Note**: The upload tool is enabled by default. For production deployments or shared environments, **disable write capabilities** by setting `LABARCHIVES_ENABLE_UPLOAD=false` in the environment configuration above. This prevents AI assistants from unintentionally modifying your research records.
 
 #### Example Agent Workflow
 

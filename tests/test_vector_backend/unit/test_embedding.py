@@ -142,19 +142,18 @@ class TestOpenAIEmbedding:
         """Exhausting retries should raise error."""
         # All calls fail with rate limit
         respx.post("https://api.openai.com/v1/embeddings").mock(
-            return_value=Response(429, json={"error": {"message": "Rate limit exceeded"}})
         )
 
         embedding_config.max_retries = 2
         client = OpenAIEmbedding(embedding_config)
 
-        with pytest.raises((httpx.HTTPStatusError, RateLimitError)):  # OpenAI SDK may wrap the error
+        # OpenAI SDK may wrap the error
+        with pytest.raises((httpx.HTTPStatusError, RateLimitError)):
             await client.embed_single("Test")
 
     @pytest.mark.asyncio
     @respx.mock
     async def test_dimension_mismatch_raises(self, embedding_config):
-        """Response with wrong dimensions should raise ValueError."""
         respx.post("https://api.openai.com/v1/embeddings").mock(
             return_value=Response(
                 200,

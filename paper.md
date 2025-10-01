@@ -9,7 +9,7 @@ tags:
   - semantic search
 authors:
   - name: Samuel N. Brudner
-    orcid: 0000-0000-0000-0000
+    orcid: 0000-0002-6043-9328
     affiliation: 1
 affiliations:
  - name: Molecular, Cellular, and Developmental Biology, Yale University, USA
@@ -62,6 +62,21 @@ Recent advances in large language models (LLMs) and AI assistants have demonstra
 **Modular Semantic Search Framework**: The vector backend provides a flexible, configuration-driven pipeline for semantic search with pluggable components fully configurable through YAML files. Text chunking parameters (chunk size, overlap, tokenizer, boundary preservation), embedding models (OpenAI API with dimensions, batch size, timeout, extensible to sentence-transformers), and vector storage backends (Pinecone, Qdrant) are all specified in Hydra-managed configuration [@hydra]. This enables reproducible search configurations across environments. Researchers can search notebooks by concept rather than exact keywords; for example, querying "olfactory navigation behavior" retrieves relevant pages using terminology like "odor-guided flight" or "chemotaxis assays." The framework is usable as a standalone library for custom search implementations beyond the MCP integration.
 
 **Experimental Upload Support**: An experimental upload API allows researchers to archive computational outputs (notebooks, figures, analysis scripts) directly to LabArchives with Git provenance metadata, supporting reproducible research workflows.
+
+## Security Considerations
+
+LabArchives is a cloud-based platform that provides secure storage for sensitive research data with access controls, audit trails, and compliance features. When using the vector search functionality, researchers should be aware that **indexing notebook content into external vector stores (Pinecone, Qdrant) creates additional copies of research data on separate third-party infrastructure**. These copies are subject to the vector store providers' security policies, creating an additional layer of data custody beyond LabArchives itself.
+
+For sensitive or proprietary research data, we recommend:
+
+1. **Use self-hosted vector stores** (local Qdrant instances) rather than cloud services to maintain institutional control
+2. **Index only non-sensitive notebooks** or create curated subsets for semantic search
+3. **Review vector store provider security policies** to ensure compliance with institutional data governance requirements
+4. **Implement namespace isolation** in shared vector indices to prevent cross-user data exposure
+
+The vector store metadata schema includes `notebook_id`, `notebook_name`, `author`, `date`, and optional `tags` fields, enabling fine-grained access control through metadata filtering. These fields allow administrators to restrict search results to specific notebooks, authors, or date ranges, supporting multi-tenant deployments where users should only access their own data.
+
+The MCP server exposes both read and write capabilities. Read operations (listing notebooks, reading pages) query LabArchives on-demand without creating external copies. The experimental `upload_to_labarchives` tool allows AI assistants to write files directly to notebooks with Git provenance metadata. **For production deployments, administrators can disable write capabilities by setting the `LABARCHIVES_ENABLE_UPLOAD=false` environment variable**, preventing unintended modifications to research records. Alternatively, approval workflows can be implemented at the AI assistant level. The optional vector indexing workflow creates external data copies as described above. Researchers must evaluate whether the semantic search and upload benefits justify the security tradeoffs for their specific use case.
 
 ## Testing and Quality Assurance
 
