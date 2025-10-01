@@ -163,7 +163,45 @@ asyncio.run(test())
 "
 ```
 
-### 6. Run the MCP Server
+### 6. Example: Querying Your Notebooks with AI
+
+Once configured with an AI assistant (Windsurf or Claude Desktop), you can conversationally interact with your lab notebooks:
+
+```
+You: "What protocols did I document for my navigation experiments?"
+
+AI: [Automatically calls list_labarchives_notebooks(),
+     list_notebook_pages(), read_notebook_page()]
+
+AI: "In your 'Mosquito Navigation' notebook, you documented three main protocols:
+
+1. Wind tunnel setup with IR tracking (updated Aug 12, 2024)
+   - Camera calibration procedure
+   - LED array configuration
+   - Temperature and humidity controls
+
+2. Odor delivery system calibration (updated Aug 13, 2024)
+   - Olfactometer settings
+   - Odor concentration measurements
+   - Flow rate verification
+
+3. Flight trajectory analysis pipeline (updated Aug 15, 2024)
+   - Video preprocessing steps
+   - Tracking algorithm parameters
+   - Statistical analysis methods
+
+Would you like me to retrieve specific details from any of these protocols?"
+```
+
+The AI assistant autonomously:
+- Searches through your notebooks to find relevant content
+- Reads the appropriate pages and entries
+- Synthesizes the information into a coherent answer
+- Maintains context for follow-up questions
+
+You can also use semantic search: *"Find experiments related to olfactory behavior"* will retrieve conceptually related content even if exact keywords differ.
+
+### 7. Run the MCP Server
 
 The server can be started in several ways:
 
