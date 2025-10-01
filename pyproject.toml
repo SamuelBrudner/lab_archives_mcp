@@ -101,6 +101,10 @@ warn_unreachable = true
 plugins = []
 exclude = ["tests/", "scripts/"]
 
+[[tool.mypy.overrides]]
+module = "tests.test_vector_backend.integration.*"
+disable_error_code = ["no-untyped-def", "import-untyped"]
+
 [tool.pytest.ini_options]
 minversion = "8.0"
 addopts = "-ra --strict-markers"

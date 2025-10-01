@@ -6,6 +6,8 @@ These tests create real files in a temporary directory.
 Run with: pytest tests/test_vector_backend/integration/test_local_persistence.py -v
 """
 
+# mypy: disable-error-code="no-untyped-def,import-untyped"
+
 import shutil
 from datetime import datetime
 
