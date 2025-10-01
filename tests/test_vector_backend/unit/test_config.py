@@ -23,7 +23,7 @@ from vector_backend.config import (
 class TestConfigCreation:
     """Tests for default config creation."""
 
-    def test_create_default_config(self):
+    def test_create_default_config(self) -> None:
         """Default config should have sensible values."""
         config_dict = create_default_config()
 
@@ -32,19 +32,18 @@ class TestConfigCreation:
         assert config_dict["embedding"]["model"] == "openai/text-embedding-3-small"
         assert config_dict["index"]["backend"] == "pinecone"
 
-    def test_default_config_has_all_sections(self):
+    def test_default_config_has_all_sections(self) -> None:
         """Default config should have all required sections."""
         config_dict = create_default_config()
 
         required_sections = ["chunking", "embedding", "index", "incremental_updates"]
-        for section in required_sections:
-            assert section in config_dict
+        assert all(section in config_dict for section in required_sections)
 
 
 class TestConfigModels:
     """Tests for config model validation."""
 
-    def test_index_config_valid_backend(self):
+    def test_index_config_valid_backend(self) -> None:
         """Index config should validate backend."""
         # Valid backends
         IndexConfig(backend="pinecone", index_name="test")
@@ -54,7 +53,7 @@ class TestConfigModels:
         with pytest.raises(ValueError):
             IndexConfig(backend="invalid", index_name="test")
 
-    def test_incremental_update_config_batch_size(self):
+    def test_incremental_update_config_batch_size(self) -> None:
         """Batch size must be within valid range."""
         # Valid batch size
         IncrementalUpdateConfig(batch_size=200)
@@ -71,7 +70,7 @@ class TestConfigModels:
 class TestConfigLoading:
     """Tests for loading config from Hydra YAML."""
 
-    def test_load_default_config(self):
+    def test_load_default_config(self) -> None:
         """Should load default config from YAML."""
         config = load_config("default")
 
@@ -79,7 +78,7 @@ class TestConfigLoading:
         assert config.chunking.chunk_size == 400
         assert config.embedding.model == "openai/text-embedding-3-small"
 
-    def test_load_config_with_overrides(self):
+    def test_load_config_with_overrides(self) -> None:
         """Should apply overrides to config."""
         config = load_config(
             "default",
@@ -92,7 +91,7 @@ class TestConfigLoading:
         assert config.chunking.chunk_size == 500
         assert config.embedding.version == "v2"
 
-    def test_load_config_env_var_interpolation(self):
+    def test_load_config_env_var_interpolation(self) -> None:
         """Should interpolate environment variables."""
         # Set test env vars
         os.environ["TEST_OPENAI_KEY"] = "test-key-123"
@@ -107,12 +106,12 @@ class TestConfigLoading:
         finally:
             del os.environ["TEST_OPENAI_KEY"]
 
-    def test_load_config_missing_file_raises(self):
+    def test_load_config_missing_file_raises(self) -> None:
         """Should raise if config file doesn't exist."""
         with pytest.raises(FileNotFoundError):
             load_config("nonexistent", config_path="/nonexistent/path")
 
-    def test_load_config_validates_structure(self):
+    def test_load_config_validates_structure(self) -> None:
         """Config should be validated by Pydantic."""
         # This should work - valid config
         config = load_config("default")

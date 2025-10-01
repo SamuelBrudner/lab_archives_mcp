@@ -48,8 +48,9 @@ def test_run_server_contract(monkeypatch: pytest.MonkeyPatch) -> None:
             return self._data
 
     class DummyLabArchivesClient:
-        def __init__(self, http_client: DummyAsyncClient) -> None:
+        def __init__(self, http_client: DummyAsyncClient, auth_manager: Any) -> None:
             captured["eln_client_init"] = http_client
+            captured["eln_auth_manager"] = auth_manager
 
         async def list_notebooks(self, uid: str) -> list[DummyNotebook]:
             captured["list_notebooks_uid"] = uid
@@ -169,7 +170,7 @@ def test_run_server_maps_labarchives_errors(monkeypatch: pytest.MonkeyPatch) -> 
     monkeypatch.setattr(mcp_module.httpx, "AsyncClient", lambda **_: DummyAsyncClient())
 
     class DummyLabArchivesClient:
-        def __init__(self, _client: DummyAsyncClient) -> None:
+        def __init__(self, _client: DummyAsyncClient, _auth_manager: Any) -> None:
             captured["eln_client_init"] = True
 
         async def list_notebooks(self, _uid: str) -> list[Any]:

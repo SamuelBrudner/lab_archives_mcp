@@ -1,38 +1,39 @@
-# LabArchives MCP Server – Proof of Life (PoL) README
+# LabArchives MCP Server
+
+[![Tests](https://github.com/SamuelBrudner/lab_archives_mcp/workflows/Tests/badge.svg)](https://github.com/SamuelBrudner/lab_archives_mcp/actions)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 
 ## Overview
 
-This repository implements a **minimal MCP server** for LabArchives ELN, providing read-only access to notebooks. It wraps the LabArchives ELN API (XML) and exposes normalized JSON responses to MCP clients.
+A **Model Context Protocol (MCP) server** that connects AI assistants to LabArchives electronic lab notebooks (ELN). This enables researchers to chat with their lab data, search notebooks semantically, and integrate lab work into AI-assisted workflows.
 
-The purpose is to verify end-to-end connectivity, authentication, and data retrieval from LabArchives via the MCP protocol. **This is not a full wrapper**—it demonstrates a proof-of-life only.
-
----
-
-## Features (In Scope)
-
-* **Authentication**
-
-  * API key signing (`akid`, `expires`, `sig`).
-  * User login flow to obtain and cache `uid`.
-* **Read-only resources**
-
-  * List notebooks for a user.
-* **Transport normalization**
-
-  * XML → JSON for ELN notebooks.
-  * Error code mapping (4500–4999) → MCP error schema.
+**Key Features:**
+- 🔍 **Semantic Search**: Vector-based search across notebook content
+- 📖 **Read Access**: List notebooks, navigate pages, read entries
+- 🤖 **AI Integration**: Works with Claude Desktop, Windsurf, and any MCP client
+- 🔐 **Secure**: API key authentication with HMAC-SHA512 signing
+- 📦 **Reproducible**: Conda-lock environment with pinned dependencies
 
 ---
 
-## Out of Scope
+## Features
 
-* All other read operations (entries, tree traversal, search, metadata).
-* Write operations (add/update entry, attachments, create notebooks, ownership transfer).
-* Binary streaming (attachments, thumbnails, snapshots).
-* Scheduler API.
-* Notifications API.
-* Site license / admin tools.
-* Rich rendering (MathML, sketch JSON, proprietary container files).
+✅ **Implemented**
+- List all notebooks for a user
+- Navigate notebook pages and folders
+- Read page entries (text, headings, attachments)
+- Semantic search across notebook content (vector search)
+- Upload files with code provenance metadata (experimental)
+- Full HMAC-SHA512 authentication flow
+
+🚧 **Experimental**
+- File upload with Git/Python provenance tracking
+
+🔮 **Future**
+- Attachment downloads
+- Advanced search filters
+- Batch operations
 
 ---
 
@@ -519,21 +520,34 @@ Version is managed in:
 
 The configuration is set to automatically update `CHANGELOG.md` and use `v` prefix for git tags (e.g., `v0.1.0`).
 
----
+## Contributing
 
-## Implementation Status
+We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for:
+- Development setup instructions
+- Code style guidelines
+- Testing procedures
+- Pull request process
 
-✅ **Completed**
-- XML→JSON parser for notebook list
-- `list_notebooks` endpoint via `user_info_via_id`
-- Full authentication flow with UID resolution
-- Request signing (HMAC-SHA512)
-- Integration tests (7/7 passing)
-- Verified with live LabArchives API
+## Citation
 
-🚧 **Future Enhancements**
-- Additional read operations (entries, tree traversal, search)
-- Write operations (add/update entry, notebooks)
-- Binary streaming (attachments, thumbnails)
-- Rate limiting and retry policies
-- Comprehensive error handling for all API error codes
+If you use this software in your research, please cite:
+
+```bibtex
+@software{brudner2025labarchives,
+  author = {Brudner, Samuel},
+  title = {LabArchives MCP Server: AI Integration for Electronic Lab Notebooks},
+  year = {2025},
+  url = {https://github.com/SamuelBrudner/lab_archives_mcp},
+  version = {0.1.0}
+}
+```
+
+## License
+
+This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
+
+## Acknowledgments
+
+- Built on the [Model Context Protocol](https://modelcontextprotocol.io/) by Anthropic
+- Uses [FastMCP](https://github.com/jlowin/fastmcp) framework
+- LabArchives API documentation and support

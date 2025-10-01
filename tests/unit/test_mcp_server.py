@@ -120,8 +120,9 @@ def test_run_server_uses_region_as_base_url(monkeypatch: pytest.MonkeyPatch) -> 
             return "uid-1"
 
     class DummyLabArchivesClient:
-        def __init__(self, client: DummyAsyncClient) -> None:
+        def __init__(self, client: DummyAsyncClient, auth_manager: Any) -> None:
             self._client = client
+            self._auth_manager = auth_manager
 
         async def list_notebooks(self, _uid: str) -> list[Any]:
             return []

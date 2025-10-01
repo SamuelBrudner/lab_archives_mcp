@@ -2,51 +2,55 @@
 
 All notable changes to the LabArchives MCP Server project.
 
-## [Unreleased]
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-### Added - Page Reading Functionality (2025-09-30)
+## [0.1.0] - 2025-09-30
 
-**New MCP Tools**:
-- `list_notebook_pages(notebook_id)` - List pages and folders in a notebook
-- `read_notebook_page(notebook_id, page_id)` - Read entries from a specific page
+### Added
 
-**Implementation**:
-- Added `get_notebook_tree()` method to `LabArchivesClient` for navigating notebook structure
-- Added `get_page_entries()` method to fetch entries with content from pages
-- Comprehensive logging throughout the stack for debugging
-- 5 unit tests covering tree navigation and entry reading
-- Documentation with schemas and example workflows
+**Core MCP Tools**:
+- `list_labarchives_notebooks()` - List all user notebooks with metadata
+- `list_notebook_pages(notebook_id, folder_id)` - Navigate notebook structure
+- `read_notebook_page(notebook_id, page_id)` - Read page entries and content
+- `search_labarchives(query, limit)` - Semantic search across notebooks (vector backend)
+- `upload_to_labarchives(...)` - Upload files with Git/Python provenance (experimental)
 
-**Bug Fixes**:
-- Fixed XML parsing: LabArchives uses `<level-node>` not `<node>` elements
-- Fixed module entry point: use `python -m labarchives_mcp` not `python -m labarchives_mcp.mcp_server`
-- Added FastMCP banner suppression via `FASTMCP_SHOW_CLI_BANNER=false`
-- Added `--no-capture-output` flag for conda to fix stdio issues
+**Authentication & API Client**:
+- HMAC-SHA512 request signing for LabArchives API
+- OAuth-based UID resolution with temporary token support
+- Async HTTP client with proper error handling
+- XML→JSON transformation with Pydantic validation
 
-**Configuration**:
-- Updated Windsurf config to use `LABARCHIVES_CONFIG_PATH` env var
-- Verified working in Windsurf with real notebooks
+**Vector Search Backend**:
+- Semantic search using OpenAI embeddings
+- Pinecone vector database integration
+- Automatic indexing of notebook content
+- CLI tools for index management
 
-### Initial Release (2025-09-30)
-
-**Core Functionality**:
-- HMAC-SHA512 authentication with LabArchives API
-- `list_labarchives_notebooks()` tool - lists all user notebooks
-- Resource: `labarchives://notebooks` - MCP resource for notebook metadata
-- Fail-fast error handling with structured fault translation
-- Async/await throughout with `httpx.AsyncClient`
-
-**Development Setup**:
-- Conda environment with locked dependencies
-- Pre-commit hooks: Ruff, Black, isort, mypy, interrogate
-- TDD with pytest + pytest-asyncio
-- Loguru for structured logging
+**Development Infrastructure**:
+- Conda-lock environment with reproducible dependencies
+- Pre-commit hooks: Ruff, Black, isort, mypy, interrogate, Commitizen
+- Comprehensive test suite (unit + integration)
+- GitHub Actions CI workflow
+- MIT License
 
 **Documentation**:
-- Complete README with setup instructions
-- API documentation from LabArchives
-- Quickstart guide
-- Windsurf and Claude Desktop configuration examples
+- Complete installation and setup guide
+- Configuration examples for Claude Desktop and Windsurf
+- API schemas generated from Pydantic models
+- Contributing guidelines
+- JOSS paper for academic citation
+
+### Fixed
+- XML parsing for LabArchives tree structure (`<level-node>` elements)
+- Module entry point for `python -m labarchives_mcp`
+- Conda stdio capture issues with `--no-capture-output` flag
+- FastMCP banner suppression in production environments
+
+### Changed
+- License changed from Proprietary to MIT
+- Project description updated to emphasize AI integration use case
 
 ## Verified Capabilities
 
@@ -99,16 +103,18 @@ All notable changes to the LabArchives MCP Server project.
 - **Integration**: Verified with live LabArchives API
 - **End-to-end**: Tested via Windsurf MCP client
 
-## Next Steps
+## [Unreleased]
 
-**High-Impact Features**:
-1. Folder navigation (pass `folder_id` to `list_notebook_pages`)
-2. Entry content search (requires vector store for semantic queries)
-3. Attachment downloads (`entries:entry_attachment`)
-4. Recent modifications (`search_tools:modified_since`)
+### Planned Features
+- Attachment download support
+- Advanced search filters (date range, author, tags)
+- Batch operations for multiple notebooks
+- Write operations (create/update entries)
+- Caching for notebook tree to reduce API calls
+- Rate limiting with automatic backoff
 
-**Infrastructure**:
-- Log file rotation and retention policy
-- Better error messages for common failures
-- Caching for notebook tree (reduce API calls)
-- Rate limiting / backoff for API compliance
+---
+
+## Version History
+
+[0.1.0]: https://github.com/SamuelBrudner/lab_archives_mcp/releases/tag/v0.1.0

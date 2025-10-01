@@ -1,0 +1,2 @@
+# GitHub Actions workflow files
+*.yml linguist-language=YAML
