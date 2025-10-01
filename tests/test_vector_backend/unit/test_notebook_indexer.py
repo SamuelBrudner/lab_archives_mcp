@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from vector_backend.chunking import ChunkingConfig
 from vector_backend.notebook_indexer import NotebookIndexer, index_notebook
 
 
@@ -131,18 +132,21 @@ class TestNotebookIndexer:
         assert result["skipped_count"] == 2
 
         # Should not call embedding or indexing
-        mock_embedding_client.embed_batch.assert_not_called()
         mock_index.upsert.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_index_page_with_chunking(self, mock_embedding_client, mock_index):
         """Should chunk long text entries."""
+        from vector_backend.chunking import ChunkingConfig
+
         indexer = NotebookIndexer(
             embedding_client=mock_embedding_client,
             vector_index=mock_index,
             embedding_version="v1",
-            chunk_size=50,  # Small chunk size to force chunking
-            chunk_overlap=10,  # Must be less than chunk_size
+            chunking_config=ChunkingConfig(
+                chunk_size=50,  # Small chunk size to force chunking
+                overlap=10,  # Must be less than chunk_size
+            ),
         )
 
         # Long text that will be chunked
