@@ -61,19 +61,21 @@ Recent advances in large language models (LLMs) and AI assistants have demonstra
 
 **Modular Semantic Search Framework**: The vector backend provides a flexible, configuration-driven pipeline for semantic search with pluggable components fully configurable through YAML files. Text chunking parameters (chunk size, overlap, tokenizer, boundary preservation), embedding models (OpenAI API with dimensions, batch size, timeout, extensible to sentence-transformers), and vector storage backends (Pinecone, Qdrant, local Parquet) are all specified in Hydra-managed configuration [@hydra]. This enables reproducible search configurations across environments. The local Parquet backend stores embeddings as compressed files on institutional infrastructure with version isolation, providing maximum data sovereignty. Researchers can search notebooks by concept rather than exact keywords; for example, querying "olfactory navigation behavior" retrieves relevant pages using terminology like "odor-guided flight" or "chemotaxis assays." The framework is usable as a standalone library for custom search implementations beyond the MCP integration.
 
-**Experimental Upload Support**: An experimental upload API allows researchers to archive computational outputs (notebooks, figures, analysis scripts) directly to LabArchives with Git provenance metadata, supporting reproducible research workflows.
+**Experimental Upload Tool**: An experimental upload tool allows researchers to use AI assistants to archive computational outputs (notebooks, figures, analysis scripts) directly to LabArchives with Git provenance metadata, supporting reproducible research workflows.
 
 ## Security Considerations
 
 LabArchives is a cloud-based platform that provides secure storage for sensitive research data with access controls, audit trails, and compliance features. When using the vector search functionality, researchers should be aware that **indexing notebook content into external vector stores (Pinecone, Qdrant cloud) creates additional copies of research data on separate third-party infrastructure**. These copies are subject to the vector store providers' security policies, creating an additional layer of data custody beyond LabArchives itself.
 
-For sensitive or proprietary research data, we provide multiple deployment options with increasing levels of institutional control:
+For sensitive or proprietary research data, this repository provides multiple deployment options with increasing levels of institutional control:
 
 1. **Use local Parquet persistence** - Store embeddings as compressed Parquet files on institutional infrastructure without any external services. This provides maximum data sovereignty while enabling semantic search through local vector similarity computations. Supports concurrent multi-user indexing via per-notebook file locking, making it suitable for research teams sharing a common embedding repository via DVC.
 2. **Use self-hosted vector stores** - Deploy local Qdrant instances within institutional boundaries for optimized semantic search with institutional control over all data. Vector databases offer additional features like filtered search and may provide better performance for very high-throughput scenarios (>100 concurrent writers).
 3. **Index only non-sensitive notebooks to cloud services** - For non-sensitive research data, cloud vector stores (Pinecone) offer convenience and scalability.
 4. **Review vector store provider security policies** to ensure compliance with institutional data governance requirements.
-5. **Implement namespace isolation** in shared vector indices to prevent cross-user data exposure.
+5. **Implement namespace isolation** in shared vector indices by using per-user or per-notebook namespaces (or partitions) so embeddings and search results from one tenant are invisible to others, preventing cross-user data exposure.
+
+Namespaces are configured via Hydra (`conf/vector_search/default.yaml`) with overrides such as `index.namespace=notebook_123`. Deployed services must inject the namespace derived from the authenticated LabArchives tenant and deny requests that omit or override it. Pinecone and Qdrant both support per-key access scoping; administrators should issue per-tenant API keys (or run a gateway that signs requests) so that end users cannot query or upsert outside their assigned namespace.
 
 The vector store metadata schema includes `notebook_id`, `notebook_name`, `author`, `date`, and optional `tags` fields, enabling fine-grained access control through metadata filtering. These fields allow administrators to restrict search results to specific notebooks, authors, or date ranges, supporting multi-tenant deployments where users should only access their own data.
 
@@ -107,9 +109,13 @@ This conversational interface reduces the cognitive overhead of manual search an
 
 # Comparison to Existing Tools
 
-While commercial ELN platforms (LabArchives, Benchling, eLabFTW) provide web APIs, existing open-source tools have focused primarily on ELN data export [@elabjournalapi] or laboratory information management systems (LIMS) integration. To our knowledge, no publicly available tools expose commercial ELN platforms to AI assistants through standardized protocols like MCP.
+While commercial ELN platforms (LabArchives, Benchling, eLabFTW) provide web APIs, existing open-source tools have focused primarily on ELN data export [@elabjournalapi] or laboratory information management systems (LIMS) integration. LabArchives' own REST API offers CRUD access to notebook entries but leaves clients to implement indexing and search logic, typically through keyword queries [@labarchives]. None of these offerings provide a turnkey bridge between ELN data and AI assistants, and semantic retrieval remains an exercise for downstream integrators.
 
-The Model Context Protocol is a recently introduced standard for connecting AI systems to external data sources [@anthropic2024mcp]. `lab_archives_mcp` represents an early academic application of this protocol for research data management, demonstrating a reusable pattern for integrating institutional data systems with AI assistants through both standardized MCP interfaces and modular vector search infrastructure.
+The Model Context Protocol is a recently introduced standard for connecting AI systems to external data sources [@anthropic2024mcp]. `lab_archives_mcp` represents an early academic application of this protocol for research data management, demonstrating a reusable pattern for integrating institutional data systems with AI assistants through both standardized MCP interfaces and modular vector search infrastructure. In contrast to raw REST APIs, this project packages:
+
+- **MCP-native connectors** that expose LabArchives notebooks, pages, and entries directly to assistants without bespoke glue code.
+- **Config-driven semantic search** via `conf/vector_search/default.yaml`, enabling reproducible chunking, embedding, and vector indexing beyond simple keyword lookups.
+- **Governance controls** including namespace isolation, Hydra-driven credential scoping, and local Parquet persistence so institutions can enforce tenancy boundaries while retaining the option for self-hosted search backends.
 
 # Acknowledgements
 
