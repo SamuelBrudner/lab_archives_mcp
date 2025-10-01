@@ -59,7 +59,7 @@ Recent advances in large language models (LLMs) and AI assistants have demonstra
 
 **Reproducible Environments**: The project uses conda-lock to pin all dependencies, ensuring bit-for-bit reproducibility across development, testing, and production environments. This approach aligns with FAIR data principles [@wilkinson2016fair] for computational research.
 
-**Modular Semantic Search Framework**: The vector backend provides a flexible, configuration-driven pipeline for semantic search with pluggable components—text chunking (token-aware with configurable overlap), embedding generation (OpenAI API with retry logic, extensible to sentence-transformers), and vector storage (Pinecone, Qdrant, or local Parquet). Researchers can search notebooks by concept rather than exact keywords; for example, querying "olfactory navigation behavior" retrieves relevant pages using terminology like "odor-guided flight" or "chemotaxis assays." The framework is usable as a standalone library for custom search implementations beyond the MCP integration.
+**Modular Semantic Search Framework**: The vector backend provides a flexible, configuration-driven pipeline for semantic search with pluggable components fully configurable through YAML files. Text chunking parameters (chunk size, overlap, tokenizer, boundary preservation), embedding models (OpenAI API with dimensions, batch size, timeout, extensible to sentence-transformers), and vector storage backends (Pinecone, Qdrant) are all specified in Hydra-managed configuration [@hydra]. This enables reproducible search configurations across environments. Researchers can search notebooks by concept rather than exact keywords; for example, querying "olfactory navigation behavior" retrieves relevant pages using terminology like "odor-guided flight" or "chemotaxis assays." The framework is usable as a standalone library for custom search implementations beyond the MCP integration.
 
 **Experimental Upload Support**: An experimental upload API allows researchers to archive computational outputs (notebooks, figures, analysis scripts) directly to LabArchives with Git provenance metadata, supporting reproducible research workflows.
 
@@ -67,7 +67,7 @@ Recent advances in large language models (LLMs) and AI assistants have demonstra
 
 The codebase maintains comprehensive test coverage with unit tests for all API methods, integration tests against live LabArchives instances (skipped in CI without credentials), and property-based tests using Hypothesis [@hypothesis] for numeric operations. Pre-commit hooks enforce code quality through Ruff linting, Black formatting, isort import sorting, and mypy type checking.
 
-Continuous integration via GitHub Actions runs the test suite on macOS across Python 3.11 and 3.12. The package is developed and tested primarily on macOS, though the use of Conda for environment management and platform-agnostic dependencies should facilitate portability to Linux systems.
+Continuous integration via GitHub Actions runs the test suite on Ubuntu and macOS across Python 3.11 and 3.12, ensuring cross-platform compatibility.
 
 # Usage Example
 
