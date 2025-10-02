@@ -4,7 +4,7 @@
 
 ```bash
 # Activate environment
-conda activate ./conda_envs/pol-dev
+conda activate ./conda_envs/labarchives-mcp-pol
 
 # Start server (stdio mode)
 python -m labarchives_mcp
@@ -28,7 +28,7 @@ labarchives-mcp
         "run",
         "--no-capture-output",
         "-p",
-        "/Users/samuelbrudner/Yale University Dropbox/Samuel Brudner/lab_archives_mcp/conda_envs/pol-dev",
+        "/Users/samuelbrudner/Yale University Dropbox/Samuel Brudner/lab_archives_mcp/conda_envs/labarchives-mcp-pol",
         "python",
         "-m",
         "labarchives_mcp"
@@ -61,7 +61,7 @@ labarchives-mcp
       "args": [
         "run",
         "-p",
-        "/Users/samuelbrudner/Yale University Dropbox/Samuel Brudner/lab_archives_mcp/conda_envs/pol-dev",
+        "/Users/samuelbrudner/Yale University Dropbox/Samuel Brudner/lab_archives_mcp/conda_envs/labarchives-mcp-pol",
         "python",
         "-m",
         "labarchives_mcp"

@@ -57,19 +57,19 @@ Vector index abstraction:
 
 ## Installation
 
-### Core dependencies
+### Core dependencies (includes Pinecone)
 ```bash
 pip install -e .
 ```
 
-### Vector backend dependencies (optional)
+### Optional vector backends (Qdrant)
 ```bash
 pip install -e ".[vector]"
 ```
 
 ### Development dependencies
 ```bash
-pip install -e ".[dev,vector]"
+pip install -e ".[dev]"
 ```
 
 ## Configuration

@@ -63,13 +63,13 @@ cd lab_archives_mcp
 Create the pinned Conda environment (local prefix):
 
 ```bash
-conda-lock install --prefix ./conda_envs/pol-dev conda-lock.yml
+conda-lock install --prefix ./conda_envs/labarchives-mcp-pol conda-lock.yml
 ```
 
 Activate it:
 
 ```bash
-conda activate ./conda_envs/pol-dev
+conda activate ./conda_envs/labarchives-mcp-pol
 ```
 
 Install git hooks and tooling:
@@ -116,7 +116,7 @@ The LabArchives API requires a user-specific ID (`uid`) for all operations. You 
 5. Run the helper script:
 
    ```bash
-   conda run -p ./conda_envs/pol-dev python scripts/resolve_uid.py redeem \
+   conda run -p ./conda_envs/labarchives-mcp-pol python scripts/resolve_uid.py redeem \
        --email your.email@institution.edu \
        --auth-code <paste_token_here>
    ```
@@ -134,7 +134,7 @@ If you prefer the browser flow (or temporary tokens aren't working):
 1. Generate a login URL:
 
    ```bash
-   conda run -p ./conda_envs/pol-dev python scripts/resolve_uid.py login-url
+   conda run -p ./conda_envs/labarchives-mcp-pol python scripts/resolve_uid.py login-url
    ```
 
 2. Open the URL in your browser and complete the LabArchives sign-in
@@ -148,7 +148,7 @@ If you prefer the browser flow (or temporary tokens aren't working):
 Test that everything works:
 
 ```bash
-conda run -p ./conda_envs/pol-dev python -c "
+conda run -p ./conda_envs/labarchives-mcp-pol python -c "
 from labarchives_mcp.auth import Credentials
 from labarchives_mcp.eln_client import LabArchivesClient, AuthenticationManager
 import httpx, asyncio
@@ -210,13 +210,13 @@ The server can be started in several ways:
 
 ```bash
 # Method 1: As a Python module
-conda run -p ./conda_envs/pol-dev python -m labarchives_mcp
+conda run -p ./conda_envs/labarchives-mcp-pol python -m labarchives_mcp
 
 # Method 2: Using the console script (after pip install -e .[dev])
-conda run -p ./conda_envs/pol-dev labarchives-mcp
+conda run -p ./conda_envs/labarchives-mcp-pol labarchives-mcp
 
 # Method 3: Direct Python (if environment is activated)
-conda activate ./conda_envs/pol-dev
+conda activate ./conda_envs/labarchives-mcp-pol
 labarchives-mcp
 ```
 
@@ -241,7 +241,7 @@ The MCP server exposes LabArchives notebooks to AI agents via the MCP protocol.
         "run",
         "--no-capture-output",
         "-p",
-        "/absolute/path/to/lab_archives_mcp/conda_envs/pol-dev",
+        "/absolute/path/to/lab_archives_mcp/conda_envs/labarchives-mcp-pol",
         "python",
         "-m",
         "labarchives_mcp"
@@ -275,7 +275,7 @@ The MCP server exposes LabArchives notebooks to AI agents via the MCP protocol.
         "run",
         "--no-capture-output",
         "-p",
-        "/absolute/path/to/lab_archives_mcp/conda_envs/pol-dev",
+        "/absolute/path/to/lab_archives_mcp/conda_envs/labarchives-mcp-pol",
         "python",
         "-m",
         "labarchives_mcp"
@@ -466,14 +466,14 @@ Generate JSON Schema for API documentation:
 
 ```bash
 # Notebook resource schema
-conda run -p ./conda_envs/pol-dev python -c "
+conda run -p ./conda_envs/labarchives-mcp-pol python -c "
 from labarchives_mcp.eln_client import NotebookRecord
 import json
 print(json.dumps(NotebookRecord.model_json_schema(), indent=2))
 "
 
 # Configuration schema
-conda run -p ./conda_envs/pol-dev python -c "
+conda run -p ./conda_envs/labarchives-mcp-pol python -c "
 from labarchives_mcp.auth import Credentials
 import json
 print(json.dumps(Credentials.model_json_schema(), indent=2))
@@ -535,13 +535,13 @@ To create a new release:
 
 ```bash
 # Dry run (preview changes without committing)
-conda run -p ./conda_envs/pol-dev cz bump --dry-run --yes
+conda run -p ./conda_envs/labarchives-mcp-pol cz bump --dry-run --yes
 
 # Automated version bump (examines commit history)
-conda run -p ./conda_envs/pol-dev cz bump --yes        # Auto-detect: patch/minor/major
-conda run -p ./conda_envs/pol-dev cz bump --patch      # Force patch: 0.1.0 → 0.1.1
-conda run -p ./conda_envs/pol-dev cz bump --minor      # Force minor: 0.1.0 → 0.2.0
-conda run -p ./conda_envs/pol-dev cz bump --major      # Force major: 0.1.0 → 1.0.0
+conda run -p ./conda_envs/labarchives-mcp-pol cz bump --yes        # Auto-detect: patch/minor/major
+conda run -p ./conda_envs/labarchives-mcp-pol cz bump --patch      # Force patch: 0.1.0 → 0.1.1
+conda run -p ./conda_envs/labarchives-mcp-pol cz bump --minor      # Force minor: 0.1.0 → 0.2.0
+conda run -p ./conda_envs/labarchives-mcp-pol cz bump --major      # Force major: 0.1.0 → 1.0.0
 ```
 
 This will:

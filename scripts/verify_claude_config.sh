@@ -68,7 +68,7 @@ echo
 # Check 5: Test server can start
 echo "✓ Check 5: Test server starts"
 cd "$REPO_DIR"
-timeout 2 conda run -p ./conda_envs/pol-dev python -m labarchives_mcp 2>&1 >/dev/null &
+timeout 2 conda run -p ./conda_envs/labarchives-mcp-pol python -m labarchives_mcp 2>&1 >/dev/null &
 SERVER_PID=$!
 sleep 1
 
@@ -77,7 +77,7 @@ if ps -p $SERVER_PID > /dev/null 2>&1; then
     kill $SERVER_PID 2>/dev/null || true
 else
     echo "  ✗ Server failed to start"
-    echo "  → Run manually to see error: conda run -p ./conda_envs/pol-dev python -m labarchives_mcp"
+    echo "  → Run manually to see error: conda run -p ./conda_envs/labarchives-mcp-pol python -m labarchives_mcp"
     exit 1
 fi
 echo
@@ -100,7 +100,7 @@ cat << 'EOF'
       "args": [
         "run",
         "-p",
-        "/Users/samuelbrudner/Yale University Dropbox/Samuel Brudner/lab_archives_mcp/conda_envs/pol-dev",
+        "/Users/samuelbrudner/Yale University Dropbox/Samuel Brudner/lab_archives_mcp/conda_envs/labarchives-mcp-pol",
         "python",
         "-m",
         "labarchives_mcp"

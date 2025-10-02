@@ -31,7 +31,7 @@ Claude Desktop is the primary client for MCP servers. Add this configuration to 
       "args": [
         "run",
         "-p",
-        "/absolute/path/to/lab_archives_mcp/conda_envs/pol-dev",
+        "/absolute/path/to/lab_archives_mcp/conda_envs/labarchives-mcp-pol",
         "python",
         "-m",
         "labarchives_mcp"
@@ -54,7 +54,7 @@ If you don't want to use conda in the configuration:
 {
   "mcpServers": {
     "labarchives": {
-      "command": "/absolute/path/to/lab_archives_mcp/conda_envs/pol-dev/bin/python",
+      "command": "/absolute/path/to/lab_archives_mcp/conda_envs/labarchives-mcp-pol/bin/python",
       "args": ["-m", "labarchives_mcp"],
       "cwd": "/absolute/path/to/lab_archives_mcp"
     }
@@ -87,7 +87,7 @@ server_params = StdioServerParameters(
     command="python",
     args=["-m", "labarchives_mcp"],
     cwd="/absolute/path/to/lab_archives_mcp",
-    env={"PATH": "/absolute/path/to/conda_envs/pol-dev/bin"}
+    env={"PATH": "/absolute/path/to/conda_envs/labarchives-mcp-pol/bin"}
 )
 
 async with stdio_client(server_params) as (read, write):
@@ -152,7 +152,7 @@ Run the server directly to verify it starts:
 
 ```bash
 cd /path/to/lab_archives_mcp
-conda activate ./conda_envs/pol-dev
+conda activate ./conda_envs/labarchives-mcp-pol
 python -m labarchives_mcp
 ```
 
@@ -228,7 +228,7 @@ export LABARCHIVES_CONFIG_PATH=/absolute/path/to/conf/secrets.yml
      "mcpServers": {
        "labarchives": {
          "command": "conda",
-         "args": ["run", "-p", "/path/to/conda_envs/pol-dev", "python", "-m", "labarchives_mcp"],
+         "args": ["run", "-p", "/path/to/conda_envs/labarchives-mcp-pol", "python", "-m", "labarchives_mcp"],
          "cwd": "/path/to/lab_archives_mcp",
          "env": {
            "LABARCHIVES_ENABLE_UPLOAD": "false"

@@ -42,7 +42,7 @@ fi
 # Step 3: Run unit tests
 echo ""
 echo "🧪 Running unit tests..."
-conda run -p ./conda_envs/pol-dev pytest -m "not integration" -q || {
+conda run -p ./conda_envs/labarchives-mcp-pol pytest -m "not integration" -q || {
     echo "⚠️  Some tests failed. Review output above."
     read -p "Continue with release anyway? (y/n) " -n 1 -r
     echo

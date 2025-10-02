@@ -17,6 +17,6 @@ REPO_DIR="/Users/samuelbrudner/Yale University Dropbox/Samuel Brudner/lab_archiv
 
     # Run the server
     # Redirect stderr to filter out banner, but keep real errors
-    conda run -p "$REPO_DIR/conda_envs/pol-dev" python -m labarchives_mcp 2>&1 | grep -v "FastMCP\|Transport:\|Docs:\|Deploy:\|MCP SDK\|Server name:" || true
+    conda run -p "$REPO_DIR/conda_envs/labarchives-mcp-pol" python -m labarchives_mcp 2>&1 | grep -v "FastMCP\|Transport:\|Docs:\|Deploy:\|MCP SDK\|Server name:" || true
 
 } | tee -a "$LOG_FILE"
