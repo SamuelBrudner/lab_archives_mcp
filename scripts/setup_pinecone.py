@@ -1,15 +1,20 @@
-#!/usr/bin/env python
 """Set up Pinecone index for vector backend testing.
 
 This script creates the test index with correct configuration.
 
 Usage:
-    export PINECONE_API_KEY="your-api-key"
     python scripts/setup_pinecone.py
+
+Populate `conf/secrets.yml` with your Pinecone credentials. The script falls back to
+environment variables only if the secrets file is missing or does not contain a key.
 """
 
 import os
 import sys
+from pathlib import Path
+from typing import Any, cast
+
+import yaml  # type: ignore[import-untyped]
 
 
 def main() -> None:
@@ -17,9 +22,23 @@ def main() -> None:
     api_key = os.environ.get("PINECONE_API_KEY")
 
     if not api_key:
-        print("❌ Error: PINECONE_API_KEY environment variable not set")
-        print("\nTo set it:")
-        print("  export PINECONE_API_KEY='your-api-key-here'")
+        secrets_path = Path(__file__).parent.parent / "conf" / "secrets.yml"
+        try:
+            with secrets_path.open() as fh:
+                loaded = yaml.safe_load(fh)
+            secrets: dict[str, Any] = cast(dict[str, Any], loaded or {})
+        except FileNotFoundError:
+            secrets = {}
+
+        api_key = secrets.get("PINECONE_API_KEY", "")
+        if secrets.get("PINECONE_ENVIRONMENT"):
+            os.environ.setdefault("PINECONE_ENVIRONMENT", secrets["PINECONE_ENVIRONMENT"])
+
+    if not api_key:
+        print(
+            "❌ Error: Pinecone credentials not found. Populate conf/secrets.yml "
+            "or export PINECONE_API_KEY."
+        )
         sys.exit(1)
 
     try:

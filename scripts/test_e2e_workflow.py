@@ -8,18 +8,23 @@ This script tests the complete flow:
 4. Search and retrieve
 
 Usage:
-    export OPENAI_API_KEY="sk-..."
-    export PINECONE_API_KEY="..."
     python scripts/test_e2e_workflow.py
+
+This script reads all required API keys from `conf/secrets.yml`. Optionally, override by
+exporting `OPENAI_API_KEY` / `PINECONE_API_KEY` before running.
 """
 
 import asyncio
 import os
 import sys
 from datetime import datetime
+from pathlib import Path
+from typing import Any, cast
 
 # Add src to path
 sys.path.insert(0, "src")
+
+import yaml  # type: ignore[import-untyped]
 
 from vector_backend.chunking import chunk_text
 from vector_backend.config import load_config
@@ -28,9 +33,23 @@ from vector_backend.index import PineconeIndex
 from vector_backend.models import ChunkMetadata, EmbeddedChunk, SearchRequest
 
 
-async def main():
+def load_secrets() -> dict[str, Any]:
+    """Load credentials from `conf/secrets.yml`."""
+
+    secrets_path = Path(__file__).parent.parent / "conf" / "secrets.yml"
+    with secrets_path.open() as fh:
+        loaded = yaml.safe_load(fh)
+    return cast(dict[str, Any], loaded or {})
+
+
+async def main() -> None:
     """Run end-to-end workflow."""
     print("=== Vector Backend End-to-End Test ===\n")
+
+    # Ensure required keys are available for Hydra config and API clients
+    secrets = load_secrets()
+    os.environ.setdefault("OPENAI_API_KEY", secrets["OPENAI_API_KEY"])
+    os.environ.setdefault("PINECONE_API_KEY", secrets["PINECONE_API_KEY"])
 
     # Load config
     print("1. Loading configuration...")
@@ -92,10 +111,16 @@ async def main():
 
     # Connect to Pinecone
     print("5. Connecting to Pinecone...")
+    api_key = config.index.api_key or os.environ.get("PINECONE_API_KEY")
+    if not api_key:
+        raise RuntimeError("Pinecone API key not configured")
+
+    environment = config.index.environment or os.environ.get("PINECONE_ENVIRONMENT") or "us-east-1"
+
     index = PineconeIndex(
         index_name="labarchives-test",
-        api_key=config.index.api_key or os.environ.get("PINECONE_API_KEY"),
-        environment=config.index.environment,
+        api_key=api_key,
+        environment=environment,
         namespace="e2e-test",
     )
 
@@ -143,13 +168,27 @@ async def main():
 
 
 if __name__ == "__main__":
-    # Check for required API keys
-    if not os.environ.get("OPENAI_API_KEY"):
-        print("Error: OPENAI_API_KEY environment variable not set")
-        sys.exit(1)
+    try:
+        # Prime environment from secrets file when variables are not already set
+        if not os.environ.get("OPENAI_API_KEY") or not os.environ.get("PINECONE_API_KEY"):
+            secrets = load_secrets()
+            os.environ.setdefault("OPENAI_API_KEY", secrets["OPENAI_API_KEY"])
+            os.environ.setdefault("PINECONE_API_KEY", secrets["PINECONE_API_KEY"])
 
-    if not os.environ.get("PINECONE_API_KEY"):
-        print("Error: PINECONE_API_KEY environment variable not set")
-        sys.exit(1)
+        missing = [
+            name for name in ("OPENAI_API_KEY", "PINECONE_API_KEY") if not os.environ.get(name)
+        ]
+        if missing:
+            print(
+                "Error: missing required API keys and `conf/secrets.yml` is either absent "
+                "or incomplete. Populate conf/secrets.yml or export the keys manually."
+            )
+            sys.exit(1)
 
-    asyncio.run(main())
+        asyncio.run(main())
+    except FileNotFoundError:
+        print(
+            "Error: conf/secrets.yml not found. Copy conf/secrets.example.yml and "
+            "fill in your keys."
+        )
+        sys.exit(1)

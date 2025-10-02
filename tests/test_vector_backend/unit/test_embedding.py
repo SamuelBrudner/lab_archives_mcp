@@ -9,7 +9,7 @@ from openai import RateLimitError
 from vector_backend.embedding import EmbeddingConfig, OpenAIEmbedding, create_embedding_client
 
 
-@pytest.fixture
+@pytest.fixture  # type: ignore[misc]
 def embedding_config() -> EmbeddingConfig:
     """Standard embedding configuration for tests."""
     return EmbeddingConfig(
@@ -26,12 +26,12 @@ def embedding_config() -> EmbeddingConfig:
 class TestEmbeddingConfig:
     """Tests for EmbeddingConfig validation."""
 
-    def test_valid_config(self, embedding_config):
+    def test_valid_config(self, embedding_config: EmbeddingConfig) -> None:
         """Valid config should construct."""
         assert embedding_config.model == "openai/text-embedding-3-small"
         assert embedding_config.dimensions == 1536
 
-    def test_invalid_dimensions(self):
+    def test_invalid_dimensions(self) -> None:
         """Dimensions must be in valid range."""
         with pytest.raises(ValueError):
             EmbeddingConfig(model="test", version="v1", dimensions=50, api_key="test")
@@ -39,7 +39,7 @@ class TestEmbeddingConfig:
         with pytest.raises(ValueError):
             EmbeddingConfig(model="test", version="v1", dimensions=5000, api_key="test")
 
-    def test_invalid_batch_size(self):
+    def test_invalid_batch_size(self) -> None:
         """Batch size must be positive and reasonable."""
         with pytest.raises(ValueError):
             EmbeddingConfig(model="test", version="v1", dimensions=1536, batch_size=0)
@@ -51,9 +51,9 @@ class TestEmbeddingConfig:
 class TestOpenAIEmbedding:
     """Tests for OpenAI embedding client."""
 
-    @pytest.mark.asyncio
-    @respx.mock
-    async def test_embed_single_success(self, embedding_config):
+    @pytest.mark.asyncio  # type: ignore[misc]
+    @respx.mock  # type: ignore[misc]
+    async def test_embed_single_success(self, embedding_config: EmbeddingConfig) -> None:
         """Single text should embed successfully."""
         # Mock OpenAI API response
         respx.post("https://api.openai.com/v1/embeddings").mock(
@@ -73,9 +73,9 @@ class TestOpenAIEmbedding:
         assert len(vector) == 1536
         assert all(isinstance(v, float) for v in vector)
 
-    @pytest.mark.asyncio
-    @respx.mock
-    async def test_embed_batch_success(self, embedding_config):
+    @pytest.mark.asyncio  # type: ignore[misc]
+    @respx.mock  # type: ignore[misc]
+    async def test_embed_batch_success(self, embedding_config: EmbeddingConfig) -> None:
         """Batch of texts should embed in order."""
         respx.post("https://api.openai.com/v1/embeddings").mock(
             return_value=Response(
@@ -101,17 +101,17 @@ class TestOpenAIEmbedding:
         assert vectors[0] != vectors[1]
         assert vectors[1] != vectors[2]
 
-    @pytest.mark.asyncio
-    async def test_batch_size_exceeded(self, embedding_config):
+    @pytest.mark.asyncio  # type: ignore[misc]
+    async def test_batch_size_exceeded(self, embedding_config: EmbeddingConfig) -> None:
         """Batch size over limit should raise ValueError."""
         client = OpenAIEmbedding(embedding_config)
 
         with pytest.raises(ValueError, match="Batch size .* exceeds limit"):
             await client.embed_batch(["text"] * 101)  # Exceeds 100
 
-    @pytest.mark.asyncio
-    @respx.mock
-    async def test_retry_on_rate_limit(self, embedding_config):
+    @pytest.mark.asyncio  # type: ignore[misc]
+    @respx.mock  # type: ignore[misc]
+    async def test_retry_on_rate_limit(self, embedding_config: EmbeddingConfig) -> None:
         """Rate limit (429) should trigger retry with backoff."""
         # First call: rate limited
         # Second call: success
@@ -136,9 +136,9 @@ class TestOpenAIEmbedding:
         # Should have made 2 requests (1 failure + 1 success)
         assert len(respx.calls) == 2
 
-    @pytest.mark.asyncio
-    @respx.mock
-    async def test_exhausted_retries_raises(self, embedding_config):
+    @pytest.mark.asyncio  # type: ignore[misc]
+    @respx.mock  # type: ignore[misc]
+    async def test_exhausted_retries_raises(self, embedding_config: EmbeddingConfig) -> None:
         """Exhausting retries should raise error."""
         # All calls fail with rate limit (need enough for all retry attempts)
         respx.post("https://api.openai.com/v1/embeddings").mock(
@@ -150,9 +150,9 @@ class TestOpenAIEmbedding:
         with pytest.raises((httpx.HTTPStatusError, RateLimitError)):
             await client.embed_single("Test")
 
-    @pytest.mark.asyncio
-    @respx.mock
-    async def test_dimension_mismatch_raises(self, embedding_config):
+    @pytest.mark.asyncio  # type: ignore[misc]
+    @respx.mock  # type: ignore[misc]
+    async def test_dimension_mismatch_raises(self, embedding_config: EmbeddingConfig) -> None:
         respx.post("https://api.openai.com/v1/embeddings").mock(
             return_value=Response(
                 200,
@@ -168,8 +168,8 @@ class TestOpenAIEmbedding:
         with pytest.raises(ValueError, match="Expected 1536 dimensions"):
             await client.embed_single("Test")
 
-    @pytest.mark.asyncio
-    async def test_empty_batch_returns_empty(self, embedding_config):
+    @pytest.mark.asyncio  # type: ignore[misc]
+    async def test_empty_batch_returns_empty(self, embedding_config: EmbeddingConfig) -> None:
         """Empty batch should return empty list without API call."""
         client = OpenAIEmbedding(embedding_config)
         vectors = await client.embed_batch([])
@@ -180,7 +180,7 @@ class TestOpenAIEmbedding:
 class TestCreateEmbeddingClient:
     """Tests for factory function."""
 
-    def test_create_openai_client(self):
+    def test_create_openai_client(self) -> None:
         """OpenAI model prefix should create OpenAI client."""
         config = EmbeddingConfig(
             model="openai/text-embedding-3-small",
@@ -192,14 +192,14 @@ class TestCreateEmbeddingClient:
 
         assert isinstance(client, OpenAIEmbedding)
 
-    def test_create_local_client_not_implemented(self):
+    def test_create_local_client_not_implemented(self) -> None:
         """Local model prefix should raise NotImplementedError."""
         config = EmbeddingConfig(model="local/bge-large", version="v1", dimensions=1024)
 
         with pytest.raises(NotImplementedError):
             create_embedding_client(config)
 
-    def test_unknown_model_prefix_raises(self):
+    def test_unknown_model_prefix_raises(self) -> None:
         """Unknown model prefix should raise ValueError."""
         config = EmbeddingConfig(model="unknown/model", version="v1", dimensions=1536)
 

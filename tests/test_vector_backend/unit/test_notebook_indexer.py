@@ -1,6 +1,7 @@
 """Unit tests for end-to-end notebook indexing workflow."""
 
-from unittest.mock import AsyncMock
+from typing import Any
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -10,22 +11,22 @@ from vector_backend.notebook_indexer import NotebookIndexer, index_notebook
 class TestNotebookIndexer:
     """Tests for NotebookIndexer class."""
 
-    @pytest.fixture
-    def mock_embedding_client(self):
+    @pytest.fixture  # type: ignore[misc]
+    def mock_embedding_client(self) -> MagicMock:
         """Mock embedding client."""
         client = AsyncMock()
         client.embed_batch = AsyncMock(return_value=[[0.1] * 1536, [0.2] * 1536])
         return client
 
-    @pytest.fixture
-    def mock_index(self):
+    @pytest.fixture  # type: ignore[misc]
+    def mock_index(self) -> MagicMock:
         """Mock vector index."""
         index = AsyncMock()
         index.upsert = AsyncMock()
         return index
 
-    @pytest.fixture
-    def sample_page_data(self):
+    @pytest.fixture  # type: ignore[misc]
+    def sample_page_data(self) -> dict[str, Any]:
         """Sample LabArchives page data."""
         return {
             "notebook_id": "nb_123",
@@ -57,8 +58,13 @@ class TestNotebookIndexer:
             ],
         }
 
-    @pytest.mark.asyncio
-    async def test_index_page_success(self, mock_embedding_client, mock_index, sample_page_data):
+    @pytest.mark.asyncio  # type: ignore[misc]
+    async def test_index_page_success(
+        self,
+        mock_embedding_client: MagicMock,
+        mock_index: MagicMock,
+        sample_page_data: dict[str, Any],
+    ) -> None:
         """Should successfully index a page with multiple entries."""
         indexer = NotebookIndexer(
             embedding_client=mock_embedding_client,
@@ -89,8 +95,10 @@ class TestNotebookIndexer:
         upserted_chunks = mock_index.upsert.call_args[0][0]
         assert len(upserted_chunks) == 2
 
-    @pytest.mark.asyncio
-    async def test_index_page_skips_all_non_text(self, mock_embedding_client, mock_index):
+    @pytest.mark.asyncio  # type: ignore[misc]
+    async def test_index_page_skips_all_non_text(
+        self, mock_embedding_client: MagicMock, mock_index: MagicMock
+    ) -> None:
         """Should handle page with no indexable content."""
         indexer = NotebookIndexer(
             embedding_client=mock_embedding_client,
@@ -133,8 +141,10 @@ class TestNotebookIndexer:
         # Should not call embedding or indexing
         mock_index.upsert.assert_not_called()
 
-    @pytest.mark.asyncio
-    async def test_index_page_with_chunking(self, mock_embedding_client, mock_index):
+    @pytest.mark.asyncio  # type: ignore[misc]
+    async def test_index_page_with_chunking(
+        self, mock_embedding_client: MagicMock, mock_index: MagicMock
+    ) -> None:
         """Should chunk long text entries."""
         from vector_backend.chunking import ChunkingConfig
 
@@ -183,8 +193,8 @@ class TestNotebookIndexer:
 class TestConvenienceFunction:
     """Tests for index_notebook convenience function."""
 
-    @pytest.mark.asyncio
-    async def test_index_notebook_convenience(self):
+    @pytest.mark.asyncio  # type: ignore[misc]
+    async def test_index_notebook_convenience(self) -> None:
         """Should provide convenient interface for indexing."""
         # This is a placeholder - actual test would mock MCP calls
         # For now, just verify the function exists and has right signature

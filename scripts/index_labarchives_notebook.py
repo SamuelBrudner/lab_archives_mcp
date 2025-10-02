@@ -4,23 +4,23 @@
 This script fetches notebook data from LabArchives and indexes it for semantic search.
 
 Usage:
-    export OPENAI_API_KEY="sk-..."
-    export PINECONE_API_KEY="..."
-    export LABARCHIVES_ACCESS_TOKEN="..."
-    export LABARCHIVES_API_KEY="..."
-
     python scripts/index_labarchives_notebook.py --notebook-id <nbid>
+
+Populate `conf/secrets.yml` with the required LabArchives, OpenAI, and Pinecone
+credentials. Environment variables are optional overrides.
 """
 
 import asyncio
 import os
 import sys
 from pathlib import Path
+from typing import Any, cast
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 import click
+import yaml  # type: ignore[import-untyped]
 from loguru import logger
 
 from vector_backend.config import load_config
@@ -33,7 +33,16 @@ logger.remove()
 logger.add(sys.stderr, level="INFO")
 
 
-async def fetch_notebook_pages(notebook_id: str) -> list[dict]:
+def load_secrets() -> dict[str, Any]:
+    """Load credentials from `conf/secrets.yml`."""
+
+    secrets_path = Path(__file__).parent.parent / "conf" / "secrets.yml"
+    with secrets_path.open() as fh:
+        loaded = yaml.safe_load(fh)
+    return cast(dict[str, Any], loaded or {})
+
+
+async def fetch_notebook_pages(notebook_id: str) -> list[dict[str, Any]]:
     """Fetch pages from a LabArchives notebook using MCP.
 
     For now, this is a placeholder. In production, this would:
@@ -79,7 +88,7 @@ async def fetch_notebook_pages(notebook_id: str) -> list[dict]:
     ]
 
 
-async def main(notebook_id: str, author: str | None = None):
+async def main(notebook_id: str, author: str | None = None) -> None:
     """Index a LabArchives notebook.
 
     Args:
@@ -87,6 +96,18 @@ async def main(notebook_id: str, author: str | None = None):
         author: Optional author email (default: fetched from LabArchives)
     """
     logger.info(f"Starting indexing for notebook ID: {notebook_id}")
+
+    try:
+        secrets = load_secrets()
+    except FileNotFoundError as exc:
+        logger.error(
+            "conf/secrets.yml not found. Copy conf/secrets.example.yml and supply " "credentials."
+        )
+        raise SystemExit(1) from exc
+
+    # Seed environment so Hydra resolves API keys
+    os.environ.setdefault("OPENAI_API_KEY", secrets.get("OPENAI_API_KEY", ""))
+    os.environ.setdefault("PINECONE_API_KEY", secrets.get("PINECONE_API_KEY", ""))
 
     # Load configuration
     config = load_config("default")
@@ -97,10 +118,17 @@ async def main(notebook_id: str, author: str | None = None):
     logger.info("Created embedding client")
 
     # Create Pinecone index
+    pinecone_api_key = config.index.api_key or os.environ.get("PINECONE_API_KEY")
+    if not pinecone_api_key:
+        logger.error(
+            "Missing Pinecone credentials. Populate conf/secrets.yml or export " "PINECONE_API_KEY."
+        )
+        raise SystemExit(1)
+
     index = PineconeIndex(
         index_name=config.index.index_name,
-        api_key=config.index.api_key or os.environ.get("PINECONE_API_KEY"),
-        environment=config.index.environment or "us-east-1",
+        api_key=pinecone_api_key,
+        environment=config.index.environment or secrets.get("PINECONE_ENVIRONMENT", "us-east-1"),
         namespace="production",  # Use production namespace
     )
 
@@ -160,25 +188,37 @@ async def main(notebook_id: str, author: str | None = None):
     logger.info(f"Index now contains {stats.total_chunks} total chunks")
 
 
-@click.command()
-@click.option(
+@click.command()  # type: ignore[misc]
+@click.option(  # type: ignore[misc]
     "--notebook-id",
     required=True,
     help="LabArchives notebook ID (nbid)",
 )
-@click.option(
+@click.option(  # type: ignore[misc]
     "--author",
     help="Author email (optional)",
 )
-def cli(notebook_id: str, author: str | None):
+def cli(notebook_id: str, author: str | None) -> None:
     """Index a LabArchives notebook into Pinecone."""
-    # Check for required environment variables
-    if not os.environ.get("OPENAI_API_KEY"):
-        logger.error("OPENAI_API_KEY environment variable not set")
-        sys.exit(1)
+    if not os.environ.get("OPENAI_API_KEY") or not os.environ.get("PINECONE_API_KEY"):
+        try:
+            secrets = load_secrets()
+        except FileNotFoundError as exc:
+            logger.error(
+                "conf/secrets.yml not found. Copy conf/secrets.example.yml and supply "
+                "credentials."
+            )
+            raise SystemExit(1) from exc
 
-    if not os.environ.get("PINECONE_API_KEY"):
-        logger.error("PINECONE_API_KEY environment variable not set")
+        os.environ.setdefault("OPENAI_API_KEY", secrets.get("OPENAI_API_KEY", ""))
+        os.environ.setdefault("PINECONE_API_KEY", secrets.get("PINECONE_API_KEY", ""))
+
+    missing = [name for name in ("OPENAI_API_KEY", "PINECONE_API_KEY") if not os.environ.get(name)]
+    if missing:
+        logger.error(
+            "Missing required API keys: %s. Populate conf/secrets.yml or export them.",
+            ", ".join(missing),
+        )
         sys.exit(1)
 
     # Run indexing

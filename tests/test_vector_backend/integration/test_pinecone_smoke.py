@@ -20,8 +20,8 @@ from vector_backend.models import ChunkMetadata, EmbeddedChunk, SearchRequest
 pytestmark = pytest.mark.integration
 
 
-@pytest.fixture
-def pinecone_config():
+@pytest.fixture  # type: ignore[misc]
+def pinecone_config() -> IndexConfig:
     """Pinecone configuration for testing."""
     api_key = os.environ.get("PINECONE_API_KEY")
     environment = os.environ.get("PINECONE_ENVIRONMENT", "us-east-1")
@@ -38,13 +38,16 @@ def pinecone_config():
     )
 
 
-@pytest.fixture
-async def pinecone_index(pinecone_config):
+@pytest.fixture  # type: ignore[misc]
+async def pinecone_index(pinecone_config: IndexConfig):  # type: ignore[no-untyped-def]
     """Create Pinecone index client for testing."""
+    api_key: str = pinecone_config.api_key or ""
+    environment: str = pinecone_config.environment or "us-east-1"
+
     index = PineconeIndex(
         index_name=pinecone_config.index_name,
-        api_key=pinecone_config.api_key,
-        environment=pinecone_config.environment,
+        api_key=api_key,
+        environment=environment,
         namespace=pinecone_config.namespace,
     )
 
@@ -52,8 +55,8 @@ async def pinecone_index(pinecone_config):
     yield index
 
 
-@pytest.fixture
-def sample_chunk():
+@pytest.fixture  # type: ignore[misc]
+def sample_chunk() -> EmbeddedChunk:
     """Sample embedded chunk for testing."""
     metadata = ChunkMetadata(
         notebook_id="test_nb_001",
@@ -79,14 +82,14 @@ def sample_chunk():
 class TestPineconeConnection:
     """Test basic Pinecone connectivity."""
 
-    @pytest.mark.asyncio
-    async def test_health_check(self, pinecone_index):
+    @pytest.mark.asyncio  # type: ignore[misc]
+    async def test_health_check(self, pinecone_index: PineconeIndex) -> None:
         """Should connect to Pinecone successfully."""
         is_healthy = await pinecone_index.health_check()
         assert is_healthy is True
 
-    @pytest.mark.asyncio
-    async def test_stats_retrieval(self, pinecone_index):
+    @pytest.mark.asyncio  # type: ignore[misc]
+    async def test_stats_retrieval(self, pinecone_index: PineconeIndex) -> None:
         """Should retrieve index statistics."""
         stats = await pinecone_index.stats()
         assert stats.total_chunks >= 0
@@ -95,13 +98,15 @@ class TestPineconeConnection:
 class TestPineconeUpsert:
     """Test upserting chunks to Pinecone."""
 
-    @pytest.mark.asyncio
-    async def test_upsert_single_chunk(self, pinecone_index, sample_chunk):
+    @pytest.mark.asyncio  # type: ignore[misc]
+    async def test_upsert_single_chunk(
+        self, pinecone_index: PineconeIndex, sample_chunk: EmbeddedChunk
+    ) -> None:
         """Should upsert a single chunk successfully."""
         await pinecone_index.upsert([sample_chunk])
 
-    @pytest.mark.asyncio
-    async def test_upsert_empty_raises(self, pinecone_index):
+    @pytest.mark.asyncio  # type: ignore[misc]
+    async def test_upsert_empty_raises(self, pinecone_index: PineconeIndex) -> None:
         """Should raise error for empty chunk list."""
         with pytest.raises(ValueError):
             await pinecone_index.upsert([])
@@ -110,8 +115,10 @@ class TestPineconeUpsert:
 class TestPineconeSearch:
     """Test semantic search in Pinecone."""
 
-    @pytest.mark.asyncio
-    async def test_search_returns_results(self, pinecone_index, sample_chunk):
+    @pytest.mark.asyncio  # type: ignore[misc]
+    async def test_search_returns_results(
+        self, pinecone_index: PineconeIndex, sample_chunk: EmbeddedChunk
+    ) -> None:
         """Should return search results."""
         import asyncio
 
@@ -127,8 +134,10 @@ class TestPineconeSearch:
 class TestPineconeDelete:
     """Test deleting chunks from Pinecone."""
 
-    @pytest.mark.asyncio
-    async def test_delete_by_id(self, pinecone_index, sample_chunk):
+    @pytest.mark.asyncio  # type: ignore[misc]
+    async def test_delete_by_id(
+        self, pinecone_index: PineconeIndex, sample_chunk: EmbeddedChunk
+    ) -> None:
         """Should delete chunks by ID."""
         import asyncio
 

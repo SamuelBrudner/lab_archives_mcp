@@ -17,7 +17,7 @@ from vector_backend.models import ChunkMetadata, EmbeddedChunk, IndexStats, Sear
 class TestChunkMetadata:
     """Tests for ChunkMetadata validation."""
 
-    def test_valid_metadata(self):
+    def test_valid_metadata(self) -> None:
         """Valid metadata should construct successfully."""
         metadata = ChunkMetadata(
             notebook_id="123",
@@ -34,7 +34,7 @@ class TestChunkMetadata:
         assert metadata.notebook_id == "123"
         assert metadata.entry_type == "text_entry"
 
-    def test_invalid_entry_type(self):
+    def test_invalid_entry_type(self) -> None:
         """Invalid entry_type should raise ValidationError."""
         with pytest.raises(ValidationError, match="entry_type must be one of"):
             ChunkMetadata(
@@ -50,7 +50,7 @@ class TestChunkMetadata:
                 embedding_version="v1",
             )
 
-    def test_invalid_url(self):
+    def test_invalid_url(self) -> None:
         """Invalid URL should raise ValidationError."""
         with pytest.raises(ValidationError, match="labarchives_url must be a valid"):
             ChunkMetadata(
@@ -66,7 +66,7 @@ class TestChunkMetadata:
                 embedding_version="v1",
             )
 
-    def test_optional_fields(self):
+    def test_optional_fields(self) -> None:
         """Optional fields should work with defaults."""
         metadata = ChunkMetadata(
             notebook_id="123",
@@ -87,7 +87,7 @@ class TestChunkMetadata:
 class TestEmbeddedChunk:
     """Tests for EmbeddedChunk validation."""
 
-    def test_valid_chunk(self):
+    def test_valid_chunk(self) -> None:
         """Valid chunk should construct successfully."""
         metadata = ChunkMetadata(
             notebook_id="123",
@@ -110,7 +110,7 @@ class TestEmbeddedChunk:
         assert chunk.id == "123_456_789_0"
         assert len(chunk.vector) == 1536
 
-    def test_invalid_id_format(self):
+    def test_invalid_id_format(self) -> None:
         """Invalid ID format should raise ValidationError."""
         metadata = ChunkMetadata(
             notebook_id="123",
@@ -132,7 +132,7 @@ class TestEmbeddedChunk:
                 metadata=metadata,
             )
 
-    def test_text_length_constraints(self):
+    def test_text_length_constraints(self) -> None:
         """Text must be 1-5000 characters."""
         metadata = ChunkMetadata(
             notebook_id="123",
@@ -165,7 +165,7 @@ class TestEmbeddedChunk:
                 metadata=metadata,
             )
 
-    def test_vector_dimension_constraints(self):
+    def test_vector_dimension_constraints(self) -> None:
         """Vector must be 768-3072 dimensions."""
         metadata = ChunkMetadata(
             notebook_id="123",
@@ -198,7 +198,7 @@ class TestEmbeddedChunk:
                 metadata=metadata,
             )
 
-    def test_non_finite_vector_values(self):
+    def test_non_finite_vector_values(self) -> None:
         """Non-finite vector values should raise ValidationError."""
         metadata = ChunkMetadata(
             notebook_id="123",
@@ -235,14 +235,14 @@ class TestEmbeddedChunk:
 class TestSearchRequest:
     """Tests for SearchRequest validation."""
 
-    def test_valid_request(self):
+    def test_valid_request(self) -> None:
         """Valid search request should construct."""
         req = SearchRequest(query="test query", limit=10)
         assert req.query == "test query"
         assert req.limit == 10
         assert req.min_score == 0.0
 
-    def test_query_length_constraints(self):
+    def test_query_length_constraints(self) -> None:
         """Query must be 1-1000 characters."""
         with pytest.raises(ValidationError):
             SearchRequest(query="")
@@ -250,7 +250,7 @@ class TestSearchRequest:
         with pytest.raises(ValidationError):
             SearchRequest(query="x" * 1001)
 
-    def test_limit_constraints(self):
+    def test_limit_constraints(self) -> None:
         """Limit must be 1-100."""
         with pytest.raises(ValidationError):
             SearchRequest(query="test", limit=0)
@@ -258,7 +258,7 @@ class TestSearchRequest:
         with pytest.raises(ValidationError):
             SearchRequest(query="test", limit=101)
 
-    def test_min_score_constraints(self):
+    def test_min_score_constraints(self) -> None:
         """Min score must be 0.0-1.0."""
         with pytest.raises(ValidationError):
             SearchRequest(query="test", min_score=-0.1)
@@ -270,7 +270,7 @@ class TestSearchRequest:
 class TestIndexStats:
     """Tests for IndexStats validation."""
 
-    def test_valid_stats(self):
+    def test_valid_stats(self) -> None:
         """Valid stats should construct."""
         stats = IndexStats(
             total_chunks=1000,
@@ -282,7 +282,7 @@ class TestIndexStats:
         assert stats.total_chunks == 1000
         assert stats.total_notebooks == 10
 
-    def test_non_negative_constraints(self):
+    def test_non_negative_constraints(self) -> None:
         """Counts and sizes must be non-negative."""
         with pytest.raises(ValidationError):
             IndexStats(

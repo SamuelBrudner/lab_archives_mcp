@@ -17,28 +17,22 @@ You need two API keys:
    - Create new key
    - Copy the key
 
-### **Step 2: Set Environment Variables**
-
-Add these to your shell profile (`~/.zshrc` or `~/.bash_profile`):
+### **Step 2: Populate `conf/secrets.yml`**
 
 ```bash
-# Pinecone
-export PINECONE_API_KEY="your-pinecone-api-key-here"
-
-# OpenAI (if not already set)
-export OPENAI_API_KEY="sk-proj-your-openai-key-here"
+cp conf/secrets.example.yml conf/secrets.yml
+$EDITOR conf/secrets.yml
 ```
 
-Then reload:
-```bash
-source ~/.zshrc  # or source ~/.bash_profile
+Add your Pinecone and OpenAI keys in that file:
+
+```yaml
+OPENAI_API_KEY: "sk-..."
+PINECONE_API_KEY: "your-pinecone-api-key"
+PINECONE_ENVIRONMENT: "us-east-1"
 ```
 
-Or set them temporarily for this session:
-```bash
-export PINECONE_API_KEY="your-key"
-export OPENAI_API_KEY="sk-..."
-```
+All scripts and MCP tooling read from `conf/secrets.yml` by default (or the path set via `LABARCHIVES_CONFIG_PATH`). You can still override individual keys for a session by exporting environment variables if needed.
 
 ### **Step 3: Run Setup Script**
 

@@ -3,19 +3,21 @@
 
 import sys
 from pathlib import Path
+from typing import Any, cast
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 from pinecone import Pinecone
 
 
-def main():
+def main() -> None:
     """Clear the index."""
     # Load secrets
     secrets_path = Path(__file__).parent.parent / "conf" / "secrets.yml"
     with open(secrets_path) as f:
-        secrets = yaml.safe_load(f)
+        loaded = yaml.safe_load(f)
+    secrets: dict[str, Any] = cast(dict[str, Any], loaded or {})
 
     # Connect to Pinecone
     pc = Pinecone(api_key=secrets["PINECONE_API_KEY"])

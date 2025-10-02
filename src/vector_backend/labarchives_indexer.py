@@ -5,6 +5,7 @@ for vector indexing.
 """
 
 from enum import Enum
+from typing import Any
 
 from bs4 import BeautifulSoup
 from pydantic import BaseModel, Field
@@ -56,7 +57,7 @@ def clean_html(html: str) -> str:
         element.decompose()
 
     # Get text and clean up whitespace
-    text = soup.get_text(separator=" ", strip=True)
+    text: str = str(soup.get_text(separator=" ", strip=True))
 
     # Normalize whitespace
     text = " ".join(text.split())
@@ -79,7 +80,7 @@ def should_index_entry(entry_type: str) -> bool:
     return normalized_type in indexable_types
 
 
-def extract_text_from_entry(entry_data: dict) -> IndexableEntry | None:
+def extract_text_from_entry(entry_data: dict[str, Any]) -> IndexableEntry | None:
     """Extract searchable text from a LabArchives entry.
 
     Args:

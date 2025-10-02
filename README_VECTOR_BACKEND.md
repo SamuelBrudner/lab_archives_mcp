@@ -81,12 +81,16 @@ mkdir -p conf/vector_search
 
 The default config is already created at `conf/vector_search/default.yaml`.
 
-### 2. Set environment variables
+### 2. Populate `conf/secrets.yml`
+
 ```bash
-export OPENAI_API_KEY="sk-..."
-export PINECONE_API_KEY="..."
-export PINECONE_ENVIRONMENT="us-east-1"
+cp conf/secrets.example.yml conf/secrets.yml
+$EDITOR conf/secrets.yml
 ```
+
+Add your `OPENAI_API_KEY`, `PINECONE_API_KEY`, and optional `PINECONE_ENVIRONMENT` values in that file. At runtime the tooling reads `conf/secrets.yml` automatically (or from the path set via `LABARCHIVES_CONFIG_PATH`).
+
+> Prefer storing keys in the secrets file instead of exporting shell variables so they are available to all workflows and MCP clients by default.
 
 ### 3. Initialize DVC for embeddings (optional)
 ```bash

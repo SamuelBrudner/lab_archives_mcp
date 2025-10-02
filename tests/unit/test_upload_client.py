@@ -193,7 +193,9 @@ class TestAddAttachment:
             notebook_id="nbid123",
             page_tree_id="PAGE_ID",
             file_path=test_file,
+            filename=None,
             caption="Test notebook",
+            change_description=None,
         )
 
         # Act
@@ -241,6 +243,9 @@ class TestAddAttachment:
             notebook_id="nbid123",
             page_tree_id="PAGE_ID",
             file_path=test_file,
+            filename=None,
+            caption=None,
+            change_description=None,
         )
 
         # Act
@@ -344,16 +349,22 @@ class TestUploadToLabArchives:
             git_branch="main",
             git_repo_url="https://github.com/user/repo",
             git_is_dirty=False,
+            code_version=None,
             executed_at=datetime(2025, 9, 30, 12, 0, 0, tzinfo=UTC),
             python_version="3.11.8",
             os_name="Darwin",
+            hostname=None,
         )
 
         request = UploadRequest(
             notebook_id="nbid123",
+            parent_folder_id=None,
             page_title="Analysis Results",
             file_path=test_file,
+            caption=None,
+            change_description=None,
             metadata=metadata,
+            allow_dirty_git=False,
         )
 
         # Mock responses
@@ -421,15 +432,20 @@ class TestUploadToLabArchives:
             git_branch="main",
             git_repo_url="https://github.com/user/repo",
             git_is_dirty=True,  # Dirty!
+            code_version=None,
             executed_at=datetime.now(UTC),
             python_version="3.11.8",
             os_name="Darwin",
+            hostname=None,
         )
 
         request = UploadRequest(
             notebook_id="nbid123",
+            parent_folder_id=None,
             page_title="Analysis",
             file_path=test_file,
+            caption=None,
+            change_description=None,
             metadata=metadata,
             allow_dirty_git=False,
         )
@@ -451,9 +467,13 @@ class TestUploadToLabArchives:
 
         request = UploadRequest(
             notebook_id="nbid123",
+            parent_folder_id=None,
             page_title="Analysis",
             file_path=test_file,
+            caption=None,
+            change_description=None,
             metadata=None,  # Missing!
+            allow_dirty_git=False,
         )
 
         # Act & Assert
@@ -473,9 +493,13 @@ class TestUploadToLabArchives:
 
         request = UploadRequest(
             notebook_id="nbid123",
+            parent_folder_id=None,
             page_title="Script",
             file_path=test_file,
+            caption=None,
+            change_description=None,
             metadata=None,  # Missing!
+            allow_dirty_git=False,
         )
 
         # Act & Assert

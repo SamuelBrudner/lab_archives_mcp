@@ -21,13 +21,13 @@ from vector_backend.labarchives_indexer import (
 class TestHTMLCleaning:
     """Tests for HTML to plain text conversion."""
 
-    def test_clean_simple_html(self):
+    def test_clean_simple_html(self) -> None:
         """Should strip HTML tags and return plain text."""
         html = "<p>This is a <strong>test</strong> paragraph.</p>"
         result = clean_html(html)
         assert result == "This is a test paragraph."
 
-    def test_clean_html_with_line_breaks(self):
+    def test_clean_html_with_line_breaks(self) -> None:
         """Should preserve line breaks from <br> and <p> tags."""
         html = "<p>Line 1</p><p>Line 2</p><br>Line 3"
         result = clean_html(html)
@@ -35,14 +35,14 @@ class TestHTMLCleaning:
         assert "Line 2" in result
         assert "Line 3" in result
 
-    def test_clean_html_with_lists(self):
+    def test_clean_html_with_lists(self) -> None:
         """Should convert lists to readable text."""
         html = "<ul><li>Item 1</li><li>Item 2</li></ul>"
         result = clean_html(html)
         assert "Item 1" in result
         assert "Item 2" in result
 
-    def test_clean_html_removes_scripts_and_styles(self):
+    def test_clean_html_removes_scripts_and_styles(self) -> None:
         """Should remove script and style tags."""
         html = "<p>Keep this</p><script>remove this</script><style>and this</style>"
         result = clean_html(html)
@@ -50,13 +50,13 @@ class TestHTMLCleaning:
         assert "remove this" not in result
         assert "and this" not in result
 
-    def test_clean_empty_html(self):
+    def test_clean_empty_html(self) -> None:
         """Empty or whitespace-only HTML should return empty string."""
         assert clean_html("") == ""
         assert clean_html("<p></p>") == ""
         assert clean_html("<p>   </p>").strip() == ""
 
-    def test_clean_html_with_entities(self):
+    def test_clean_html_with_entities(self) -> None:
         """Should decode HTML entities."""
         html = "<p>Test &amp; example &lt;tag&gt;</p>"
         result = clean_html(html)
@@ -67,23 +67,23 @@ class TestHTMLCleaning:
 class TestEntryFiltering:
     """Tests for determining which entries to index."""
 
-    def test_should_index_text_entry(self):
+    def test_should_index_text_entry(self) -> None:
         """Text entries should be indexed."""
         assert should_index_entry("text_entry") is True
 
-    def test_should_index_heading(self):
+    def test_should_index_heading(self) -> None:
         """Headings should be indexed."""
         assert should_index_entry("heading") is True
 
-    def test_should_skip_attachment(self):
+    def test_should_skip_attachment(self) -> None:
         """Attachments should be skipped."""
         assert should_index_entry("attachment") is False
 
-    def test_should_skip_image(self):
+    def test_should_skip_image(self) -> None:
         """Images should be skipped."""
         assert should_index_entry("image") is False
 
-    def test_should_skip_unknown_type(self):
+    def test_should_skip_unknown_type(self) -> None:
         """Unknown types should be skipped."""
         assert should_index_entry("unknown_type") is False
 
@@ -91,7 +91,7 @@ class TestEntryFiltering:
 class TestTextExtraction:
     """Tests for extracting searchable text from entries."""
 
-    def test_extract_from_text_entry(self):
+    def test_extract_from_text_entry(self) -> None:
         """Should extract and clean text from text_entry."""
         entry_data = {
             "eid": "12345",
@@ -107,7 +107,7 @@ class TestTextExtraction:
         assert result.entry_type == EntryType.TEXT_ENTRY
         assert result.entry_id == "12345"
 
-    def test_extract_from_heading(self):
+    def test_extract_from_heading(self) -> None:
         """Should extract text from heading."""
         entry_data = {
             "eid": "67890",
@@ -121,7 +121,7 @@ class TestTextExtraction:
         assert result.text == "Experiment Results"
         assert result.entry_type == EntryType.HEADING
 
-    def test_extract_from_plain_text(self):
+    def test_extract_from_plain_text(self) -> None:
         """Should handle plain_text entry type."""
         entry_data = {
             "eid": "11111",
@@ -135,7 +135,7 @@ class TestTextExtraction:
         assert result.text == "Plain text content here."
         assert result.entry_type == EntryType.PLAIN_TEXT
 
-    def test_extract_skips_attachment(self):
+    def test_extract_skips_attachment(self) -> None:
         """Should return None for attachments."""
         entry_data = {
             "eid": "22222",
@@ -146,7 +146,7 @@ class TestTextExtraction:
         result = extract_text_from_entry(entry_data)
         assert result is None
 
-    def test_extract_skips_image(self):
+    def test_extract_skips_image(self) -> None:
         """Should return None for images."""
         entry_data = {
             "eid": "33333",
@@ -157,7 +157,7 @@ class TestTextExtraction:
         result = extract_text_from_entry(entry_data)
         assert result is None
 
-    def test_extract_handles_empty_content(self):
+    def test_extract_handles_empty_content(self) -> None:
         """Should return None for empty content."""
         entry_data = {
             "eid": "44444",
@@ -168,7 +168,7 @@ class TestTextExtraction:
         result = extract_text_from_entry(entry_data)
         assert result is None  # Empty text should be skipped
 
-    def test_extract_handles_missing_eid(self):
+    def test_extract_handles_missing_eid(self) -> None:
         """Should raise error if eid is missing."""
         entry_data = {
             "part_type": "text_entry",
@@ -182,7 +182,7 @@ class TestTextExtraction:
 class TestIndexableEntry:
     """Tests for IndexableEntry model."""
 
-    def test_valid_indexable_entry(self):
+    def test_valid_indexable_entry(self) -> None:
         """Should create valid IndexableEntry."""
         entry = IndexableEntry(
             entry_id="12345",
@@ -194,7 +194,7 @@ class TestIndexableEntry:
         assert entry.entry_type == EntryType.TEXT_ENTRY
         assert entry.text == "This is searchable text"
 
-    def test_indexable_entry_requires_text(self):
+    def test_indexable_entry_requires_text(self) -> None:
         """IndexableEntry should require non-empty text."""
         with pytest.raises(ValueError, match="at least 1 character"):
             IndexableEntry(
@@ -203,7 +203,7 @@ class TestIndexableEntry:
                 text="",
             )
 
-    def test_entry_type_enum(self):
+    def test_entry_type_enum(self) -> None:
         """EntryType should have expected values."""
         assert hasattr(EntryType, "TEXT_ENTRY")
         assert hasattr(EntryType, "HEADING")

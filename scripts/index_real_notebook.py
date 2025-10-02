@@ -13,11 +13,12 @@ import asyncio
 import os
 import sys
 from pathlib import Path
+from typing import Any, cast
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 import httpx
-import yaml
+import yaml  # type: ignore[import-untyped]
 from loguru import logger
 
 from vector_backend.config import load_config
@@ -32,14 +33,17 @@ logger.add(
 )
 
 
-def load_secrets():
+def load_secrets() -> dict[str, Any]:
     """Load secrets from conf/secrets.yml."""
     secrets_path = Path(__file__).parent.parent / "conf" / "secrets.yml"
     with open(secrets_path) as f:
-        return yaml.safe_load(f)
+        loaded = yaml.safe_load(f)
+    return cast(dict[str, Any], loaded or {})
 
 
-async def fetch_notebook_via_api(notebook_id: str, client, auth_manager, uid: str):
+async def fetch_notebook_via_api(
+    notebook_id: str, client: Any, auth_manager: Any, uid: str
+) -> tuple[list[dict[str, Any]], str]:
     """Fetch notebook pages using LabArchives API client.
 
     Args:
@@ -66,7 +70,7 @@ async def fetch_notebook_via_api(notebook_id: str, client, auth_manager, uid: st
     # Recursively fetch all pages
     page_data_list = []
 
-    async def fetch_pages_recursive(parent_tree_id: int | str = 0, depth: int = 0):
+    async def fetch_pages_recursive(parent_tree_id: int | str = 0, depth: int = 0) -> None:
         """Recursively fetch pages from a folder."""
         indent = "  " * depth
         tree_items = await client.get_notebook_tree(uid, notebook_id, parent_tree_id=parent_tree_id)
@@ -109,7 +113,7 @@ async def fetch_notebook_via_api(notebook_id: str, client, auth_manager, uid: st
     return page_data_list, notebook_name
 
 
-async def main():
+async def main() -> None:
     """Index LabArchives notebooks."""
     logger.info("=" * 60)
     logger.info("LabArchives Notebook Indexer")

@@ -273,7 +273,7 @@ async def run_server() -> None:
             """
             import os
 
-            import yaml
+            import yaml  # type: ignore[import-untyped]
 
             from vector_backend.config import load_config
             from vector_backend.embedding import create_embedding_client
@@ -287,7 +287,7 @@ async def run_server() -> None:
                 # Load secrets using same logic as Credentials.from_file()
                 from pathlib import Path
 
-                import aiofiles
+                import aiofiles  # type: ignore[import-untyped]
 
                 env_path = os.environ.get("LABARCHIVES_CONFIG_PATH")
                 secrets_path = Path(env_path) if env_path else Path("conf/secrets.yml")

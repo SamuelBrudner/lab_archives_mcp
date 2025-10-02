@@ -40,6 +40,8 @@ dependencies:
       - respx>=0.21
       - mutmut>=2.4
       - mypy>=1.9
+      - types-PyYAML>=6.0
+      - types-aiofiles>=23.0
       - ruff>=0.5
       - black>=24.4
       - isort>=5.13

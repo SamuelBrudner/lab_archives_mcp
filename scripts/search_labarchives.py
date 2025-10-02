@@ -14,12 +14,13 @@ import asyncio
 import os
 import sys
 from pathlib import Path
+from typing import Any, cast
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 import click
 import httpx
-import yaml
+import yaml  # type: ignore[import-untyped]
 from loguru import logger
 
 from labarchives_mcp.auth import AuthenticationManager, Credentials
@@ -35,11 +36,12 @@ logger.remove()
 logger.add(sys.stderr, level="INFO", format="<level>{message}</level>")
 
 
-def load_secrets():
+def load_secrets() -> dict[str, Any]:
     """Load secrets from conf/secrets.yml."""
     secrets_path = Path(__file__).parent.parent / "conf" / "secrets.yml"
     with open(secrets_path) as f:
-        return yaml.safe_load(f)
+        loaded = yaml.safe_load(f)
+    return cast(dict[str, Any], loaded or {})
 
 
 async def fetch_full_page(
@@ -80,7 +82,7 @@ async def fetch_full_page(
         return f"(Error fetching page: {e})"
 
 
-async def search(query: str, top_k: int = 5, full_page: bool = False):
+async def search(query: str, top_k: int = 5, full_page: bool = False) -> None:
     """Search indexed LabArchives content.
 
     Args:
@@ -139,8 +141,9 @@ async def search(query: str, top_k: int = 5, full_page: bool = False):
     logger.success(f"Found {len(results)} results:\n")
 
     # Initialize LabArchives client if full_page mode
-    labarchives_client = None
-    uid = None
+    labarchives_client: LabArchivesClient | None = None
+    uid: str | None = None
+    http_client: httpx.AsyncClient | None = None
     if full_page:
         logger.info("Fetching full pages from LabArchives...\n")
         credentials = Credentials(
@@ -162,6 +165,8 @@ async def search(query: str, top_k: int = 5, full_page: bool = False):
         # Get text content
         if full_page:
             # Fetch full page content
+            assert labarchives_client is not None
+            assert uid is not None
             text = await fetch_full_page(
                 metadata.notebook_id, metadata.page_id, labarchives_client, uid
             )
@@ -181,19 +186,19 @@ async def search(query: str, top_k: int = 5, full_page: bool = False):
         logger.info("")
 
     # Cleanup
-    if labarchives_client:
+    if http_client:
         await http_client.aclose()
 
 
-@click.command()
-@click.argument("query", type=str)
-@click.option("--top-k", default=5, help="Number of results to return")
-@click.option(
+@click.command()  # type: ignore[misc]
+@click.argument("query", type=str)  # type: ignore[misc]
+@click.option("--top-k", default=5, help="Number of results to return")  # type: ignore[misc]
+@click.option(  # type: ignore[misc]
     "--full-page",
     is_flag=True,
     help="Fetch and display full page content (parent-child retrieval)",
 )
-def cli(query: str, top_k: int, full_page: bool):
+def cli(query: str, top_k: int, full_page: bool) -> None:
     """Search indexed LabArchives content using semantic search.
 
     By default, returns small precise chunks. Use --full-page to retrieve

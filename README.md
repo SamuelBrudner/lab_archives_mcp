@@ -98,6 +98,9 @@ Edit `conf/secrets.yml` and add your credentials:
 LABARCHIVES_AKID: 'your_access_key_id'
 LABARCHIVES_PASSWORD: 'your_api_password'
 LABARCHIVES_REGION: 'https://api.labarchives.com'
+OPENAI_API_KEY: 'sk-...'
+PINECONE_API_KEY: 'your_pinecone_key'
+PINECONE_ENVIRONMENT: 'us-east-1'
 ```
 
 ### 4. Obtain Your User ID (UID)
