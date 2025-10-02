@@ -12,7 +12,7 @@ import os
 import sys
 
 
-def main():
+def main() -> None:
     """Create Pinecone test index."""
     api_key = os.environ.get("PINECONE_API_KEY")
 
@@ -72,9 +72,9 @@ def main():
         print("  python scripts/test_e2e_workflow.py")
 
     except ImportError:
-        print("❌ Error: pinecone-client not installed")
+        print("❌ Error: pinecone package not installed")
         print("\nInstall it with:")
-        print("  pip install 'pinecone-client>=4.1'")
+        print("  pip install 'pinecone>=4.1'")
         sys.exit(1)
 
     except Exception as e:

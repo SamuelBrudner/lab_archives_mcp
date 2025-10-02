@@ -135,11 +135,11 @@ Verify:
 echo $PINECONE_API_KEY
 ```
 
-### **Error: "pinecone-client not installed"**
+### **Error: "pinecone not installed"**
 
 **Solution:** Install the package:
 ```bash
-pip install 'pinecone-client>=4.1'
+pip install 'pinecone>=4.1'
 ```
 
 Or reinstall the vector extras:

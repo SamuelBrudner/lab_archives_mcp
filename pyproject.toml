@@ -65,7 +65,7 @@ dev = [
   "commitizen>=3.12"
 ]
 vector = [
-  "pinecone-client>=4.1",
+  "pinecone>=4.1",
   "qdrant-client>=1.9"
 ]
 
