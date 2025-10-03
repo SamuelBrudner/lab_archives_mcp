@@ -8,8 +8,10 @@ Provides unified interface for Pinecone and Qdrant backends with:
 """
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
+from typing import ParamSpec, TypeVar
 
 from vector_backend.models import (
     ChunkMetadata,
@@ -80,7 +82,12 @@ class VectorIndex(ABC):
 
 
 class PineconeIndex(VectorIndex):
-    """Pinecone vector index implementation."""
+    """Pinecone vector index implementation with timeouts.
+
+    Wraps blocking Pinecone client calls in a background thread and applies an
+    asyncio timeout so that MCP tools do not appear to hang indefinitely when
+    network issues occur.
+    """
 
     def __init__(
         self,
@@ -88,6 +95,7 @@ class PineconeIndex(VectorIndex):
         api_key: str,
         environment: str,
         namespace: str | None = None,
+        timeout_seconds: float = 20.0,
     ):
         """Initialize Pinecone index client.
 
@@ -103,10 +111,34 @@ class PineconeIndex(VectorIndex):
         self.api_key = api_key
         self.environment = environment
         self.namespace = namespace
+        self.timeout_seconds = timeout_seconds
 
         # Initialize Pinecone client
         self.pc = Pinecone(api_key=api_key)
         self.index = self.pc.Index(index_name)
+
+    _P = ParamSpec("_P")
+    _T = TypeVar("_T")
+
+    async def _call_with_timeout(
+        self,
+        func: Callable[_P, _T],
+        /,
+        *args: _P.args,
+        **kwargs: _P.kwargs,
+    ) -> _T:
+        """Run a blocking Pinecone call in a thread with an async timeout."""
+        import asyncio
+
+        try:
+            return await asyncio.wait_for(
+                asyncio.to_thread(func, *args, **kwargs), timeout=self.timeout_seconds
+            )
+        except TimeoutError as exc:  # pragma: no cover - env/network dependent
+            raise TimeoutError(
+                f"Pinecone call '{getattr(func, '__name__', str(func))}' timed out after "
+                f"{self.timeout_seconds}s"
+            ) from exc
 
     async def upsert(self, chunks: list[EmbeddedChunk]) -> None:
         """Insert or update chunks in Pinecone.
@@ -143,8 +175,8 @@ class PineconeIndex(VectorIndex):
                 }
             )
 
-        # Upsert to Pinecone
-        self.index.upsert(vectors=vectors, namespace=self.namespace)
+        # Upsert to Pinecone (with timeout)
+        await self._call_with_timeout(self.index.upsert, vectors=vectors, namespace=self.namespace)
 
     async def delete(self, chunk_ids: list[str]) -> None:
         """Delete chunks from Pinecone.
@@ -155,7 +187,7 @@ class PineconeIndex(VectorIndex):
         if not chunk_ids:
             return
 
-        self.index.delete(ids=chunk_ids, namespace=self.namespace)
+        await self._call_with_timeout(self.index.delete, ids=chunk_ids, namespace=self.namespace)
 
     async def search(
         self, request: SearchRequest, query_vector: list[float] | None = None
@@ -173,7 +205,8 @@ class PineconeIndex(VectorIndex):
             raise ValueError("query_vector must be provided for smoke tests")
 
         # Query Pinecone
-        results = self.index.query(
+        results = await self._call_with_timeout(
+            self.index.query,
             vector=query_vector,
             top_k=request.limit,
             namespace=self.namespace,
@@ -222,7 +255,7 @@ class PineconeIndex(VectorIndex):
         Returns:
             Index statistics
         """
-        stats = self.index.describe_index_stats()
+        stats = await self._call_with_timeout(self.index.describe_index_stats)
 
         total_vectors = stats.total_vector_count if hasattr(stats, "total_vector_count") else 0
 
@@ -241,8 +274,8 @@ class PineconeIndex(VectorIndex):
             True if index is accessible
         """
         try:
-            # Try to get stats as a health check
-            self.index.describe_index_stats()
+            # Try to get stats as a health check (with timeout)
+            await self._call_with_timeout(self.index.describe_index_stats)
             return True
         except Exception:
             return False

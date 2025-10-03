@@ -313,6 +313,13 @@ async def run_server() -> None:
                     namespace=None,
                 )
 
+                # Quick health check so we fail fast instead of hanging
+                healthy = await index.health_check()
+                if not healthy:
+                    raise RuntimeError(
+                        "Pinecone index not reachable. Check network, API key, or environment."
+                    )
+
                 # Generate query embedding
                 logger.debug("Generating query embedding...")
                 query_vector = await embedding_client.embed_single(query)
