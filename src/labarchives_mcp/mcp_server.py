@@ -39,7 +39,7 @@ def _resolve_version() -> str:
     try:
         return metadata.version("labarchives-mcp-pol")
     except metadata.PackageNotFoundError:
-        return "0.1.0"
+        return "0.2.0"
 
 
 __version__ = _resolve_version()

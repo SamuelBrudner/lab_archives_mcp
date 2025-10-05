@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "labarchives-mcp-pol"
-version = "0.1.0"
+version = "0.2.0"
 description = "Proof-of-life MCP server for LabArchives ELN."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -126,9 +126,12 @@ asyncio_mode = "auto"
 
 [tool.commitizen]
 name = "cz_conventional_commits"
-version = "0.1.0"
+version = "0.2.0"
 version_files = [
-  "pyproject.toml:^version"
+  "pyproject.toml:^version",
+  "src/vector_backend/__init__.py:^__version__\\s*=\\s*\"\\d+\\.\\d+\\.\\d+\"",
+  "src/cli/version.py:return\\s+\"\\d+\\.\\d+\\.\\d+\"",
+  "src/labarchives_mcp/mcp_server.py:return\\s+\"\\d+\\.\\d+\\.\\d+\""
 ]
 update_changelog_on_bump = true
 tag_format = "v$version"
