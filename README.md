@@ -615,10 +615,10 @@ git push && git push --tags
 ### Version Configuration
 
 Version is managed in:
-- **Source of truth**: `pyproject.toml` (`version = "0.1.0"`)
+- **Source of truth**: `pyproject.toml` (`version = "0.2.0"`)
 - **Commitizen config**: `[tool.commitizen]` section in `pyproject.toml`
 
-The configuration is set to automatically update `CHANGELOG.md` and use `v` prefix for git tags (e.g., `v0.1.0`).
+The configuration is set to automatically update `CHANGELOG.md` and use `v` prefix for git tags (e.g., `v0.2.0`).
 
 ## Contributing
 
