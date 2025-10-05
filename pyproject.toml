@@ -40,7 +40,9 @@ dependencies = [
   "pyarrow>=16.0",
   "beautifulsoup4>=4.12",
   "click>=8.1",
-  "pinecone>=4.1"
+  "pinecone>=4.1",
+  "markdown>=3.5",
+  "Pygments>=2.15"
 ]
 
 [project.scripts]
@@ -63,7 +65,8 @@ dev = [
   "pre-commit>=3.7",
   "nbstripout>=0.6",
   "nbdime>=4.0",
-  "commitizen>=3.12"
+  "commitizen>=3.12",
+  "types-Markdown>=0.1"
 ]
 vector = [
   "qdrant-client>=1.9"
@@ -87,6 +90,8 @@ known_first_party = ["labarchives_mcp", "vector_backend"]
 
 [tool.ruff]
 line-length = 100
+
+[tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "N", "ASYNC"]
 
 [tool.mypy]

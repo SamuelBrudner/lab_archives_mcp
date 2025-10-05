@@ -411,11 +411,13 @@ async def run_server() -> None:
                 git_is_dirty: bool = False,
                 allow_dirty_git: bool = False,
                 dependencies: dict[str, str] | None = None,
+                as_page_text: bool = True,
             ) -> dict[str, Any]:
                 """Upload a file to LabArchives with code provenance metadata.
 
-                Creates a new page, uploads the file as an attachment, and adds
-                metadata about code version, execution context, and dependencies.
+                Creates a new page, then either stores the file contents as the
+                page text (default, Markdown → HTML) or uploads the file as an attachment, and
+                adds metadata about code version, execution context, and dependencies.
 
                 Args:
                     notebook_id: LabArchives notebook ID
@@ -431,6 +433,7 @@ async def run_server() -> None:
                     git_is_dirty: True if uncommitted changes exist
                     allow_dirty_git: Allow upload despite dirty Git (not recommended)
                     dependencies: Key package versions (e.g., {"numpy": "1.26.0"})
+                    as_page_text: If True, store file contents as page text instead of attachment
 
                 Returns:
                     Dictionary with:
@@ -489,6 +492,7 @@ async def run_server() -> None:
                         change_description=None,
                         metadata=metadata,
                         allow_dirty_git=allow_dirty_git,
+                        create_as_text=as_page_text,
                     )
 
                     # Execute upload

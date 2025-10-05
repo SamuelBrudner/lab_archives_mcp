@@ -77,6 +77,7 @@ class UploadRequest(BaseModel):
         change_description: Optional audit log message
         metadata: MANDATORY for .ipynb, .py, figures - code provenance
         allow_dirty_git: Allow upload despite uncommitted changes (use with caution)
+        create_as_text: If True, store file contents as page text instead of attachment
     """
 
     notebook_id: str = Field(..., min_length=1, description="LabArchives notebook ID")
@@ -92,6 +93,13 @@ class UploadRequest(BaseModel):
     )
     allow_dirty_git: bool = Field(
         False, description="Allow upload with dirty Git state (not recommended)"
+    )
+    create_as_text: bool = Field(
+        False,
+        description=(
+            "If True, create a page and add the file contents as a text entry "
+            "instead of uploading it as an attachment."
+        ),
     )
 
     @field_validator("file_path")

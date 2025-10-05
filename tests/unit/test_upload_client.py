@@ -365,6 +365,7 @@ class TestUploadToLabArchives:
             change_description=None,
             metadata=metadata,
             allow_dirty_git=False,
+            create_as_text=False,
         )
 
         # Mock responses
@@ -448,6 +449,7 @@ class TestUploadToLabArchives:
             change_description=None,
             metadata=metadata,
             allow_dirty_git=False,
+            create_as_text=False,
         )
 
         # Act & Assert
@@ -474,6 +476,7 @@ class TestUploadToLabArchives:
             change_description=None,
             metadata=None,  # Missing!
             allow_dirty_git=False,
+            create_as_text=False,
         )
 
         # Act & Assert
@@ -500,6 +503,7 @@ class TestUploadToLabArchives:
             change_description=None,
             metadata=None,  # Missing!
             allow_dirty_git=False,
+            create_as_text=False,
         )
 
         # Act & Assert

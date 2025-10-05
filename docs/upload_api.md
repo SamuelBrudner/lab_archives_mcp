@@ -16,7 +16,7 @@ The upload functionality enables programmatic creation of notebook pages and upl
 │   MCP Tool: upload_to_labarchives   │
 │   - Validates inputs                │
 │   - Orchestrates page creation      │
-│   - Uploads file as attachment      │
+│   - Stores page text (Markdown → HTML) or uploads attachment │
 └──────────────┬──────────────────────┘
                │
                ↓
@@ -66,12 +66,12 @@ The upload functionality enables programmatic creation of notebook pages and upl
 **Flow**:
 1. CI/CD pipeline triggers on commit
 2. Tool uploads `protocol.md` to "Protocols" folder
-3. Tool optionally converts markdown to HTML entry
+3. Tool converts Markdown to HTML and stores it as a text entry by default
 4. Tool returns entry ID for tracking
 
 **Postconditions**:
-- Markdown file uploaded as attachment
-- Optional: Rendered HTML entry for readability
+- Markdown rendered and stored as page text (HTML)
+- Optional: Also attach original file if desired
 
 ### UC3: Archive Python Scripts
 **Actor**: Researcher
@@ -244,16 +244,74 @@ class UploadRequest(BaseModel):
 
     # Allow upload despite dirty Git state (use with caution)
     allow_dirty_git: bool = False
+
+    # Store file contents as page text (Markdown → HTML for .md)
+    create_as_text: bool = False
 ```
 
 ### UploadResponse
 ```python
 class UploadResponse(BaseModel):
     page_tree_id: str  # tree_id of created page
-    entry_id: str  # eid of uploaded attachment
+    entry_id: str  # EID of text entry or attachment
     page_url: str  # LabArchives web URL
     created_at: datetime
     file_size_bytes: int
+```
+
+## Library Usage Example
+
+```python
+import asyncio
+from pathlib import Path
+from datetime import datetime, UTC
+
+import httpx
+from labarchives_mcp.auth import Credentials, AuthenticationManager
+from labarchives_mcp.eln_client import LabArchivesClient
+from labarchives_mcp.models.upload import UploadRequest, ProvenanceMetadata
+
+async def main():
+    creds = Credentials.from_file()  # reads conf/secrets.yml
+    async with httpx.AsyncClient(base_url=str(creds.region)) as http_client:
+        auth = AuthenticationManager(http_client, creds)
+        client = LabArchivesClient(http_client, auth)
+        uid = await auth.ensure_uid()
+
+        # Example A: Upload Markdown as page text (rendered to HTML)
+        md_request = UploadRequest(
+            notebook_id="NBID...",
+            parent_folder_id=None,
+            page_title="Protocol - 2025-10-02",
+            file_path=Path("protocol.md"),
+            metadata=ProvenanceMetadata(
+                git_commit_sha="a"*40,
+                git_branch="main",
+                git_repo_url="https://github.com/user/repo",
+                git_is_dirty=False,
+                executed_at=datetime.now(UTC),
+                python_version="3.11.8",
+                dependencies={"numpy": "1.26.0"},
+                os_name="Darwin",
+                hostname=None,
+            ),
+            create_as_text=True,  # Render Markdown → HTML on the page
+        )
+        result = await client.upload_to_labarchives(uid, md_request)
+        print("Page:", result.page_url)
+
+        # Example B: Upload notebook as attachment
+        nb_request = UploadRequest(
+            notebook_id="NBID...",
+            page_title="Analysis - 2025-10-02",
+            file_path=Path("analysis.ipynb"),
+            metadata=md_request.metadata,
+            create_as_text=False,  # Keep as attachment
+        )
+        result = await client.upload_to_labarchives(uid, nb_request)
+        print("Page:", result.page_url)
+
+asyncio.run(main())
 ```
 
 ### PageCreationResult

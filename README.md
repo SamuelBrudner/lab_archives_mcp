@@ -369,18 +369,73 @@ upload_to_labarchives(
   git_repo_url="https://github.com/user/repo",
   python_version="3.11.8",
   executed_at="2025-09-30T12:00:00Z",
-  dependencies={"numpy": "1.26.0", "pandas": "2.1.0"}
+  dependencies={"numpy": "1.26.0", "pandas": "2.1.0"},
+  as_page_text=True  # default: store contents as page text (Markdown → HTML)
 )
 
 # Returns:
 {
   "page_tree_id": "NEW_PAGE_ID",
-  "entry_id": "ATTACHMENT_ID",
+  "entry_id": "ENTRY_ID",  # text entry or attachment EID
   "page_url": "https://mynotebook.labarchives.com/...",
   "created_at": "2025-09-30T12:00:00Z",
   "file_size_bytes": 12345,
   "filename": "analysis.ipynb"
 }
+```
+
+### Library Usage (Python)
+
+```python
+import asyncio
+from datetime import datetime, UTC
+from pathlib import Path
+
+import httpx
+from labarchives_mcp.auth import Credentials, AuthenticationManager
+from labarchives_mcp.eln_client import LabArchivesClient
+from labarchives_mcp.models.upload import UploadRequest, ProvenanceMetadata
+
+async def main():
+    creds = Credentials.from_file()  # reads conf/secrets.yml
+    async with httpx.AsyncClient(base_url=str(creds.region)) as http_client:
+        auth = AuthenticationManager(http_client, creds)
+        client = LabArchivesClient(http_client, auth)
+        uid = await auth.ensure_uid()
+
+        # A) Render Markdown → HTML as page text (recommended for .md)
+        md_req = UploadRequest(
+            notebook_id="NBID...",
+            page_title="Protocol - 2025-10-02",
+            file_path=Path("protocol.md"),
+            metadata=ProvenanceMetadata(
+                git_commit_sha="a" * 40,
+                git_branch="main",
+                git_repo_url="https://github.com/user/repo",
+                git_is_dirty=False,
+                executed_at=datetime.now(UTC),
+                python_version="3.11.8",
+                dependencies={"numpy": "1.26.0"},
+                os_name="Darwin",
+                hostname=None,
+            ),
+            create_as_text=True,
+        )
+        result = await client.upload_to_labarchives(uid, md_req)
+        print("Page:", result.page_url)
+
+        # B) Keep file as attachment (e.g., .ipynb)
+        nb_req = UploadRequest(
+            notebook_id="NBID...",
+            page_title="Analysis - 2025-10-02",
+            file_path=Path("analysis.ipynb"),
+            metadata=md_req.metadata,
+            create_as_text=False,
+        )
+        result = await client.upload_to_labarchives(uid, nb_req)
+        print("Page:", result.page_url)
+
+asyncio.run(main())
 ```
 
 > **🔒 Security Note**: The upload tool is enabled by default. For production deployments or shared environments, **disable write capabilities** by setting `LABARCHIVES_ENABLE_UPLOAD=false` in the environment configuration above. This prevents AI assistants from unintentionally modifying your research records.

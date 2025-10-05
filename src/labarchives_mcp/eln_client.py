@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import html as _html
+import re
+from collections.abc import Callable
 from datetime import UTC
 from typing import TYPE_CHECKING, Any
 
@@ -65,6 +68,115 @@ class LabArchivesClient:
     def __init__(self, client: httpx.AsyncClient, auth_manager: AuthenticationManager) -> None:
         self._client = client
         self._auth_manager = auth_manager
+
+    @staticmethod
+    def _markdown_to_html(markdown_text: str, require_lib: bool = False) -> str:
+        """Convert Markdown to HTML.
+
+        Tries to use the `markdown` package if available; falls back to a
+        lightweight converter handling common constructs (headings, lists,
+        bold/italic, code blocks, inline code, paragraphs).
+        """
+        try:
+            import markdown as _md  # type: ignore[import-untyped]
+
+            return str(
+                _md.markdown(
+                    markdown_text,
+                    extensions=[
+                        "fenced_code",
+                        "tables",
+                        "sane_lists",
+                        "toc",
+                        "attr_list",
+                        "codehilite",
+                    ],
+                    output_format="html5",
+                )
+            )
+        except Exception as e:
+            if require_lib:
+                raise RuntimeError(
+                    "High-fidelity Markdown conversion requires the 'markdown' package. "
+                    "Install it (e.g., 'pip install markdown' or add to your environment)"
+                ) from e
+            # Fall back to a lightweight converter with a warning
+            logger.warning(
+                f"High-fidelity Markdown conversion not available ({e}); using fallback converter."
+            )
+
+        text = markdown_text.replace("\r\n", "\n").replace("\r", "\n")
+
+        # Handle fenced code blocks first to avoid interfering with other rules
+        code_blocks: list[str] = []
+
+        def _codeblock_repl(match: re.Match[str]) -> str:
+            lang = match.group(1) or ""
+            code = match.group(2)
+            escaped = _html.escape(code)
+            code_blocks.append(f'<pre><code class="language-{lang}">{escaped}</code></pre>')
+            return f"[[CODEBLOCK:{len(code_blocks)-1}]]"
+
+        text = re.sub(r"```([\w+-]*)\n([\s\S]*?)\n```", _codeblock_repl, text)
+
+        # Headings
+        def _mk_heading_replacer(level: int) -> Callable[[re.Match[str]], str]:
+            def _repl(m: re.Match[str]) -> str:
+                content = m.group(1).strip()
+                return f"<h{level}>{content}</h{level}>"
+
+            return _repl
+
+        for level in range(6, 0, -1):
+            pattern = re.compile(rf"^{'#' * level} +(.+)$", re.MULTILINE)
+            text = pattern.sub(_mk_heading_replacer(level), text)
+
+        # Unordered lists (simple): group consecutive - or * items
+        lines = text.split("\n")
+        out_lines: list[str] = []
+        in_list = False
+        for line in lines:
+            m = re.match(r"^[\-*] +(.*)$", line)
+            if m:
+                if not in_list:
+                    out_lines.append("<ul>")
+                    in_list = True
+                out_lines.append(f"<li>{m.group(1).strip()}</li>")
+            else:
+                if in_list:
+                    out_lines.append("</ul>")
+                    in_list = False
+                out_lines.append(line)
+        if in_list:
+            out_lines.append("</ul>")
+        text = "\n".join(out_lines)
+
+        # Inline code
+        text = re.sub(r"`([^`]+)`", lambda m: f"<code>{_html.escape(m.group(1))}</code>", text)
+
+        # Bold and italic (basic non-greedy)
+        text = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", text)
+        text = re.sub(r"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)", r"<em>\1</em>", text)
+
+        # Paragraphs: wrap non-HTML lines separated by blank lines
+        blocks = [b.strip() for b in text.split("\n\n")]
+        wrapped_blocks: list[str] = []
+        for b in blocks:
+            if not b:
+                continue
+            if b.startswith("<h") or b.startswith("<ul>") or b.startswith("<pre>"):
+                wrapped_blocks.append(b)
+            else:
+                wrapped_blocks.append(f"<p>{b}</p>")
+        html = "\n\n".join(wrapped_blocks)
+
+        # Restore code blocks placeholders
+        def _restore_code(m: re.Match[str]) -> str:
+            idx = int(m.group(1))
+            return code_blocks[idx]
+
+        html = re.sub(r"\[\[CODEBLOCK:(\d+)\]\]", _restore_code, html)
+        return html
 
     async def list_notebooks(self, uid: str) -> list[NotebookRecord]:
         """Return notebooks for a user uid."""
@@ -360,15 +472,23 @@ class LabArchivesClient:
         if entry is None:
             raise ValueError("No entry returned in add_entry response")
 
-        return {
+        result: dict[str, str] = {
             "eid": entry.findtext("eid") or "",
             "part_type": entry.findtext("part-type") or part_type,
         }
+        created_at_val = entry.findtext("created-at")
+        if created_at_val:
+            result["created_at"] = created_at_val
+        return result
 
     async def upload_to_labarchives(self, uid: str, request: UploadRequest) -> UploadResponse:
-        """Orchestrate complete file upload workflow.
+        """Orchestrate complete upload workflow.
 
-        Creates page, uploads file, adds metadata entry.
+        Creates a page and either:
+        - Adds the file contents as a page text entry (if request.create_as_text is True), or
+        - Uploads the file as an attachment (default behavior).
+
+        Always adds a provenance metadata entry when provided.
 
         Args:
             uid: User ID
@@ -412,17 +532,63 @@ class LabArchivesClient:
         page_result = await self.insert_node(uid, page_request)
         logger.info(f"Created page: {page_result.tree_id}")
 
-        # Step 2: Upload file as attachment
-        attachment_request = AttachmentUploadRequest(
-            notebook_id=request.notebook_id,
-            page_tree_id=page_result.tree_id,
-            file_path=request.file_path,
-            filename=request.file_path.name,  # Will be defaulted by model
-            caption=request.caption,
-            change_description=request.change_description,
-        )
-        attachment_result = await self.add_attachment(uid, attachment_request)
-        logger.info(f"Uploaded attachment: {attachment_result.eid}")
+        # Step 2: Either add file as page text or upload as attachment
+        main_entry_eid: str
+        filename_for_response: str = request.file_path.name
+        file_size_bytes_for_response: int
+        created_entry_dict: dict[str, str] | None = None
+        from datetime import datetime as dt
+
+        attachment_created_at: dt | None = None
+
+        if request.create_as_text:
+            # Read file content as text (best-effort decoding)
+            raw_bytes = request.file_path.read_bytes()
+            try:
+                file_text = raw_bytes.decode("utf-8")
+            except UnicodeDecodeError:
+                file_text = raw_bytes.decode("latin-1", errors="replace")
+
+            # Choose entry type based on extension
+            suffix = request.file_path.suffix.lower()
+            if suffix in {".html", ".htm"}:
+                part_type = "text entry"
+                entry_body = file_text
+            elif suffix in {".md", ".markdown"}:
+                part_type = "text entry"
+                entry_body = self._markdown_to_html(file_text, require_lib=True)
+            else:
+                part_type = "plain text entry"
+                entry_body = file_text
+
+            created = await self.add_entry(
+                uid=uid,
+                notebook_id=request.notebook_id,
+                page_tree_id=page_result.tree_id,
+                part_type=part_type,
+                entry_data=entry_body,
+                caption=request.caption,
+                change_description=request.change_description,
+            )
+            main_entry_eid = created["eid"]
+            created_entry_dict = created
+            file_size_bytes_for_response = len(raw_bytes)
+            logger.info(f"Added page text entry: {main_entry_eid}")
+        else:
+            # Upload as attachment (default)
+            attachment_request = AttachmentUploadRequest(
+                notebook_id=request.notebook_id,
+                page_tree_id=page_result.tree_id,
+                file_path=request.file_path,
+                filename=request.file_path.name,  # Will be defaulted by model
+                caption=request.caption,
+                change_description=request.change_description,
+            )
+            attachment_result = await self.add_attachment(uid, attachment_request)
+            main_entry_eid = attachment_result.eid
+            file_size_bytes_for_response = attachment_result.file_size_bytes
+            attachment_created_at = attachment_result.created_at
+            logger.info(f"Uploaded attachment: {main_entry_eid}")
 
         # Step 3: Add metadata entry if provided
         if request.metadata:
@@ -437,14 +603,30 @@ class LabArchivesClient:
             )
             logger.info("Added metadata entry")
 
-        # Construct page URL
-        page_url = f"https://mynotebook.labarchives.com/share_attachment/{page_result.tree_id}"
+        # Construct canonical page URL (not attachment URL)
+        page_url = (
+            f"https://mynotebook.labarchives.com/share/{request.notebook_id}/{page_result.tree_id}"
+        )
+
+        from datetime import UTC
+
+        if request.create_as_text:
+            if created_entry_dict and isinstance(created_entry_dict.get("created_at"), str):
+                created_at_dt = dt.fromisoformat(
+                    created_entry_dict["created_at"].replace("Z", "+00:00")
+                )
+            else:
+                created_at_dt = dt.now(UTC)
+        else:
+            # mypy: attachment_created_at is set in the attachment branch
+            assert attachment_created_at is not None
+            created_at_dt = attachment_created_at
 
         return UploadResponse(
             page_tree_id=page_result.tree_id,
-            entry_id=attachment_result.eid,
+            entry_id=main_entry_eid,
             page_url=page_url,
-            created_at=attachment_result.created_at,
-            file_size_bytes=attachment_result.file_size_bytes,
-            filename=attachment_result.filename,
+            created_at=created_at_dt,
+            file_size_bytes=file_size_bytes_for_response,
+            filename=filename_for_response,
         )
