@@ -21,6 +21,13 @@ import httpx
 import yaml  # type: ignore[import-untyped]
 from loguru import logger
 
+from vector_backend.build_state import (
+    build_record_from_config,
+    compute_config_fingerprint,
+    load_build_record,
+    save_build_record,
+    should_rebuild,
+)
 from vector_backend.config import load_config
 from vector_backend.embedding import create_embedding_client
 from vector_backend.index import PineconeIndex
@@ -131,6 +138,14 @@ async def main() -> None:
     config = load_config("default")
     logger.info(f"Config: {config.embedding.model}, chunk_size={config.chunking.chunk_size}")
 
+    # Decide whether to rebuild based on build record
+    record_path = Path(config.incremental_updates.last_indexed_file)
+    current_fp = compute_config_fingerprint(config)
+    previous = load_build_record(record_path)
+    if previous and not should_rebuild(previous, current_fp, config.embedding.version):
+        logger.info("No changes detected in config/embedding version; using existing index.\n")
+        return
+
     # Create embedding client
     embedding_client = create_embedding_client(config.embedding)
     logger.info("✓ Created embedding client")
@@ -237,6 +252,12 @@ async def main() -> None:
     logger.info(f"  Chunks indexed: {total_indexed}")
     logger.info(f"  Entries skipped: {total_skipped}")
     logger.info(f"  Total index size: {initial_stats.total_chunks} → {final_stats.total_chunks}")
+    # Persist build record for future runs
+    try:
+        save_build_record(record_path, build_record_from_config(config))
+        logger.info(f"Saved build record to {record_path}")
+    except Exception as e:
+        logger.warning(f"Failed to save build record: {e}")
     logger.info("=" * 60)
 
 

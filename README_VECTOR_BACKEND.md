@@ -234,6 +234,27 @@ pytest tests/vector_backend/unit/test_chunking.py --benchmark-only
 - [ ] Local embedding models (sentence-transformers)
 - [ ] Production deployment guide
 
+## Build Records
+
+To avoid unnecessary re-indexing runs, the backend can persist a small "build record"
+describing the last successful indexing build. The record includes:
+
+- `built_at` (timestamp)
+- `embedding_version` (from config)
+- `config_fingerprint` (hash over relevant config keys)
+- `backend`, `index_name`, `namespace`
+
+By default, the path is controlled by `incremental_updates.last_indexed_file`
+in `conf/vector_search/default.yaml` (defaults to `data/.last_indexed`).
+
+The script `scripts/index_real_notebook.py` reads the record on startup and:
+
+- Skips rebuild if the fingerprint and `embedding_version` match
+- Otherwise performs a rebuild and writes a new record
+
+This logic lives in `vector_backend.build_state` and the persisted schema
+is defined as `vector_backend.models.BuildRecord`.
+
 ## Design Principles
 
 Following the global development guidelines:
