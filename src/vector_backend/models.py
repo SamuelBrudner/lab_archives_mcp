@@ -140,3 +140,25 @@ class IndexStats(BaseModel):
     embedding_version: str
     last_updated: datetime
     storage_size_mb: float = Field(ge=0.0)
+
+
+class BuildRecord(BaseModel):
+    """Record of the last completed build of local/indexed persistence.
+
+    Attributes:
+        built_at: Timestamp when the build completed
+        embedding_version: Embedding model version used for the build
+        config_fingerprint: Stable hash of relevant configuration fields
+        backend: Index backend name (e.g., "pinecone", "qdrant")
+        index_name: Optional index/collection name
+        namespace: Optional namespace (for multi-tenant indices)
+        notes: Optional human-readable notes
+    """
+
+    built_at: datetime
+    embedding_version: str
+    config_fingerprint: str
+    backend: str
+    index_name: str | None = None
+    namespace: str | None = None
+    notes: str | None = None

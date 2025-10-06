@@ -5,6 +5,21 @@ All notable changes to the LabArchives MCP Server project.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.2.1 (2025-10-06)
+
+### Feat
+
+- promote BuildRecord into shared semantic models (`vector_backend.models.BuildRecord`)
+- add unit tests for build-state (fingerprint, persistence, rebuild logic)
+
+### Test
+
+- load `conf/secrets.yml` automatically during tests and set `DVC_SITE_CACHE_DIR` for reliable DVC integration tests on macOS
+
+### Docs
+
+- reference BuildRecord location in README_VECTOR_BACKEND
+
 ## [0.1.0] - 2025-09-30
 
 ### Added
