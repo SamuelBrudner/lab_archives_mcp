@@ -306,6 +306,23 @@ The MCP server exposes LabArchives notebooks to AI agents via the MCP protocol.
 **Reading**:
 - **`read_notebook_page(notebook_id, page_id)`** - Read content from a specific page
 
+### Indexing & Sync
+
+- Semantic search operates over content that has already been indexed. Searches do not
+  perform indexing implicitly.
+- To index or refresh the vector database, use the MCP tool:
+  - `sync_vector_index(force=False, dry_run=False, max_age_hours=None, notebook_id=None)`
+  - The tool:
+    - Loads config from `conf/vector_search/default.yaml`
+    - Reads the persisted build record from `incremental_updates.last_indexed_file`
+    - Decides one of:
+      - `skip` when config + embedding version match and the build is recent
+      - `incremental` when the build is older than `max_age_hours` (only changed entries)
+      - `rebuild` when embedding version or config fingerprint changed, or `force=True`
+    - Use `dry_run=True` to return the plan without any side effects
+- Details of the build record and planning are documented in
+  `README_VECTOR_BACKEND.md` under “Build Records” and “MCP Sync”.
+
 #### Tool Schemas
 
 **`list_labarchives_notebooks()`**
