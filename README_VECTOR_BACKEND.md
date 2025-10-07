@@ -295,6 +295,9 @@ The MCP server exposes a `sync_vector_index` tool to coordinate indexing runs.
   - `incremental` (stale by age threshold; process only changed entries)
   - `rebuild` (config/embedding changed or forced)
 - Supports `dry_run=true` to return a plan without side effects.
+- Execution requires a `notebook_id` scope; otherwise the tool returns the plan only.
+  - Incremental: only changed entries since `built_at` are embedded and upserted
+  - Rebuild: all pages in the notebook are re-indexed
 
 Example call (from an MCP client):
 

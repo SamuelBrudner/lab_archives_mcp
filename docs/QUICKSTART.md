@@ -111,6 +111,9 @@ cat conf/secrets.yml
   - `dry_run=true` returns the plan (`skip` | `incremental` | `rebuild`) without changes
   - When `max_age_hours` is set and the last build is older, `incremental` processing is chosen
   - `force=true` performs a rebuild regardless of the prior record
+  - To actually index, provide a notebook scope: `notebook_id="<nbid>"`
+    - Incremental: indexes only changed entries on that notebook's pages
+    - Rebuild: re-indexes all entries on that notebook's pages
 
 - Configuration lives at `conf/vector_search/default.yaml` and the persisted build record path is
   `incremental_updates.last_indexed_file`. See `README_VECTOR_BACKEND.md` for details.
