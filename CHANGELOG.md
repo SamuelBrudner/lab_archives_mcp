@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Feat
+
+- mcp: implement `sync_vector_index` execution for incremental and rebuild paths (requires `notebook_id` scope). Incremental indexes only changed entries since the last build; rebuild re-indexes all pages for the notebook.
+
+### Test
+
+- spec: add execution tests for incremental and rebuild sync flows (`tests/spec/test_mcp_sync_execution.py`)
+
+### Docs
+
+- clarify `sync_vector_index` usage in docs/QUICKSTART.md and README_VECTOR_BACKEND.md (execution requires `notebook_id`)
+
 ## v0.2.2 (2025-10-07)
 
 ### Fix
