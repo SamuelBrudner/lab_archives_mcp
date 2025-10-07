@@ -296,8 +296,7 @@ async def run_server() -> None:
                     content = await f.read()
                     secrets = yaml.safe_load(content)
 
-                os.environ["OPENAI_API_KEY"] = secrets["OPENAI_API_KEY"]
-                os.environ["PINECONE_API_KEY"] = secrets["PINECONE_API_KEY"]
+                # Do not mutate process environment; pass keys via config/clients
 
                 # Load configuration
                 config = load_config("default")

@@ -158,7 +158,7 @@ def mcp_env(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
         pass
 
     fake_openai.AsyncOpenAI = _AsyncOpenAI  # type: ignore[attr-defined]
-    sys.modules["openai"] = fake_openai
+    monkeypatch.setitem(sys.modules, "openai", fake_openai)
 
     import yaml  # type: ignore[import-untyped]
 
@@ -183,7 +183,7 @@ def mcp_env(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
         return _C()
 
     fake_aiofiles.open = _fake_open  # type: ignore[attr-defined]
-    sys.modules["aiofiles"] = fake_aiofiles
+    monkeypatch.setitem(sys.modules, "aiofiles", fake_aiofiles)
 
     monkeypatch.setattr(vbe, "create_embedding_client", fake_create_embedding_client)
     monkeypatch.setattr(vbi, "PineconeIndex", DummyIndex)
