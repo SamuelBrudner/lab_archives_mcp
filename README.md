@@ -170,7 +170,7 @@ async def test():
 
 asyncio.run(test())
 "
-```
+```bash
 
 ### 6. Example: Querying Your Notebooks with AI
 
@@ -200,7 +200,7 @@ AI: "In your 'Mosquito Navigation' notebook, you documented three main protocols
    - Statistical analysis methods
 
 Would you like me to retrieve specific details from any of these protocols?"
-```
+```text
 
 The AI assistant autonomously:
 
@@ -225,7 +225,7 @@ conda run -p ./conda_envs/labarchives-mcp-pol labarchives-mcp
 # Method 3: Direct Python (if environment is activated)
 conda activate ./conda_envs/labarchives-mcp-pol
 labarchives-mcp
-```
+```bash
 
 The server runs in stdio mode and waits for MCP protocol messages. Press `Ctrl+C` to stop.
 
@@ -348,7 +348,7 @@ The MCP server exposes LabArchives notebooks to AI agents via the MCP protocol.
   "created_at": "1970-01-01T00:00:00Z",
   "modified_at": "1970-01-01T00:00:00Z"
 }]
-```
+```json
 
 **`list_notebook_pages(notebook_id, folder_id=None)`**
 
@@ -368,7 +368,7 @@ The MCP server exposes LabArchives notebooks to AI agents via the MCP protocol.
 
 # Navigate into a folder by passing its tree_id as folder_id:
 list_notebook_pages(notebook_id, folder_id="67890")
-```
+```python
 
 **`read_notebook_page(notebook_id, page_id)`**
 
@@ -385,7 +385,7 @@ list_notebook_pages(notebook_id, folder_id="67890")
     "updated_at": "2025-01-02T08:30:00Z"
   }]
 }
-```
+```json
 
 **`upload_to_labarchives(...)`** ⭐ NEW
 
@@ -414,7 +414,7 @@ upload_to_labarchives(
   "file_size_bytes": 12345,
   "filename": "analysis.ipynb"
 }
-```
+```json
 
 ### Library Usage (Python)
 
@@ -468,7 +468,7 @@ async def main():
         print("Page:", result.page_url)
 
 asyncio.run(main())
-```
+```python
 
 > **🔒 Security Note**: The upload tool is enabled by default. For production deployments or shared environments, **disable write capabilities** by setting `LABARCHIVES_ENABLE_UPLOAD=false` in the environment configuration above. This prevents AI assistants from unintentionally modifying your research records.
 
@@ -490,7 +490,7 @@ Agent: calls list_notebook_pages("MTU2MTI4NS43...", folder_id="MS4z...")
 User: "Show me the first page"
 Agent: calls read_notebook_page("MTU2MTI4NS43...", "12345")
 → Returns: All text entries, headings, and attachment info from that page
-```
+```text
 
 ---
 
@@ -566,7 +566,7 @@ from labarchives_mcp.auth import Credentials
 import json
 print(json.dumps(Credentials.model_json_schema(), indent=2))
 "
-```
+```bash
 
 All field descriptions, examples, and validation rules are in the Pydantic models. No separate YAML/JSON schema files—code is the source of truth.
 

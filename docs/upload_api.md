@@ -11,7 +11,7 @@ The upload functionality enables programmatic creation of notebook pages and upl
 
 ## Architecture
 
-```
+```text
 ┌─────────────────────────────────────┐
 │   MCP Tool: upload_to_labarchives   │
 │   - Validates inputs                │

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import inspect
 import os
 from collections.abc import Awaitable, Callable, Coroutine
@@ -566,19 +567,13 @@ async def run_server() -> None:
                         indexed_chunks += int(res.get("indexed_count", 0))
 
             # Save/refresh build record for both incremental and rebuild
-            try:
+            with contextlib.suppress(Exception):
                 save_build_record(record_path, build_record_from_config(config))
-            except Exception:  # pragma: no cover - filesystem edge cases
-                pass
-
             return {
                 **decision,
                 "processed_pages": processed_pages,
                 "indexed_chunks": indexed_chunks,
             }
-
-            # Fallback (should not occur)
-            # (no-op)
 
         # Conditionally register upload tool based on environment variable
         if _is_upload_enabled():

@@ -104,7 +104,7 @@ cat conf/secrets.yml
 - Searches use the existing index; nothing is indexed implicitly during a search.
 - To index or refresh, call the MCP tool from your agent:
 
-  ```
+  ```json
   sync_vector_index {"force": false, "dry_run": true, "max_age_hours": 24}
   ```
 

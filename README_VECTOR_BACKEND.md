@@ -119,7 +119,7 @@ dvc remote add -d myremote s3://mybucket/embeddings
 dvc remote add -d localremote /tmp/dvc-storage
 
 # LocalPersistence will auto-track files when enable_dvc=True
-```
+```bash
 
 ## Usage Examples
 
@@ -307,7 +307,7 @@ sync_vector_index {"force": false, "dry_run": true, "max_age_hours": 24}
 
 Response (example):
 
-```python
+```json
 {
   "action": "incremental",
   "reason": "stale",
