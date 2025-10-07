@@ -28,13 +28,13 @@ labarchives-mcp
         "run",
         "--no-capture-output",
         "-p",
-        "/Users/samuelbrudner/Yale University Dropbox/Samuel Brudner/lab_archives_mcp/conda_envs/labarchives-mcp-pol",
+        "/absolute/path/to/lab_archives_mcp/conda_envs/labarchives-mcp-pol",
         "python",
         "-m",
         "labarchives_mcp"
       ],
       "env": {
-        "LABARCHIVES_CONFIG_PATH": "/Users/samuelbrudner/Yale University Dropbox/Samuel Brudner/lab_archives_mcp/conf/secrets.yml",
+        "LABARCHIVES_CONFIG_PATH": "/absolute/path/to/lab_archives_mcp/conf/secrets.yml",
         "FASTMCP_SHOW_CLI_BANNER": "false",
         "LABARCHIVES_ENABLE_UPLOAD": "true"
       }
@@ -62,14 +62,14 @@ labarchives-mcp
       "args": [
         "run",
         "-p",
-        "/Users/samuelbrudner/Yale University Dropbox/Samuel Brudner/lab_archives_mcp/conda_envs/labarchives-mcp-pol",
+        "/absolute/path/to/lab_archives_mcp/conda_envs/labarchives-mcp-pol",
         "python",
         "-m",
         "labarchives_mcp"
       ],
-      "cwd": "/Users/samuelbrudner/Yale University Dropbox/Samuel Brudner/lab_archives_mcp",
+      "cwd": "/absolute/path/to/lab_archives_mcp",
       "env": {
-        "LABARCHIVES_CONFIG_PATH": "/Users/samuelbrudner/Yale University Dropbox/Samuel Brudner/lab_archives_mcp/conf/secrets.yml",
+        "LABARCHIVES_CONFIG_PATH": "/absolute/path/to/lab_archives_mcp/conf/secrets.yml",
         "LABARCHIVES_ENABLE_UPLOAD": "true"
       }
     }
