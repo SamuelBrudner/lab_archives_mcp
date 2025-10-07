@@ -5,6 +5,7 @@ This guide explains how to expose the LabArchives MCP server to AI agents.
 ## Overview
 
 The LabArchives MCP server uses **stdio transport** for communication. This means:
+
 - Agents launch the server as a subprocess
 - Communication happens via stdin/stdout
 - No network ports or HTTP endpoints needed
@@ -43,6 +44,7 @@ Claude Desktop is the primary client for MCP servers. Add this configuration to 
 ```
 
 **Important**:
+
 - Replace `/absolute/path/to/lab_archives_mcp` with your actual repository path.
 - The `cwd` parameter ensures the server finds `conf/secrets.yml` in the working directory.
 
@@ -113,6 +115,7 @@ The server exposes one resource:
 Returns a list of LabArchives notebooks for the authenticated user.
 
 **Response Schema**:
+
 ```json
 {
   "resource": "labarchives:notebooks",
@@ -120,9 +123,9 @@ Returns a list of LabArchives notebooks for the authenticated user.
     {
       "nbid": "MTU2MTI4NS43fDEyMDA5ODkvMTIwMDk4OS9Ob3RlYm9vay81MzgyNzU0MDh8Mzk2MzI2My42OTk5OTk5OTk3",
       "name": "Fly Behavior Study",
-      "owner": "samuel.brudner@yale.edu",
-      "owner_email": "samuel.brudner@yale.edu",
-      "owner_name": "Samuel Brudner",
+      "owner": "owner@example.com",
+      "owner_email": "owner@example.com",
+      "owner_name": "Owner Name",
       "created_at": "2025-01-01T12:00:00Z",
       "modified_at": "2025-01-02T08:30:00Z"
     }
@@ -131,6 +134,7 @@ Returns a list of LabArchives notebooks for the authenticated user.
 ```
 
 **Error Response**:
+
 ```json
 {
   "resource": "labarchives:notebooks",
@@ -167,6 +171,7 @@ npx @modelcontextprotocol/inspector python -m labarchives_mcp
 ```
 
 This opens a web UI where you can:
+
 - View available resources
 - Send requests
 - Inspect responses
@@ -180,6 +185,7 @@ This opens a web UI where you can:
 **Error**: `FileNotFoundError: Secrets file not found: conf/secrets.yml`
 
 **Solution**: Ensure you're running from the repository root or set `LABARCHIVES_CONFIG_PATH`:
+
 ```bash
 export LABARCHIVES_CONFIG_PATH=/absolute/path/to/conf/secrets.yml
 ```
@@ -189,6 +195,7 @@ export LABARCHIVES_CONFIG_PATH=/absolute/path/to/conf/secrets.yml
 **Symptom**: Claude Desktop shows "MCP server failed to start"
 
 **Checks**:
+
 1. Verify conda environment path is correct
 2. Test command manually in terminal
 3. Check Claude Desktop logs:
@@ -200,6 +207,7 @@ export LABARCHIVES_CONFIG_PATH=/absolute/path/to/conf/secrets.yml
 **Error**: `error: {"code": 4520, "message": "Invalid signature"}`
 
 **Solution**: Verify credentials in `conf/secrets.yml`:
+
 - `LABARCHIVES_AKID` matches your API key
 - `LABARCHIVES_PASSWORD` is correct
 - `LABARCHIVES_UID` is valid (or use temp token method)
@@ -218,11 +226,13 @@ export LABARCHIVES_CONFIG_PATH=/absolute/path/to/conf/secrets.yml
 3. **Fail-Fast**: The server will refuse to start if credentials are missing or invalid. No silent fallbacks.
 
 4. **Write Capabilities**: The server includes an experimental `upload_to_labarchives` tool that allows AI assistants to upload files with Git provenance metadata. To disable this for production deployments, set the environment variable:
+
    ```bash
    export LABARCHIVES_ENABLE_UPLOAD=false
    ```
 
    Add this to your agent configuration:
+
    ```json
    {
      "mcpServers": {

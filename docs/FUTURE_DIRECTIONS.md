@@ -89,7 +89,7 @@ labarchives-mcp export-embeddings     # Export to portable format
 labarchives-mcp import-embeddings     # Import from another system
 ```
 
-**Value:** Better control over local persistence storage.
+**Value: Better control over local persistence storage.
 **Effort:** Low - thin layer over LocalPersistence API.
 **Decision criteria:** Implement when users need to migrate embeddings between systems.
 

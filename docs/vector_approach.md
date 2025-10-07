@@ -3,7 +3,7 @@
 This document describes how to build, maintain, and update the semantic search index for LabArchives notebook entries.
 
 **Status:** Design document (2025-09-30)
-**Owner:** Samuel Brudner
+**Owner:** Owner Name
 **Dependencies:** LabArchives MCP, DVC, Hydra, Pydantic
 
 ---
@@ -41,9 +41,9 @@ This improves discovery, supports metadata-based filtering, and provides a found
 3. **Embed** chunks using an embedding model (see §3.2).
 4. **Validate** chunks with Pydantic models (see §3.3).
 5. **Persist** each chunk to Parquet tracked by DVC:
-   - File: `data/embeddings/v1/{notebook_id}.parquet`
-   - Schema: see §3.3
-   - DVC tracked: `dvc add data/embeddings/`
+   * File: `data/embeddings/v1/{notebook_id}.parquet`
+   * Schema: see §3.3
+   * DVC tracked: `dvc add data/embeddings/`
 6. **Bulk upsert** chunks into Pinecone (later Qdrant) with exponential backoff retry.
 
 **Deliverables:**
@@ -78,18 +78,20 @@ chunking:
 **Library:** Use `langchain.text_splitter.RecursiveCharacterTextSplitter` wrapped with validation.
 
 **Test coverage:** Unit tests in `tests/vector_search/test_chunking.py` with:
-- Edge cases (empty text, single sentence, very long paragraphs)
-- Boundary preservation verification
-- Deterministic output (same input → same chunks)
+
+* Edge cases (empty text, single sentence, very long paragraphs)
+* Boundary preservation verification
+* Deterministic output (same input → same chunks)
 
 ### 3.2 Embedding Model Selection
 
 **Current landscape (2025-09):** There is *no* GPT‑5 embedding model. OpenAI's latest public embedding family is the **`text-embedding-3`** series released in 2024. The "small" variant is cost-efficient; the "large" variant offers the best recall, especially on scientific prose, but at ~6× the price. Several commercial and open-source alternatives have also surpassed earlier generations.
 
 **Recommendation:**
-- Start evaluation with **`text-embedding-3-large`** for ground-truth quality. If recall@10 improves by <5% relative to cheaper models, fall back to the lower-cost option.
-- Maintain a cost-conscious baseline with **`text-embedding-3-small`** (default config) for day-to-day indexing until evaluation justifies an upgrade.
-- Include at least one commercial non-OpenAI model and one open model in every benchmark run.
+
+* Start evaluation with **`text-embedding-3-large`** for ground-truth quality. If recall@10 improves by <5% relative to cheaper models, fall back to the lower-cost option.
+* Maintain a cost-conscious baseline with **`text-embedding-3-small`** (default config) for day-to-day indexing until evaluation justifies an upgrade.
+* Include at least one commercial non-OpenAI model and one open model in every benchmark run.
 
 **Candidate models to compare:**
 
@@ -105,13 +107,15 @@ chunking:
 > **Note:** Continue tracking releases from Voyage AI, Cohere, and Mistral. Update this table whenever new leaderboard results appear (e.g., MTEB, MIRACL, BioASQ).
 
 **Evaluation plan:**
-- Build test set of 50 query→expected_entry pairs from existing notebooks.
-- Include at least one metadata-filtered query per notebook type (protocols, results, lab meeting notes).
-- Measure recall@5, recall@10, and MRR for each model across all queries.
-- Record latency and per-chunk cost; compute monthly spend scenarios (e.g., 5%, 10%, 20% churn).
-- Select primary model balancing recall, latency, and total cost of ownership.
+
+* Build test set of 50 query→expected_entry pairs from existing notebooks.
+* Include at least one metadata-filtered query per notebook type (protocols, results, lab meeting notes).
+* Measure recall@5, recall@10, and MRR for each model across all queries.
+* Record latency and per-chunk cost; compute monthly spend scenarios (e.g., 5%, 10%, 20% churn).
+* Select primary model balancing recall, latency, and total cost of ownership.
 
 **Config versioning:**
+
 ```yaml
 embedding:
   model: "openai/text-embedding-3-small"  # change to 3-large after evaluation
@@ -168,9 +172,10 @@ class EmbeddedChunk(BaseModel):
 ```
 
 **Parquet schema:** Store as columnar format for efficient filtering.
-- Each notebook → separate Parquet file
-- DVC tracks entire `data/embeddings/v1/` directory
-- Read with `pandas` or `polars` for incremental updates
+
+* Each notebook → separate Parquet file
+* DVC tracks entire `data/embeddings/v1/` directory
+* Read with `pandas` or `polars` for incremental updates
 
 ---
 
@@ -220,11 +225,13 @@ incremental_updates:
 1. Increment `embedding.version` in Hydra config (e.g., `v1` → `v2`).
 2. Create new DVC-tracked directory: `data/embeddings/v2/`.
 3. Run full reindexing pipeline:
+
    ```bash
    python -m vector_backend.cli reindex \
      --config-name=default \
      --overrides embedding.version=v2
    ```
+
 4. Create new Pinecone/Qdrant index with suffix `_v2`.
 5. Build evaluation benchmark: compare retrieval quality v1 vs. v2.
 6. If v2 improves recall@10 by >5%, switch MCP default to v2.
@@ -252,52 +259,60 @@ incremental_updates:
 | Disk full during Parquet write | `OSError` | Fail entire batch; retry after cleanup |
 
 **Dead-letter queue:** Log failed chunks to `data/failed_chunks.jsonl` with:
+
 ```json
 {"chunk_id": "...", "error": "...", "timestamp": "...", "retry_count": 0}
 ```
 
 **Retry logic:** Separate script to reprocess dead-letter queue:
+
 ```bash
 python -m vector_backend.cli retry-failed
 ```
 
 **Monitoring:** Structured logs (JSON) written to `logs/vector_search.log` with:
-- Chunks processed per run
-- API call latencies (p50, p95, p99)
-- Error rates by type
-- Index count drift (local vs. remote)
+
+* Chunks processed per run
+* API call latencies (p50, p95, p99)
+* Error rates by type
+* Index count drift (local vs. remote)
 
 ### 6.2 Cost & Scalability Analysis
 
 **Assumptions:**
-- 10 notebooks, 50 pages each, 10 entries per page = 5,000 entries
-- Average entry length: 500 words (~667 tokens)
-- Chunking with 400-token chunks, 50-token overlap → ~2 chunks/entry
-- Total chunks: ~10,000
+
+* 10 notebooks, 50 pages each, 10 entries per page = 5,000 entries
+* Average entry length: 500 words (~667 tokens)
+* Chunking with 400-token chunks, 50-token overlap → ~2 chunks/entry
+* Total chunks: ~10,000
 
 **OpenAI embedding costs (Phase 1):**
-- Total tokens: 10,000 chunks × 400 tokens = 4M tokens
-- Initial indexing: 4M tokens × $0.02/1M = **$0.08**
-- Incremental updates: assume 5% churn/month = 500 chunks
-  - Monthly cost: 200K tokens × $0.02/1M = **$0.004/month**
+
+* Total tokens: 10,000 chunks × 400 tokens = 4M tokens
+* Initial indexing: 4M tokens × $0.02/1M = **$0.08**
+* Incremental updates: assume 5% churn/month = 500 chunks
+  * Monthly cost: 200K tokens × $0.02/1M = **$0.004/month**
 
 **Pinecone costs:**
-- Serverless tier: $0.096 per 1M queries + storage
-- 10K vectors × 1536 dims = ~60 MB
-- Storage: **~$5/month** for serverless
-- Query cost: 1K queries/month = **$0.10/month**
+
+* Serverless tier: $0.096 per 1M queries + storage
+* 10K vectors × 1536 dims = ~60 MB
+* Storage: **~$5/month** for serverless
+* Query cost: 1K queries/month = **$0.10/month**
 
 **Total Phase 1 cost:** ~$5.20/month
 
 **Qdrant migration (Phase 4):**
-- Self-hosted: 10K vectors fit in 1 GB RAM with quantization
-- Cloud: ~$25/month for 1M vectors (cheaper at scale)
-- Break-even point: >50K chunks → migrate to Qdrant
+
+* Self-hosted: 10K vectors fit in 1 GB RAM with quantization
+* Cloud: ~$25/month for 1M vectors (cheaper at scale)
+* Break-even point: >50K chunks → migrate to Qdrant
 
 **Scalability limits:**
-- Pinecone serverless: up to 1M vectors without performance degradation
-- Qdrant: tested up to 100M vectors with product quantization
-- DVC storage: embeddings compress well (~5:1 ratio with gzip)
+
+* Pinecone serverless: up to 1M vectors without performance degradation
+* Qdrant: tested up to 100M vectors with product quantization
+* DVC storage: embeddings compress well (~5:1 ratio with gzip)
 
 ### 6.3 Data Governance
 
@@ -323,31 +338,35 @@ python -m vector_backend.cli retry-failed
 | Embedding coverage | >95% | % of entries successfully embedded |
 
 **Benchmark creation:**
+
 1. Sample 50 diverse entries from existing notebooks.
 2. For each entry, write 1–2 natural language queries that should retrieve it.
 3. Store in `tests/fixtures/semantic_search_benchmark.json`.
 4. Version control with Git (not DVC; small file).
 
 **Continuous evaluation:**
-- Run benchmark weekly via GitHub Actions.
-- Track metrics in `data/evaluation/results.csv` (DVC-tracked).
-- Alert if recall@10 drops >5% week-over-week.
+
+* Run benchmark weekly via GitHub Actions.
+* Track metrics in `data/evaluation/results.csv` (DVC-tracked).
+* Alert if recall@10 drops >5% week-over-week.
 
 **A/B comparison vs. keyword search:**
-- Implement simple TF-IDF baseline using scikit-learn.
-- Measure retrieval overlap (Jaccard similarity of top-10 results).
-- User study: 10 lab members rate result relevance (1–5 scale).
+
+* Implement simple TF-IDF baseline using scikit-learn.
+* Measure retrieval overlap (Jaccard similarity of top-10 results).
+* User study: 10 lab members rate result relevance (1–5 scale).
 
 ### 7.1 Testing Strategy
 
 **Test coverage targets:**
-- Pure functions (chunking, embedding transforms): **90%**
-- API integration (LabArchives, Pinecone): **70%**
-- End-to-end indexing pipeline: **80%**
+
+* Pure functions (chunking, embedding transforms): **90%**
+* API integration (LabArchives, Pinecone): **70%**
+* End-to-end indexing pipeline: **80%**
 
 **Test structure:**
 
-```
+```text
 tests/vector_backend/
 ├── unit/
 │   ├── test_chunking.py         # Chunking logic with edge cases
@@ -367,6 +386,7 @@ tests/vector_backend/
 **Testing approach:**
 
 1. **Unit tests:** Use `pytest` with `hypothesis` for property-based tests:
+
    ```python
    @given(st.text(min_size=1, max_size=10000))
    def test_chunking_deterministic(text: str):
@@ -376,6 +396,7 @@ tests/vector_backend/
    ```
 
 2. **Integration tests:** Use `vcrpy` to record/replay HTTP requests:
+
    ```python
    @vcr.use_cassette("tests/fixtures/vcr_cassettes/fetch_notebook.yaml")
    def test_fetch_notebook_entries():
@@ -385,6 +406,7 @@ tests/vector_backend/
    ```
 
 3. **Performance tests:** Use `pytest-benchmark`:
+
    ```python
    def test_chunking_performance(benchmark):
        text = "lorem ipsum" * 10000
@@ -393,11 +415,13 @@ tests/vector_backend/
    ```
 
 4. **Mutation testing:** Run `mutmut` on critical chunking/validation logic:
+
    ```bash
    mutmut run --paths-to-mutate=src/vector_backend/chunking.py
    ```
 
 **CI pipeline (GitHub Actions):**
+
 ```yaml
 name: Vector Search Tests
 on: [push, pull_request]
@@ -413,52 +437,51 @@ jobs:
       - run: pytest tests/vector_backend/ -v --cov --cov-report=xml
       - run: pytest tests/vector_backend/integration/ --benchmark-only
       - uses: codecov/codecov-action@v3
-```
 
-**Mocking strategy:**
-- Mock OpenAI API with `respx` for deterministic embedding vectors.
-- Mock Pinecone with in-memory index for fast tests.
-- Use real LabArchives API in CI with dedicated test notebook (cleaned up after runs).
+**Mocking strategy:
+* Mock OpenAI API with `respx` for deterministic embedding vectors.
+* Mock Pinecone with in-memory index for fast tests.
+* Use real LabArchives API in CI with dedicated test notebook (cleaned up after runs).
 
-## 8. Roadmap
+## 8. roadmap
 
-**Phase 1 (2 weeks):** Prototype
-- One-time bulk indexing script.
-- Pinecone integration.
-- Manual trigger for incremental updates.
-- Hydra config + Pydantic validation.
-- DVC tracking for embeddings.
+{{ ... }}
+* One-time bulk indexing script.
+* Pinecone integration.
+* Manual trigger for incremental updates.
+* Hydra config + Pydantic validation.
+* DVC tracking for embeddings.
 
 **Phase 2 (1 week):** Automation
-- Cron job for nightly incremental updates.
-- Error handling + dead-letter queue.
-- Monitoring dashboard (Grafana or simple HTML).
+* Cron job for nightly incremental updates.
+* Error handling + dead-letter queue.
+* Monitoring dashboard (Grafana or simple HTML).
 
 **Phase 3 (1 week):** Evaluation
-- Build benchmark test set.
-- Measure baseline performance.
-- Document retrieval quality.
+* Build benchmark test set.
+* Measure baseline performance.
+* Document retrieval quality.
 
 **Phase 4 (2 weeks):** Advanced features
-- Metadata filters (notebook, date range, author).
-- MCP tool: `search_notebooks(query, filters)`.
-- Reindexing pipeline with version management.
+* Metadata filters (notebook, date range, author).
+* MCP tool: `search_notebooks(query, filters)`.
+* Reindexing pipeline with version management.
 
 **Phase 5 (2 weeks):** Production hardening
-- Compare alternative embedding models.
-- Implement quantization for Qdrant migration.
-- Load testing (10K+ queries).
-- Documentation: operator runbook.
+* Compare alternative embedding models.
+* Implement quantization for Qdrant migration.
+* Load testing (10K+ queries).
+* Documentation: operator runbook.
 
 **Phase 6 (ongoing):** Scaling
-- Migrate to Qdrant when >50K chunks.
-- Integrate with broader ILWS knowledge infrastructure.
-- Add hybrid search (semantic + keyword).
+* Migrate to Qdrant when >50K chunks.
+* Integrate with broader ILWS knowledge infrastructure.
+* Add hybrid search (semantic + keyword).
 
 **Orchestration approach:**
-- Use GitHub Actions for scheduled reindexing (not Celery; simpler for now).
-- MCP tool for on-demand reindexing: `reindex_notebooks(notebook_ids=None)`.
-- External orchestrator (Airflow/Prefect) only if workflow complexity grows.
+* Use GitHub Actions for scheduled reindexing (not Celery; simpler for now).
+* MCP tool for on-demand reindexing: `reindex_notebooks(notebook_ids=None)`.
+* External orchestrator (Airflow/Prefect) only if workflow complexity grows.
 
 ---
 

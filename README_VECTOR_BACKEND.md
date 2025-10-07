@@ -2,7 +2,7 @@
 
 **Status:** ✅ Production-ready (2025-10-01)
 **Tests:** 100 passing (92 unit/integration, 6 Pinecone skipped)
-**Owner:** Samuel Brudner
+**Owner:** Owner Name
 **Documentation:** See `docs/vector_approach.md` for design details
 
 ## Overview
@@ -119,7 +119,7 @@ dvc remote add -d myremote s3://mybucket/embeddings
 dvc remote add -d localremote /tmp/dvc-storage
 
 # LocalPersistence will auto-track files when enable_dvc=True
-```
+```bash
 
 ## Usage Examples
 
@@ -295,6 +295,9 @@ The MCP server exposes a `sync_vector_index` tool to coordinate indexing runs.
   - `incremental` (stale by age threshold; process only changed entries)
   - `rebuild` (config/embedding changed or forced)
 - Supports `dry_run=true` to return a plan without side effects.
+- Execution requires a `notebook_id` scope; otherwise the tool returns the plan only.
+  - Incremental: only changed entries since `built_at` are embedded and upserted
+  - Rebuild: all pages in the notebook are re-indexed
 
 Example call (from an MCP client):
 
@@ -304,7 +307,7 @@ sync_vector_index {"force": false, "dry_run": true, "max_age_hours": 24}
 
 Response (example):
 
-```python
+```json
 {
   "action": "incremental",
   "reason": "stale",
@@ -361,4 +364,4 @@ pre-commit run --all-files
 
 ## License
 
-Proprietary - Yale University / Samuel Brudner
+Proprietary - Example Organization / Owner Name

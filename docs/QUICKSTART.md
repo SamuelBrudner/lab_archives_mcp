@@ -28,13 +28,13 @@ labarchives-mcp
         "run",
         "--no-capture-output",
         "-p",
-        "/Users/samuelbrudner/Yale University Dropbox/Samuel Brudner/lab_archives_mcp/conda_envs/labarchives-mcp-pol",
+        "/absolute/path/to/lab_archives_mcp/conda_envs/labarchives-mcp-pol",
         "python",
         "-m",
         "labarchives_mcp"
       ],
       "env": {
-        "LABARCHIVES_CONFIG_PATH": "/Users/samuelbrudner/Yale University Dropbox/Samuel Brudner/lab_archives_mcp/conf/secrets.yml",
+        "LABARCHIVES_CONFIG_PATH": "/absolute/path/to/lab_archives_mcp/conf/secrets.yml",
         "FASTMCP_SHOW_CLI_BANNER": "false",
         "LABARCHIVES_ENABLE_UPLOAD": "true"
       }
@@ -62,14 +62,14 @@ labarchives-mcp
       "args": [
         "run",
         "-p",
-        "/Users/samuelbrudner/Yale University Dropbox/Samuel Brudner/lab_archives_mcp/conda_envs/labarchives-mcp-pol",
+        "/absolute/path/to/lab_archives_mcp/conda_envs/labarchives-mcp-pol",
         "python",
         "-m",
         "labarchives_mcp"
       ],
-      "cwd": "/Users/samuelbrudner/Yale University Dropbox/Samuel Brudner/lab_archives_mcp",
+      "cwd": "/absolute/path/to/lab_archives_mcp",
       "env": {
-        "LABARCHIVES_CONFIG_PATH": "/Users/samuelbrudner/Yale University Dropbox/Samuel Brudner/lab_archives_mcp/conf/secrets.yml",
+        "LABARCHIVES_CONFIG_PATH": "/absolute/path/to/lab_archives_mcp/conf/secrets.yml",
         "LABARCHIVES_ENABLE_UPLOAD": "true"
       }
     }
@@ -104,13 +104,16 @@ cat conf/secrets.yml
 - Searches use the existing index; nothing is indexed implicitly during a search.
 - To index or refresh, call the MCP tool from your agent:
 
-  ```
+  ```json
   sync_vector_index {"force": false, "dry_run": true, "max_age_hours": 24}
   ```
 
   - `dry_run=true` returns the plan (`skip` | `incremental` | `rebuild`) without changes
   - When `max_age_hours` is set and the last build is older, `incremental` processing is chosen
   - `force=true` performs a rebuild regardless of the prior record
+  - To actually index, provide a notebook scope: `notebook_id="<nbid>"`
+    - Incremental: indexes only changed entries on that notebook's pages
+    - Rebuild: re-indexes all entries on that notebook's pages
 
 - Configuration lives at `conf/vector_search/default.yaml` and the persisted build record path is
   `incremental_updates.last_indexed_file`. See `README_VECTOR_BACKEND.md` for details.

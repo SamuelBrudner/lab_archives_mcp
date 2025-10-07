@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Feat
+
+- mcp: implement `sync_vector_index` execution for incremental and rebuild paths (requires `notebook_id` scope). Incremental indexes only changed entries since the last build; rebuild re-indexes all pages for the notebook.
+
+### Test
+
+- spec: add execution tests for incremental and rebuild sync flows (`tests/spec/test_mcp_sync_execution.py`)
+
+### Docs
+
+- clarify `sync_vector_index` usage in docs/QUICKSTART.md and README_VECTOR_BACKEND.md (execution requires `notebook_id`)
+
 ## v0.2.2 (2025-10-07)
 
 ### Fix
@@ -33,6 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 **Core MCP Tools**:
+
 - `list_labarchives_notebooks()` - List all user notebooks with metadata
 - `list_notebook_pages(notebook_id, folder_id)` - Navigate notebook structure
 - `read_notebook_page(notebook_id, page_id)` - Read page entries and content
@@ -40,18 +53,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `upload_to_labarchives(...)` - Upload files with Git/Python provenance (experimental)
 
 **Authentication & API Client**:
+
 - HMAC-SHA512 request signing for LabArchives API
 - OAuth-based UID resolution with temporary token support
 - Async HTTP client with proper error handling
 - XML→JSON transformation with Pydantic validation
 
 **Vector Search Backend**:
+
 - Semantic search using OpenAI embeddings
 - Pinecone vector database integration
 - Automatic indexing of notebook content
 - CLI tools for index management
 
 **Development Infrastructure**:
+
 - Conda-lock environment with reproducible dependencies
 - Pre-commit hooks: Ruff, Black, isort, mypy, interrogate, Commitizen
 - Comprehensive test suite (unit + integration)
@@ -59,6 +75,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - MIT License
 
 **Documentation**:
+
 - Complete installation and setup guide
 - Configuration examples for Claude Desktop and Windsurf
 - API schemas generated from Pydantic models
@@ -66,24 +83,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - JOSS paper for academic citation
 
 ### Fixed
+
 - XML parsing for LabArchives tree structure (`<level-node>` elements)
 - Module entry point for `python -m labarchives_mcp`
 - Conda stdio capture issues with `--no-capture-output` flag
 - FastMCP banner suppression in production environments
 
 ### Changed
+
 - License changed from Proprietary to MIT
 - Project description updated to emphasize AI integration use case
 
 ## Verified Capabilities
 
 **Tested with Real Data**:
-✅ List 4 notebooks from samuel.brudner@yale.edu account
+✅ List 4 notebooks from <samuel.brudner@yale.edu> account
 ✅ Navigate "Mosquito Navigation" notebook structure
 ✅ Retrieve 6 top-level folders (Protocols, Sample Log, Experiment Data, Presentations, Manuscripts, References)
 ✅ Full MCP integration with Windsurf agent
 
 **API Coverage**:
+
 - `users:user_access_info` - UID resolution via temp token
 - `users:user_info_via_id` - Fetch user notebooks
 - `tree_tools:get_tree_level` - Navigate notebook tree
@@ -91,7 +111,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Architecture
 
-```
+```text
 ┌─────────────────────────────────────────────┐
 │         Windsurf / Claude Desktop           │
 │              (MCP Client)                   │
@@ -125,7 +145,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Unit tests**: 5 tests for page reading, all passing
 - **Integration**: Verified with live LabArchives API
 - **End-to-end**: Tested via Windsurf MCP client
-
 
 [0.1.0]: https://github.com/SamuelBrudner/lab_archives_mcp/releases/tag/v0.1.0
 
