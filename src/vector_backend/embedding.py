@@ -9,7 +9,6 @@ from typing import Protocol
 
 import httpx
 from loguru import logger
-from openai import AsyncOpenAI, RateLimitError
 from pydantic import BaseModel, Field
 
 
@@ -75,7 +74,8 @@ class OpenAIEmbedding:
             config: Embedding configuration with API key
         """
         self.config = config
-        self.client = AsyncOpenAI(api_key=config.api_key, timeout=config.timeout_seconds)
+        # Use plain HTTP client to avoid tight coupling to SDK versions
+        self._http = httpx.AsyncClient(timeout=config.timeout_seconds)
 
         # Extract model name (strip "openai/" prefix if present)
         self.model_name = (
@@ -105,10 +105,33 @@ class OpenAIEmbedding:
 
         for attempt in range(self.config.max_retries):
             try:
-                response = await self.client.embeddings.create(model=self.model_name, input=texts)
+                # Call OpenAI embeddings REST endpoint directly
+                resp = await self._http.post(
+                    "https://api.openai.com/v1/embeddings",
+                    headers={
+                        "Authorization": f"Bearer {self.config.api_key or ''}",
+                        "Content-Type": "application/json",
+                    },
+                    json={"model": self.model_name, "input": texts},
+                )
 
+                if resp.status_code == 429:
+                    # Rate limited
+                    logger.warning(
+                        f"Rate limited (attempt {attempt + 1}/{self.config.max_retries})"
+                    )
+                    if attempt < self.config.max_retries - 1:
+                        await asyncio.sleep(2 ** (attempt + 1))
+                        continue
+                    resp.raise_for_status()
+
+                # Raise on non-OK responses
+                resp.raise_for_status()
+
+                payload = resp.json()
+                data = payload.get("data", [])
                 # Extract vectors in original order
-                embeddings = [item.embedding for item in response.data]
+                embeddings = [item.get("embedding", []) for item in data]
 
                 # Validate dimensionality
                 for i, emb in enumerate(embeddings):
@@ -133,18 +156,8 @@ class OpenAIEmbedding:
                     await asyncio.sleep(2**attempt)  # Exponential backoff
                 else:
                     raise
-
-            except RateLimitError as e:
-                logger.warning(
-                    f"Rate limited (attempt {attempt + 1}/{self.config.max_retries}): {e}"
-                )
-                if attempt < self.config.max_retries - 1:
-                    await asyncio.sleep(2 ** (attempt + 1))  # Longer backoff
-                else:
-                    raise
-
             except httpx.HTTPStatusError as e:
-                # Non-retryable HTTP error
+                # Non-retryable HTTP error (other than 429 handled above)
                 logger.error(f"HTTP error embedding batch: {e}")
                 raise
 

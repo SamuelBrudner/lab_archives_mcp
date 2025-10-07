@@ -50,7 +50,7 @@ def _setup_fastmcp_capture(mcp_module: Any) -> dict[str, Any]:
 
 
 @pytest.fixture()  # type: ignore[misc]
-def mcp_env(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
+def mcp_env(monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest) -> dict[str, Any]:
     mcp_module = cast(Any, mcp_server)
     captured = _setup_fastmcp_capture(mcp_module)
 
@@ -199,6 +199,13 @@ def mcp_env(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     # Wire server
     asyncio.run(mcp_server.run_server())
     captured["module"] = mcp_module
+
+    # Ensure any modules we stubbed and imports we triggered are reset after tests
+    def _cleanup() -> None:
+        for name in ("vector_backend.embedding", "openai", "aiofiles"):
+            sys.modules.pop(name, None)
+
+    request.addfinalizer(_cleanup)
     return captured
 
 
