@@ -5,6 +5,14 @@ All notable changes to the LabArchives MCP Server project.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## v0.2.2 (2025-10-07)
+
+### Fix
+
+- embedding: replace OpenAI SDK usage with direct HTTP via httpx to avoid `openai` import/package conflicts and stabilize tests (respx-mocked)
+
 ## v0.2.1 (2025-10-06)
 
 ### Feat

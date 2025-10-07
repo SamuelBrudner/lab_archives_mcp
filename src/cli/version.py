@@ -12,7 +12,7 @@ def _resolve_version() -> str:
         return metadata.version("labarchives-mcp-pol")
     except metadata.PackageNotFoundError:
         # Fallback for development checkouts where the distribution is not installed.
-        return "0.2.1"
+        return "0.2.2"
 
 
 __version__ = _resolve_version()

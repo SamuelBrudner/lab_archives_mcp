@@ -50,3 +50,6 @@ conf/secrets.yml
 
 # Hypothesis
 .hypothesis/
+
+# DVC site cache (set by tests)
+.dvc_site_cache/

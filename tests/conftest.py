@@ -42,10 +42,11 @@ def _load_secrets_into_env() -> None:
         return
 
     # Map YAML keys to environment variable names
+    # Only load non-sensitive defaults by default; avoid forcing integration keys.
     key_map = {
+        # Embedding/OpenAI (unit tests pass API key directly; env not required)
         "OPENAI_API_KEY": "OPENAI_API_KEY",
-        "PINECONE_API_KEY": "PINECONE_API_KEY",
-        "PINECONE_ENVIRONMENT": "PINECONE_ENVIRONMENT",
+        # Pinecone keys intentionally omitted to avoid unintentionally hitting external service
         # LabArchives (used by MCP integration tests/scripts)
         "LABARCHIVES_AKID": "LABARCHIVES_AKID",
         "LABARCHIVES_PASSWORD": "LABARCHIVES_PASSWORD",

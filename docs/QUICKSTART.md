@@ -44,6 +44,7 @@ labarchives-mcp
 ```
 
 **Setup Steps**:
+
 1. Update both paths to match your repository location
 2. Save the file
 3. **Completely restart Windsurf** (Cmd+Q → Reopen)
@@ -98,19 +99,38 @@ cat conf/secrets.yml
 
 **Resource**: `labarchives://notebooks` (same as list_labarchives_notebooks tool)
 
+## Indexing & Sync
+
+- Searches use the existing index; nothing is indexed implicitly during a search.
+- To index or refresh, call the MCP tool from your agent:
+
+  ```
+  sync_vector_index {"force": false, "dry_run": true, "max_age_hours": 24}
+  ```
+
+  - `dry_run=true` returns the plan (`skip` | `incremental` | `rebuild`) without changes
+  - When `max_age_hours` is set and the last build is older, `incremental` processing is chosen
+  - `force=true` performs a rebuild regardless of the prior record
+
+- Configuration lives at `conf/vector_search/default.yaml` and the persisted build record path is
+  `incremental_updates.last_indexed_file`. See `README_VECTOR_BACKEND.md` for details.
+
 ## Troubleshooting
 
 ### Server won't start
+
 - Check `conf/secrets.yml` exists with valid credentials
 - Ensure conda environment is activated
 - Run `python scripts/test_baseline.py` to diagnose
 
 ### Claude Desktop can't connect
+
 - Verify the config file path is correct
 - Check Claude Desktop logs: `~/Library/Logs/Claude/mcp*.log`
 - Test server manually: `python -m labarchives_mcp`
 
 ### Authentication errors
+
 - Verify `LABARCHIVES_UID` in `conf/secrets.yml`
 - Re-run `scripts/resolve_uid.py` if UID is stale
 

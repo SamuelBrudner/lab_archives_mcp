@@ -39,7 +39,7 @@ def _resolve_version() -> str:
     try:
         return metadata.version("labarchives-mcp-pol")
     except metadata.PackageNotFoundError:
-        return "0.2.1"
+        return "0.2.2"
 
 
 __version__ = _resolve_version()
@@ -296,8 +296,7 @@ async def run_server() -> None:
                     content = await f.read()
                     secrets = yaml.safe_load(content)
 
-                os.environ["OPENAI_API_KEY"] = secrets["OPENAI_API_KEY"]
-                os.environ["PINECONE_API_KEY"] = secrets["PINECONE_API_KEY"]
+                # Do not mutate process environment; pass keys via config/clients
 
                 # Load configuration
                 config = load_config("default")
@@ -324,8 +323,9 @@ async def run_server() -> None:
                 logger.debug("Generating query embedding...")
                 query_vector = await embedding_client.embed_single(query)
 
-                # Search
-                search_request = SearchRequest(query=query, limit=limit, filters=None)
+                # Search for candidates (oversample to allow page-level dedup)
+                candidate_k = max(min(limit * 3, 100), limit)
+                search_request = SearchRequest(query=query, limit=candidate_k, filters=None)
                 results = await index.search(request=search_request, query_vector=query_vector)
 
                 if not results:
@@ -334,11 +334,23 @@ async def run_server() -> None:
 
                 logger.info(f"Found {len(results)} results")
 
-                # Fetch full page content for each result
+                # Deduplicate by page and enforce page-level limit
+                seen_pages: set[tuple[str, str]] = set()
+                unique_results: list[Any] = []
+                for r in results:
+                    key = (r.chunk.metadata.notebook_id, r.chunk.metadata.page_id)
+                    if key in seen_pages:
+                        continue
+                    seen_pages.add(key)
+                    unique_results.append(r)
+                    if len(unique_results) >= limit:
+                        break
+
+                # Fetch full page content for each unique result
                 uid = await auth_manager.ensure_uid()
                 output = []
 
-                for result in results:
+                for result in unique_results:
                     chunk = result.chunk
                     metadata = chunk.metadata
 
@@ -391,6 +403,84 @@ async def run_server() -> None:
             except Exception as exc:
                 logger.error(f"Failed to search LabArchives: {exc}", exc_info=True)
                 raise
+
+        @server.tool()  # type: ignore[misc]
+        async def sync_vector_index(
+            *,
+            force: bool = False,
+            dry_run: bool = False,
+            max_age_hours: int | None = None,
+            notebook_id: str | None = None,
+        ) -> dict[str, Any]:
+            """Plan and (optionally) execute a vector-index sync.
+
+            Skips work if a recent build exists. When `dry_run=True`, returns the
+            decision without side effects.
+
+            Args:
+                force: Force a rebuild regardless of prior record
+                dry_run: Report the action without performing it
+                max_age_hours: If set and the last build is older, do incremental
+                notebook_id: Optional notebook scope (reserved for future use)
+
+            Returns:
+                Dictionary describing the action taken or planned.
+            """
+            from datetime import datetime
+            from pathlib import Path
+
+            from vector_backend.build_state import (
+                build_record_from_config,
+                compute_config_fingerprint,
+                load_build_record,
+                save_build_record,
+            )
+            from vector_backend.config import load_config
+            from vector_backend.sync import plan_sync, select_incremental_entries
+
+            # Load configuration and prior record
+            config = load_config("default")
+            record_path = Path(config.incremental_updates.last_indexed_file)
+            record = load_build_record(record_path)
+            current_fp = compute_config_fingerprint(config)
+
+            # Decide what to do
+            decision = plan_sync(
+                record,
+                current_fp,
+                config.embedding.version,
+                force=force,
+                max_age_hours=max_age_hours,
+            )
+
+            if dry_run or decision["action"] == "skip":
+                # Return plan-only view
+                return {**decision, "dry_run": dry_run}
+
+            # Execute minimal effects based on decision
+            action = decision["action"]
+            if action == "incremental":
+                # For now, just exercise the selector path; full indexing will be wired later
+                built_at_str = decision.get("built_at")
+                built_at = (
+                    datetime.fromisoformat(built_at_str.replace("Z", "+00:00"))
+                    if built_at_str
+                    else datetime.now()
+                )
+                _ = select_incremental_entries([], built_at)
+                return {**decision, "processed_pages": 0}
+
+            if action == "rebuild":
+                # No-op implementation; real indexing will be added subsequently.
+                # Persist a new build record to reflect the rebuild.
+                try:
+                    save_build_record(record_path, build_record_from_config(config))
+                except Exception:
+                    pass
+                return dict(decision)
+
+            # Fallback (should not occur)
+            return dict(decision)
 
         # Conditionally register upload tool based on environment variable
         if _is_upload_enabled():

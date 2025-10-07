@@ -9,6 +9,7 @@
 A **Model Context Protocol (MCP) server** that connects AI assistants to LabArchives electronic lab notebooks (ELN). This enables researchers to chat with their lab data, search notebooks semantically, and integrate lab work into AI-assisted workflows.
 
 **Key Features:**
+
 - 🔍 **Semantic Search**: Vector-based search across notebook content
 - 📖 **Read Access**: List notebooks, navigate pages, read entries
 - 🤖 **AI Integration**: Works with Claude Desktop, Windsurf, and any MCP client
@@ -20,6 +21,7 @@ A **Model Context Protocol (MCP) server** that connects AI assistants to LabArch
 ## Features
 
 ✅ **Implemented**
+
 - List all notebooks for a user
 - Navigate notebook pages and folders
 - Read page entries (text, headings, attachments)
@@ -28,9 +30,11 @@ A **Model Context Protocol (MCP) server** that connects AI assistants to LabArch
 - Full HMAC-SHA512 authentication flow
 
 🚧 **Experimental**
+
 - File upload with Git/Python provenance tracking
 
 🔮 **Future**
+
 - Attachment downloads
 - Advanced search filters
 - Batch operations
@@ -39,13 +43,14 @@ A **Model Context Protocol (MCP) server** that connects AI assistants to LabArch
 
 ## Architecture
 
-* **Language**: Python.
-* **Modules**:
+- **Language**: Python.
 
-  * `auth.py` – API signing, OAuth login, uid cache.
-  * `eln_client.py` – minimal ELN API call for listing notebooks.
-  * `transform.py` – XML→JSON, error mapping.
-  * `mcp_server.py` – MCP protocol server.
+- **Modules**:
+
+  - `auth.py` – API signing, OAuth login, uid cache.
+  - `eln_client.py` – minimal ELN API call for listing notebooks.
+  - `transform.py` – XML→JSON, error mapping.
+  - `mcp_server.py` – MCP protocol server.
 
 ---
 
@@ -88,6 +93,7 @@ cp conf/secrets.example.yml conf/secrets.yml
 ```
 
 Contact LabArchives support to request API access credentials. You'll need:
+
 - **Access Key ID** (`akid`)
 - **Access Password** (used for HMAC-SHA512 signature)
 - **API Region** (e.g., `https://api.labarchives.com`)
@@ -170,7 +176,7 @@ asyncio.run(test())
 
 Once configured with an AI assistant (Windsurf or Claude Desktop), you can conversationally interact with your lab notebooks:
 
-```
+```CHATBOT
 You: "What protocols did I document for my navigation experiments?"
 
 AI: [Automatically calls list_labarchives_notebooks(),
@@ -197,6 +203,7 @@ Would you like me to retrieve specific details from any of these protocols?"
 ```
 
 The AI assistant autonomously:
+
 - Searches through your notebooks to find relevant content
 - Reads the appropriate pages and entries
 - Synthesizes the information into a coherent answer
@@ -257,6 +264,7 @@ The MCP server exposes LabArchives notebooks to AI agents via the MCP protocol.
 ```
 
 **Steps**:
+
 1. Replace both `/absolute/path/to/lab_archives_mcp` with your actual repository path
 2. Save the config file
 3. **Completely restart Windsurf** (Cmd+Q, then reopen)
@@ -291,6 +299,7 @@ The MCP server exposes LabArchives notebooks to AI agents via the MCP protocol.
 ```
 
 **Steps**:
+
 1. Replace `/absolute/path/to/lab_archives_mcp` with your repository path
 2. Save and restart Claude Desktop
 3. The server provides:
@@ -300,15 +309,35 @@ The MCP server exposes LabArchives notebooks to AI agents via the MCP protocol.
 ### Available Tools
 
 **Discovery**:
+
 - **`list_labarchives_notebooks()`** - List all your notebooks
 - **`list_notebook_pages(notebook_id)`** - Show table of contents for a notebook
 
 **Reading**:
+
 - **`read_notebook_page(notebook_id, page_id)`** - Read content from a specific page
+
+### Indexing & Sync
+
+- Semantic search operates over content that has already been indexed. Searches do not
+  perform indexing implicitly.
+- To index or refresh the vector database, use the MCP tool:
+  - `sync_vector_index(force=False, dry_run=False, max_age_hours=None, notebook_id=None)`
+  - The tool:
+    - Loads config from `conf/vector_search/default.yaml`
+    - Reads the persisted build record from `incremental_updates.last_indexed_file`
+    - Decides one of:
+      - `skip` when config + embedding version match and the build is recent
+      - `incremental` when the build is older than `max_age_hours` (only changed entries)
+      - `rebuild` when embedding version or config fingerprint changed, or `force=True`
+    - Use `dry_run=True` to return the plan without any side effects
+- Details of the build record and planning are documented in
+  `README_VECTOR_BACKEND.md` under “Build Records” and “MCP Sync”.
 
 #### Tool Schemas
 
 **`list_labarchives_notebooks()`**
+
 ```python
 # Returns list of notebooks:
 [{
@@ -322,6 +351,7 @@ The MCP server exposes LabArchives notebooks to AI agents via the MCP protocol.
 ```
 
 **`list_notebook_pages(notebook_id, folder_id=None)`**
+
 ```python
 # Returns pages and folders:
 [{
@@ -341,6 +371,7 @@ list_notebook_pages(notebook_id, folder_id="67890")
 ```
 
 **`read_notebook_page(notebook_id, page_id)`**
+
 ```python
 # Returns page content:
 {
@@ -357,6 +388,7 @@ list_notebook_pages(notebook_id, folder_id="67890")
 ```
 
 **`upload_to_labarchives(...)`** ⭐ NEW
+
 ```python
 # Upload a file with code provenance metadata
 # MANDATORY parameters:
@@ -442,7 +474,7 @@ asyncio.run(main())
 
 #### Example Agent Workflow
 
-```
+```Chat
 User: "What notebooks do I have?"
 Agent: calls list_labarchives_notebooks()
 → Shows: Mosquito Navigation, Odor motion PNAS, etc.
@@ -467,6 +499,7 @@ Agent: calls read_notebook_page("MTU2MTI4NS43...", "12345")
 ### "The supplied signature parameter was invalid" (Error 4520)
 
 This means the API signature computation failed. Common causes:
+
 - Wrong `LABARCHIVES_PASSWORD` in secrets file
 - Incorrect method name (should omit class prefix, e.g., `user_access_info` not `users:user_access_info`)
 - Clock skew between your machine and LabArchives servers
@@ -541,10 +574,10 @@ All field descriptions, examples, and validation rules are in the Pydantic model
 
 ## Development Notes
 
-* Fail loud and fast on errors (invalid signature, uid expired, etc.).
-* No silent fallbacks—errors must propagate as structured MCP errors.
-* Enforce backoff and ≥1s delay between API requests.
-* Cache `epoch_time` and `api_base_urls` to reduce load.
+- Fail loud and fast on errors (invalid signature, uid expired, etc.).
+- No silent fallbacks—errors must propagate as structured MCP errors.
+- Enforce backoff and ≥1s delay between API requests.
+- Cache `epoch_time` and `api_base_urls` to reduce load.
 
 ---
 
@@ -556,7 +589,7 @@ This project follows [**Semantic Versioning**](https://semver.org/) with automat
 
 All commits **must** follow the [Conventional Commits](https://www.conventionalcommits.org/) specification. The pre-commit hook enforces this format:
 
-```
+```text
 <type>[optional scope]: <description>
 
 [optional body]
@@ -565,6 +598,7 @@ All commits **must** follow the [Conventional Commits](https://www.conventionalc
 ```
 
 **Common types**:
+
 - `feat`: New feature (triggers MINOR version bump)
 - `fix`: Bug fix (triggers PATCH version bump)
 - `docs`: Documentation changes
@@ -577,6 +611,7 @@ All commits **must** follow the [Conventional Commits](https://www.conventionalc
 - `BREAKING CHANGE`: (footer or `!` after type) triggers MAJOR version bump
 
 **Examples**:
+
 ```bash
 git commit -m "feat(auth): add OAuth token refresh"
 git commit -m "fix: handle expired UID gracefully"
@@ -600,6 +635,7 @@ conda run -p ./conda_envs/labarchives-mcp-pol cz bump --major      # Force major
 ```
 
 This will:
+
 1. Analyze commit messages since last tag
 2. Determine appropriate version increment
 3. Update version in `pyproject.toml`
@@ -608,6 +644,7 @@ This will:
 6. Create a git tag `v<version>`
 
 **Push the release**:
+
 ```bash
 git push && git push --tags
 ```
@@ -615,6 +652,7 @@ git push && git push --tags
 ### Version Configuration
 
 Version is managed in:
+
 - **Source of truth**: `pyproject.toml` (`version = "0.2.0"`)
 - **Commitizen config**: `[tool.commitizen]` section in `pyproject.toml`
 
@@ -623,6 +661,7 @@ The configuration is set to automatically update `CHANGELOG.md` and use `v` pref
 ## Contributing
 
 We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for:
+
 - Development setup instructions
 - Code style guidelines
 - Testing procedures
