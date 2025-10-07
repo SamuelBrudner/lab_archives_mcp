@@ -324,8 +324,9 @@ async def run_server() -> None:
                 logger.debug("Generating query embedding...")
                 query_vector = await embedding_client.embed_single(query)
 
-                # Search
-                search_request = SearchRequest(query=query, limit=limit, filters=None)
+                # Search for candidates (oversample to allow page-level dedup)
+                candidate_k = max(min(limit * 3, 100), limit)
+                search_request = SearchRequest(query=query, limit=candidate_k, filters=None)
                 results = await index.search(request=search_request, query_vector=query_vector)
 
                 if not results:
@@ -334,11 +335,23 @@ async def run_server() -> None:
 
                 logger.info(f"Found {len(results)} results")
 
-                # Fetch full page content for each result
+                # Deduplicate by page and enforce page-level limit
+                seen_pages: set[tuple[str, str]] = set()
+                unique_results: list[Any] = []
+                for r in results:
+                    key = (r.chunk.metadata.notebook_id, r.chunk.metadata.page_id)
+                    if key in seen_pages:
+                        continue
+                    seen_pages.add(key)
+                    unique_results.append(r)
+                    if len(unique_results) >= limit:
+                        break
+
+                # Fetch full page content for each unique result
                 uid = await auth_manager.ensure_uid()
                 output = []
 
-                for result in results:
+                for result in unique_results:
                     chunk = result.chunk
                     metadata = chunk.metadata
 

@@ -9,7 +9,7 @@ from typing import Protocol
 
 import httpx
 from loguru import logger
-from openai import AsyncOpenAI
+from openai import AsyncOpenAI, RateLimitError
 from pydantic import BaseModel, Field
 
 
@@ -134,19 +134,19 @@ class OpenAIEmbedding:
                 else:
                     raise
 
-            except httpx.HTTPStatusError as e:
-                if e.response.status_code == 429:  # Rate limit
-                    logger.warning(
-                        f"Rate limited (attempt {attempt + 1}/{self.config.max_retries})"
-                    )
-                    if attempt < self.config.max_retries - 1:
-                        await asyncio.sleep(2 ** (attempt + 1))  # Longer backoff
-                    else:
-                        raise
+            except RateLimitError as e:
+                logger.warning(
+                    f"Rate limited (attempt {attempt + 1}/{self.config.max_retries}): {e}"
+                )
+                if attempt < self.config.max_retries - 1:
+                    await asyncio.sleep(2 ** (attempt + 1))  # Longer backoff
                 else:
-                    # Non-retryable error
-                    logger.error(f"HTTP error embedding batch: {e}")
                     raise
+
+            except httpx.HTTPStatusError as e:
+                # Non-retryable HTTP error
+                logger.error(f"HTTP error embedding batch: {e}")
+                raise
 
         raise RuntimeError("Exhausted all retry attempts")
 

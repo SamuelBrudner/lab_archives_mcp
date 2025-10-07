@@ -11,7 +11,7 @@ The `vector_backend` package provides semantic search infrastructure for LabArch
 
 ## Architecture
 
-```
+```python
 src/vector_backend/
 ├── __init__.py          # Package exports
 ├── models.py            # Pydantic data models
@@ -24,32 +24,42 @@ src/vector_backend/
 ## Key Components
 
 ### 1. **Models** (`models.py`)
+
 Pydantic schemas with fail-fast validation:
+
 - `ChunkMetadata` - Metadata for text chunks
 - `EmbeddedChunk` - Chunk + embedding vector
 - `SearchRequest` / `SearchResult` - Search I/O
 - `IndexStats` - Index health metrics
 
 ### 2. **Chunking** (`chunking.py`)
+
 Token-aware text splitting:
+
 - Uses `tiktoken` for accurate token counting
 - Configurable chunk size, overlap, boundary preservation
 - Deterministic: same input → same output
 
 ### 3. **Embedding** (`embedding.py`)
+
 Model-agnostic embedding client:
+
 - OpenAI API with retry logic and batching
 - Extensible to local models (sentence-transformers, etc.)
 - Exponential backoff for rate limits
 
 ### 4. **Configuration** (`config.py`)
+
 Hydra-based config management:
+
 - All parameters in YAML: `conf/vector_search/default.yaml`
 - Environment variable interpolation for secrets
 - Type-safe loading with Pydantic validation
 
 ### 5. **Index** (`index.py`)
+
 Vector index abstraction:
+
 - Unified interface for Pinecone and Qdrant
 - Local persistence with Parquet + DVC tracking
 - Bulk upsert, search, delete operations
@@ -58,16 +68,19 @@ Vector index abstraction:
 ## Installation
 
 ### Core dependencies (includes Pinecone)
+
 ```bash
 pip install -e .
 ```
 
 ### Optional vector backends (Qdrant)
+
 ```bash
 pip install -e ".[vector]"
 ```
 
 ### Development dependencies
+
 ```bash
 pip install -e ".[dev]"
 ```
@@ -75,6 +88,7 @@ pip install -e ".[dev]"
 ## Configuration
 
 ### 1. Create config directory
+
 ```bash
 mkdir -p conf/vector_search
 ```
@@ -93,6 +107,7 @@ Add your `OPENAI_API_KEY`, `PINECONE_API_KEY`, and optional `PINECONE_ENVIRONMEN
 > Prefer storing keys in the secrets file instead of exporting shell variables so they are available to all workflows and MCP clients by default.
 
 ### 3. Initialize DVC for embeddings (optional)
+
 ```bash
 # In project root
 dvc init
@@ -109,6 +124,7 @@ dvc remote add -d localremote /tmp/dvc-storage
 ## Usage Examples
 
 ### Chunking text
+
 ```python
 from vector_backend.chunking import chunk_text
 
@@ -121,6 +137,7 @@ for chunk in chunks:
 ```
 
 ### Generating embeddings
+
 ```python
 import asyncio
 from vector_backend.embedding import EmbeddingConfig, create_embedding_client
@@ -138,6 +155,7 @@ print(f"Generated {len(vector)}-dimensional vector")
 ```
 
 ### Loading configuration
+
 ```python
 from vector_backend.config import load_config
 
@@ -150,6 +168,7 @@ config = load_config("default", overrides=["embedding.version=v2"])
 ```
 
 ### Local persistence with DVC
+
 ```python
 from pathlib import Path
 from vector_backend.index import LocalPersistence
@@ -173,6 +192,7 @@ notebook_ids = persistence.list_notebooks()
 ```
 
 **DVC Workflow:**
+
 1. LocalPersistence automatically initializes DVC in the embeddings directory
 2. Parquet files are tracked via `.dvc` files committed to git
 3. Large embeddings live in DVC remote storage (S3, GCS, etc.)
@@ -181,6 +201,7 @@ notebook_ids = persistence.list_notebooks()
 
 **Concurrency Support:**
 ✅ LocalPersistence is **safe for concurrent writes** using per-notebook file locking:
+
 - **Multiple processes writing different notebooks**: Fully concurrent (separate locks)
 - **Multiple processes writing same notebook**: Serialized via 30s timeout locks
 - **Read operations**: Always safe, no locking overhead
@@ -191,21 +212,25 @@ For very high-throughput multi-user scenarios (>100 concurrent writers), **Pinec
 ## Testing
 
 ### Run all tests
+
 ```bash
 pytest tests/vector_backend/ -v
 ```
 
 ### Run with coverage
+
 ```bash
 pytest tests/vector_backend/ --cov=vector_backend --cov-report=html
 ```
 
 ### Run property-based tests
+
 ```bash
 pytest tests/vector_backend/unit/test_chunking.py -v --hypothesis-show-statistics
 ```
 
 ### Run benchmarks
+
 ```bash
 pytest tests/vector_backend/unit/test_chunking.py --benchmark-only
 ```
@@ -213,6 +238,7 @@ pytest tests/vector_backend/unit/test_chunking.py --benchmark-only
 ## Implementation Status
 
 ### ✅ Completed
+
 - [x] Package structure
 - [x] Pydantic models with validation
 - [x] Chunking implementation with tests
@@ -227,6 +253,7 @@ pytest tests/vector_backend/unit/test_chunking.py --benchmark-only
 - [x] Documentation
 
 ### 📋 Planned
+
 - [ ] Qdrant index integration
 - [ ] CLI for bulk indexing and reindexing
 - [ ] Incremental update scheduler
@@ -271,13 +298,13 @@ The MCP server exposes a `sync_vector_index` tool to coordinate indexing runs.
 
 Example call (from an MCP client):
 
-```
+```python
 sync_vector_index {"force": false, "dry_run": true, "max_age_hours": 24}
 ```
 
 Response (example):
 
-```
+```python
 {
   "action": "incremental",
   "reason": "stale",
@@ -300,12 +327,14 @@ Following the global development guidelines:
 ## Development Status
 
 **Completed Phases:**
+
 1. ✅ **Phase 1:** Pinecone integration with retry logic
 2. ✅ **Phase 2:** Local Parquet persistence with DVC tracking
 3. ✅ **Phase 3:** Working indexing scripts (`scripts/index_real_notebook.py`)
 4. ✅ **Phase 4:** MCP server integration complete
 
 **Optional Enhancements:**
+
 - See `FUTURE_DIRECTIONS.md` for planned improvements (CLI, local models, optimization)
 
 ## Related Documentation
@@ -318,11 +347,13 @@ Following the global development guidelines:
 ## Contributing
 
 This module follows TDD:
+
 1. Write tests first (red)
 2. Implement minimal solution (green)
 3. Refactor for clarity (refactor)
 
 Run pre-commit hooks before committing:
+
 ```bash
 pre-commit install
 pre-commit run --all-files
