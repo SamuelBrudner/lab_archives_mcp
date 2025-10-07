@@ -343,7 +343,7 @@ The MCP server exposes LabArchives notebooks to AI agents via the MCP protocol.
 [{
   "nbid": "MTU2MTI4NS43...",  # Notebook ID
   "name": "Mosquito Navigation",
-  "owner": "samuel.brudner@yale.edu",
+  "owner": "owner@example.com",
   "owner_name": "Sam snb6@yale.edu",
   "created_at": "1970-01-01T00:00:00Z",
   "modified_at": "1970-01-01T00:00:00Z"
@@ -535,9 +535,9 @@ This means the API signature computation failed. Common causes:
     {
       "nbid": "12345",
       "name": "Fly Behavior Study",
-      "owner": "samuel.brudner@yale.edu",
-      "owner_email": "samuel.brudner@yale.edu",
-      "owner_name": "Samuel Brudner",
+      "owner": "owner@example.com",
+      "owner_email": "owner@example.com",
+      "owner_name": "Owner Name",
       "created_at": "2025-01-01T12:00:00Z",
       "modified_at": "2025-01-02T08:30:00Z"
     }

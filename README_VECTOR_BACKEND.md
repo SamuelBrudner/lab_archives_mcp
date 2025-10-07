@@ -2,7 +2,7 @@
 
 **Status:** ✅ Production-ready (2025-10-01)
 **Tests:** 100 passing (92 unit/integration, 6 Pinecone skipped)
-**Owner:** Samuel Brudner
+**Owner:** Owner Name
 **Documentation:** See `docs/vector_approach.md` for design details
 
 ## Overview
@@ -364,4 +364,4 @@ pre-commit run --all-files
 
 ## License
 
-Proprietary - Yale University / Samuel Brudner
+Proprietary - Example Organization / Owner Name

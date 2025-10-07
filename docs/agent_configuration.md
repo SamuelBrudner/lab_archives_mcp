@@ -120,9 +120,9 @@ Returns a list of LabArchives notebooks for the authenticated user.
     {
       "nbid": "MTU2MTI4NS43fDEyMDA5ODkvMTIwMDk4OS9Ob3RlYm9vay81MzgyNzU0MDh8Mzk2MzI2My42OTk5OTk5OTk3",
       "name": "Fly Behavior Study",
-      "owner": "samuel.brudner@yale.edu",
-      "owner_email": "samuel.brudner@yale.edu",
-      "owner_name": "Samuel Brudner",
+      "owner": "owner@example.com",
+      "owner_email": "owner@example.com",
+      "owner_name": "Owner Name",
       "created_at": "2025-01-01T12:00:00Z",
       "modified_at": "2025-01-02T08:30:00Z"
     }
