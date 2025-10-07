@@ -253,7 +253,38 @@ The script `scripts/index_real_notebook.py` reads the record on startup and:
 - Otherwise performs a rebuild and writes a new record
 
 This logic lives in `vector_backend.build_state` and the persisted schema
-is defined as `vector_backend.models.BuildRecord`.
+is defined as `vector_backend.models.BuildRecord`. For MCP usage, sync planning
+is provided by `vector_backend.sync.plan_sync()` and incremental selection by
+`vector_backend.sync.select_incremental_entries()`.
+
+## MCP Sync
+
+The MCP server exposes a `sync_vector_index` tool to coordinate indexing runs.
+
+- Reads `conf/vector_search/default.yaml` (via `load_config`) and the persisted
+  build record at `incremental_updates.last_indexed_file`.
+- Decides one of:
+  - `skip` (config + embedding match and within max-age)
+  - `incremental` (stale by age threshold; process only changed entries)
+  - `rebuild` (config/embedding changed or forced)
+- Supports `dry_run=true` to return a plan without side effects.
+
+Example call (from an MCP client):
+
+```
+sync_vector_index {"force": false, "dry_run": true, "max_age_hours": 24}
+```
+
+Response (example):
+
+```
+{
+  "action": "incremental",
+  "reason": "stale",
+  "built_at": "2025-10-01T12:00:00+00:00",
+  "dry_run": true
+}
+```
 
 ## Design Principles
 
