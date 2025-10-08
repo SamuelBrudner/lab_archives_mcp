@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## v0.2.3 (2025-10-07)
+
 ### Feat
 
 - mcp: implement `sync_vector_index` execution for incremental and rebuild paths (requires `notebook_id` scope). Incremental indexes only changed entries since the last build; rebuild re-indexes all pages for the notebook.

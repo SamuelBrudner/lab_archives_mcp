@@ -1,5 +1,5 @@
 {
-  "built_at": "2025-10-07T16:19:25.962330Z",
+  "built_at": "2025-10-08T00:23:57.440665Z",
   "embedding_version": "v1",
   "config_fingerprint": "89689ecd0a4f92dbebd382bb24bbe9f95d2d93f3c3a7d0c0833b1daf15d4d7ec",
   "backend": "pinecone",
