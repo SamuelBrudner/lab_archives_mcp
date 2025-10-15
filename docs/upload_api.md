@@ -90,6 +90,8 @@ The upload functionality enables programmatic creation of notebook pages and upl
 
 ## API Endpoints
 
+Note: API parameter values and internal enums may differ in naming. For example, API `part_type` values use human-readable strings like "text entry" or "plain text entry", while internal models and examples may show enum-style names like `text_entry` or `plain_text`. When calling the HTTP API, use the API forms.
+
 ### 1. `insert_node`
 Creates a new page or folder in the notebook hierarchy.
 

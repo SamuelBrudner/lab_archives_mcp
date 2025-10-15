@@ -37,7 +37,7 @@ All scripts and MCP tooling read from `conf/secrets.yml` by default (or the path
 ### **Step 3: Run Setup Script**
 
 ```bash
-conda activate labarchives-mcp-pol
+conda activate ./conda_envs/labarchives-mcp-pol
 python scripts/setup_pinecone.py
 ```
 
@@ -219,4 +219,4 @@ Once setup is complete:
 4. 🔍 Test semantic search quality
 5. 📊 Benchmark performance
 
-See `PHASE1_COMPLETE.md` for full usage guide.
+See `README_VECTOR_BACKEND.md` for full usage guide.

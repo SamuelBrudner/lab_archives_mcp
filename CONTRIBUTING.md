@@ -296,9 +296,11 @@ lab_archives_mcp/
 │   │   ├── transform.py       # XML→JSON transformation
 │   │   └── upload_client.py   # Upload functionality
 │   └── vector_backend/        # Semantic search
-│       ├── embedding.py       # Text embedding
-│       ├── indexing.py        # Vector indexing
-│       └── search.py          # Search implementation
+│       ├── models.py          # Pydantic models
+│       ├── chunking.py        # Text chunking
+│       ├── embedding.py       # Embedding client(s)
+│       ├── config.py          # Hydra config loading
+│       └── index.py           # Vector index operations
 ├── tests/
 │   ├── unit/                  # Unit tests (no API calls)
 │   ├── spec/                  # Specification tests
@@ -408,6 +410,19 @@ This automatically:
 - Determines version bump (major/minor/patch)
 - Updates `CHANGELOG.md`
 - Creates git tag
+
+### Version Configuration
+
+- Source of truth: `pyproject.toml` (`version = "<current>"`)
+- Commitizen configuration: `[tool.commitizen]` in `pyproject.toml`
+- Tags use `v` prefix (e.g., `v0.2.0`); CHANGELOG follows Keep a Changelog format
+
+If you are using the pinned conda environment, you can also run Commitizen via `conda run` without activating:
+
+```bash
+conda run -p ./conda_envs/dev cz bump --dry-run --yes
+conda run -p ./conda_envs/dev cz bump --yes
+```
 
 ## Getting Help
 

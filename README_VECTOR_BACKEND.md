@@ -2,7 +2,6 @@
 
 **Status:** ✅ Production-ready (2025-10-01)
 **Tests:** 100 passing (92 unit/integration, 6 Pinecone skipped)
-**Owner:** Owner Name
 **Documentation:** See `docs/vector_approach.md` for design details
 
 ## Overview
@@ -119,7 +118,7 @@ dvc remote add -d myremote s3://mybucket/embeddings
 dvc remote add -d localremote /tmp/dvc-storage
 
 # LocalPersistence will auto-track files when enable_dvc=True
-```bash
+```
 
 ## Usage Examples
 
@@ -364,4 +363,4 @@ pre-commit run --all-files
 
 ## License
 
-Proprietary - Example Organization / Owner Name
+MIT License — see `LICENSE`

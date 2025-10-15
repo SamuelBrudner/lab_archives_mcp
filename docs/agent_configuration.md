@@ -75,7 +75,7 @@ The server will look for `conf/secrets.yml` in the current working directory.
 Any MCP client supporting stdio transport can connect. The server expects:
 
 - **Command**: Python interpreter from the conda environment
-- **Args**: `["-m", "labarchives_mcp.mcp_server"]`
+- **Args**: `["-m", "labarchives_mcp"]`
 - **Working Directory**: Repository root (for `conf/secrets.yml` access)
 - **Environment**: Optional `LABARCHIVES_CONFIG_PATH` to override secrets location
 
@@ -125,7 +125,7 @@ Returns a list of LabArchives notebooks for the authenticated user.
       "name": "Fly Behavior Study",
       "owner": "owner@example.com",
       "owner_email": "owner@example.com",
-      "owner_name": "Owner Name",
+      "owner_name": "Example Owner",
       "created_at": "2025-01-01T12:00:00Z",
       "modified_at": "2025-01-02T08:30:00Z"
     }

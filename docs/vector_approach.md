@@ -3,7 +3,6 @@
 This document describes how to build, maintain, and update the semantic search index for LabArchives notebook entries.
 
 **Status:** Design document (2025-09-30)
-**Owner:** Owner Name
 **Dependencies:** LabArchives MCP, DVC, Hydra, Pydantic
 
 ---

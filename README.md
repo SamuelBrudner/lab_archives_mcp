@@ -18,6 +18,13 @@ A **Model Context Protocol (MCP) server** that connects AI assistants to LabArch
 
 ---
 
+## Documentation
+
+- Quick start: `docs/QUICKSTART.md`
+- Agent configuration: `docs/agent_configuration.md`
+- Upload API: `docs/upload_api.md`
+- Vector backend design and ops: `README_VECTOR_BACKEND.md`
+
 ## Features
 
 ✅ **Implemented**
@@ -58,7 +65,8 @@ A **Model Context Protocol (MCP) server** that connects AI assistants to LabArch
 
 ### 1. Clone and Install
 
-```bash
+# Method 1: As a Python module
+```
 git clone https://github.com/SamuelBrudner/lab_archives_mcp.git
 cd lab_archives_mcp
 ```
@@ -67,13 +75,13 @@ cd lab_archives_mcp
 
 Create the pinned Conda environment (local prefix):
 
-```bash
+```
 conda-lock install --prefix ./conda_envs/labarchives-mcp-pol conda-lock.yml
 ```
 
 Activate it:
 
-```bash
+```
 conda activate ./conda_envs/labarchives-mcp-pol
 ```
 
@@ -170,7 +178,7 @@ async def test():
 
 asyncio.run(test())
 "
-```bash
+```
 
 ### 6. Example: Querying Your Notebooks with AI
 
@@ -225,7 +233,7 @@ conda run -p ./conda_envs/labarchives-mcp-pol labarchives-mcp
 # Method 3: Direct Python (if environment is activated)
 conda activate ./conda_envs/labarchives-mcp-pol
 labarchives-mcp
-```bash
+```
 
 The server runs in stdio mode and waits for MCP protocol messages. Press `Ctrl+C` to stop.
 
@@ -235,76 +243,9 @@ The server runs in stdio mode and waits for MCP protocol messages. Press `Ctrl+C
 
 The MCP server exposes LabArchives notebooks to AI agents via the MCP protocol.
 
-### Windsurf (Codeium) - Verified Working ✅
+For the most up-to-date configuration examples (Claude Desktop, Windsurf, generic MCP clients), see `docs/agent_configuration.md`. The snippets below are included for convenience.
 
-**Config file**: `~/.codeium/windsurf/mcp_config.json`
-
-```json
-{
-  "mcpServers": {
-    "labarchives": {
-      "command": "conda",
-      "args": [
-        "run",
-        "--no-capture-output",
-        "-p",
-        "/absolute/path/to/lab_archives_mcp/conda_envs/labarchives-mcp-pol",
-        "python",
-        "-m",
-        "labarchives_mcp"
-      ],
-      "env": {
-        "LABARCHIVES_CONFIG_PATH": "/absolute/path/to/lab_archives_mcp/conf/secrets.yml",
-        "FASTMCP_SHOW_CLI_BANNER": "false",
-        "LABARCHIVES_ENABLE_UPLOAD": "true"
-      }
-    }
-  }
-}
-```
-
-**Steps**:
-
-1. Replace both `/absolute/path/to/lab_archives_mcp` with your actual repository path
-2. Save the config file
-3. **Completely restart Windsurf** (Cmd+Q, then reopen)
-4. Test by asking: "List my LabArchives notebooks"
-
-### Claude Desktop
-
-**Config file**: `~/Library/Application Support/Claude/claude_desktop_config.json`
-
-```json
-{
-  "mcpServers": {
-    "labarchives": {
-      "command": "conda",
-      "args": [
-        "run",
-        "--no-capture-output",
-        "-p",
-        "/absolute/path/to/lab_archives_mcp/conda_envs/labarchives-mcp-pol",
-        "python",
-        "-m",
-        "labarchives_mcp"
-      ],
-      "env": {
-        "LABARCHIVES_CONFIG_PATH": "/absolute/path/to/lab_archives_mcp/conf/secrets.yml",
-        "FASTMCP_SHOW_CLI_BANNER": "false",
-        "LABARCHIVES_ENABLE_UPLOAD": "true"
-      }
-    }
-  }
-}
-```
-
-**Steps**:
-
-1. Replace `/absolute/path/to/lab_archives_mcp` with your repository path
-2. Save and restart Claude Desktop
-3. The server provides:
-   - **Tool**: `list_labarchives_notebooks()` - List all notebooks
-   - **Resource**: `labarchives://notebooks` - Read notebooks resource
+For configuration examples for Windsurf and Claude Desktop (including environment variables and restart steps), see `docs/agent_configuration.md`.
 
 ### Available Tools
 
@@ -312,6 +253,7 @@ The MCP server exposes LabArchives notebooks to AI agents via the MCP protocol.
 
 - **`list_labarchives_notebooks()`** - List all your notebooks
 - **`list_notebook_pages(notebook_id)`** - Show table of contents for a notebook
+- **`search_labarchives(query, limit=5)`** - Semantic search across indexed notebooks
 
 **Reading**:
 
@@ -338,21 +280,21 @@ The MCP server exposes LabArchives notebooks to AI agents via the MCP protocol.
 
 **`list_labarchives_notebooks()`**
 
-```python
+```json
 # Returns list of notebooks:
 [{
   "nbid": "MTU2MTI4NS43...",  # Notebook ID
   "name": "Mosquito Navigation",
   "owner": "owner@example.com",
-  "owner_name": "Sam snb6@yale.edu",
+  "owner_name": "Example Owner",
   "created_at": "1970-01-01T00:00:00Z",
   "modified_at": "1970-01-01T00:00:00Z"
 }]
-```json
+```
 
 **`list_notebook_pages(notebook_id, folder_id=None)`**
 
-```python
+```json
 # Returns pages and folders:
 [{
   "tree_id": "12345",
@@ -368,7 +310,7 @@ The MCP server exposes LabArchives notebooks to AI agents via the MCP protocol.
 
 # Navigate into a folder by passing its tree_id as folder_id:
 list_notebook_pages(notebook_id, folder_id="67890")
-```python
+```json
 
 **`read_notebook_page(notebook_id, page_id)`**
 
@@ -385,9 +327,11 @@ list_notebook_pages(notebook_id, folder_id="67890")
     "updated_at": "2025-01-02T08:30:00Z"
   }]
 }
-```json
+```
 
 **`upload_to_labarchives(...)`** ⭐ NEW
+
+See `docs/upload_api.md` for the complete API documentation and usage notes.
 
 ```python
 # Upload a file with code provenance metadata
@@ -537,7 +481,7 @@ This means the API signature computation failed. Common causes:
       "name": "Fly Behavior Study",
       "owner": "owner@example.com",
       "owner_email": "owner@example.com",
-      "owner_name": "Owner Name",
+      "owner_name": "Example Owner",
       "created_at": "2025-01-01T12:00:00Z",
       "modified_at": "2025-01-02T08:30:00Z"
     }
@@ -566,7 +510,7 @@ from labarchives_mcp.auth import Credentials
 import json
 print(json.dumps(Credentials.model_json_schema(), indent=2))
 "
-```bash
+```
 
 All field descriptions, examples, and validation rules are in the Pydantic models. No separate YAML/JSON schema files—code is the source of truth.
 
@@ -583,80 +527,7 @@ All field descriptions, examples, and validation rules are in the Pydantic model
 
 ## Versioning & Release Management
 
-This project follows [**Semantic Versioning**](https://semver.org/) with automated version bumping via [Commitizen](https://commitizen-tools.github.io/commitizen/).
-
-### Commit Message Format
-
-All commits **must** follow the [Conventional Commits](https://www.conventionalcommits.org/) specification. The pre-commit hook enforces this format:
-
-```text
-<type>[optional scope]: <description>
-
-[optional body]
-
-[optional footer]
-```
-
-**Common types**:
-
-- `feat`: New feature (triggers MINOR version bump)
-- `fix`: Bug fix (triggers PATCH version bump)
-- `docs`: Documentation changes
-- `style`: Code style/formatting changes
-- `refactor`: Code refactoring without behavior change
-- `test`: Adding or updating tests
-- `chore`: Build process, tooling, dependencies
-- `ci`: CI/CD pipeline changes
-- `perf`: Performance improvements
-- `BREAKING CHANGE`: (footer or `!` after type) triggers MAJOR version bump
-
-**Examples**:
-
-```bash
-git commit -m "feat(auth): add OAuth token refresh"
-git commit -m "fix: handle expired UID gracefully"
-git commit -m "docs: update API usage examples"
-git commit -m "chore(deps): bump pydantic to 2.7.1"
-```
-
-### Version Bumping
-
-To create a new release:
-
-```bash
-# Dry run (preview changes without committing)
-conda run -p ./conda_envs/labarchives-mcp-pol cz bump --dry-run --yes
-
-# Automated version bump (examines commit history)
-conda run -p ./conda_envs/labarchives-mcp-pol cz bump --yes        # Auto-detect: patch/minor/major
-conda run -p ./conda_envs/labarchives-mcp-pol cz bump --patch      # Force patch: 0.1.0 → 0.1.1
-conda run -p ./conda_envs/labarchives-mcp-pol cz bump --minor      # Force minor: 0.1.0 → 0.2.0
-conda run -p ./conda_envs/labarchives-mcp-pol cz bump --major      # Force major: 0.1.0 → 1.0.0
-```
-
-This will:
-
-1. Analyze commit messages since last tag
-2. Determine appropriate version increment
-3. Update version in `pyproject.toml`
-4. Generate/update `CHANGELOG.md`
-5. Create a git commit with the changes
-6. Create a git tag `v<version>`
-
-**Push the release**:
-
-```bash
-git push && git push --tags
-```
-
-### Version Configuration
-
-Version is managed in:
-
-- **Source of truth**: `pyproject.toml` (`version = "0.2.0"`)
-- **Commitizen config**: `[tool.commitizen]` section in `pyproject.toml`
-
-The configuration is set to automatically update `CHANGELOG.md` and use `v` prefix for git tags (e.g., `v0.2.0`).
+See `CONTRIBUTING.md` for versioning, Conventional Commits, and release steps.
 
 ## Contributing
 

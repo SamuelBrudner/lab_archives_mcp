@@ -15,75 +15,13 @@ labarchives-mcp
 
 ## Agent Configuration
 
-### Windsurf (Codeium) - ✅ Verified Working
-
-**File**: `~/.codeium/windsurf/mcp_config.json`
-
-```json
-{
-  "mcpServers": {
-    "labarchives": {
-      "command": "conda",
-      "args": [
-        "run",
-        "--no-capture-output",
-        "-p",
-        "/absolute/path/to/lab_archives_mcp/conda_envs/labarchives-mcp-pol",
-        "python",
-        "-m",
-        "labarchives_mcp"
-      ],
-      "env": {
-        "LABARCHIVES_CONFIG_PATH": "/absolute/path/to/lab_archives_mcp/conf/secrets.yml",
-        "FASTMCP_SHOW_CLI_BANNER": "false",
-        "LABARCHIVES_ENABLE_UPLOAD": "true"
-      }
-    }
-  }
-}
-```
-
-**Setup Steps**:
-
-1. Update both paths to match your repository location
-2. Save the file
-3. **Completely restart Windsurf** (Cmd+Q → Reopen)
-4. Test: Ask "List my LabArchives notebooks"
-
-### Claude Desktop
-
-**File**: `~/Library/Application Support/Claude/claude_desktop_config.json`
-
-```json
-{
-  "mcpServers": {
-    "labarchives": {
-      "command": "conda",
-      "args": [
-        "run",
-        "-p",
-        "/absolute/path/to/lab_archives_mcp/conda_envs/labarchives-mcp-pol",
-        "python",
-        "-m",
-        "labarchives_mcp"
-      ],
-      "cwd": "/absolute/path/to/lab_archives_mcp",
-      "env": {
-        "LABARCHIVES_CONFIG_PATH": "/absolute/path/to/lab_archives_mcp/conf/secrets.yml",
-        "LABARCHIVES_ENABLE_UPLOAD": "true"
-      }
-    }
-  }
-}
-```
-
-**Important**: Update the paths to match your system.
+See `docs/agent_configuration.md` for configuration examples for Claude Desktop, Windsurf, and generic MCP clients (including environment configuration and restart tips).
 
 ## Verify Setup
 
 ```bash
-# Test baseline functionality
-python scripts/test_baseline.py
+# Test vector backend end-to-end
+python scripts/test_e2e_workflow.py
 
 # Check credentials
 cat conf/secrets.yml
@@ -124,7 +62,7 @@ cat conf/secrets.yml
 
 - Check `conf/secrets.yml` exists with valid credentials
 - Ensure conda environment is activated
-- Run `python scripts/test_baseline.py` to diagnose
+- Run `python scripts/test_e2e_workflow.py` to diagnose
 
 ### Claude Desktop can't connect
 
