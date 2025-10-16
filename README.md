@@ -58,6 +58,8 @@ A **Model Context Protocol (MCP) server** that connects AI assistants to LabArch
   - `eln_client.py` – minimal ELN API call for listing notebooks.
   - `transform.py` – XML→JSON, error mapping.
   - `mcp_server.py` – MCP protocol server.
+  - `models/upload.py` – Provenance-aware upload data contracts.
+  - `vector_backend/` – Semantic search indexing, embeddings, and sync tooling.
 
 ---
 
@@ -65,27 +67,27 @@ A **Model Context Protocol (MCP) server** that connects AI assistants to LabArch
 
 ### 1. Clone and Install
 
-# Method 1: As a Python module
-```
+```bash
 git clone https://github.com/SamuelBrudner/lab_archives_mcp.git
 cd lab_archives_mcp
+pip install -e .[dev]
 ```
 
 ### 2. Create Environment
 
 Create the pinned Conda environment (local prefix):
 
-```
+```bash
 conda-lock install --prefix ./conda_envs/labarchives-mcp-pol conda-lock.yml
 ```
 
 Activate it:
 
-```
+```bash
 conda activate ./conda_envs/labarchives-mcp-pol
 ```
 
-Install git hooks and tooling:
+Install git hooks and tooling (already available after the editable install above):
 
 ```bash
 pre-commit install
@@ -474,7 +476,7 @@ This means the API signature computation failed. Common causes:
 
 ```json
 {
-  "resource": "labarchives:notebooks",
+  "resource": "labarchives://notebooks",
   "list": [
     {
       "nbid": "12345",
@@ -521,7 +523,6 @@ All field descriptions, examples, and validation rules are in the Pydantic model
 - Fail loud and fast on errors (invalid signature, uid expired, etc.).
 - No silent fallbacks—errors must propagate as structured MCP errors.
 - Enforce backoff and ≥1s delay between API requests.
-- Cache `epoch_time` and `api_base_urls` to reduce load.
 
 ---
 
@@ -548,7 +549,7 @@ If you use this software in your research, please cite:
   title = {LabArchives MCP Server: AI Integration for Electronic Lab Notebooks},
   year = {2025},
   url = {https://github.com/SamuelBrudner/lab_archives_mcp},
-  version = {0.1.0}
+  version = {0.2.4}
 }
 ```
 
