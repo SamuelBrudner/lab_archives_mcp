@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## v0.2.4 (2025-10-15)
+
+### Docs
+
+- Consolidate agent configuration into a single canonical guide; link from README and Quickstart
+- Unify vector backend license language to MIT and remove placeholder owner fields
+- Fix code-fence closers and language tags across README and vector backend docs
+- Replace missing/broken references (e.g., test_baseline.py → test_e2e_workflow.py, PHASE1_COMPLETE.md → README_VECTOR_BACKEND.md)
+- Standardize example owner names and placeholder paths in example configs
+
 ## v0.2.3 (2025-10-07)
 
 ### Feat
