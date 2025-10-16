@@ -210,7 +210,7 @@ AI: "In your 'Mosquito Navigation' notebook, you documented three main protocols
    - Statistical analysis methods
 
 Would you like me to retrieve specific details from any of these protocols?"
-```text
+```
 
 The AI assistant autonomously:
 
