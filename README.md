@@ -54,10 +54,12 @@ A **Model Context Protocol (MCP) server** that connects AI assistants to LabArch
 
 - **Modules**:
 
-  - `auth.py` – API signing, OAuth login, uid cache.
-  - `eln_client.py` – minimal ELN API call for listing notebooks.
-  - `transform.py` – XML→JSON, error mapping.
-  - `mcp_server.py` – MCP protocol server.
+  - `auth.py` – credential loading, HMAC signing, UID resolution.
+  - `eln_client.py` – notebook navigation, page entry retrieval, upload orchestration.
+  - `models/upload.py` – Pydantic contracts for uploads and provenance metadata.
+  - `transform.py` – XML→JSON transforms and API fault translation.
+  - `mcp_server.py` – MCP server wiring and tool registration.
+  - `vector_backend/` – semantic search indexing and Pinecone/Qdrant integrations.
 
 ---
 
@@ -464,7 +466,7 @@ This means the API signature computation failed. Common causes:
 
 - Verify `LABARCHIVES_UID` is set in `conf/secrets.yml`
 - Run the verification script (step 5 of setup) to test credentials
-- Check logs in `logs/` directory for detailed error messages
+- Inspect stderr output for Loguru messages, or configure a Loguru file sink if you need persistent logs
 
 ---
 
@@ -520,8 +522,8 @@ All field descriptions, examples, and validation rules are in the Pydantic model
 
 - Fail loud and fast on errors (invalid signature, uid expired, etc.).
 - No silent fallbacks—errors must propagate as structured MCP errors.
-- Enforce backoff and ≥1s delay between API requests.
-- Cache `epoch_time` and `api_base_urls` to reduce load.
+- Core LabArchives requests run directly through `httpx.AsyncClient`; add external throttling if your deployment demands rate limits beyond the platform defaults.
+- The MCP server does not currently cache `epoch_time` or `api_base_urls`; extend `AuthenticationManager` if you need those optimisations.
 
 ---
 
