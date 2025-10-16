@@ -5,9 +5,11 @@ Optional enhancements to consider based on actual usage patterns and requirement
 ## Vector Backend Enhancements
 
 ### ✅ DVC Integration (COMPLETED - 2025-10-01)
+
 Implemented via TDD with 8 passing integration tests.
 
 **Features:**
+
 - Automatic DVC initialization when `enable_dvc=True`
 - Parquet files tracked with `.dvc` files committed to git
 - Version isolation (separate directories per embedding version)
@@ -15,6 +17,7 @@ Implemented via TDD with 8 passing integration tests.
 - Works with pre-existing DVC repos
 
 **Usage:**
+
 ```python
 persistence = LocalPersistence(
     base_path=Path("data/embeddings"),
@@ -28,6 +31,7 @@ See `README_VECTOR_BACKEND.md` for full workflow.
 ---
 
 ### Performance Optimization
+
 - Benchmark embedding batch sizes for large-scale indexing (100+ notebooks)
 - Profile chunking performance on very large pages (>50k tokens)
 - Optimize Parquet compression settings based on actual storage usage
@@ -40,7 +44,8 @@ See `README_VECTOR_BACKEND.md` for full workflow.
 
 ### Production Hardening (Remaining)
 
-**Structured Logging**
+#### Structured Logging
+
 - Replace print statements with structured logging (JSON format)
 - Add correlation IDs for request tracing
 - Configurable log levels per component
@@ -49,7 +54,8 @@ See `README_VECTOR_BACKEND.md` for full workflow.
 **Effort:** Medium - consistent logging across codebase.
 **Decision criteria:** Implement when deploying as shared service (concurrent write safety is now complete).
 
-**Retry Logic Abstraction**
+#### Retry Logic Abstraction
+
 - Extract retry patterns to utility module if used in 3+ places
 - Add exponential backoff configuration
 
@@ -57,7 +63,8 @@ See `README_VECTOR_BACKEND.md` for full workflow.
 **Effort:** Low - refactoring existing code.
 **Decision criteria:** Implement when adding more API clients with retry needs.
 
-**Connection Pooling**
+#### Connection Pooling
+
 - Evaluate httpx connection pool tuning for concurrent usage
 - Add connection limits and timeout configuration
 
@@ -70,7 +77,9 @@ See `README_VECTOR_BACKEND.md` for full workflow.
 ## CLI Enhancements
 
 ### Search Command
+
 Add `labarchives-mcp search` command for direct semantic search:
+
 ```bash
 labarchives-mcp search "olfactory navigation behavior" --limit 10
 ```
@@ -82,7 +91,9 @@ labarchives-mcp search "olfactory navigation behavior" --limit 10
 ---
 
 ### Local Persistence Management
+
 Add commands to manage local embeddings:
+
 ```bash
 labarchives-mcp list-embeddings       # Show indexed notebooks
 labarchives-mcp export-embeddings     # Export to portable format
@@ -98,6 +109,7 @@ labarchives-mcp import-embeddings     # Import from another system
 ## Integration Features
 
 ### Local Embedding Models
+
 - Add sentence-transformers support for offline embeddings
 - Remove OpenAI API dependency for air-gapped deployments
 
@@ -108,6 +120,7 @@ labarchives-mcp import-embeddings     # Import from another system
 ---
 
 ### Additional Vector Stores
+
 - Chroma support (lightweight SQLite-based)
 - Weaviate support (GraphQL API)
 
@@ -120,6 +133,7 @@ labarchives-mcp import-embeddings     # Import from another system
 ## Testing Improvements
 
 ### Coverage Measurement
+
 - Run coverage analysis on vector backend
 - Target: 90%+ for pure functions, 70%+ overall
 - Add coverage CI job
@@ -133,6 +147,7 @@ labarchives-mcp import-embeddings     # Import from another system
 ## Documentation
 
 ### Vector Backend Tutorial
+
 - Standalone tutorial for using vector backend as library
 - Example: custom indexing pipeline
 - Integration patterns
@@ -146,11 +161,13 @@ labarchives-mcp import-embeddings     # Import from another system
 ## Decision Framework
 
 **Priority levels:**
+
 1. **High:** Requested by multiple users, clear value proposition
 2. **Medium:** Nice-to-have, implement when convenient
 3. **Low:** Speculative, defer until proven need
 
 **Implementation approach:**
+
 - Follow TDD for all new features
 - Maintain minimal design - no features until required
 - Document decision criteria for each enhancement

@@ -2,7 +2,7 @@
 
 **Status:** ✅ Production-ready (2025-10-01)
 **Tests:** 100 passing (92 unit/integration, 6 Pinecone skipped)
-**Documentation:** See `docs/vector_approach.md` for design details
+**Documentation:** See `docs/vector_approach.md` for design details (use alongside the MCP onboarding guidance in `docs/onboard_example.json`)
 
 ## Overview
 
