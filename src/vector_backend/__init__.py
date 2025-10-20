@@ -17,7 +17,7 @@ Usage:
     >>> results = index.search("protein aggregation in neurons", limit=10)
 """
 
-__version__ = "0.2.3"
+__version__ = "0.2.4"
 
 from vector_backend.models import BuildRecord, ChunkMetadata, EmbeddedChunk, SearchResult
 
