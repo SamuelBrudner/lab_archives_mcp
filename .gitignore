@@ -14,6 +14,7 @@ conda_envs/
 # Tooling caches and coverage artefacts
 .mypy_cache/
 .pytest_cache/
+.beads/
 .coverage
 .coverage.*
 coverage.xml
