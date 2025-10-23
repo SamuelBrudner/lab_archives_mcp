@@ -72,9 +72,11 @@ The server will look for `conf/secrets.yml` in the current working directory.
 
 ### Recommended Session Bootstrap
 
-- Run `bd onboard` in the repository root once per checkout to confirm tooling.
-- After launching the MCP server, call the `onboard()` tool to fetch the lab overview, notebook summary, and `sticky_context` block.
-- Persist the returned `sticky_context` in your agent memory and include it with every subsequent response touching LabArchives data.
+- Generate onboarding data via the CLI:
+  ```bash
+  labarchives-mcp --print-onboard json  # or markdown
+  ```
+- Persist the returned `sticky_context` in your agent memory and include it with every response that references LabArchives content.
 - Use `decide_labarchives_usage(prompt)` before expensive operations to confirm that a user request truly needs LabArchives context.
 
 ### Generic MCP Client

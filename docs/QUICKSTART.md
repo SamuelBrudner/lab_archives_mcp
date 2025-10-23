@@ -29,7 +29,7 @@ cat conf/secrets.yml
 
 ## Available Tools
 
-- **`onboard()`** — Return structured lab overview, usage guidance, and sticky context
+- **CLI** `labarchives-mcp --print-onboard json|markdown` — Emit onboarding payload for routers/assistants
 - **`decide_labarchives_usage(prompt)`** — Heuristic check for LabArchives relevance
 - **`list_labarchives_notebooks()`** — List all notebooks for the authenticated user
 - **`list_notebook_pages(notebook_id, folder_id?)`** — Navigate notebook hierarchy
@@ -42,7 +42,7 @@ cat conf/secrets.yml
 
 **Resource**: `labarchives://notebooks` (same as list_labarchives_notebooks tool)
 
-> **Workflow tip:** Run `bd onboard` once per repo checkout, then call `onboard()` and persist the `sticky_context` block in your agent session before executing other tools.
+> **Workflow tip:** Capture the CLI onboarding output once per session and persist the `sticky_context` block before invoking other tools.
 
 ## Indexing & Sync
 

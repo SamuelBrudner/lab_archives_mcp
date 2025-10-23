@@ -188,12 +188,12 @@ asyncio.run(test())
 
 ## Agent Onboarding Workflow
 
-- Run `bd onboard` in the repository root to confirm workspace tooling.
-- Call the MCP `onboard()` tool at session start to obtain:
+- From the CLI, run `labarchives-mcp --print-onboard json` (or `markdown`) to capture:
   - Server banner and purpose summary
   - Recommended tool usage (`semantic_search`, `peek_page`, `summarize_page`, etc.)
   - Current lab notebook snapshot and sticky context block to persist in responses
-- Before using other tools, optionally invoke `decide_labarchives_usage()` to confirm LabArchives relevance for the current prompt.
+- Persist the returned `sticky_context` in your agent memory before invoking other tools.
+- Optionally call `decide_labarchives_usage()` to validate that a prompt truly needs LabArchives context.
 
 ### 6. Example: Querying Your Notebooks with AI
 

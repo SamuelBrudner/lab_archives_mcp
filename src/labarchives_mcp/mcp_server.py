@@ -15,7 +15,6 @@ from loguru import logger
 
 from .auth import AuthenticationManager, Credentials
 from .eln_client import LabArchivesClient
-from .onboard import OnboardService
 from .transform import LabArchivesAPIError, translate_labarchives_fault
 
 ResourceHandler = Callable[[], Awaitable[dict[str, Any]]]
@@ -98,12 +97,6 @@ async def run_server() -> None:
             description="Proof-of-life MCP server exposing LabArchives notebooks.",
         )
 
-        onboard_service = OnboardService(
-            auth_manager=auth_manager,
-            notebook_client=notebook_client,
-            version=__version__,
-        )
-
         # Define resource
         resource_decorator = cast(ResourceDecorator, server.resource("labarchives://notebooks"))
 
@@ -140,13 +133,6 @@ async def run_server() -> None:
             uid = await auth_manager.ensure_uid()
             notebooks = await notebook_client.list_notebooks(uid)
             return [notebook.model_dump(by_alias=True) for notebook in notebooks]
-
-        @server.tool()  # type: ignore[misc]
-        async def onboard() -> dict[str, Any]:
-            """Return a structured onboarding payload for LabArchives MCP agents."""
-
-            payload = await onboard_service.get_payload()
-            return payload.as_dict()
 
         @server.tool()  # type: ignore[misc]
         async def list_notebook_pages(
