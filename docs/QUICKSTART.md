@@ -29,13 +29,20 @@ cat conf/secrets.yml
 
 ## Available Tools
 
-- **`list_labarchives_notebooks()`** — List all your notebooks
-- **`list_notebook_pages(notebook_id, folder_id?)`** — Navigate notebook pages and folders
-- **`read_notebook_page(notebook_id, page_id)`** — Read page content with entries
-- **`search_labarchives(query, limit=5)`** — Semantic search across indexed notebooks
-- **`upload_to_labarchives(...)`** — Upload files with Git provenance (see README for details)
+- **CLI** `labarchives-mcp --print-onboard json|markdown` — Emit onboarding payload for routers/assistants
+- **`decide_labarchives_usage(prompt)`** — Heuristic check for LabArchives relevance
+- **`list_labarchives_notebooks()`** — List all notebooks for the authenticated user
+- **`list_notebook_pages(notebook_id, folder_id?)`** — Navigate notebook hierarchy
+- **`read_notebook_page(notebook_id, page_id)`** — Fetch full page entries with metadata
+- **`peek_page(notebook_id, page_id)`** — Lightweight summary of a page
+- **`summarize_page(notebook_id, page_id)`** — Generate condensed bullet/timeline summary
+- **`semantic_search(query, limit=5, filters=None)`** — Filterable vector search across notebooks
+- **`sync_vector_index(...)`** — Plan or run embedding/index updates
+- **`upload_to_labarchives(...)`** — Upload files with provenance metadata
 
 **Resource**: `labarchives://notebooks` (same as list_labarchives_notebooks tool)
+
+> **Workflow tip:** Capture the CLI onboarding output once per session and persist the `sticky_context` block before invoking other tools.
 
 ## Indexing & Sync
 

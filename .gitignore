@@ -10,10 +10,13 @@ venv/
 .env*/
 conda_env/
 conda_envs/
+AGENTS.md
+CLAUDE.md
 
 # Tooling caches and coverage artefacts
 .mypy_cache/
 .pytest_cache/
+.beads/
 .coverage
 .coverage.*
 coverage.xml

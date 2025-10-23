@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import contextlib
+import json
 import logging
 import signal
 import sys
@@ -127,11 +129,20 @@ def _run_cli(argv: Sequence[str] | None = None) -> int:
         action="store_true",
         help="Display the LabArchives MCP server version and exit.",
     )
+    parser.add_argument(
+        "--print-onboard",
+        choices=("json", "markdown"),
+        help="Print the onboarding payload to stdout and exit.",
+    )
 
     parsed = parser.parse_args(list(argv) if argv is not None else None)
 
     if parsed.version:
         print(__version__)
+        return 0
+
+    if parsed.print_onboard:
+        asyncio.run(_emit_onboard(parsed.print_onboard))
         return 0
 
     logger.info("Starting LabArchives MCP server")
@@ -148,6 +159,30 @@ def _run_cli(argv: Sequence[str] | None = None) -> int:
         server_instance = None
 
     return 0
+
+
+async def _emit_onboard(output_format: str) -> None:
+    import httpx
+
+    from labarchives_mcp.auth import AuthenticationManager, Credentials
+    from labarchives_mcp.eln_client import LabArchivesClient
+    from labarchives_mcp.onboard import OnboardService
+
+    credentials = Credentials.from_file()
+    async with httpx.AsyncClient(base_url=str(credentials.region)) as http_client:
+        auth_manager = AuthenticationManager(http_client, credentials)
+        notebook_client = LabArchivesClient(http_client, auth_manager)
+        service = OnboardService(
+            auth_manager=auth_manager,
+            notebook_client=notebook_client,
+            version=mcp_server.__version__,
+        )
+        payload = await service.get_payload()
+
+    if output_format == "json":
+        print(json.dumps(payload.as_dict(), indent=2))
+    else:
+        print(payload.markdown)
 
 
 # =============================================================================

@@ -70,6 +70,15 @@ The server will look for `conf/secrets.yml` in the current working directory.
 
 ## Configuration for Other MCP Clients
 
+### Recommended Session Bootstrap
+
+- Generate onboarding data via the CLI:
+  ```bash
+  labarchives-mcp --print-onboard json  # or markdown
+  ```
+- Persist the returned `sticky_context` in your agent memory and include it with every response that references LabArchives content.
+- Use `decide_labarchives_usage(prompt)` before expensive operations to confirm that a user request truly needs LabArchives context.
+
 ### Generic MCP Client
 
 Any MCP client supporting stdio transport can connect. The server expects:

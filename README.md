@@ -10,7 +10,8 @@ A **Model Context Protocol (MCP) server** that connects AI assistants to LabArch
 
 **Key Features:**
 
-- 🔍 **Semantic Search**: Vector-based search across notebook content
+- 🧭 **Agent Onboarding**: `onboard()` returns a structured lab overview, sticky context, and usage guidance
+- 🔍 **Semantic Search**: Vector-based search across notebook content with enhanced filters
 - 📖 **Read Access**: List notebooks, navigate pages, read entries
 - 🤖 **AI Integration**: Works with Claude Desktop, Windsurf, and any MCP client
 - 🔐 **Secure**: API key authentication with HMAC-SHA512 signing
@@ -22,6 +23,8 @@ A **Model Context Protocol (MCP) server** that connects AI assistants to LabArch
 
 - Quick start: `docs/QUICKSTART.md`
 - Agent configuration: `docs/agent_configuration.md`
+- Onboarding payload reference: `docs/onboard_example.json`
+- Onboarding walkthrough: see `docs/QUICKSTART.md` and `docs/agent_configuration.md`
 - Upload API: `docs/upload_api.md`
 - Vector backend design and ops: `README_VECTOR_BACKEND.md`
 
@@ -67,8 +70,9 @@ A **Model Context Protocol (MCP) server** that connects AI assistants to LabArch
 
 ### 1. Clone and Install
 
-# Method 1: As a Python module
-```
+#### Method 1: As a Python module
+
+```bash
 git clone https://github.com/SamuelBrudner/lab_archives_mcp.git
 cd lab_archives_mcp
 ```
@@ -77,13 +81,13 @@ cd lab_archives_mcp
 
 Create the pinned Conda environment (local prefix):
 
-```
+```bash
 conda-lock install --prefix ./conda_envs/labarchives-mcp-pol conda-lock.yml
 ```
 
 Activate it:
 
-```
+```bash
 conda activate ./conda_envs/labarchives-mcp-pol
 ```
 
@@ -181,6 +185,15 @@ async def test():
 asyncio.run(test())
 "
 ```
+
+## Agent Onboarding Workflow
+
+- From the CLI, run `labarchives-mcp --print-onboard json` (or `markdown`) to capture:
+  - Server banner and purpose summary
+  - Recommended tool usage (`semantic_search`, `peek_page`, `summarize_page`, etc.)
+  - Current lab notebook snapshot and sticky context block to persist in responses
+- Persist the returned `sticky_context` in your agent memory before invoking other tools.
+- Optionally call `decide_labarchives_usage()` to validate that a prompt truly needs LabArchives context.
 
 ### 6. Example: Querying Your Notebooks with AI
 
