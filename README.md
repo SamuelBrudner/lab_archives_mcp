@@ -186,6 +186,63 @@ asyncio.run(test())
 "
 ```
 
+## Requirements & limitations
+
+- **LabArchives account and API access**
+  - Full functionality (listing notebooks, reading pages, semantic search, upload with provenance) requires a LabArchives account and API token.
+  - The MCP server assumes that authentication has been configured via the documented environment variables and configuration files.
+
+- **Optional external vector stores**
+  - The semantic search and embedding layers can use external services such as OpenAI or Pinecone when configured.
+  - When these backends are enabled, text content and/or embeddings will be sent to the corresponding provider; institutions should review their data-governance policies before enabling them.
+
+- **On-premise and open backends**
+  - The core vector backend and Pydantic models are designed to work without LabArchives and without any commercial vector store.
+  - Institutions can plug in a local or on-prem backend (for example, a filesystem or database-backed index) to keep all embeddings and metadata on institutional hardware.
+
+- **Intended usage**
+  - `lab_archives_mcp` is designed as an integration layer between ELNs and AI assistants, not as a general-purpose ELN or standalone LIMS.
+  - Production deployments should run behind institutional authentication and logging appropriate for research data.
+
+## FAIR & provenance
+
+- **Reproducible environments**
+  - Conda-lock files pin Python and dependency versions, enabling deterministic reconstruction of the MCP server environment.
+  - Continuous integration runs the test suite against these environments on multiple operating systems.
+
+- **Provenance-aware uploads**
+  - The upload tools capture rich code-provenance metadata, including:
+    - `git_commit_sha`, `git_branch`, `git_repo_url`, `git_is_dirty`
+    - Optional `code_version` tag
+    - `executed_at` timestamp
+    - `python_version` and key `dependencies`
+    - Operating system and (optionally) hostname
+  - This metadata is stored alongside the uploaded file in LabArchives, providing a durable link between notebook entries and the code that produced them.
+
+- **Structured schemas**
+  - All API payloads and configuration structures are defined using Pydantic models.
+  - This ensures explicit, versioned schemas for:
+    - LabArchives notebook and page representations
+    - Upload requests with provenance
+    - Server configuration, including vector backends
+
+- **Data and code versioning**
+  - The MCP server is intended to be used in conjunction with Git-based workflows (and optionally DVC or similar tools) so that raw data, processed data, and analysis code can be versioned in tandem with ELN entries.
+
+## For reviewers and editors
+
+- **Code organization and testing**
+  - The MCP server is organized into logical modules with clear responsibilities.
+  - Unit tests and integration tests cover key functionality, including authentication, notebook navigation, and upload workflows.
+
+- **Security and authentication**
+  - The MCP server uses HMAC-SHA512 signing for authentication, with credentials stored securely in environment variables or configuration files.
+  - API keys and access tokens are never stored in plaintext or committed to version control.
+
+- **Vector backend and search**
+  - The semantic search and embedding layers are designed to be modular and extensible.
+  - Institutions can choose to use external vector stores or implement their own on-premise solutions.
+
 ## Agent Onboarding Workflow
 
 - From the CLI, run `labarchives-mcp --print-onboard json` (or `markdown`) to capture:
