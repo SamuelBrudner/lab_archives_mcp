@@ -190,10 +190,9 @@ asyncio.run(test())
 
 - From the CLI, run `labarchives-mcp --print-onboard json` (or `markdown`) to capture:
   - Server banner and purpose summary
-  - Recommended tool usage (`semantic_search`, `peek_page`, `summarize_page`, etc.)
+  - Recommended tool usage (`search_labarchives`, `list_notebook_pages`, `read_notebook_page`)
   - Current lab notebook snapshot and sticky context block to persist in responses
 - Persist the returned `sticky_context` in your agent memory before invoking other tools.
-- Optionally call `decide_labarchives_usage()` to validate that a prompt truly needs LabArchives context.
 
 ### 6. Example: Querying Your Notebooks with AI
 
@@ -325,7 +324,7 @@ For configuration examples for Windsurf and Claude Desktop (including environmen
 
 # Navigate into a folder by passing its tree_id as folder_id:
 list_notebook_pages(notebook_id, folder_id="67890")
-```json
+```
 
 **`read_notebook_page(notebook_id, page_id)`**
 
@@ -348,7 +347,7 @@ list_notebook_pages(notebook_id, folder_id="67890")
 
 See `docs/upload_api.md` for the complete API documentation and usage notes.
 
-```python
+```
 # Upload a file with code provenance metadata
 # MANDATORY parameters:
 upload_to_labarchives(
@@ -563,7 +562,7 @@ If you use this software in your research, please cite:
   title = {LabArchives MCP Server: AI Integration for Electronic Lab Notebooks},
   year = {2025},
   url = {https://github.com/SamuelBrudner/lab_archives_mcp},
-  version = {0.1.0}
+  version = {0.2.4}
 }
 ```
 

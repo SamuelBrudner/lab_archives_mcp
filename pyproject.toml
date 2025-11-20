@@ -46,7 +46,7 @@ dependencies = [
 ]
 
 [project.scripts]
-labarchives-mcp = "labarchives_mcp.mcp_server:run"
+labarchives-mcp = "cli.main:main"
 
 [project.optional-dependencies]
 dev = [

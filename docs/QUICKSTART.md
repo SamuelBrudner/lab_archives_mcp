@@ -29,16 +29,13 @@ cat conf/secrets.yml
 
 ## Available Tools
 
-- **CLI** `labarchives-mcp --print-onboard json|markdown` — Emit onboarding payload for routers/assistants
-- **`decide_labarchives_usage(prompt)`** — Heuristic check for LabArchives relevance
-- **`list_labarchives_notebooks()`** — List all notebooks for the authenticated user
-- **`list_notebook_pages(notebook_id, folder_id?)`** — Navigate notebook hierarchy
-- **`read_notebook_page(notebook_id, page_id)`** — Fetch full page entries with metadata
-- **`peek_page(notebook_id, page_id)`** — Lightweight summary of a page
-- **`summarize_page(notebook_id, page_id)`** — Generate condensed bullet/timeline summary
-- **`semantic_search(query, limit=5, filters=None)`** — Filterable vector search across notebooks
-- **`sync_vector_index(...)`** — Plan or run embedding/index updates
-- **`upload_to_labarchives(...)`** — Upload files with provenance metadata
+- `labarchives-mcp --print-onboard json|markdown` — Print onboarding payload for agents
+- `list_labarchives_notebooks()` — List all notebooks for the authenticated user
+- `list_notebook_pages(notebook_id, folder_id?)` — Navigate notebook hierarchy
+- `read_notebook_page(notebook_id, page_id)` — Fetch full page entries with metadata
+- `search_labarchives(query, limit=5)` — Semantic search across indexed notebooks
+- `sync_vector_index(...)` — Plan or run embedding/index updates
+- `upload_to_labarchives(...)` — Upload files with provenance metadata
 
 **Resource**: `labarchives://notebooks` (same as list_labarchives_notebooks tool)
 
