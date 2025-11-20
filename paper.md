@@ -122,3 +122,5 @@ The Model Context Protocol is a recently introduced standard for connecting AI s
 This work was performed independently by the author, and validated against a LabArchives account at Yale University. The author thanks LabArchives for API documentation and technical support, and the FastMCP and Anthropic teams for the Model Context Protocol specification.
 
 # References
+
+See `paper.bib`
