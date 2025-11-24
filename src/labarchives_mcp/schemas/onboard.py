@@ -7,7 +7,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-MAX_ONBOARD_PAYLOAD_BYTES = 4096
+MAX_ONBOARD_PAYLOAD_BYTES = 16384
 
 
 class HowToUse(BaseModel):
@@ -65,8 +65,15 @@ class StickyContext(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    last_notebook_id: str | None = Field(None, description="Most recently referenced notebook id")
-    last_page_id: str | None = Field(None, description="Most recently referenced page id")
+    last_notebook_id: str | None = Field(
+        None, description="Notebook ID referenced in the most recent conversation turn"
+    )
+    last_page_id: str | None = Field(
+        None, description="Page ID referenced in the most recent conversation turn"
+    )
+    workflow_hint: str | None = Field(
+        None, description="Guidance for the next turn (e.g., prioritize search)"
+    )
 
 
 def _lab_summary_factory() -> LabSummary:
@@ -74,7 +81,11 @@ def _lab_summary_factory() -> LabSummary:
 
 
 def _sticky_context_factory() -> StickyContext:
-    return StickyContext(last_notebook_id=None, last_page_id=None)
+    return StickyContext(
+        last_notebook_id=None,
+        last_page_id=None,
+        workflow_hint="Prioritize semantic search (search_labarchives) for new queries.",
+    )
 
 
 class OnboardPayload(BaseModel):

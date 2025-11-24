@@ -15,6 +15,7 @@ from loguru import logger
 
 from .auth import AuthenticationManager, Credentials
 from .eln_client import LabArchivesClient
+from .state import StateManager
 from .transform import LabArchivesAPIError, translate_labarchives_fault
 
 ResourceHandler = Callable[[], Awaitable[dict[str, Any]]]
@@ -88,6 +89,7 @@ async def run_server() -> None:
     async with httpx.AsyncClient(base_url=str(credentials.region)) as http_client:
         auth_manager = AuthenticationManager(http_client, credentials)
         notebook_client = LabArchivesClient(http_client, auth_manager)
+        state_manager = StateManager()
 
         server = _instantiate_fastmcp(
             fastmcp_class,
@@ -243,6 +245,16 @@ async def run_server() -> None:
 
                 result = {"notebook_id": notebook_id, "page_id": page_id, "entries": entries}
                 logger.success(f"Successfully read page with {len(entries)} entries")
+
+                # Log visit to active project context
+                try:
+                    # Title is not readily available without another call; use placeholder for now.
+                    page_title = "Unknown Title"
+
+                    state_manager.log_visit(notebook_id, page_id, page_title)
+                except Exception as e:
+                    logger.warning(f"Failed to log page visit to state: {e}")
+
                 return result
 
             except Exception as exc:
@@ -699,6 +711,325 @@ async def run_server() -> None:
 
         else:
             logger.info("Upload functionality is DISABLED (LABARCHIVES_ENABLE_UPLOAD=false)")
+
+        # --- Project / State Management Tools ---
+
+        @server.tool()  # type: ignore[misc]
+        async def create_project(
+            name: str, description: str, linked_notebook_ids: list[str] | None = None
+        ) -> dict[str, Any]:
+            """Start a new project context.
+
+            This creates a new "workspace" for your research. All subsequent page reads
+            and findings will be logged to this project until you switch or create another.
+
+            Args:
+                name: Human-readable name
+                description: Goal or hypothesis
+                linked_notebook_ids: Optional LabArchives Notebook IDs to link to this context.
+            """
+            context = state_manager.create_project(name, description, linked_notebook_ids)
+            return context.model_dump()
+
+        @server.tool()  # type: ignore[misc]
+        async def delete_project(project_id: str) -> str:
+            """Delete a project context and its history."""
+            success = state_manager.delete_project(project_id)
+            if success:
+                return f"Successfully deleted project {project_id}"
+            return f"Project {project_id} not found"
+
+        @server.tool()  # type: ignore[misc]
+        async def switch_project(project_id: str) -> dict[str, Any]:
+            """Switch the active context to an existing project."""
+            try:
+                context = state_manager.switch_project(project_id)
+                return context.model_dump()
+            except ValueError as e:
+                return {"error": str(e)}
+
+        @server.tool()  # type: ignore[misc]
+        async def list_projects() -> list[dict[str, Any]]:
+            """List all projects and their status."""
+            return state_manager.list_projects()
+
+        @server.tool()  # type: ignore[misc]
+        async def log_finding(content: str, source_url: str | None = None) -> str:
+            """Record a key fact or finding in the current project context.
+
+            Use this to "take notes" about what you've discovered.
+            """
+            try:
+                state_manager.log_finding(content, source_url)
+                return "Finding logged successfully."
+            except RuntimeError as e:
+                return f"Error: {e}"
+
+        @server.tool()  # type: ignore[misc]
+        async def get_current_context() -> dict[str, Any]:
+            """Retrieve the full state of the active project (findings, history)."""
+            context = state_manager.get_active_context()
+            if not context:
+                return {
+                    "status": "no_active_context",
+                    "message": "No project is currently active.",
+                }
+            return context.model_dump()
+
+        @server.tool()  # type: ignore[misc]
+        async def get_related_pages(notebook_id: str, page_id: str) -> list[dict[str, Any]]:
+            """Find pages related to the given page using the project graph and content links.
+
+            Args:
+                notebook_id: Notebook ID
+                page_id: Page ID to find relations for
+
+            Returns:
+                List of related pages with relationship type
+                (e.g., 'graph_neighbor', 'linked_in_content')
+            """
+            import re
+
+            import networkx as nx
+
+            context = state_manager.get_active_context()
+            if not context:
+                return []
+
+            related_pages = []
+            seen_ids = set()
+
+            # 1. Graph Neighbors (from NetworkX)
+            try:
+                graph = nx.node_link_graph(context.graph_data)
+                page_node_id = f"page:{page_id}"
+
+                if graph.has_node(page_node_id):
+                    # Undirected view lets us traverse Page -> Project -> sibling Page.
+                    graph_undir = graph.to_undirected()
+
+                    # We want pages related via the Project (siblings) or direct links if any
+                    # Simple neighbor check on undirected graph:
+                    for neighbor in graph_undir.neighbors(page_node_id):
+                        node_data = graph.nodes[neighbor]
+
+                        # If neighbor is Project, get its neighbors (siblings of current page)
+                        if node_data.get("type") == "project":
+                            for sibling in graph_undir.neighbors(neighbor):
+                                sibling_data = graph.nodes[sibling]
+                                if sibling_data.get("type") == "page":
+                                    pid = sibling.replace("page:", "")
+                                    if pid != page_id and pid not in seen_ids:
+                                        related_pages.append(
+                                            {
+                                                "page_id": pid,
+                                                "title": sibling_data.get("label", "Unknown"),
+                                                "source": "project_sibling",
+                                            }
+                                        )
+                                        seen_ids.add(pid)
+
+                        # If neighbor is another page (direct link?), add it
+                        elif node_data.get("type") == "page":
+                            pid = neighbor.replace("page:", "")
+                            if pid != page_id and pid not in seen_ids:
+                                related_pages.append(
+                                    {
+                                        "page_id": pid,
+                                        "title": node_data.get("label", "Unknown"),
+                                        "source": "graph_neighbor",
+                                    }
+                                )
+                                seen_ids.add(pid)
+            except Exception as e:
+                logger.warning(f"Graph query failed: {e}")
+
+            # 2. Content Links (Heuristic parsing)
+            try:
+                uid = await auth_manager.ensure_uid()
+                entries = await notebook_client.get_page_entries(
+                    uid, notebook_id, page_id, include_data=True
+                )
+
+                # Regex for LabArchives page links: https://.../share/NotebookID/PageID
+                # or internal links
+                link_pattern = re.compile(r'labarchives\.com/share/[^/]+/([^/"\s]+)')
+
+                for entry in entries:
+                    content = entry.get("content", "")
+                    if content:
+                        matches = link_pattern.findall(content)
+                        for match in matches:
+                            # match is likely a tree_id (PageID)
+                            if match != page_id and match not in seen_ids:
+                                # Title unknown without fetching page details
+                                related_pages.append(
+                                    {
+                                        "page_id": match,
+                                        "title": "Linked Page",
+                                        "source": "content_link",
+                                    }
+                                )
+                                seen_ids.add(match)
+            except Exception as e:
+                logger.warning(f"Content link parsing failed: {e}")
+
+            return related_pages
+
+        @server.tool()  # type: ignore[misc]
+        async def trace_provenance(notebook_id: str, page_id: str, entry_id: str) -> dict[str, Any]:
+            """Trace the provenance of a specific entry (e.g., finding its source).
+
+            Args:
+                notebook_id: Notebook ID
+                page_id: Page ID containing the entry
+                entry_id: Entry ID to trace
+
+            Returns:
+                Dictionary with 'sources' (list of parent entities) and 'metadata'
+            """
+            import re
+
+            sources: list[dict[str, str]] = []
+            metadata: dict[str, Any] = {}
+
+            try:
+                uid = await auth_manager.ensure_uid()
+                entries = await notebook_client.get_page_entries(
+                    uid, notebook_id, page_id, include_data=True
+                )
+
+                # Find target entry
+                target_entry = next((e for e in entries if e.get("eid") == entry_id), None)
+                if not target_entry:
+                    return {"error": f"Entry {entry_id} not found on page {page_id}"}
+
+                # 1. Check Content/Caption for "Derived From" patterns
+                # Patterns: "Derived From: [ID]", "Source: [ID]"
+                content = target_entry.get("content", "")
+                source_pattern = re.compile(r"(?:Derived From|Source):\s*([a-zA-Z0-9_\-]+)")
+
+                matches = source_pattern.findall(content)
+                for match in matches:
+                    sources.append(
+                        {
+                            "id": match,
+                            "type": "derived_from_text",
+                            "description": "Found explicit citation in entry content",
+                        }
+                    )
+
+                # 2. Check Sibling Metadata Entries
+                # Our upload tool creates a "Code Provenance Metadata" entry on the same page.
+                # We look for entries with that caption or content.
+                for entry in entries:
+                    # Check caption
+                    caption = (
+                        entry.get("caption", "") or ""
+                    )  # caption might be None? check client.py
+                    # Check content for metadata markers
+                    e_content = entry.get("content", "")
+
+                    if "Code Provenance Metadata" in caption or "Git Commit SHA" in e_content:
+                        metadata["code_provenance"] = {
+                            "eid": entry.get("eid"),
+                            "content_snippet": e_content[:200] + "...",
+                        }
+
+            except Exception as e:
+                logger.error(f"Provenance trace failed: {e}")
+                return {"error": str(e)}
+
+            return {"sources": sources, "metadata": metadata}
+
+        @server.tool()  # type: ignore[misc]
+        async def suggest_next_steps() -> dict[str, Any]:
+            """Analyze the current project state and suggest logical next actions.
+
+            Returns:
+                Dictionary with 'phase' (e.g., 'cold_start', 'exploration')
+                and 'suggestions' (list of strings).
+            """
+            import networkx as nx
+
+            context = state_manager.get_active_context()
+            if not context:
+                return {
+                    "phase": "no_context",
+                    "suggestions": [
+                        "Create a new project with `create_project`.",
+                        "List existing projects with `list_projects`.",
+                    ],
+                }
+
+            try:
+                graph = nx.node_link_graph(context.graph_data)
+                node_count = graph.number_of_nodes()
+
+                # Heuristic 1: Cold Start
+                if node_count <= 1:  # Only Project node (or empty)
+                    return {
+                        "phase": "cold_start",
+                        "suggestions": [
+                            "Search for relevant literature using `search_labarchives`.",
+                            "List notebook pages using `list_notebook_pages` to explore structure.",
+                            "Log a hypothesis using `log_finding`.",
+                        ],
+                    }
+
+                # Analyze graph composition
+                findings = [n for n, d in graph.nodes(data=True) if d.get("type") == "finding"]
+                pages = [n for n, d in graph.nodes(data=True) if d.get("type") == "page"]
+
+                # Heuristic 3: Synthesis Phase (Many findings)
+                if len(findings) >= 3:
+                    return {
+                        "phase": "synthesis",
+                        "suggestions": [
+                            "Synthesize your findings into a summary.",
+                            "Document conclusions with `upload_to_labarchives` (as text).",
+                            "Review your findings using `get_current_context`.",
+                        ],
+                    }
+
+                # Heuristic 2: Exploration Phase (Pages visited, few findings)
+                if len(pages) > 0:
+                    # Check for dead end: last page visited has no other connections yet.
+                    # Our simple graph only links Project -> Page and Project -> Finding.
+                    # If last page lacks findings, suggest follow-up work.
+
+                    last_page = pages[-1]  # Order preserved or timestamp could be added later
+                    # Check if last page has finding neighbors
+                    has_findings = False
+                    for n in graph.neighbors(last_page):
+                        if graph.nodes[n].get("type") == "finding":
+                            has_findings = True
+                            break
+
+                    if not has_findings:
+                        return {
+                            "phase": "exploration",
+                            "suggestions": [
+                                "Read the content of the last visited page carefully.",
+                                "Log any key facts using `log_finding`.",
+                                "Use `get_related_pages` to find similar content.",
+                                "Use `trace_provenance` if the page contains derived data.",
+                            ],
+                        }
+
+                # Default / Fallback
+                return {
+                    "phase": "ongoing_research",
+                    "suggestions": [
+                        "Continue exploring notebook pages.",
+                        "Search for specific terms related to your project.",
+                        "Switch to a different project if blocked.",
+                    ],
+                }
+
+            except Exception as e:
+                logger.error(f"Heuristics failed: {e}")
+                return {"error": str(e)}
 
         await server.run_async()
 

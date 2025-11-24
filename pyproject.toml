@@ -42,7 +42,8 @@ dependencies = [
   "click>=8.1",
   "pinecone>=4.1",
   "markdown>=3.5",
-  "Pygments>=2.15"
+  "Pygments>=2.15",
+  "networkx>=3.0"
 ]
 
 [project.scripts]

@@ -134,11 +134,20 @@ def _run_cli(argv: Sequence[str] | None = None) -> int:
         choices=("json", "markdown"),
         help="Print the onboarding payload to stdout and exit.",
     )
+    parser.add_argument(
+        "--init",
+        action="store_true",
+        help="Initialize the local state directory and exit.",
+    )
 
     parsed = parser.parse_args(list(argv) if argv is not None else None)
 
     if parsed.version:
         print(__version__)
+        return 0
+
+    if parsed.init:
+        _init_state()
         return 0
 
     if parsed.print_onboard:
@@ -183,6 +192,22 @@ async def _emit_onboard(output_format: str) -> None:
         print(json.dumps(payload.as_dict(), indent=2))
     else:
         print(payload.markdown)
+
+
+def _init_state() -> None:
+    """Initialize the local state directory."""
+    from pathlib import Path
+
+    from labarchives_mcp.state import StateManager
+
+    state_dir = Path(".labarchives_state")
+    if state_dir.exists():
+        print(f"State directory already exists at {state_dir.absolute()}")
+    else:
+        print(f"Initializing state directory at {state_dir.absolute()}...")
+        # StateManager init will create the directory and empty state file
+        StateManager(storage_dir=state_dir)
+        print("Done.")
 
 
 # =============================================================================
