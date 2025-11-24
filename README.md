@@ -13,6 +13,7 @@ A **Model Context Protocol (MCP) server** that connects AI assistants to LabArch
 - 🧭 **Agent Onboarding**: `onboard()` returns a structured lab overview, sticky context, and usage guidance
 - 🔍 **Semantic Search**: Vector-based search across notebook content with enhanced filters
 - 📖 **Read Access**: List notebooks, navigate pages, read entries
+- 🧠 **Persistent Context & Graphs**: Project-scoped memory with NetworkX-backed graphs, related-page lookups, provenance tracing, and AI heuristics
 - 🤖 **AI Integration**: Works with Claude Desktop, Windsurf, and any MCP client
 - 🔐 **Secure**: API key authentication with HMAC-SHA512 signing
 - 📦 **Reproducible**: Conda-lock environment with pinned dependencies
@@ -60,6 +61,7 @@ A **Model Context Protocol (MCP) server** that connects AI assistants to LabArch
   - `auth.py` – credential loading, HMAC signing, UID resolution.
   - `eln_client.py` – notebook navigation, page entry retrieval, upload orchestration.
   - `models/upload.py` – Pydantic contracts for uploads and provenance metadata.
+  - `state.py` – persistent project contexts, graph construction, related-page heuristics, and next-step suggestions.
   - `transform.py` – XML→JSON transforms and API fault translation.
   - `mcp_server.py` – MCP server wiring and tool registration.
   - `vector_backend/` – semantic search indexing and Pinecone/Qdrant integrations.
@@ -243,6 +245,13 @@ asyncio.run(test())
   - The semantic search and embedding layers are designed to be modular and extensible.
   - Institutions can choose to use external vector stores or implement their own on-premise solutions.
 
+## Project state, graph navigation, and heuristics
+
+- **Persistent context**: The server now maintains project-scoped memory (visited pages, findings, linked notebooks) in `~/.labarchives_state/session_state.json` by default so assistants can resume work across sessions and repositories.
+- **Graph-backed navigation**: Every page visit and finding is added to a NetworkX graph, enabling related-page discovery (`get_related_pages`) and provenance tracing (`trace_provenance`).
+- **Project tools**: Manage contexts with `create_project`, `list_projects`, `switch_project`, `delete_project`, inspect them with `get_current_context`, and log observations via `log_finding`.
+- **Ready-to-work heuristics**: `suggest_next_steps` inspects the project graph to recommend cold-start, exploration, and synthesis actions when the assistant is unsure how to proceed.
+
 ## Agent Onboarding Workflow
 
 - From the CLI, run `labarchives-mcp --print-onboard json` (or `markdown`) to capture:
@@ -329,6 +338,16 @@ For configuration examples for Windsurf and Claude Desktop (including environmen
 **Reading**:
 
 - **`read_notebook_page(notebook_id, page_id)`** - Read content from a specific page
+
+**Project state & heuristics**:
+
+- **`create_project(name, description, linked_notebook_ids=None)`** - Start and activate a project workspace
+- **`list_projects()`**, **`switch_project(project_id)`**, **`delete_project(project_id)`** - Manage project contexts
+- **`log_finding(content, source_url=None)`** - Append a finding to the active project
+- **`get_current_context()`** - Return full project state (pages, findings, graph)
+- **`get_related_pages(notebook_id, page_id)`** - Find sibling/linked pages via the project graph and detected LabArchives links
+- **`trace_provenance(notebook_id, page_id, entry_id)`** - Heuristically identify sources for an entry (derived-from text or metadata)
+- **`suggest_next_steps()`** - Suggest next actions based on the current project graph
 
 ### Indexing & Sync
 
