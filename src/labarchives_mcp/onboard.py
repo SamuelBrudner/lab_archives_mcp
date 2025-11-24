@@ -136,7 +136,7 @@ class OnboardService:
                 "User wants to start a long-running research task or manage a project context.",
             ],
             primary_tools={
-                "semantic_search": "Use the semantic index to find relevant pages by meaning.",
+                "search_labarchives": "Search ALL notebooks with natural language—no ID needed.",
                 "create_project": "Start a new research context to organize your work.",
                 "get_related_pages": (
                     "Find related pages via project graph or detected content links."
