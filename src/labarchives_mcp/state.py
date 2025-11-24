@@ -64,6 +64,8 @@ class SessionState(BaseModel):
 class StateManager:
     """Manages persistence and modification of agent state."""
 
+    MAX_VISITS = 1000
+
     def __init__(self, storage_dir: Path | str | None = None) -> None:
         if storage_dir is None:
             # Default to home directory for cross-repository access
@@ -271,6 +273,10 @@ class StateManager:
         # 1. Add to visited_pages list
         visit = VisitedPage(page_id=page_id, title=title, notebook_id=notebook_id)
         context.visited_pages.append(visit)
+        if len(context.visited_pages) > self.MAX_VISITS:
+            removed = len(context.visited_pages) - self.MAX_VISITS
+            context.visited_pages = context.visited_pages[-self.MAX_VISITS :]
+            logger.warning(f"Pruned visited_pages history by {removed} to cap at {self.MAX_VISITS}")
 
         # 2. Update Graph
         try:

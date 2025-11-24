@@ -144,3 +144,15 @@ def test_list_projects(state_manager: StateManager) -> None:
 
     proj1_summary = next(e for e in projects if e["name"] == "Proj 1")
     assert proj1_summary["active"] is False
+
+
+def test_visited_pages_capped(state_manager: StateManager) -> None:
+    """Ensure visited_pages history is capped at MAX_VISITS."""
+    context = state_manager.create_project("Proj", "Desc")
+    for i in range(1100):
+        state_manager.log_visit("nb", f"p{i}", f"Page {i}")
+
+    assert len(context.visited_pages) == state_manager.MAX_VISITS
+    # Should retain the most recent MAX_VISITS
+    assert context.visited_pages[0].page_id == "p100"
+    assert context.visited_pages[-1].page_id == "p1099"
