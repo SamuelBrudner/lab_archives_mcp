@@ -1,63 +1,67 @@
 {
   "server": "lab_archives_mcp",
-  "version": "0.2.4",
+  "version": "0.3.0",
   "purpose": "Provide experimental context from LabArchives ELN.",
   "banner": "LabArchives MCP • Access experimental notebooks and context.",
   "how_to_use": {
     "when": [
       "User mentions experiments, protocols, results, or prior lab work.",
       "Prompts reference LabArchives notebooks, pages, figures, or sample IDs.",
-      "Requests involve lab dates, experiment logs, or ELN provenance."
+      "Requests involve lab dates, experiment logs, or ELN provenance.",
+      "User wants to start or continue a long-running research task."
     ],
     "primary_tools": {
-      "semantic_search": "Find relevant ELN pages from free-text prompts.",
+      "search_labarchives": "Semantic search across indexed ELN content.",
       "list_notebooks": "Enumerate notebooks available to the authenticated user.",
       "list_notebook_pages": "Browse notebook structure to locate pages.",
-      "read_notebook_page": "Retrieve full structured content for a given page.",
-      "peek_page": "Quickly preview summaries without full content load.",
-      "summarize_page": "Generate concise bullet or timeline summaries for a page."
-    },
-    "decision_aid": "Call `decide_labarchives_usage` before querying to confirm relevance.",
+      "read_notebook_page": "Retrieve structured content for a given page.",
+      "create_project": "Start a project context to persist findings and navigation.",
+      "log_finding": "Record a key fact in the active project context.",
+      "get_related_pages": "Find related pages via the project graph and detected links.",
+      "trace_provenance": "Heuristically trace an entry's sources and metadata.",
+      "suggest_next_steps": "Recommend next actions based on the project graph."
+    ],
+    "decision_aid": "Default to `search_labarchives`; create a project for multi-session work.",
     "context_persistence": "Add the provided `sticky_context` block to each response turn."
   },
   "lab_summary": {
     "notebooks": [
       {
-        "id": "NB001",
-        "title": "Fly Rig Experiments",
-        "n_pages": 143,
+        "id": "NB-001",
+        "title": "Behavioral Assays",
+        "n_pages": 142,
         "last_updated": "2025-10-20T19:12:00Z"
       },
       {
-        "id": "NB002",
+        "id": "NB-002",
         "title": "Optogenetic Stimuli Logs",
-        "n_pages": 85,
+        "n_pages": 87,
         "last_updated": "2025-10-19T15:04:00Z"
       }
     ],
     "recent_activity": [
       {
-        "notebook_id": "NB001",
-        "notebook_title": "Fly Rig Experiments",
-        "page_id": "PG120",
-        "page_title": "Rig A QC 2025-10-21",
-        "summary": "QC drift detected; retuned gain to 0.21 and re-ran baseline check.",
+        "notebook_id": "NB-001",
+        "notebook_title": "Behavioral Assays",
+        "page_id": "PG-120",
+        "page_title": "Arena QC 2025-10-21",
+        "summary": "QC drift detected; retuned gain and re-ran baseline check.",
         "updated_at": "2025-10-21T13:45:00Z"
       },
       {
-        "notebook_id": "NB002",
+        "notebook_id": "NB-002",
         "notebook_title": "Optogenetic Stimuli Logs",
-        "page_id": "PG087",
+        "page_id": "PG-087",
         "page_title": "Odor Ramping Test",
-        "summary": "Validated new 45s ramp protocol on 10 flies; recorded spike timing metrics.",
+        "summary": "Validated new 45s ramp protocol; recorded spike timing metrics.",
         "updated_at": "2025-10-20T22:18:00Z"
       }
     ]
   },
   "sticky_context": {
-    "last_notebook_id": "NB001",
-    "last_page_id": "PG120"
+    "last_notebook_id": "NB-001",
+    "last_page_id": "PG-120",
+    "workflow_hint": "Start with `search_labarchives`. Use `create_project` to persist context."
   },
-  "router_prompt": "Use LabArchives MCP for anything involving experiments, protocols, results, or ELN pages.",
-  "markdown": "## LabArchives MCP Onboarding\n\n### When to Use\n- User mentions experiments, protocols, results, or prior lab work.\n- Prompts reference LabArchives notebooks, pages, figures, or sample IDs.\n- Requests involve lab dates, experiment logs, or ELN provenance.\n\n### Primary Tools\n- `semantic_search` — Find relevant ELN pages from free-text prompts.\n- `list_notebooks` — Enumerate notebooks available to the authenticated user.\n- `list_notebook_pages` — Browse notebook structure to locate pages.\n- `read_notebook_page` — Retrieve full structured content for a given page.\n- `peek_page` — Quickly preview summaries without full content load.\n- `summarize_page` — Generate concise bullet or timeline summaries for a page.\n\n### Workflow Aids\n- Decision aid: Call `decide_labarchives_usage` before querying to confirm relevance.\n- Context persistence: Add the provided `sticky_context` block to each response turn.\n\n### Notebooks\n- **Fly Rig Experiments** (`NB001`), pages: 143, last updated: 2025-10-20T19:12:00Z\n- **Optogenetic Stimuli Logs** (`NB002`), pages: 85, last updated: 2025-10-19T15:04:00Z\n\n### Recent Activity\n- **Rig A QC 2025-10-21** (`PG120` in `Fly Rig Experiments`) — QC drift detected; retuned gain to 0.21 and re-ran baseline check. (updated 2025-10-21T13:45:00Z)\n- **Odor Ramping Test** (`PG087` in `Optogenetic Stimuli Logs`) — Validated new 45s ramp protocol on 10 flies; recorded spike timing metrics. (updated 2025-10-20T22:18:00Z)\n\n### Router Prompt\nUse LabArchives MCP for anything involving experiments, protocols, results, or ELN pages."
+  "router_prompt": "Use LabArchives MCP for anything involving experiments, protocols, results, or ELN provenance."
 }

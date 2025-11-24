@@ -77,7 +77,7 @@ The server will look for `conf/secrets.yml` in the current working directory.
   labarchives-mcp --print-onboard json  # or markdown
   ```
 - Persist the returned `sticky_context` in your agent memory and include it with every response that references LabArchives content.
-- Persist the returned `sticky_context` in your agent memory for LabArchives-related tasks.
+- Start a project context (`create_project`) for multi-session work; state persists to `~/.labarchives_state/session_state.json`.
 
 ### Generic MCP Client
 
