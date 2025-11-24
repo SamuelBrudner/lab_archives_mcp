@@ -4,7 +4,7 @@
 
 set -e
 
-echo "🚀 Preparing lab_archives_mcp v0.1.0 for JOSS submission"
+echo "🚀 Preparing lab_archives_mcp v0.1.0 for JORS submission"
 echo ""
 
 # Step 1: Verify we're on main branch
@@ -32,7 +32,7 @@ if [[ -n $(git status -s) ]]; then
 - Add MIT LICENSE
 - Add CONTRIBUTING.md and CODE_OF_CONDUCT.md
 - Add GitHub Actions CI workflow
-- Add JOSS paper (paper.md and paper.bib)
+- Add JORS metapaper (jors_metapaper.md and paper.bib)
 - Update README with badges and license info
 - Update CHANGELOG for v0.1.0 release
 - Add community templates (PR, issue templates)"
@@ -54,7 +54,7 @@ conda run -p ./conda_envs/labarchives-mcp-pol pytest -m "not integration" -q || 
 # Step 4: Tag release
 echo ""
 echo "🏷️  Creating release tag v0.1.0..."
-git tag -a v0.1.0 -m "Release v0.1.0 for JOSS submission
+git tag -a v0.1.0 -m "Release v0.1.0 for JORS submission
 
 LabArchives MCP Server - AI Integration for Electronic Lab Notebooks
 
@@ -88,17 +88,17 @@ echo "📋 Next steps:"
 echo "1. Create GitHub Release:"
 echo "   - Go to: https://github.com/SamuelBrudner/lab_archives_mcp/releases/new"
 echo "   - Select tag: v0.1.0"
-echo "   - Title: 'v0.1.0 - JOSS Submission Release'"
+echo "   - Title: 'v0.1.0 - JORS Submission Release'"
 echo "   - Copy release notes from CHANGELOG.md"
 echo "   - Publish release"
 echo ""
-echo "2. Update paper.md:"
-echo "   - Add your ORCID ID (line 11)"
+echo "2. Update jors_metapaper.md:"
+echo "   - Add your ORCID ID (line 5)"
 echo "   - Review author affiliation"
 echo ""
-echo "3. Submit to JOSS:"
-echo "   - Go to: https://joss.theoj.org/papers/new"
+echo "3. Submit to JORS:"
+echo "   - Go to: https://openresearchsoftware.metajnl.com/about/submissions/"
 echo "   - Repository URL: https://github.com/SamuelBrudner/lab_archives_mcp"
-echo "   - Follow JOSS submission wizard"
+echo "   - Follow JORS submission guidelines"
 echo ""
-echo "📚 See JOSS_READY.md for complete checklist"
+echo "📚 See JORS_READY.md for complete checklist"
