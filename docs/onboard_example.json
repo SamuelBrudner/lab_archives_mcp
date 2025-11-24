@@ -22,7 +22,7 @@
       "suggest_next_steps": "Recommend next actions based on the project graph."
     ],
     "decision_aid": "Default to `search_labarchives`; create a project for multi-session work.",
-    "context_persistence": "Add the provided `sticky_context` block to each response turn."
+    "context_persistence": "Add the provided `sticky_context` block to each response turn and create/switch a project before logging visits or findings."
   },
   "lab_summary": {
     "notebooks": [
@@ -63,5 +63,5 @@
     "last_page_id": "PG-120",
     "workflow_hint": "Start with `search_labarchives`. Use `create_project` to persist context."
   },
-  "router_prompt": "Use LabArchives MCP for anything involving experiments, protocols, results, or ELN provenance."
+  "router_prompt": "Use LabArchives MCP for anything involving experiments, protocols, results, or ELN provenance. Create a project before logging visits/findings."
 }

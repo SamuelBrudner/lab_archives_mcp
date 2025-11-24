@@ -38,14 +38,16 @@ cat conf/secrets.yml
 - `upload_to_labarchives(...)` — Upload files with provenance metadata
 - Project memory and graph tools:
   - `create_project`, `list_projects`, `switch_project`, `delete_project`
-  - `log_finding`, `get_current_context`
-  - `get_related_pages`, `trace_provenance`, `suggest_next_steps`
+- `log_finding`, `get_current_context`
+- `get_related_pages`, `trace_provenance`, `suggest_next_steps`
+- State is tied to an active project; call `create_project` (or reuse a default) before logging visits/findings.
 
 **Resource**: `labarchives://notebooks` (same as list_labarchives_notebooks tool)
 
 > **Workflow tip:** Capture the CLI onboarding output once per session and persist the `sticky_context` block before invoking other tools.
 
 **State location:** Project state (active project, visited pages, findings, graph) persists to `~/.labarchives_state/session_state.json` by default so assistants can resume work across sessions.
+**Requirement:** No active project means visits are ignored and findings error; create/switch first.
 
 ## Indexing & Sync
 
