@@ -11,6 +11,8 @@ import networkx as nx
 from loguru import logger
 from pydantic import BaseModel, Field
 
+GRAPH_SCHEMA_VERSION = 1
+
 
 class Finding(BaseModel):
     """A key fact or data point extracted during an experiment."""
@@ -48,7 +50,7 @@ class ProjectContext(BaseModel):
             "links": [],
             "directed": True,
             "multigraph": False,
-            "graph": {},
+            "graph": {"schema_version": GRAPH_SCHEMA_VERSION},
         },
         description="Serialized NetworkX graph",
     )
@@ -82,7 +84,8 @@ class StateManager:
         try:
             with open(self.state_file, encoding="utf-8") as f:
                 data = json.load(f)
-                return SessionState.model_validate(data)
+                migrated = self._migrate_state_dict(data)
+                return SessionState.model_validate(migrated)
         except Exception as e:
             logger.error(f"Failed to load state: {e}. Backing up and starting fresh.")
             # Backup corrupted state
@@ -117,6 +120,56 @@ class StateManager:
             logger.error(f"Failed to save state: {e}")
             if temp_file.exists():
                 temp_file.unlink()
+
+    def _migrate_state_dict(self, data: dict[str, Any]) -> dict[str, Any]:
+        """Ensure graph data carries schema version and baseline metadata."""
+        contexts = data.get("contexts") or {}
+        now = time.time()
+
+        if not isinstance(contexts, dict):
+            return data
+
+        for ctx in contexts.values():
+            if not isinstance(ctx, dict):
+                continue
+            graph_data = ctx.get("graph_data") or {}
+            ctx["graph_data"] = self._migrate_graph_data(graph_data, now)
+
+        data["contexts"] = contexts
+        return data
+
+    def _migrate_graph_data(
+        self, graph_data: dict[str, Any], default_ts: float | None = None
+    ) -> dict[str, Any]:
+        """Backfill schema_version and timing metadata for nodes/edges."""
+        ts = default_ts or time.time()
+        graph_data = graph_data or {}
+
+        nodes = graph_data.get("nodes") or []
+        for node in nodes:
+            if not isinstance(node, dict):
+                continue
+            node.setdefault("first_seen", ts)
+            node.setdefault("last_seen", ts)
+
+        links = graph_data.get("links") or []
+        for edge in links:
+            if not isinstance(edge, dict):
+                continue
+            edge.setdefault("created_at", ts)
+            edge.setdefault("last_seen", ts)
+
+        meta = graph_data.get("graph")
+        if not isinstance(meta, dict):
+            meta = {}
+        meta.setdefault("schema_version", GRAPH_SCHEMA_VERSION)
+
+        graph_data["nodes"] = nodes
+        graph_data["links"] = links
+        graph_data["graph"] = meta
+        graph_data.setdefault("directed", True)
+        graph_data.setdefault("multigraph", False)
+        return graph_data
 
     async def _prune_context_graph(
         self, context: ProjectContext, check_page_exists: Any, max_checks: int
@@ -259,6 +312,34 @@ class StateManager:
             for ctx in self._state.contexts.values()
         ]
 
+    def _ensure_default_context(self) -> ProjectContext:
+        """Get or create the singleton default project context.
+
+        Returns the same default context every time, preventing proliferation.
+        """
+        # Check if default already exists
+        default_id = "default-research-context"
+        if default_id in self._state.contexts:
+            context = self._state.contexts[default_id]
+            # Ensure it's active
+            if self._state.active_context_id != default_id:
+                self._state.active_context_id = default_id
+                self._save_state()
+            return context
+
+        # Create it for the first time with a fixed ID
+        context = ProjectContext(
+            id=default_id,
+            name="Default Research Context",
+            description="Auto-created context for tracking work",
+            status="active",
+        )
+        self._state.contexts[default_id] = context
+        self._state.active_context_id = default_id
+        self._save_state()
+        logger.info("Created singleton default project context")
+        return context
+
     def log_visit(self, notebook_id: str, page_id: str, title: str) -> None:
         """Log a page visit to the active context and update the graph.
 
@@ -281,6 +362,7 @@ class StateManager:
         # 2. Update Graph
         try:
             graph = nx.node_link_graph(context.graph_data)
+            graph.graph.setdefault("schema_version", GRAPH_SCHEMA_VERSION)
             now = time.time()
 
             def _touch_node(node_id: str, **attrs: Any) -> None:
@@ -363,6 +445,7 @@ class StateManager:
         # 2. Update Graph
         try:
             graph = nx.node_link_graph(context.graph_data)
+            graph.graph.setdefault("schema_version", GRAPH_SCHEMA_VERSION)
             now = time.time()
 
             # Add Project Node (root)

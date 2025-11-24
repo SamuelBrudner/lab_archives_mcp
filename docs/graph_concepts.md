@@ -11,6 +11,8 @@ This MCP server solves this by maintaining a **Project Context**—a local, pers
 2.  **What has been learned** (Logged findings)
 3.  **How items are related** (Semantic and structural links)
 
+**Note**: Projects are explicit—create one with `create_project()` (or `create_default_context()` if you want a reusable default) before logging visits or findings so state is persisted in a single context. Without an active project, visits are ignored and findings will error.
+
 ## The Graph Model
 
 The state is modeled as a directed graph using `networkx`, where nodes represent research entities and edges represent relationships.
@@ -27,25 +29,28 @@ The state is modeled as a directed graph using `networkx`, where nodes represent
 
 | Edge Type | Source | Target | Description |
 | :--- | :--- | :--- | :--- |
-| `HAS_FINDING` | Project | Finding | Connects a finding to the active project. |
-| `VISITED` | Project | Page | Records that a page was read during this project. |
-| `LINKED_TO` | Finding | Page | (Optional) Provenance link from a finding to its source page. |
+| `uses_notebook` | Project | Notebook | Connects project to notebooks it references. |
+| `contains` | Notebook | Page | Links a notebook to pages within it. |
+| `visited` | Project | Page | Records that a page was accessed during this project. |
+| `discovered` | Project | Finding | Connects findings logged during the project. |
+| `evidence_from` | Page | Finding | Provenance link from a page to findings derived from it. |
 
 ## Agent Heuristics
 
 The server exposes tools that leverage this graph to guide the AI assistant:
-
-### `suggest_next_steps`
-Analyzes the current graph topology to recommend actions:
-- **Cold Start**: If the graph is empty, suggests searching for key terms in the project description.
-- **Exploration**: If many pages are visited but few findings logged, suggests synthesizing information.
-- **Convergence**: If many findings are logged, suggests formulating a hypothesis or experiment.
 
 ### `get_related_pages`
 Finds pages related to the current page by traversing the graph:
 - **Structural**: Pages in the same folder.
 - **Temporal**: Pages visited in the same session.
 - **Semantic**: Pages with high vector similarity (if vector search is enabled).
+
+### `suggest_next_steps`
+Provides lightweight guidance based on project state:
+- **Cold start**: If the graph is empty (no pages or findings), suggests using `search_labarchives` or `list_notebooks` to get started.
+- **Active phase**: Returns stats (pages visited, findings logged) and generic suggestions for continuing work.
+
+The tool provides information, not prescriptive workflow rules. It's designed as a dashboard for the AI to understand current state, not as a director telling it what to do.
 
 ## Persistence
 

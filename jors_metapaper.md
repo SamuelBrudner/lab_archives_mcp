@@ -15,7 +15,7 @@ bibliography: paper.bib
 
 # 1. Overview
 
-For artificial intelligence (AI) to maximally benefit scientific discovery, **context engineering**—the deliberate structuring of information for AI systems—must become a fundamental component of laboratory operations. As AI capabilities advance, context-aware architectures have the potential participate as cognitive assistatns. To be effective, these systems must have access to the past and ongoing processes of the lab. This work explores these ideas by implementing a Model Context Protocol-based interface to language models that persists project contexts, models semantic relationships as graphs, and provides metacognitive heuristics so AI assistants can conduct multi-session research investigations.
+As AI capabilities advance, context-aware architectures have the potential participate in scientific research as cognitive assistants. To be most helpful, these systems need information about the past and ongoing work and processes of the lab. For this reason, **context engineering**, the deliberate structuring of information for AI systems, will become an increasingly important aspect of laboratory operations. To advance this area, this work implements a Model Context Protocol-based interface to language models. This interface exposes project contexts, graph models of knowledge relationships, and provides metacognitive heuristics so AI assistants can conduct multi-session research investigations.
 
 Specifically, this work bridges Electronic Lab Notebooks (ELNs), which serve as the central repositories for research data and laboratory records, and Large Language Models (LLMs), which offer powerful interfaces for querying complex information. These systems are often disconnected: ELN records are siloed within their platforms, and LLMs are restricted to their pre-trained knowledge.
 
@@ -57,7 +57,7 @@ graph LR
 5. **State management layer (`state.py`)**
    - Maintains persistent project contexts that scope multi-session research work.
    - Models project state as a NetworkX graph, tracking relationships between pages, findings, and projects, persisted by default to `~/.labarchives_state/session_state.json`.
-   - Publishes MCP tools for project lifecycle (`create_project`, `list_projects`, `switch_project`, `delete_project`), evidence capture (`log_finding`, `get_current_context`), graph navigation (`get_related_pages`, `trace_provenance`), and AI-driven heuristics (`suggest_next_steps`), transforming the server from a stateless API wrapper into a stateful research assistant.
+   - Publishes MCP tools for project lifecycle (`create_project`, `list_projects`, `switch_project`, `delete_project`), evidence capture (`log_finding`, `get_current_context`), and graph navigation (`get_related_pages`, `trace_provenance`), transforming the server from a stateless API wrapper into a stateful research assistant.
 
 6. **Upload and provenance layer (`models/upload.py`, `upload_to_labarchives`)**
    - Provides a high-level upload API for archiving computational artefacts (e.g. Jupyter notebooks, figures, scripts) directly into LabArchives pages.
@@ -72,7 +72,7 @@ Beyond basic API access and semantic search, `lab_archives_mcp` implements a per
 
 - **Project contexts**: Researchers can create named projects (via `create_project`) that scope all subsequent interactions. Each project tracks visited pages, logged findings, and linked notebook IDs, providing the assistant with a coherent "workspace" for multi-session research tasks.
 - **Persistence**: State is persisted to `~/.labarchives_state` as JSON, ensuring that findings and navigation history survive server restarts and are accessible across different working directories. This allows assistants to "remember" prior work and resume investigation seamlessly, even when switching between different codebases or projects.
-- **Scoped memory**: All page visits (via `read_notebook_page`) and user-annotated findings (via `log_finding`) are automatically logged to the active project, creating an audit trail and enabling reflection on what has been explored.
+- **Scoped memory**: When an active project exists, page visits (via `read_notebook_page`) and user-annotated findings (via `log_finding`) are logged to it, creating an audit trail and enabling reflection on what has been explored. Without an active project, visits are silently ignored and findings will error.
 
 This design transforms the MCP server from a stateless API wrapper into a **stateful research assistant** that can maintain continuity across complex, multi-day investigations.
 
@@ -86,24 +86,13 @@ To support semantic exploration of notebook content, `lab_archives_mcp` integrat
 
 This graph-based approach enables the assistant to **navigate semantically** rather than purely hierarchically, discovering related content via shared context rather than relying solely on folder structure.
 
-## 2.3 AI-Driven Research Heuristics
-
-To guide assistants when they are uncertain what to do next, the MCP server includes a **suggest_next_steps** tool that analyzes the current project graph and proposes logical actions based on predefined heuristics:
-
-- **Cold start**: If the project graph is empty or contains only the project node, the tool suggests initiating exploration via `search_labarchives` or `list_notebook_pages`.
-- **Exploration phase**: If pages have been visited but few findings are logged, the tool recommends reading page content or using `get_related_pages` to discover connections.
-- **Synthesis phase**: If multiple findings have been accumulated, the tool suggests synthesizing results or creating a summary page.
-- **Dead end detection**: If the most recently visited page has no outgoing links or neighbors in the graph, the tool recommends backtracking or searching for related terms.
-
-These heuristics provide a **"ready-to-work" scaffolding** that reduces the cognitive load on assistants when navigating complex, multi-notebook research contexts. Rather than relying solely on user prompts, the assistant can autonomously reflect on its current state and suggest productive next steps.
-
-## 2.4 Onboarding and Agent Instruction
+## 2.3 Onboarding and Agent Instruction
 
 The MCP server includes an **onboarding payload system** (`onboard.py`) that generates structured instructions for AI assistants upon initialization. This payload describes:
 
 - **When to use the server**: Scenarios such as "user mentions experiments, protocols, results" or "user wants to start a long-running research task."
-- **Primary tools**: A curated list of tools (`create_project`, `search_labarchives`, `log_finding`, `suggest_next_steps`) with usage guidance, prioritizing semantic search as the default entry point.
-- **Workflow hints**: Recommendations such as "Start a project context before conducting multi-session research" and "Use `suggest_next_steps` when uncertain how to proceed."
+- **Primary tools**: A curated list of tools (`create_project`, `search_labarchives`, `log_finding`) with usage guidance, prioritizing semantic search as the default entry point.
+- **Workflow hints**: Recommendations such as "Use semantic search as your primary entry point."
 
 This onboarding layer ensures that assistants are **contextually aware** of the MCP server's capabilities from the outset, rather than treating it as an opaque API. Researchers can inspect the onboarding payload via `labarchives-mcp --print-onboard markdown`, making the server's behavior transparent and auditable.
 
@@ -167,7 +156,6 @@ While LabArchives and other ELN platforms expose REST APIs for CRUD operations, 
 
 - The **state management layer** (`state.py`) provides a general-purpose pattern for maintaining assistant memory across sessions, applicable to any MCP server that needs to track long-running tasks.
 - The **graph-based navigation** approach (using NetworkX to model semantic relationships) can be adapted to other domains where content relationships extend beyond hierarchical structure (e.g. citation networks, experimental lineages, or institutional knowledge graphs).
-- The **AI heuristics layer** (`suggest_next_steps`) demonstrates how MCP servers can provide metacognitive support to assistants, guiding them when uncertain. Similar heuristics could be implemented for other task domains (e.g. code review, literature surveys, or experimental design).
 - The **onboarding payload system** (`onboard.py`) offers a transparent, inspectable way to instruct assistants about server capabilities, reducing reliance on implicit prompt engineering.
 
 ## 5.5 Institutional deployment patterns

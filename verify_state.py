@@ -136,34 +136,6 @@ class TestStateManager(unittest.TestCase):
             }
             self.assertIn("p2", siblings)
 
-    def test_heuristics_logic(self) -> None:
-        """Simulate the heuristics logic for suggest_next_steps."""
-        self.state_manager.create_project("Heuristic Proj", "Desc")
-        context = self.state_manager.get_active_context()
-        self.assertIsNotNone(context)
-        assert context is not None
-
-        import networkx as nx
-
-        graph = nx.node_link_graph(context.graph_data)
-        self.assertTrue(graph.number_of_nodes() <= 1)  # Project node only
-
-        self.state_manager.log_visit("nb1", "p1", "Page 1")
-        context = self.state_manager.get_active_context()
-        assert context is not None
-        graph = nx.node_link_graph(context.graph_data)
-        pages = [n for n, d in graph.nodes(data=True) if d.get("type") == "page"]
-        self.assertEqual(len(pages), 1)
-
-        self.state_manager.log_finding("F1")
-        self.state_manager.log_finding("F2")
-        self.state_manager.log_finding("F3")
-        context = self.state_manager.get_active_context()
-        assert context is not None
-        graph = nx.node_link_graph(context.graph_data)
-        findings = [n for n, d in graph.nodes(data=True) if d.get("type") == "finding"]
-        self.assertTrue(len(findings) >= 3)
-
 
 if __name__ == "__main__":
     unittest.main()

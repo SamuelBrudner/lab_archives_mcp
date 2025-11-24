@@ -7,7 +7,7 @@ from pathlib import Path
 import networkx as nx
 import pytest
 
-from labarchives_mcp.state import ProjectContext, StateManager
+from labarchives_mcp.state import GRAPH_SCHEMA_VERSION, ProjectContext, StateManager
 
 
 @pytest.fixture  # type: ignore[misc]
@@ -128,6 +128,63 @@ def test_log_finding_links_page(state_manager: StateManager) -> None:
     assert graph.has_node(page_node_id)
     assert finding_nodes
     assert graph.has_edge(page_node_id, finding_nodes[0])
+
+
+def test_graph_migration_adds_version_and_timestamps(temp_state_dir: Path) -> None:
+    """Old graph data is upgraded with schema_version and timing metadata."""
+    old_state = {
+        "active_context_id": "proj-1",
+        "contexts": {
+            "proj-1": {
+                "id": "proj-1",
+                "name": "Proj 1",
+                "description": "Desc",
+                "linked_notebook_ids": [],
+                "status": "active",
+                "created_at": 0,
+                "visited_pages": [],
+                "findings": [],
+                "graph_data": {
+                    "nodes": [
+                        {
+                            "id": "proj-1",
+                            "type": "project",
+                            # missing first_seen/last_seen to be backfilled
+                        }
+                    ],
+                    "links": [
+                        {
+                            "source": "proj-1",
+                            "target": "page:p1",
+                            "relation": "visited",
+                            # missing created_at/last_seen
+                        }
+                    ],
+                    "directed": True,
+                    "multigraph": False,
+                    "graph": {},
+                },
+            }
+        },
+    }
+
+    state_file = temp_state_dir / "session_state.json"
+    state_file.write_text(json.dumps(old_state))
+
+    migrated_manager = StateManager(storage_dir=temp_state_dir)
+    context = migrated_manager.get_active_context()
+    assert context is not None
+
+    meta = context.graph_data.get("graph", {})
+    assert meta.get("schema_version") == GRAPH_SCHEMA_VERSION
+
+    for node in context.graph_data.get("nodes", []):
+        assert "first_seen" in node
+        assert "last_seen" in node
+
+    for edge in context.graph_data.get("links", []):
+        assert "created_at" in edge
+        assert "last_seen" in edge
 
 
 def test_list_projects(state_manager: StateManager) -> None:

@@ -47,6 +47,26 @@ def _resolve_version() -> str:
 __version__ = _resolve_version()
 
 
+def _paginate_items(
+    items: list[dict[str, Any]], limit: int | None = None, offset: int = 0
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Slice items with limit/offset and emit truncation metadata."""
+    total = len(items)
+    start = max(offset, 0)
+    if limit is None or limit <= 0:
+        # No pagination applied
+        return items, {"total": total, "offset": start, "limit": limit, "truncated": False}
+
+    end = start + limit
+    truncated = total > end
+    return items[start:end], {
+        "total": total,
+        "offset": start,
+        "limit": limit,
+        "truncated": truncated,
+    }
+
+
 def _import_fastmcp() -> type[Any]:
     """Import FastMCP lazily so tests can stub the implementation."""
 
@@ -200,7 +220,12 @@ async def run_server() -> None:
                 raise
 
         @server.tool()  # type: ignore[misc]
-        async def read_notebook_page(notebook_id: str, page_id: str) -> dict[str, Any]:
+        async def read_notebook_page(
+            notebook_id: str,
+            page_id: str,
+            track_visit: bool = True,
+            dry_run: bool = False,
+        ) -> dict[str, Any]:
             """Read all entries from a specific page in a LabArchives notebook.
 
             Returns the actual content: text entries, headings, and attachments from one page.
@@ -243,19 +268,25 @@ async def run_server() -> None:
                         f"has_content={bool(entry.get('content'))}"
                     )
 
-                result = {"notebook_id": notebook_id, "page_id": page_id, "entries": entries}
-                logger.success(f"Successfully read page with {len(entries)} entries")
+                # Log visit and prepare response with project disclosure
+                page_title = "Unknown Title"
+                tracked = False
+                if track_visit and not dry_run:
+                    try:
+                        state_manager.log_visit(notebook_id, page_id, page_title)
+                        tracked = True
+                    except Exception as e:
+                        logger.warning(f"Failed to log page visit to state: {e}")
 
-                # Log visit to active project context
-                try:
-                    # Title is not readily available without another call; use placeholder for now.
-                    page_title = "Unknown Title"
-
-                    state_manager.log_visit(notebook_id, page_id, page_title)
-                except Exception as e:
-                    logger.warning(f"Failed to log page visit to state: {e}")
-
-                return result
+                context = state_manager.get_active_context()
+                return {
+                    "notebook_id": notebook_id,
+                    "page_id": page_id,
+                    "entries": entries,
+                    "tracked_in_project": context.name if context else None,
+                    "tracked": tracked,
+                    "dry_run": dry_run,
+                }
 
             except Exception as exc:
                 logger.error(f"Failed to read notebook page: {exc}", exc_info=True)
@@ -716,7 +747,10 @@ async def run_server() -> None:
 
         @server.tool()  # type: ignore[misc]
         async def create_project(
-            name: str, description: str, linked_notebook_ids: list[str] | None = None
+            name: str,
+            description: str,
+            linked_notebook_ids: list[str] | None = None,
+            dry_run: bool = False,
         ) -> dict[str, Any]:
             """Start a new project context.
 
@@ -727,26 +761,51 @@ async def run_server() -> None:
                 name: Human-readable name
                 description: Goal or hypothesis
                 linked_notebook_ids: Optional LabArchives Notebook IDs to link to this context.
+                dry_run: When True, validate input but do not persist changes.
             """
+            if dry_run:
+                return {
+                    "status": "dry_run",
+                    "project": {
+                        "name": name,
+                        "description": description,
+                        "linked_notebook_ids": linked_notebook_ids or [],
+                    },
+                }
+
             context = state_manager.create_project(name, description, linked_notebook_ids)
-            return context.model_dump()
+            return {"status": "ok", "project": context.model_dump()}
 
         @server.tool()  # type: ignore[misc]
-        async def delete_project(project_id: str) -> str:
+        async def delete_project(project_id: str, dry_run: bool = False) -> dict[str, Any]:
             """Delete a project context and its history."""
+            exists = project_id in state_manager._state.contexts
+            if not exists:
+                return {"status": "error", "code": "project_not_found", "project_id": project_id}
+
+            if dry_run:
+                return {"status": "dry_run", "project_id": project_id}
+
             success = state_manager.delete_project(project_id)
             if success:
-                return f"Successfully deleted project {project_id}"
-            return f"Project {project_id} not found"
+                return {"status": "ok", "project_id": project_id}
+            return {"status": "error", "code": "delete_failed", "project_id": project_id}
 
         @server.tool()  # type: ignore[misc]
-        async def switch_project(project_id: str) -> dict[str, Any]:
+        async def switch_project(project_id: str, dry_run: bool = False) -> dict[str, Any]:
             """Switch the active context to an existing project."""
+            if project_id not in state_manager._state.contexts:
+                return {"status": "error", "code": "project_not_found", "project_id": project_id}
+
+            if dry_run:
+                context = state_manager._state.contexts[project_id]
+                return {"status": "dry_run", "project": context.model_dump()}
+
             try:
                 context = state_manager.switch_project(project_id)
-                return context.model_dump()
+                return {"status": "ok", "project": context.model_dump()}
             except ValueError as e:
-                return {"error": str(e)}
+                return {"status": "error", "code": "switch_failed", "message": str(e)}
 
         @server.tool()  # type: ignore[misc]
         async def list_projects() -> list[dict[str, Any]]:
@@ -755,18 +814,35 @@ async def run_server() -> None:
 
         @server.tool()  # type: ignore[misc]
         async def log_finding(
-            content: str, source_url: str | None = None, page_id: str | None = None
-        ) -> str:
+            content: str,
+            source_url: str | None = None,
+            page_id: str | None = None,
+            dry_run: bool = False,
+        ) -> dict[str, Any]:
             """Record a key fact or finding in the current project context.
 
             Use this to "take notes" about what you've discovered. If you supply
-            a page_id, the finding is linked back to that page for provenance.
+            a page_id, the finding is linked back to that page for provenance. Set dry_run
+            to preview without mutating state.
             """
             try:
-                state_manager.log_finding(content, source_url, page_id)
-                return "Finding logged successfully."
+                if dry_run:
+                    return {
+                        "status": "dry_run",
+                        "content": content[:50] + "..." if len(content) > 50 else content,
+                        "page_id": page_id,
+                    }
+
+                state_manager.log_finding(content, source_url=source_url, page_id=page_id)
+                context = state_manager.get_active_context()
+                return {
+                    "status": "ok",
+                    "content": content[:50] + "..." if len(content) > 50 else content,
+                    "project": context.name if context else "Unknown",
+                    "project_id": context.id if context else None,
+                }
             except RuntimeError as e:
-                return f"Error: {e}"
+                return {"status": "error", "code": "no_active_context", "message": str(e)}
 
         @server.tool()  # type: ignore[misc]
         async def get_current_context() -> dict[str, Any]:
@@ -780,15 +856,19 @@ async def run_server() -> None:
             return context.model_dump()
 
         @server.tool()  # type: ignore[misc]
-        async def get_related_pages(notebook_id: str, page_id: str) -> list[dict[str, Any]]:
+        async def get_related_pages(
+            notebook_id: str, page_id: str, limit: int | None = 20, offset: int = 0
+        ) -> dict[str, Any]:
             """Find pages related to the given page using the project graph and content links.
 
             Args:
                 notebook_id: Notebook ID
                 page_id: Page ID to find relations for
+                limit: Maximum related pages to return (None or <=0 to disable)
+                offset: Offset into the related pages list (for pagination)
 
             Returns:
-                List of related pages with relationship type
+                Dict with paginated related pages and metadata
                 (e.g., 'graph_neighbor', 'linked_in_content')
             """
             import re
@@ -797,7 +877,15 @@ async def run_server() -> None:
 
             context = state_manager.get_active_context()
             if not context:
-                return []
+                return {
+                    "items": [],
+                    "meta": {
+                        "total": 0,
+                        "offset": offset,
+                        "limit": limit,
+                        "truncated": False,
+                    },
+                }
 
             related_pages = []
             seen_ids = set()
@@ -877,7 +965,8 @@ async def run_server() -> None:
             except Exception as e:
                 logger.warning(f"Content link parsing failed: {e}")
 
-            return related_pages
+            items, meta = _paginate_items(related_pages, limit=limit, offset=offset)
+            return {"items": items, "meta": meta}
 
         @server.tool()  # type: ignore[misc]
         async def trace_provenance(notebook_id: str, page_id: str, entry_id: str) -> dict[str, Any]:
@@ -972,11 +1061,10 @@ async def run_server() -> None:
 
         @server.tool()  # type: ignore[misc]
         async def suggest_next_steps() -> dict[str, Any]:
-            """Analyze the current project state and suggest logical next actions.
+            """Provide lightweight heuristics on next actions based on current project state.
 
-            Returns:
-                Dictionary with 'phase' (e.g., 'cold_start', 'exploration')
-                and 'suggestions' (list of strings).
+            Returns simple guidance based on whether you're just starting (cold start)
+            or actively working. Uses basic graph metrics as hints, not requirements.
             """
             import networkx as nx
 
@@ -985,78 +1073,46 @@ async def run_server() -> None:
                 return {
                     "phase": "no_context",
                     "suggestions": [
-                        "Create a new project with `create_project`.",
-                        "List existing projects with `list_projects`.",
+                        "Create a project with create_project() to start tracking your work.",
                     ],
                 }
 
             try:
                 graph = nx.node_link_graph(context.graph_data)
-                node_count = graph.number_of_nodes()
 
-                # Heuristic 1: Cold Start
-                if node_count <= 1:  # Only Project node (or empty)
+                # Count node types
+                pages = [n for n, d in graph.nodes(data=True) if d.get("type") == "page"]
+                findings = [n for n, d in graph.nodes(data=True) if d.get("type") == "finding"]
+
+                # Cold start: empty or nearly empty graph
+                if len(pages) == 0 and len(findings) == 0:
                     return {
                         "phase": "cold_start",
                         "suggestions": [
-                            "Search for relevant literature using `search_labarchives`.",
-                            "List notebook pages using `list_notebook_pages` to explore structure.",
-                            "Log a hypothesis using `log_finding`.",
+                            "Use search_labarchives to find relevant pages.",
+                            "Use list_notebooks to explore what's available.",
+                            "Read pages with read_notebook_page to start building context.",
                         ],
                     }
 
-                # Analyze graph composition
-                findings = [n for n, d in graph.nodes(data=True) if d.get("type") == "finding"]
-                pages = [n for n, d in graph.nodes(data=True) if d.get("type") == "page"]
-
-                # Heuristic 3: Synthesis Phase (Many findings)
-                if len(findings) >= 3:
-                    return {
-                        "phase": "synthesis",
-                        "suggestions": [
-                            "Synthesize your findings into a summary.",
-                            "Document conclusions with `upload_to_labarchives` (as text).",
-                            "Review your findings using `get_current_context`.",
-                        ],
-                    }
-
-                # Heuristic 2: Exploration Phase (Pages visited, few findings)
-                if len(pages) > 0:
-                    # Check for dead end: last page visited has no other connections yet.
-                    # Our simple graph only links Project -> Page and Project -> Finding.
-                    # If last page lacks findings, suggest follow-up work.
-
-                    last_page = pages[-1]  # Order preserved or timestamp could be added later
-                    # Check if last page has finding neighbors
-                    has_findings = False
-                    for n in graph.neighbors(last_page):
-                        if graph.nodes[n].get("type") == "finding":
-                            has_findings = True
-                            break
-
-                    if not has_findings:
-                        return {
-                            "phase": "exploration",
-                            "suggestions": [
-                                "Read the content of the last visited page carefully.",
-                                "Log any key facts using `log_finding`.",
-                                "Use `get_related_pages` to find similar content.",
-                                "Use `trace_provenance` if the page contains derived data.",
-                            ],
-                        }
-
-                # Default / Fallback
+                # Active phase: provide stats and generic suggestions
                 return {
-                    "phase": "ongoing_research",
+                    "phase": "active",
+                    "stats": {
+                        "pages_visited": len(pages),
+                        "findings_logged": len(findings),
+                        "project_name": context.name,
+                    },
                     "suggestions": [
-                        "Continue exploring notebook pages.",
-                        "Search for specific terms related to your project.",
-                        "Switch to a different project if blocked.",
+                        "Continue exploring with search_labarchives or read_notebook_page.",
+                        "Log key observations with log_finding.",
+                        "Review your progress with get_current_context.",
+                        "Find related content with get_related_pages.",
                     ],
                 }
 
             except Exception as e:
-                logger.error(f"Heuristics failed: {e}")
+                logger.error(f"suggest_next_steps failed: {e}")
                 return {"error": str(e)}
 
         # Startup Validation (bounded to avoid heavy API load)

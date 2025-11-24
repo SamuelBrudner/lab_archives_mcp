@@ -248,10 +248,10 @@ asyncio.run(test())
 
 ## Project state, graph navigation, and heuristics
 
-- **Persistent context**: The server now maintains project-scoped memory (visited pages, findings, linked notebooks) in `~/.labarchives_state/session_state.json` by default so assistants can resume work across sessions and repositories.
+- **Persistent context**: The server maintains project-scoped memory (visited pages, findings, linked notebooks) in `~/.labarchives_state/session_state.json` by default so assistants can resume work across sessions and repositories. **Projects are required**—create one before logging visits or findings.
 - **Graph-backed navigation**: Every page visit and finding is added to a NetworkX graph, enabling related-page discovery (`get_related_pages`) and provenance tracing (`trace_provenance`).
-- **Project tools**: Manage contexts with `create_project`, `list_projects`, `switch_project`, `delete_project`, inspect them with `get_current_context`, and log observations via `log_finding`.
-- **Ready-to-work heuristics**: `suggest_next_steps` inspects the project graph to recommend cold-start, exploration, and synthesis actions when the assistant is unsure how to proceed.
+- **Project tools**: Manage contexts with `create_project`, `list_projects`, `switch_project`, `delete_project`, inspect them with `get_current_context`, and log observations via `log_finding`. State is only persisted when a project is active.
+- **Lightweight guidance**: `suggest_next_steps` provides cold start detection and activity stats (not prescriptive workflow phases).
 
 ## Agent Onboarding Workflow
 
@@ -347,8 +347,8 @@ For configuration examples for Windsurf and Claude Desktop (including environmen
 - **`log_finding(content, source_url=None)`** - Append a finding to the active project
 - **`get_current_context()`** - Return full project state (pages, findings, graph)
 - **`get_related_pages(notebook_id, page_id)`** - Find sibling/linked pages via the project graph and detected LabArchives links
-- **`trace_provenance(notebook_id, page_id, entry_id)`** - Heuristically identify sources for an entry (derived-from text or metadata)
-- **`suggest_next_steps()`** - Suggest next actions based on the current project graph
+- **`trace_provenance(notebook_id, page_id, entry_id)`** - Trace sources and metadata for a specific entry
+- **`suggest_next_steps()`** - Get lightweight guidance based on your current project state (cold start vs active)
 
 ### Indexing & Sync
 
