@@ -27,6 +27,7 @@ A **Model Context Protocol (MCP) server** that connects AI assistants to LabArch
 - Onboarding payload reference: `docs/onboard_example.json`
 - Onboarding walkthrough: see `docs/QUICKSTART.md` and `docs/agent_configuration.md`
 - Upload API: `docs/upload_api.md`
+- Graph concepts ("The Lab Brain"): `docs/graph_concepts.md`
 - Vector backend design and ops: `README_VECTOR_BACKEND.md`
 
 ## Features
