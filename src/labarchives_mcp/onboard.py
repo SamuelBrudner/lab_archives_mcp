@@ -147,7 +147,7 @@ class OnboardService:
                 "list_notebook_pages": "Browse notebook structure to locate pages.",
                 "read_notebook_page": "Retrieve full structured content for a given page.",
             },
-            decision_aid="Call `decide_labarchives_usage` or start with `search_labarchives`.",
+            decision_aid="Start with `search_labarchives`—it searches all notebooks.",
             context_persistence="Add the provided `sticky_context` block to each response turn.",
         )
 
@@ -159,10 +159,8 @@ class OnboardService:
         sticky_context = StickyContext(
             last_notebook_id=None,
             last_page_id=None,
-            workflow_hint=(
-                "Start a project with create_project() before logging visits/findings. "
-                "Prioritize semantic search (search_labarchives) for new queries."
-            ),
+            workflow_hint="ALWAYS start with search_labarchives for content queries. "
+            "Use create_project() to organize multi-session work.",
         )
 
         router_prompt = (
