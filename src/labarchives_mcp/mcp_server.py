@@ -893,6 +893,8 @@ async def run_server() -> None:
             """
             import re
 
+            import networkx as nx
+
             sources: list[dict[str, str]] = []
             metadata: dict[str, Any] = {}
 
@@ -942,6 +944,29 @@ async def run_server() -> None:
             except Exception as e:
                 logger.error(f"Provenance trace failed: {e}")
                 return {"error": str(e)}
+
+            # 3. Check Graph for Related Findings (Agent Context)
+            try:
+                context = state_manager.get_active_context()
+                if context:
+                    graph = nx.node_link_graph(context.graph_data)
+                    page_node_id = f"page:{page_id}"
+
+                    if graph.has_node(page_node_id):
+                        for successor in graph.successors(page_node_id):
+                            node_data = graph.nodes[successor]
+                            if node_data.get("type") == "finding":
+                                edge_data = graph.get_edge_data(page_node_id, successor)
+                                if edge_data.get("relation") == "evidence_from":
+                                    sources.append(
+                                        {
+                                            "id": successor.replace("finding:", ""),
+                                            "type": "agent_finding",
+                                            "description": node_data.get("label", "Agent finding"),
+                                        }
+                                    )
+            except Exception as e:
+                logger.warning(f"Graph provenance check failed: {e}")
 
             return {"sources": sources, "metadata": metadata}
 
@@ -1033,6 +1058,30 @@ async def run_server() -> None:
             except Exception as e:
                 logger.error(f"Heuristics failed: {e}")
                 return {"error": str(e)}
+
+        # Startup Validation (bounded to avoid heavy API load)
+        async def _validate_graph_task() -> None:
+            await asyncio.sleep(5)  # allow server to finish bootstrapping
+            logger.info("Starting background graph validation (bounded sample)...")
+
+            async def _check_page(nb_id: str, p_id: str) -> bool:
+                try:
+                    uid = await auth_manager.ensure_uid()
+                    await notebook_client.get_page_entries(uid, nb_id, p_id)
+                    await asyncio.sleep(0)  # yield between calls
+                    return True
+                except Exception:
+                    return False
+
+            stats = await state_manager.validate_graph(
+                _check_page, max_checks=10, include_all_contexts=True
+            )
+            if stats.get("removed_nodes", 0) > 0:
+                logger.warning(f"Graph validation pruned invalid elements: {stats}")
+            else:
+                logger.info("Graph validation passed (no invalid nodes found).")
+
+        asyncio.create_task(_validate_graph_task())
 
         await server.run_async()
 
