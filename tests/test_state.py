@@ -4,6 +4,7 @@ import json
 from collections.abc import Generator
 from pathlib import Path
 
+import networkx as nx
 import pytest
 
 from labarchives_mcp.state import ProjectContext, StateManager
@@ -113,6 +114,20 @@ def test_log_finding(state_manager: StateManager) -> None:
     assert context.id in graph_nodes
     finding_nodes = [node for node in graph_nodes if node.startswith("finding:")]
     assert finding_nodes
+
+
+def test_log_finding_links_page(state_manager: StateManager) -> None:
+    """Finding should be connected to a source page when provided."""
+    context = state_manager.create_project("Proj 1", "Desc 1")
+    state_manager.log_finding("Fact 1", page_id="p1")
+
+    graph = nx.node_link_graph(context.graph_data)
+    page_node_id = "page:p1"
+    finding_nodes = [n for n, d in graph.nodes(data=True) if d.get("type") == "finding"]
+
+    assert graph.has_node(page_node_id)
+    assert finding_nodes
+    assert graph.has_edge(page_node_id, finding_nodes[0])
 
 
 def test_list_projects(state_manager: StateManager) -> None:

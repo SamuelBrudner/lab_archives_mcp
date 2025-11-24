@@ -157,7 +157,11 @@ class StateManager:
         ]
 
     def log_visit(self, notebook_id: str, page_id: str, title: str) -> None:
-        """Log a page visit to the active context and update the graph."""
+        """Log a page visit to the active context and update the graph.
+
+        Enriches graph nodes with timestamps and visit counts, and wires
+        project→notebook, notebook→page, and project→page edges.
+        """
         context = self.get_active_context()
         if not context:
             # If no context is active, we just ignore (or could log a warning)
@@ -170,18 +174,61 @@ class StateManager:
         # 2. Update Graph
         try:
             graph = nx.node_link_graph(context.graph_data)
+            now = time.time()
+
+            def _touch_node(node_id: str, **attrs: Any) -> None:
+                """Create or update a node while preserving first_seen/last_seen."""
+                default_attrs = {
+                    "first_seen": now,
+                    "last_seen": now,
+                }
+                if graph.has_node(node_id):
+                    existing = graph.nodes[node_id]
+                    existing.setdefault("first_seen", now)
+                    existing["last_seen"] = now
+                    existing.update(attrs)
+                else:
+                    default_attrs.update(attrs)
+                    graph.add_node(node_id, **default_attrs)
 
             # Add Project Node (root)
-            if not graph.has_node(context.id):
-                graph.add_node(context.id, type="project", label=context.name)
+            _touch_node(context.id, type="project", label=context.name)
+
+            # Add Notebook Node
+            if notebook_id:
+                notebook_node_id = f"notebook:{notebook_id}"
+                _touch_node(
+                    notebook_node_id,
+                    type="notebook",
+                    label=notebook_id,
+                )
 
             # Add Page Node
             page_node_id = f"page:{page_id}"
-            if not graph.has_node(page_node_id):
-                graph.add_node(page_node_id, type="page", label=title, notebook_id=notebook_id)
+            existing_page = graph.nodes[page_node_id] if graph.has_node(page_node_id) else {}
+            visit_count = existing_page.get("visit_count", 0) + 1
+            _touch_node(
+                page_node_id,
+                type="page",
+                label=title,
+                notebook_id=notebook_id,
+                visit_count=visit_count,
+            )
 
-            # Edge: Project -> Page (indicates "visited during project")
-            graph.add_edge(context.id, page_node_id, relation="visited")
+            def _add_edge(src: str, dst: str, **attrs: Any) -> None:
+                if graph.has_edge(src, dst):
+                    edge = graph.edges[src, dst]
+                    edge["last_seen"] = now
+                    edge.update(attrs)
+                else:
+                    graph.add_edge(src, dst, last_seen=now, **attrs)
+
+            # Edges
+            if notebook_id:
+                _add_edge(context.id, notebook_node_id, relation="uses_notebook", created_at=now)
+                _add_edge(notebook_node_id, page_node_id, relation="contains", created_at=now)
+
+            _add_edge(context.id, page_node_id, relation="visited", created_at=now)
 
             # Serialize back
             context.graph_data = nx.node_link_data(graph)
@@ -191,8 +238,13 @@ class StateManager:
         self._save_state()
         logger.debug(f"Logged visit to {title} in context {context.id}")
 
-    def log_finding(self, content: str, source_url: str | None = None) -> None:
-        """Record a finding in the active context and update the graph."""
+    def log_finding(
+        self, content: str, source_url: str | None = None, page_id: str | None = None
+    ) -> None:
+        """Record a finding in the active context and update the graph.
+
+        If a page_id is provided, also connect the finding to its source page.
+        """
         context = self.get_active_context()
         if not context:
             raise RuntimeError("No active project context. Create or switch to a project first.")
@@ -204,10 +256,12 @@ class StateManager:
         # 2. Update Graph
         try:
             graph = nx.node_link_graph(context.graph_data)
+            now = time.time()
 
             # Add Project Node (root)
             if not graph.has_node(context.id):
-                graph.add_node(context.id, type="project", label=context.name)
+                graph.add_node(context.id, type="project", label=context.name, first_seen=now)
+            graph.nodes[context.id]["last_seen"] = now
 
             # Add Finding Node
             # Use a hash or timestamp for ID since content can be long
@@ -216,13 +270,59 @@ class StateManager:
             finding_hash = hashlib.md5(content.encode()).hexdigest()[:8]
             finding_node_id = f"finding:{finding_hash}"
 
-            if not graph.has_node(finding_node_id):
+            if graph.has_node(finding_node_id):
+                node = graph.nodes[finding_node_id]
+                node["last_seen"] = now
+                node["count"] = node.get("count", 1) + 1
+                node["source_url"] = source_url or node.get("source_url")
+            else:
                 graph.add_node(
-                    finding_node_id, type="finding", label=content[:50], full_content=content
+                    finding_node_id,
+                    type="finding",
+                    label=content[:50],
+                    full_content=content,
+                    source_url=source_url,
+                    first_seen=now,
+                    last_seen=now,
+                    count=1,
                 )
 
             # Edge: Project -> Finding
-            graph.add_edge(context.id, finding_node_id, relation="discovered")
+            if graph.has_edge(context.id, finding_node_id):
+                graph.edges[context.id, finding_node_id]["last_seen"] = now
+            else:
+                graph.add_edge(
+                    context.id,
+                    finding_node_id,
+                    relation="discovered",
+                    created_at=now,
+                    last_seen=now,
+                )
+
+            # Edge: Page -> Finding (provenance) if provided
+            if page_id:
+                page_node_id = f"page:{page_id}"
+                if not graph.has_node(page_node_id):
+                    graph.add_node(
+                        page_node_id,
+                        type="page",
+                        label=page_id,
+                        first_seen=now,
+                        last_seen=now,
+                    )
+                else:
+                    graph.nodes[page_node_id]["last_seen"] = now
+
+                if graph.has_edge(page_node_id, finding_node_id):
+                    graph.edges[page_node_id, finding_node_id]["last_seen"] = now
+                else:
+                    graph.add_edge(
+                        page_node_id,
+                        finding_node_id,
+                        relation="evidence_from",
+                        created_at=now,
+                        last_seen=now,
+                    )
 
             # Serialize back
             context.graph_data = nx.node_link_data(graph)

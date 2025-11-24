@@ -15,6 +15,6 @@
 - [x] References are in `paper.bib`.
 
 ## Submission
-- [ ] Create a release tag (e.g., v0.1.0).
+- [x] Create a release tag (e.g., `v0.3.0`) corresponding to the submission.
 - [ ] Archive the release on Zenodo (or similar) to get a DOI.
 - [ ] Submit via the JORS portal.

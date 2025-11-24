@@ -754,13 +754,16 @@ async def run_server() -> None:
             return state_manager.list_projects()
 
         @server.tool()  # type: ignore[misc]
-        async def log_finding(content: str, source_url: str | None = None) -> str:
+        async def log_finding(
+            content: str, source_url: str | None = None, page_id: str | None = None
+        ) -> str:
             """Record a key fact or finding in the current project context.
 
-            Use this to "take notes" about what you've discovered.
+            Use this to "take notes" about what you've discovered. If you supply
+            a page_id, the finding is linked back to that page for provenance.
             """
             try:
-                state_manager.log_finding(content, source_url)
+                state_manager.log_finding(content, source_url, page_id)
                 return "Finding logged successfully."
             except RuntimeError as e:
                 return f"Error: {e}"
