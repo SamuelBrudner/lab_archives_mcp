@@ -19,6 +19,7 @@ dependencies:
       - tenacity>=8.3
       - omegaconf>=2.3
       - fastmcp>=2.1
+      - aiofiles>=24.1
       - notebook>=7.2
       # Vector backend dependencies
       - tiktoken>=0.7
