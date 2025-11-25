@@ -168,27 +168,32 @@ While LabArchives and other ELN platforms expose REST APIs for CRUD operations, 
 
 - Full functionality requires access to the LabArchives API; institutions using other ELNs would need corresponding API access to build similar connectors.
 - When external vector stores (e.g. managed Pinecone or Qdrant instances) are used, embeddings and possibly derived text are stored on third-party infrastructure, introducing an additional data custody layer. Local and self-hosted options are provided for deployments that require stricter control.
-- The graph-based navigation and heuristics layers assume that assistants will engage in exploratory, multi-session research tasks; for simple, one-off queries, the overhead of project initialization may not be justified.
+- The graph-based navigation and heuristics layers assume that assistants will engage in exploratory, multi-session research tasks; for simple, one-off queries, the overhead may not be justified.
 
 # 6. Illustrative Example
 
 Once credentials are configured and the MCP server is registered with an AI assistant, researchers can query their notebooks conversationally. For example:
 
 ```text
-Researcher: "What protocols did I use for mosquito navigation experiments?"
+Researcher: "I'm starting a new analysis of the mosquito wind tunnel data. Create a project for this."
 
-Assistant (via MCP): [calls semantic_search("mosquito navigation protocols"),
-                     inspects the top results for the Mosquito Navigation notebook,
-                     then read_notebook_page(page_id="protocols")]
+Assistant: [calls create_project(name="Mosquito Analysis", description="Wind tunnel data analysis")]
+"Project 'Mosquito Analysis' created. I'm ready to help."
 
-Assistant: "Your Mosquito Navigation notebook contains three main protocols:
-1. Wind tunnel setup with IR tracking
-2. Odor delivery system calibration
-3. Flight trajectory analysis pipeline
-The most recent version was updated on August 15, 2025."
+Researcher: "Find the calibration protocols we used last summer."
+
+Assistant: [calls search_labarchives("wind tunnel calibration protocol summer 2024")]
+[calls read_notebook_page(page_id="12345")]
+"I found the 'Wind Tunnel Calibration (Aug 2024)' page. It details the IR tracking setup."
+
+Researcher: "Log that as a key finding, and check if there are any related experiment runs linked to it."
+
+Assistant: [calls log_finding(content="Calibration protocol from Aug 2024 uses IR tracking", page_id="12345")]
+[calls get_related_pages(page_id="12345")]
+"Finding logged. I also found three linked experiment pages: 'Run 14', 'Run 15', and 'Run 16' that cite this calibration."
 ```
 
-In this workflow, the assistant first uses semantic search to identify relevant notebook pages, then traverses their structure and aggregates content into a concise answer. Similar conversations can drive related queries (e.g. "Find experiments related to olfactory navigation behaviour") and upload new analysis artefacts with provenance metadata.
+In this workflow, the assistant explicitly manages the research context by creating a project, then uses semantic search to find entry points. By logging findings and traversing the graph, it builds a persistent model of the investigation that can be resumed in future sessions. Similar conversations can drive related queries (e.g. "Find experiments related to olfactory navigation behaviour") and upload new analysis artefacts with provenance metadata.
 
 # 7. Funding and Acknowledgements
 
