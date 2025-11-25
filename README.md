@@ -252,6 +252,7 @@ asyncio.run(test())
 - **Graph-backed navigation**: Every page visit and finding is added to a NetworkX graph, enabling related-page discovery (`get_related_pages`) and provenance tracing (`trace_provenance`).
 - **Project tools**: Manage contexts with `create_project`, `list_projects`, `switch_project`, `delete_project`, inspect them with `get_current_context`, and log observations via `log_finding`. State is only persisted when a project is active.
 - **Lightweight guidance**: `suggest_next_steps` provides cold start detection and activity stats (not prescriptive workflow phases).
+- **Onboarding**: `get_onboard_payload` (or `labarchives-mcp --print-onboard`) returns usage guidance and sticky context.
 
 ## Agent Onboarding Workflow
 

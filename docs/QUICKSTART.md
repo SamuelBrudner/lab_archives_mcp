@@ -30,6 +30,7 @@ cat conf/secrets.yml
 ## Available Tools
 
 - `labarchives-mcp --print-onboard json|markdown` — Print onboarding payload for agents
+- `get_onboard_payload(format="json"|"markdown")` — Fetch onboarding payload via MCP
 - `list_labarchives_notebooks()` — List all notebooks for the authenticated user
 - `list_notebook_pages(notebook_id, folder_id?)` — Navigate notebook hierarchy
 - `read_notebook_page(notebook_id, page_id)` — Fetch full page entries with metadata

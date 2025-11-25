@@ -13,6 +13,7 @@ from typing import Any, cast
 import httpx
 from loguru import logger
 
+from . import onboard
 from .auth import AuthenticationManager, Credentials
 from .eln_client import LabArchivesClient
 from .state import StateManager
@@ -1114,6 +1115,21 @@ async def run_server() -> None:
             except Exception as e:
                 logger.error(f"suggest_next_steps failed: {e}")
                 return {"error": str(e)}
+
+        @server.tool()  # type: ignore[misc]
+        async def get_onboard_payload(format: str = "json") -> dict[str, Any] | str:
+            """Return the onboarding payload (json or markdown).
+
+            Args:
+                format: "json" or "markdown" (default "json")
+            """
+            service = onboard.OnboardService(
+                auth_manager=auth_manager, notebook_client=notebook_client, version=__version__
+            )
+            payload = await service.get_payload()
+            if format.lower() == "markdown":
+                return payload.markdown
+            return payload.model_dump()
 
         # Startup Validation (bounded to avoid heavy API load)
         async def _validate_graph_task() -> None:

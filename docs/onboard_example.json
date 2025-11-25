@@ -15,6 +15,7 @@
       "list_notebooks": "Enumerate notebooks available to the authenticated user.",
       "list_notebook_pages": "Browse notebook structure to locate pages.",
       "read_notebook_page": "Retrieve structured content for a given page.",
+      "get_onboard_payload": "Return this onboarding payload (json or markdown).",
       "create_project": "Start a project context to persist findings and navigation.",
       "log_finding": "Record a key fact in the active project context.",
       "get_related_pages": "Find related pages via the project graph and detected links.",
