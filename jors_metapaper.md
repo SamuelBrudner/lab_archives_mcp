@@ -123,8 +123,8 @@ In addition to automated checks, the MCP server has been tested against real Lab
   - Default development branch: `main`
 
 - **Archived version**
-  - A versioned snapshot corresponding to the JORS submission will be archived on Zenodo and referenced here via its DOI.
-  - The Git tag used for the submission will match the archived version.
+  - Zenodo: <https://doi.org/10.5281/zenodo.17728480>
+  - Git tag: `v0.3.1`
 
 - **License**
   - Distributed under the MIT License.
