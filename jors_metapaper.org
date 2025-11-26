@@ -208,3 +208,15 @@ The author declares that they have no competing interests.
 [2] LabArchives, LLC. LabArchives Electronic Laboratory Notebook. 2024. https://www.labarchives.com/
 
 [3] Wilkinson MD, Dumontier M, Aalbersberg IJ, et al. The FAIR Guiding Principles for scientific data management and stewardship. Scientific Data. 2016;3:160018. DOI: https://doi.org/10.1038/sdata.2016.18
+
+[4] Lowin J. FastMCP: A fast, developer-friendly framework for building Model Context Protocol servers. 2024. https://github.com/jlowin/fastmcp
+
+[5] Colvin S, et al. Pydantic: Data validation using Python type hints. 2024. https://docs.pydantic.dev/ DOI: https://doi.org/10.5281/zenodo.3551468
+
+[6] Yadan O. Hydra: A framework for elegantly configuring complex applications. 2024. https://hydra.cc/ DOI: https://doi.org/10.5281/zenodo.3551468
+
+[7] Pinecone Systems Inc. Pinecone: Vector Database for Machine Learning. 2024. https://www.pinecone.io/
+
+[8] Qdrant. Qdrant: Vector Database for the Next Generation of AI Applications. 2024. https://qdrant.tech/
+
+[9] Yegge S. Beads: A lightweight, graph-based issue tracker for agents. 2024. https://github.com/steveyegge/beads
