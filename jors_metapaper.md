@@ -96,7 +96,7 @@ The MCP server includes an **onboarding payload system** (`onboard.py`) that gen
 
 This onboarding layer ensures that assistants are **contextually aware** of the MCP server's capabilities from the outset, rather than treating it as an opaque API. Researchers can inspect the onboarding payload via `labarchives-mcp --print-onboard markdown`, making the server's behavior transparent and auditable.
 
-## 2.5 Security and Governance Controls
+## 2.4 Security and Governance Controls
 
 To support deployment in institutional environments with strict data governance requirements, the server implements several layers of security control beyond basic authentication:
 

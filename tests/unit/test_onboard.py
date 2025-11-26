@@ -245,7 +245,7 @@ async def test_how_to_use_includes_primary_tools(
     payload = await onboard_service.get_payload()
     tools = payload.how_to_use.primary_tools
 
-    assert "semantic_search" in tools
+    assert "search_labarchives" in tools
     assert "list_notebooks" in tools
     assert "list_notebook_pages" in tools
     assert "read_notebook_page" in tools

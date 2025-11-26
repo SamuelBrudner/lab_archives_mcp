@@ -1,9 +1,0 @@
-{
-  "built_at": "2025-11-24T23:41:04.894446Z",
-  "embedding_version": "v1",
-  "config_fingerprint": "89689ecd0a4f92dbebd382bb24bbe9f95d2d93f3c3a7d0c0833b1daf15d4d7ec",
-  "backend": "pinecone",
-  "index_name": "labarchives-semantic-search",
-  "namespace": null,
-  "notes": null
-}

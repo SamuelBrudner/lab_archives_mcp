@@ -55,3 +55,6 @@ conf/secrets.yml
 
 # DVC site cache (set by tests)
 .dvc_site_cache/
+
+# Vector index build state (changes on each sync)
+data/.last_indexed
