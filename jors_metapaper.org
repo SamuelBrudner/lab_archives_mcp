@@ -1,0 +1,299 @@
+#+TITLE: @@latex:\textcolor{black}{@@Software paper for submission to the @@latex:\\@@ /Journal of Open Research Software/ @@latex:}@@
+#+LATEX_CLASS: article
+#+LATEX_CLASS_OPTIONS: [a4paper]
+#+OPTIONS: num:1 toc:nil author:nil date:nil todo:nil
+
+* About this template                                              :noexport:
+
+  This [[http://orgmode.org/][Org mode]] file is a template for submitting papers to the [[https://openresearchsoftware.metajnl.com/][Journal of Open
+  Research Software (JORS)]].  It tries to emulate the look-and-feel of the
+  original [[https://s3-eu-west-1.amazonaws.com/ubiquity-partner-network/up/journal/jors/LaTex%2520Template.zip][LaTeX template]] in the journal's [[https://openresearchsoftware.metajnl.com/about/submissions/][Author Guidelines]].
+
+  The template has been prepared by [[http://www.iup.uni-bremen.de/~hilboll/][Andreas Hilboll]] from the [[http://www.uni-bremen.de/][University of
+  Bremen]].  It is available in a [[https://gist.github.com/andreas-h/3bdeccf0c13ee0d2bab7f4898649c4ba][GitHubGist]].
+
+** How to use this template
+
+   This template includes all definitions from the original [[https://s3-eu-west-1.amazonaws.com/ubiquity-partner-network/up/journal/jors/LaTex%2520Template.zip][LaTeX template]] from
+   the journal's [[https://openresearchsoftware.metajnl.com/about/submissions/][Author Guidelines]].  It uses the basic
+   =\documentclass{article}=, so no additional LaTeX files have to be
+   downloaded.
+
+   This =.org= file can be compiled to PDF using the command sequence =C-c=
+   =C-e= =l= =P= in Emacs.
+
+** Template definitions                                            :noexport:
+
+   In this section, we reproduce the layout of the original JORS LaTeX template,
+   including some additions.
+
+#+LATEX_HEADER: \NeedsTeXFormat{LaTeX2e}
+#+LATEX_HEADER: \ProvidesClass{josr}[2016/03/08 Journal Of Open Software Research]
+#+LATEX_HEADER:
+#+LATEX_HEADER: %% Article options
+#+LATEX_HEADER: \DeclareOption{12pt}{
+#+LATEX_HEADER:   \PassOptionsToClass{\CurrentOption}{article}
+#+LATEX_HEADER: }
+#+LATEX_HEADER:
+#+LATEX_HEADER:
+#+LATEX_HEADER: \DeclareOption{sansserif}{
+#+LATEX_HEADER:   \PassOptionsToPackage{\CurrentOption}{paxcommands}
+#+LATEX_HEADER: }
+#+LATEX_HEADER: \DeclareOption{neverindent}{
+#+LATEX_HEADER:   \PassOptionsToPackage{\CurrentOption}{paxcommands}
+#+LATEX_HEADER: }
+#+LATEX_HEADER:
+#+LATEX_HEADER: %% Fallback
+#+LATEX_HEADER: \DeclareOption*{
+#+LATEX_HEADER:   \ClassWarning{josr}{Unknown option '\CurrentOption'}
+#+LATEX_HEADER: }
+#+LATEX_HEADER:
+#+LATEX_HEADER:
+#+LATEX_HEADER: \ExecuteOptions{12pt}
+#+LATEX_HEADER:
+#+LATEX_HEADER:
+#+LATEX_HEADER: \ProcessOptions\relax
+#+LATEX_HEADER:
+#+LATEX_HEADER: %% Load additional packages and commands.
+#+LATEX_HEADER: \RequirePackage{xcolor}
+#+LATEX_HEADER: \RequirePackage{sectsty}
+#+LATEX_HEADER: \RequirePackage{enumitem}
+#+LATEX_HEADER: \RequirePackage{hyperref}
+#+LATEX_HEADER: \RequirePackage{fancyhdr}
+#+LATEX_HEADER: \RequirePackage{titlesec}
+#+LATEX_HEADER:
+#+LATEX_HEADER: %% Additional TeX/LaTeX code...
+#+LATEX_HEADER:
+#+LATEX_HEADER: %% Remove the indentation
+#+LATEX_HEADER: \newlength\tindent
+#+LATEX_HEADER: \setlength{\tindent}{\parindent}
+#+LATEX_HEADER: \setlength{\parindent}{0pt}
+#+LATEX_HEADER: \renewcommand{\indent}{\hspace*{\tindent}}
+#+LATEX_HEADER:
+#+LATEX_HEADER: %% Remove the page numbers
+#+LATEX_HEADER: \pagenumbering{gobble}
+#+LATEX_HEADER:
+#+LATEX_HEADER: %% Set the font too 13 for the titles
+#+LATEX_HEADER:
+#+LATEX_HEADER: %% Set indentation for the lists
+#+LATEX_HEADER: \setlist[description]{leftmargin=1cm,labelindent=1cm}
+#+LATEX_HEADER:
+#+LATEX_HEADER: %% Set spacing for the section headings
+#+LATEX_HEADER:
+#+LATEX_HEADER: %% Set margins
+#+LATEX_HEADER: \usepackage[margin=1.2in,footskip=0.25in]{geometry}
+
+*** Section headers
+
+    The =\section= headers should start with =(n)=:
+
+ #+LATEX_HEADER: % see https://tex.stackexchange.com/a/188024/7434
+ #+LATEX_HEADER: \renewcommand\thesection{(\arabic{section})}
+
+    At the same time, the section headers should be black; also, we fix the font
+    sizes as in the original [[https://openresearchsoftware.metajnl.com/about/submissions/][JORS class]]:
+
+ #+LATEX_HEADER: \sectionfont{\color{black}{\fontsize{13}{15}\selectfont}}
+ #+LATEX_HEADER: \subsectionfont{\color{black}{\fontsize{13}{15}\selectfont}}
+ #+LATEX_HEADER: \subsubsectionfont{\color{black}{\fontsize{13}{15}\selectfont}}
+
+    Finally, we want some extra spacing (0.5cm) after each =\section= header, as
+    in the original [[https://openresearchsoftware.metajnl.com/about/submissions/][JORS template]]:
+
+ #+LATEX_HEADER: % see https://tex.stackexchange.com/a/108747/7434 for adding the 0.5cm vskip
+ #+LATEX_HEADER: \titlespacing\section{0pt}{12pt plus 4pt minus 2pt}{0.5cm plus 2pt minus 2pt}
+
+*** Reduce spacing in itemize/enumerate environments
+    [2017-07-13 Thu]
+    from https://tex.stackexchange.com/a/10689/7434:
+
+#+LATEX_HEADER: \usepackage{enumitem}
+#+LATEX_HEADER: \setlist{nosep}
+
+*** Color
+
+    The main text should be blue:
+
+ #+LATEX_HEADER: \color{blue}
+
+*** Tables
+
+ In order to have the left column /black/, we use the hint from
+ https://tex.stackexchange.com/a/203358/7434:
+
+ #+LATEX_HEADER: \usepackage{array}
+
+*** Paragraph style
+
+ #+LATEX_HEADER: \usepackage{parskip}
+
+*** Bibliography
+
+ #+LATEX_HEADER: \usepackage[numbers]{natbib}
+ #+LATEX_HEADER: \usepackage{doi}
+ #+LATEX_HEADER: \renewcommand{\doitext}{DOI:\ }
+ #+LATEX_HEADER: \renewcommand\bibsection{\vspace*{-1cm}\subsection{}}
+
+** Version history
+
+   | Version | Date        | Change          |
+   |---------+-------------+-----------------|
+   |     0.1 | 12 Jul 2017 | initial version |
+
+* Overview
+
+** Title
+
+Integrating AI Assistants with Electronic Lab Notebooks using the LabArchives Model Context Protocol Server
+
+** Paper Authors
+
+1. Brudner, Samuel N.
+
+** Paper Authors Roles and Affiliations
+
+1. Researcher, Molecular, Cellular, and Developmental Biology, Yale University, USA. ORCID: 0000-0002-6043-9328
+
+** Abstract
+
+Research labs increasingly rely on electronic lab notebooks (ELNs) such as LabArchives to manage experimental records, yet these systems remain largely siloed from modern AI assistants. =lab_archives_mcp= addresses this gap by exposing LabArchives notebooks, pages, and entries as tools under the Model Context Protocol (MCP), together with a configurable vector search backend for semantic retrieval over notebook content. The system allows AI assistants to navigate notebooks, perform concept-level search, maintain multi-session project contexts, and archive computational outputs with rich provenance metadata, without duplicating ELN records outside institutional infrastructure. The software is implemented in Python and available on GitHub and Zenodo under the MIT License.
+
+** Keywords
+
+electronic lab notebook; Model Context Protocol; AI assistant; semantic search; research data management; LabArchives; vector database; retrieval-augmented generation
+
+** Introduction
+
+As AI capabilities advance, context-aware architectures have the potential to participate in scientific research as cognitive assistants. To be most helpful, these systems need information about the past and ongoing work and processes of the lab. Electronic Lab Notebooks (ELNs) serve as central repositories for research data and laboratory records, while Large Language Models (LLMs) offer powerful interfaces for querying complex information. However, these systems are often disconnected: ELN records are siloed within their platforms, and LLMs are restricted to their pre-trained knowledge.
+
+=lab_archives_mcp= addresses this gap by providing a Model Context Protocol (MCP) server that connects AI assistants to LabArchives, a widely used commercial ELN, together with a modular, backend-agnostic semantic search framework based on a vector database. LabArchives was selected as the integration target because it is a dominant platform in academic research with widespread institutional licensing (e.g., at Yale University, Cornell, Caltech), offers a comprehensive and documented API, and provides a hierarchical structure (Notebooks > Pages > Entries, with folder organization) that maps naturally to file-system-like navigation.
+
+The intended users are wet-lab researchers, research data management (RDM) teams, and institutional platform engineers who want to make ELN content available to AI assistants. The main contributions are (i) an MCP-based connector for LabArchives that can serve as a template for other ELNs and LIMS, (ii) a reusable vector search backend that can be adopted independently of LabArchives for institutional retrieval-augmented generation (RAG) workflows, and (iii) a graph-based state management layer that models research context as a persistent network of pages and findings.
+
+While LabArchives and other ELN platforms expose REST APIs for CRUD operations, these interfaces typically rely on keyword search and leave indexing, semantic retrieval, and AI integration as downstream implementation details. Existing open-source tools focus on exporting ELN data or integrating ELNs into LIMS workflows rather than exposing them directly to AI assistants. In contrast, =lab_archives_mcp= provides an MCP-native connector that publishes LabArchives notebooks, pages, and entries as typed tools discoverable by AI assistants, together with a configuration-driven semantic search backend. To our knowledge, this represents one of the first academic applications of the Model Context Protocol to research data management.
+
+** Implementation and architecture
+
+=lab_archives_mcp= is organized into six primary components that separate authentication, API access, MCP integration, semantic search, persistent state management, and upload/provenance tracking:
+
+1. *Authentication layer* (=auth.py=): Implements HMAC-SHA512 request signing for the LabArchives REST API, manages secure credential loading from configuration files or environment variables, and provides user ID resolution flows.
+
+2. *API client* (=eln_client.py=): Wraps the LabArchives API using an async HTTP client, provides methods for listing notebooks, traversing page hierarchies, and reading entries, and translates XML responses into validated JSON using Pydantic models.
+
+3. *MCP server* (=mcp_server.py=): Exposes notebook operations as MCP tools using the FastMCP framework. Tools are grouped into Discovery (=list_notebooks=, =list_pages=), Reading (=read_page=), Search (=search_labarchives=), and Index Management (=sync_vector_index=). An experimental =upload_to_labarchives= tool enables upload of artefacts with provenance metadata.
+
+4. *Vector backend* (=vector_backend/=): Implements a configuration-driven pipeline for semantic search with pluggable text chunking strategies, embedding providers, and vector indices (including Pinecone, Qdrant, and local Parquet-based storage). Uses Hydra-based configuration so parameters are declared in YAML rather than hard-coded.
+
+5. *State management layer* (=state.py=): Maintains persistent project contexts that scope multi-session research work. Models project state as a NetworkX graph, tracking relationships between pages, findings, and projects. Publishes MCP tools for project lifecycle, evidence capture, and graph navigation.
+
+6. *Upload and provenance layer* (=models/upload.py=): Provides a high-level upload API for archiving computational artefacts directly into LabArchives pages, capturing rich provenance metadata including Git commit SHA, repository URL, execution timestamp, Python version, and dependency versions.
+
+The vector backend and state management layer are intentionally packaged as reusable components: institutions that do not use LabArchives can still adopt them for RAG pipelines and stateful agent architectures over other content sources.
+
+** Quality control
+
+The project employs both automated and manual quality control measures. The automated test suite includes unit tests for authentication, notebook navigation, and vector-backend components, as well as integration tests that exercise full workflows (listing notebooks, reading pages, running semantic search, and performing uploads) against a live LabArchives account when credentials are available. It also covers the state management layer (project creation/switching, graph persistence, related-page heuristics). Continuous integration via GitHub Actions runs these tests on Linux and macOS for Python 3.11+, installing the project via the pinned conda-lock environment.
+
+In addition to automated checks, the MCP server has been tested against real LabArchives notebooks from an institutional account, verifying notebook listing, navigation, semantic search behaviour, and upload workflows.
+
+* Availability
+
+** Operating system
+
+Linux (tested on Ubuntu via GitHub Actions) and macOS (tested on macOS 12+). No Windows testing has been performed, but the software should work on any platform supporting Python 3.11+.
+
+** Programming language
+
+Python 3.11 or higher.
+
+** Additional system requirements
+
+No special hardware requirements. Internet connectivity is required for LabArchives API access and (optionally) for cloud-based vector stores and embedding APIs.
+
+** Dependencies
+
+Key dependencies include: FastMCP (MCP server framework), httpx (async HTTP client), Pydantic (data validation), NetworkX (graph modelling), Hydra (configuration management), and optionally OpenAI/Pinecone/Qdrant client libraries for the vector backend. A complete, pinned environment is provided via =conda-lock.yml=.
+
+** List of contributors
+
+1. Samuel N. Brudner (sole developer and maintainer)
+
+** Software location
+
+*** Archive
+
+#+ATTR_LaTeX: :center nil :align >{\color{black}}ll
+| *Name*                  | Zenodo                                      |
+| *Persistent identifier* | https://doi.org/10.5281/zenodo.17728480     |
+| *Licence*               | MIT License                                 |
+| *Publisher*             | Samuel N. Brudner                           |
+| *Version published*     | 0.3.1                                       |
+| *Date published*        | 26/11/2025                                  |
+
+*** Code repository
+
+#+ATTR_LaTeX: :center nil :align >{\color{black}}ll
+| *Name*           | GitHub                                              |
+| *Identifier*     | https://github.com/SamuelBrudner/lab_archives_mcp   |
+| *Licence*        | MIT License                                         |
+| *Date published* | 26/11/2025                                          |
+
+** Language
+
+English.
+
+* Reuse potential
+
+The design of =lab_archives_mcp= prioritizes reuse at three levels: as a concrete connector for LabArchives, as a reference architecture for ELN/AI integration, and as a set of reusable agent design patterns.
+
+*Template for other ELN and LIMS systems:* The separation between authentication, API client, MCP server, vector backend, and state management allows developers to replace only the =eln_client.py= layer when targeting a different ELN or LIMS. Developers adapting this architecture to other systems (e.g. BioRAFT, Benchling, or eLabFTW) can preserve the project context abstraction and graph navigation logic while swapping out only the underlying API calls.
+
+*Standalone vector backend:* The vector backend can be used independently of LabArchives to build institutional RAG pipelines over other content types, such as lab wikis or institutional repositories. Hydra-managed configuration makes it straightforward to tune chunking, embedding models, and storage backends for new domains without modifying code.
+
+*Reusable agent architecture patterns:* The state management layer (=state.py=) provides a general-purpose pattern for maintaining assistant memory across sessions, applicable to any MCP server that needs to track long-running tasks. The graph-based navigation approach (using NetworkX to model semantic relationships) can be adapted to other domains where content relationships extend beyond hierarchical structure. The onboarding payload system (=onboard.py=) offers a transparent, inspectable way to instruct assistants about server capabilities.
+
+*Institutional deployment:* Research data management teams can deploy the MCP server as part of an institutional AI assistant, exposing ELN content under existing authentication and logging policies. The project documents multiple deployment options for the vector backend, including local Parquet persistence and self-hosted vector stores, allowing institutions to keep embeddings and metadata on-premise when required.
+
+*Support:* Issues and feature requests are tracked via the GitHub issue tracker. Contribution guidelines, including development setup, testing, and release procedures, are documented in =CONTRIBUTING.md=.
+
+** Acknowledgements
+
+The author thanks LabArchives for API documentation and technical support, and the FastMCP and Anthropic teams for the Model Context Protocol specification and reference implementations.
+
+** Funding statement
+
+This work was performed independently by the author and tested against a LabArchives account at Yale University. No external funding was received for this project.
+
+** Competing interests
+
+The author declares that they have no competing interests.
+
+** References
+
+bibliographystyle:apalike
+
+#+LATEX: \nocite{*}
+
+bibliography:paper.bib
+
+#+LATEX: \color{black}
+
+* Copyright Notice
+  :PROPERTIES:
+  :UNNUMBERED: t
+  :END:
+
+Authors who publish with this journal agree to the following terms:
+
+Authors retain copyright and grant the journal right of first publication with
+the work simultaneously licensed under a Creative Commons Attribution License
+that allows others to share the work with an acknowledgement of the work's
+authorship and initial publication in this journal.
+
+Authors are able to enter into separate, additional contractual arrangements for
+the non-exclusive distribution of the journal's published version of the work
+(e.g., post it to an institutional repository or publish it in a book), with an
+acknowledgement of its initial publication in this journal.
+
+By submitting this paper you agree to the terms of this Copyright Notice, which
+will apply to this submission if and when it is published by this journal.
