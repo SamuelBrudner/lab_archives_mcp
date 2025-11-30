@@ -201,4 +201,4 @@ This work was performed independently by the author and tested against a LabArch
 
 # 8. References
 
-References are managed via the shared `paper.bib` file and are not duplicated here. The reference list for this metapaper should include works cited in the sections above, including the MCP specification, Hydra, Pydantic, FAIR principles, and any vector store or LLM providers referenced in the implementation and reuse discussions.
+See`paper.bib` file for references.
