@@ -34,24 +34,24 @@ graph LR
 ```
 
 1. **Authentication layer (`auth.py`)**
-   - Implements HMAC-SHA512 request signing for the LabArchives REST API.
+   - Implements HMAC-SHA512 request signing for the LabArchives REST API [@labarchives].
    - Manages secure credential loading from configuration files or environment variables.
    - Provides user ID (UID) resolution flows based on temporary password tokens or browser-based login.
 
 2. **API client (`eln_client.py`)**
    - Wraps the LabArchives API using an async HTTP client.
    - Provides methods for listing notebooks, traversing page hierarchies, and reading entries.
-   - Translates XML responses into validated JSON using Pydantic models, ensuring consistent schemas for notebooks, pages, and entries.
+   - Translates XML responses into validated JSON using Pydantic models, ensuring consistent schemas for notebooks, pages, and entries [@pydantic].
 
 3. **MCP server (`mcp_server.py`)**
-   - Exposes notebook operations as MCP tools using the FastMCP framework.
+   - Exposes notebook operations as MCP tools using the FastMCP framework [@fastmcp].
    - Publishes self-describing tool schemas so AI assistants can autonomously decide when and how to call them.
    - Groups tools into four main categories: **Discovery** (`list_notebooks`, `list_pages`), **Reading** (`read_page`), **Search** (`search_labarchives`), and **Index Management** (`sync_vector_index`). An experimental `upload_to_labarchives` tool enables upload of artefacts with provenance metadata.
 
 4. **Vector backend (`vector_backend/`)**
    - Implements a configuration-driven pipeline for semantic search.
    - Supports pluggable text chunking strategies, embedding providers, and vector indices (including Pinecone, Qdrant, and local Parquet-based storage).
-   - Uses Hydra-based configuration so that chunking parameters, model choices, and storage backends are declared in YAML rather than hard-coded.
+   - Uses Hydra-based configuration so that chunking parameters, model choices, and storage backends are declared in YAML rather than hard-coded [@hydra].
    - The `sync_vector_index` tool uses a persisted build record to decide between skipping, incrementally updating, or fully rebuilding an index when embedding configurations or model versions change, enabling reproducible and efficient maintenance of large notebook indices.
 
 5. **State management layer (`state.py`)**
