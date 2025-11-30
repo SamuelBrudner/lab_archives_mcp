@@ -3,6 +3,8 @@
 [![Tests](https://github.com/SamuelBrudner/lab_archives_mcp/workflows/Tests/badge.svg?branch=main)](https://github.com/SamuelBrudner/lab_archives_mcp/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.17728440.svg)](https://doi.org/10.5281/zenodo.17728440)
+
 
 ## Overview
 

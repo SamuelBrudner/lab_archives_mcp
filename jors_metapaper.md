@@ -123,8 +123,8 @@ In addition to automated checks, the MCP server has been tested against real Lab
   - Default development branch: `main`
 
 - **Archived version**
-  - Zenodo: <https://doi.org/10.5281/zenodo.17728480>
-  - Git tag: `v0.3.1`
+  - Zenodo: <https://doi.org/10.5281/zenodo.17728440>
+  - Git tag: `v0.3.2`
 
 - **License**
   - Distributed under the MIT License.
