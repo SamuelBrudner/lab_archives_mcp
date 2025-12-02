@@ -157,11 +157,11 @@ Key dependencies include: FastMCP [4] (MCP server framework), httpx (async HTTP 
 
 #+ATTR_LaTeX: :center nil :align >{\color{black}}ll
 | *Name*                  | Zenodo                                      |
-| *Persistent identifier* | https://doi.org/10.5281/zenodo.17728480     |
+| *Persistent identifier* | https://doi.org/10.5281/zenodo.17728440     |
 | *Licence*               | MIT License                                 |
 | *Publisher*             | Samuel N. Brudner                           |
-| *Version published*     | 0.3.1                                       |
-| *Date published*        | 26/11/2025                                  |
+| *Version published*     | 0.3.2                                       |
+| *Date published*        | 23/11/2025                                  |
 
 *** Code repository
 
@@ -169,7 +169,7 @@ Key dependencies include: FastMCP [4] (MCP server framework), httpx (async HTTP 
 | *Name*           | GitHub                                              |
 | *Identifier*     | https://github.com/SamuelBrudner/lab_archives_mcp   |
 | *Licence*        | MIT License                                         |
-| *Date published* | 26/11/2025                                          |
+| *Date published* | 23/11/2025                                          |
 
 ** Language
 
