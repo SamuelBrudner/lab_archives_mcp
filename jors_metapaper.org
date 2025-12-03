@@ -1,4 +1,3 @@
-#+TITLE: @@latex:\textcolor{black}{@@Software paper for submission to the @@latex:\\@@ /Journal of Open Research Software/ @@latex:}@@
 #+LATEX_CLASS: article
 #+LATEX_CLASS_OPTIONS: [a4paper]
 #+OPTIONS: num:1 toc:nil author:nil date:nil todo:nil
