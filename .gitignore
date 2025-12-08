@@ -58,3 +58,12 @@ conf/secrets.yml
 
 # Vector index build state (changes on each sync)
 data/.last_indexed
+
+# LaTeX build artifacts
+*.aux
+*.bbl
+*.blg
+*.out
+*.synctex.gz
+*.fdb_latexmk
+*.fls

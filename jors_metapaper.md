@@ -6,8 +6,7 @@ authors:
     affiliation: 1
 affiliations:
   - name: Molecular, Cellular, and Developmental Biology, Yale University, USA
-    index: 1
-date: 23 November 2025
+  - index: 1
 abstract: >-
   Research labs increasingly rely on electronic lab notebooks (ELNs) such as LabArchives to manage experimental records, yet these systems remain largely siloed from modern AI assistants. Researchers still copy–paste protocols and results between ELNs and AI tools, and often fall back on brittle keyword search when trying to find historical experiments, parameters, or methods. lab_archives_mcp addresses this gap by (i) exposing LabArchives notebooks, pages, and entries as tools under the Model Context Protocol (MCP), and (ii) providing a configurable vector search backend for semantic retrieval over notebook content. Together, these components allow AI assistants to navigate notebooks, perform concept‑level search, maintain multi‑session project contexts, and archive computational outputs with rich provenance metadata, without duplicating ELN records outside institutional infrastructure.
 bibliography: paper.bib
@@ -19,19 +18,16 @@ As AI capabilities advance, context-aware architectures have the potential to pa
 
 Electronic Lab Notebooks (ELNs) serve as central repositories for research data and laboratory records, while Large Language Models (LLMs) offer powerful interfaces for querying complex information. These systems are often disconnected: ELN records are siloed within their platforms, and LLMs are restricted to their pre-trained knowledge.
 
-`lab_archives_mcp` addresses this gap by providing a Model Context Protocol (MCP) server that connects AI assistants to LabArchives, a widely used commercial ELN [@anthropic2024mcp]. The server exposes notebooks, pages, and entries as typed tools, provides a modular vector backend for semantic search, and maintains persistent project contexts with graph-based provenance tracking. LabArchives was selected as the integration target because it is a dominant platform in academic research with widespread institutional licensing (e.g., at Yale University, Cornell, Caltech), offers a comprehensive and documented API, and provides a hierarchical structure (Notebooks > Pages > Entries, with folder organization) that maps naturally to file-system-like navigation. The result is a system that allows AI assistants to navigate notebooks, perform concept-level search, maintain multi-session project contexts, and archive computational outputs with rich provenance metadata, without duplicating ELN records outside institutional infrastructure.
+`lab_archives_mcp` addresses this gap by providing a Model Context Protocol (MCP) server that connects AI assistants to LabArchives, a widely used commercial ELN [@labarchives].
+ The server exposes notebooks, pages, and entries as typed tools, provides a modular vector backend for semantic search, and maintains persistent project contexts with graph-based provenance tracking. LabArchives was selected as the integration target because it is a dominant platform in academic research with widespread institutional licensing (e.g., at Yale University, Cornell, Caltech), offers a comprehensive and documented API, and provides a hierarchical structure (Notebooks > Pages > Entries, with folder organization) that maps naturally to file-system-like navigation. The result is a system that allows AI assistants to navigate notebooks, perform concept-level search, maintain multi-session project contexts, and archive computational outputs with rich provenance metadata, without duplicating ELN records outside institutional infrastructure.
 
-The intended users are wet-lab researchers, research data management teams, and institutional platform engineers who want to make ELN content available to AI assistants. The main contributions are (i) an MCP-based connector for LabArchives that can serve as a template for other ELNs and LIMS, (ii) a reusable vector search backend that can be adopted independently of LabArchives for institutional retrieval-augmented generation (RAG) workflows, and (iii) a graph-based state management layer that models research context as a persistent network of pages and findings.
+The intended users are wet-lab researchers, research data management teams, and institutional platform engineers who want to make ELN content available to AI assistants. The main contributions are (i) an MCP-based connector for LabArchives that can serve as a template for other ELNs and Laboratory Information Management Systems (LIMS), (ii) a reusable vector search backend that can be adopted independently of LabArchives for institutional retrieval-augmented generation (RAG) workflows, and (iii) a graph-based state management layer that models research context as a persistent network of pages and findings.
 
 # 2. Implementation and Architecture
 
 `lab_archives_mcp` is organized into five primary components that separate authentication, API access, MCP integration, semantic search, and persistent state management. This modular structure is intended to support both direct reuse and adaptation to other ELNs.
 
-```mermaid
-graph LR
-    Assistant[AI Assistant] <--> MCP[lab_archives_mcp\n(Auth + Client + Vector + State)]
-    MCP <--> API[LabArchives API]
-```
+![System architecture showing Assistant, lab_archives_mcp components, and LabArchives API](docs/figures/architecture.png)
 
 1. **Authentication layer (`auth.py`)**
    - Implements HMAC-SHA512 request signing for the LabArchives REST API [@labarchives].
@@ -174,24 +170,24 @@ While LabArchives and other ELN platforms expose REST APIs for CRUD operations, 
 
 Once credentials are configured and the MCP server is registered with an AI assistant, researchers can query their notebooks conversationally. For example:
 
-```text
-Researcher: "I'm starting a new analysis of the mosquito wind tunnel data. Create a project for this."
+**Researcher:** "I'm starting a new analysis of the mosquito wind tunnel data. Create a project for this."
 
-Assistant: [calls create_project(name="Mosquito Analysis", description="Wind tunnel data analysis")]
+**Assistant:** Creates a `create_project` task named "Mosquito Analysis" with the description "Wind tunnel data analysis."
+
+**Assistant:**
 "Project 'Mosquito Analysis' created. I'm ready to help."
 
-Researcher: "Find the calibration protocols we used last summer."
+**Researcher:** "Find the calibration protocols we used last summer."
 
-Assistant: [calls search_labarchives("wind tunnel calibration protocol summer 2024")]
-[calls read_notebook_page(page_id="12345")]
-"I found the 'Wind Tunnel Calibration (Aug 2024)' page. It details the IR tracking setup."
+**Assistant:** Runs semantic search for "wind tunnel calibration protocol summer 2024" and opens the resulting page (ID 12345).
 
-Researcher: "Log that as a key finding, and check if there are any related experiment runs linked to it."
+**Assistant:** "I found the 'Wind Tunnel Calibration (Aug 2024)' page. It details the IR tracking setup."
 
-Assistant: [calls log_finding(content="Calibration protocol from Aug 2024 uses IR tracking", page_id="12345")]
-[calls get_related_pages(page_id="12345")]
-"Finding logged. I also found three linked experiment pages: 'Run 14', 'Run 15', and 'Run 16' that cite this calibration."
-```
+**Researcher:** "Log that as a key finding, and check if there are any related experiment runs linked to it."
+
+**Assistant:** Logs the calibration finding on page 12345, then retrieves related pages linked to that entry.
+
+**Assistant:** "Finding logged. I also found three linked experiment pages: 'Run 14', 'Run 15', and 'Run 16' that cite this calibration."
 
 In this workflow, the assistant explicitly manages the research context by creating a project, then uses semantic search to find entry points. By logging findings and traversing the graph, it builds a persistent model of the investigation that can be resumed in future sessions. Similar conversations can drive related queries (e.g. "Find experiments related to olfactory navigation behaviour") and upload new analysis artefacts with provenance metadata.
 
@@ -200,5 +196,3 @@ In this workflow, the assistant explicitly manages the research context by creat
 This work was performed independently by the author and tested against a LabArchives account at Yale University. The author thanks LabArchives for API documentation and technical support, and the FastMCP and Anthropic teams for the Model Context Protocol specification and reference implementations.
 
 # 8. References
-
-See`paper.bib` file for references.
