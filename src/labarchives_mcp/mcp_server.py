@@ -893,7 +893,7 @@ async def run_server() -> None:
 
             # 1. Graph Neighbors (from NetworkX)
             try:
-                graph = nx.node_link_graph(context.graph_data)
+                graph = nx.node_link_graph(context.graph_data, edges="links")
                 page_node_id = f"page:{page_id}"
 
                 if graph.has_node(page_node_id):
@@ -1039,7 +1039,7 @@ async def run_server() -> None:
             try:
                 context = state_manager.get_active_context()
                 if context:
-                    graph = nx.node_link_graph(context.graph_data)
+                    graph = nx.node_link_graph(context.graph_data, edges="links")
                     page_node_id = f"page:{page_id}"
 
                     if graph.has_node(page_node_id):
@@ -1079,7 +1079,7 @@ async def run_server() -> None:
                 }
 
             try:
-                graph = nx.node_link_graph(context.graph_data)
+                graph = nx.node_link_graph(context.graph_data, edges="links")
 
                 # Count node types
                 pages = [n for n, d in graph.nodes(data=True) if d.get("type") == "page"]

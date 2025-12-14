@@ -105,11 +105,15 @@ warn_redundant_casts = true
 warn_no_return = true
 warn_unreachable = true
 plugins = []
-exclude = ["tests/", "scripts/"]
+exclude = ["tests/", "scripts/", "conda_envs/"]
 
 [[tool.mypy.overrides]]
 module = "tests.test_vector_backend.integration.*"
 disable_error_code = ["no-untyped-def", "import-untyped"]
+
+[[tool.mypy.overrides]]
+module = ["dvc.*", "lxml.*", "networkx.*", "pandas.*"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 minversion = "8.0"

@@ -75,7 +75,6 @@ class OpenAIEmbedding:
         """
         self.config = config
         # Use plain HTTP client to avoid tight coupling to SDK versions
-        self._http = httpx.AsyncClient(timeout=config.timeout_seconds)
 
         # Extract model name (strip "openai/" prefix if present)
         self.model_name = (
@@ -103,63 +102,73 @@ class OpenAIEmbedding:
         if not texts:
             return []
 
-        for attempt in range(self.config.max_retries):
-            try:
-                # Call OpenAI embeddings REST endpoint directly
-                resp = await self._http.post(
-                    "https://api.openai.com/v1/embeddings",
-                    headers={
-                        "Authorization": f"Bearer {self.config.api_key or ''}",
-                        "Content-Type": "application/json",
-                    },
-                    json={"model": self.model_name, "input": texts},
-                )
-
-                if resp.status_code == 429:
-                    # Rate limited
-                    logger.warning(
-                        f"Rate limited (attempt {attempt + 1}/{self.config.max_retries})"
+        async with httpx.AsyncClient(timeout=self.config.timeout_seconds) as http:
+            for attempt in range(self.config.max_retries):
+                try:
+                    # Call OpenAI embeddings REST endpoint directly
+                    resp = await http.post(
+                        "https://api.openai.com/v1/embeddings",
+                        headers={
+                            "Authorization": f"Bearer {self.config.api_key or ''}",
+                            "Content-Type": "application/json",
+                        },
+                        json={"model": self.model_name, "input": texts},
                     )
-                    if attempt < self.config.max_retries - 1:
-                        await asyncio.sleep(2 ** (attempt + 1))
-                        continue
+
+                    if resp.status_code == 429:
+                        # Rate limited
+                        logger.warning(
+                            f"Rate limited (attempt {attempt + 1}/{self.config.max_retries})"
+                        )
+                        if attempt < self.config.max_retries - 1:
+                            await asyncio.sleep(2 ** (attempt + 1))
+                            continue
+                        resp.raise_for_status()
+
+                    # Raise on non-OK responses
                     resp.raise_for_status()
 
-                # Raise on non-OK responses
-                resp.raise_for_status()
-
-                payload = resp.json()
-                data = payload.get("data", [])
-                # Extract vectors in original order
-                embeddings = [item.get("embedding", []) for item in data]
-
-                # Validate dimensionality
-                for i, emb in enumerate(embeddings):
-                    if len(emb) != self.config.dimensions:
+                    payload = resp.json()
+                    data = payload.get("data", [])
+                    if len(data) != len(texts):
                         raise ValueError(
-                            f"Expected {self.config.dimensions} dimensions, "
-                            f"got {len(emb)} for text {i}"
+                            f"Expected {len(texts)} embeddings, got {len(data)} from OpenAI"
                         )
 
-                logger.debug(
-                    f"Embedded {len(texts)} texts with {self.model_name} "
-                    f"(attempt {attempt + 1}/{self.config.max_retries})"
-                )
-                return embeddings
+                    try:
+                        ordered = sorted(data, key=lambda item: int(item.get("index", 0)))
+                    except Exception:
+                        ordered = data
 
-            except httpx.TimeoutException as e:
-                logger.warning(
-                    f"Timeout embedding batch "
-                    f"(attempt {attempt + 1}/{self.config.max_retries}): {e}"
-                )
-                if attempt < self.config.max_retries - 1:
-                    await asyncio.sleep(2**attempt)  # Exponential backoff
-                else:
+                    embeddings = [item.get("embedding", []) for item in ordered]
+
+                    # Validate dimensionality
+                    for i, emb in enumerate(embeddings):
+                        if len(emb) != self.config.dimensions:
+                            raise ValueError(
+                                f"Expected {self.config.dimensions} dimensions, "
+                                f"got {len(emb)} for text {i}"
+                            )
+
+                    logger.debug(
+                        f"Embedded {len(texts)} texts with {self.model_name} "
+                        f"(attempt {attempt + 1}/{self.config.max_retries})"
+                    )
+                    return embeddings
+
+                except httpx.TimeoutException as e:
+                    logger.warning(
+                        f"Timeout embedding batch "
+                        f"(attempt {attempt + 1}/{self.config.max_retries}): {e}"
+                    )
+                    if attempt < self.config.max_retries - 1:
+                        await asyncio.sleep(2**attempt)  # Exponential backoff
+                    else:
+                        raise
+                except httpx.HTTPStatusError as e:
+                    # Non-retryable HTTP error (other than 429 handled above)
+                    logger.error(f"HTTP error embedding batch: {e}")
                     raise
-            except httpx.HTTPStatusError as e:
-                # Non-retryable HTTP error (other than 429 handled above)
-                logger.error(f"HTTP error embedding batch: {e}")
-                raise
 
         raise RuntimeError("Exhausted all retry attempts")
 

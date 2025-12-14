@@ -121,7 +121,7 @@ def test_log_finding_links_page(state_manager: StateManager) -> None:
     context = state_manager.create_project("Proj 1", "Desc 1")
     state_manager.log_finding("Fact 1", page_id="p1")
 
-    graph = nx.node_link_graph(context.graph_data)
+    graph = nx.node_link_graph(context.graph_data, edges="links")
     page_node_id = "page:p1"
     finding_nodes = [n for n, d in graph.nodes(data=True) if d.get("type") == "finding"]
 

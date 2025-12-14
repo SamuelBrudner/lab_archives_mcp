@@ -176,7 +176,7 @@ class StateManager:
     ) -> dict[str, int]:
         """Prune invalid page nodes from a single context graph."""
         try:
-            graph = nx.node_link_graph(context.graph_data)
+            graph = nx.node_link_graph(context.graph_data, edges="links")
             page_nodes = [
                 (node, data) for node, data in graph.nodes(data=True) if data.get("type") == "page"
             ]
@@ -201,7 +201,7 @@ class StateManager:
 
             if removed_nodes > 0:
                 removed_edges = max(0, initial_edge_count - graph.number_of_edges())
-                context.graph_data = nx.node_link_data(graph)
+                context.graph_data = nx.node_link_data(graph, edges="links")
                 self._save_state()
 
             return {"removed_nodes": removed_nodes, "removed_edges": removed_edges}
@@ -361,7 +361,7 @@ class StateManager:
 
         # 2. Update Graph
         try:
-            graph = nx.node_link_graph(context.graph_data)
+            graph = nx.node_link_graph(context.graph_data, edges="links")
             graph.graph.setdefault("schema_version", GRAPH_SCHEMA_VERSION)
             now = time.time()
 
@@ -420,7 +420,7 @@ class StateManager:
             _add_edge(context.id, page_node_id, relation="visited", created_at=now)
 
             # Serialize back
-            context.graph_data = nx.node_link_data(graph)
+            context.graph_data = nx.node_link_data(graph, edges="links")
         except Exception as e:
             logger.error(f"Failed to update graph for visit: {e}")
 
@@ -444,7 +444,7 @@ class StateManager:
 
         # 2. Update Graph
         try:
-            graph = nx.node_link_graph(context.graph_data)
+            graph = nx.node_link_graph(context.graph_data, edges="links")
             graph.graph.setdefault("schema_version", GRAPH_SCHEMA_VERSION)
             now = time.time()
 
@@ -515,7 +515,7 @@ class StateManager:
                     )
 
             # Serialize back
-            context.graph_data = nx.node_link_data(graph)
+            context.graph_data = nx.node_link_data(graph, edges="links")
         except Exception as e:
             logger.error(f"Failed to update graph for finding: {e}")
 

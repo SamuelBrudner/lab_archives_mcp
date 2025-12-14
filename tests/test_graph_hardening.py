@@ -19,7 +19,7 @@ def _build_graph(project_id: str, pages: list[tuple[str, str]]) -> dict[str, Any
         node_id = f"page:{page_id}"
         graph.add_node(node_id, type="page", notebook_id=notebook_id)
         graph.add_edge(project_id, node_id, relation="visited")
-    return cast(dict[str, Any], nx.node_link_data(graph))
+    return cast(dict[str, Any], nx.node_link_data(graph, edges="links"))
 
 
 @pytest.mark.asyncio()  # type: ignore[misc]
