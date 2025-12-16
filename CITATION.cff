@@ -2,8 +2,8 @@ cff-version: 1.2.0
 message: "If you use this software, please cite it as below."
 type: software
 title: "LabArchives MCP Server: AI Integration for Electronic Lab Notebooks"
-version: 0.3.1
-date-released: "2025-11-26"
+version: 0.3.3
+date-released: "2025-12-16"
 authors:
   - family-names: "Brudner"
     given-names: "Samuel N."
@@ -35,5 +35,5 @@ preferred-citation:
       given-names: "Samuel N."
       orcid: "https://orcid.org/0000-0002-6043-9328"
   year: 2025
-  version: 0.3.1
+  version: 0.3.3
   repository-code: "https://github.com/SamuelBrudner/lab_archives_mcp"

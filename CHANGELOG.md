@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## v0.3.3 (2025-12-16)
+
+### Fix
+
+- auth: strengthen secrets file resolution to avoid startup failures across working directories
+
+### Docs
+
+- scripts: sanitize helper scripts by removing hard-coded user paths and avoiding logging secret values
+
+### Chore
+
+- release: bump package version to 0.3.3
+
 ## v0.2.4 (2025-10-15)
 
 ### Docs
