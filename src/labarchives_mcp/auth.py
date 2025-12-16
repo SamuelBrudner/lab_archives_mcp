@@ -21,7 +21,9 @@ def _repo_root() -> Path:
 
 
 def _candidate_paths(raw: Path) -> tuple[Path, ...]:
-    return (raw, ) if raw.is_absolute() else (Path.cwd() / raw, _repo_root() / raw)
+    if raw.is_absolute():
+        return (raw,)
+    return (Path.cwd() / raw, _repo_root() / raw)
 
 
 def _existing_unique_paths(candidates: tuple[Path, ...]) -> tuple[Path, ...]:
