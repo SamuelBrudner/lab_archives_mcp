@@ -3,7 +3,9 @@
 
 set -e
 
-REPO_DIR="/Users/samuelbrudner/Yale University Dropbox/Samuel Brudner/lab_archives_mcp"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+CONDA_ENV_NAME="${LABARCHIVES_CONDA_ENV:-labarchives-mcp-pol}"
 CONFIG_FILE="$HOME/Library/Application Support/Claude/claude_desktop_config.json"
 
 echo "🔍 Claude Desktop MCP Configuration Checker"
@@ -55,7 +57,7 @@ echo
 
 # Check 4: Secrets file exists
 echo "✓ Check 4: Secrets file exists"
-SECRETS_FILE="$REPO_DIR/conf/secrets.yml"
+SECRETS_FILE="$CWD_PATH/conf/secrets.yml"
 if [ -f "$SECRETS_FILE" ]; then
     echo "  → Found: $SECRETS_FILE"
 else
@@ -67,8 +69,8 @@ echo
 
 # Check 5: Test server can start
 echo "✓ Check 5: Test server starts"
-cd "$REPO_DIR"
-timeout 2 conda run -p ./conda_envs/labarchives-mcp-pol python -m labarchives_mcp 2>&1 >/dev/null &
+cd "$CWD_PATH"
+conda run --no-capture-output -n "$CONDA_ENV_NAME" python -m labarchives_mcp >/dev/null 2>&1 &
 SERVER_PID=$!
 sleep 1
 
@@ -77,7 +79,7 @@ if ps -p $SERVER_PID > /dev/null 2>&1; then
     kill $SERVER_PID 2>/dev/null || true
 else
     echo "  ✗ Server failed to start"
-    echo "  → Run manually to see error: conda run -p ./conda_envs/labarchives-mcp-pol python -m labarchives_mcp"
+    echo "  → Run manually to see error: conda run --no-capture-output -n $CONDA_ENV_NAME python -m labarchives_mcp"
     exit 1
 fi
 echo
@@ -92,20 +94,24 @@ echo
 
 # Show the correct config
 echo "Expected configuration in $CONFIG_FILE:"
-cat << 'EOF'
+cat << EOF
 {
   "mcpServers": {
     "labarchives": {
       "command": "conda",
       "args": [
         "run",
-        "-p",
-        "/Users/samuelbrudner/Yale University Dropbox/Samuel Brudner/lab_archives_mcp/conda_envs/labarchives-mcp-pol",
+        "--no-capture-output",
+        "-n",
+        "${CONDA_ENV_NAME}",
         "python",
         "-m",
         "labarchives_mcp"
       ],
-      "cwd": "/Users/samuelbrudner/Yale University Dropbox/Samuel Brudner/lab_archives_mcp"
+      "cwd": "${REPO_DIR}",
+      "env": {
+        "LABARCHIVES_CONFIG_PATH": "${REPO_DIR}/conf/secrets.yml"
+      }
     }
   }
 }

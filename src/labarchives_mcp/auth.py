@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
+import os
 import time
 from pathlib import Path
 from typing import Any, cast
@@ -13,6 +14,81 @@ import httpx
 from lxml import etree
 from omegaconf import OmegaConf
 from pydantic import BaseModel, Field, HttpUrl
+
+
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parents[2]
+
+
+def _candidate_paths(raw: Path) -> tuple[Path, ...]:
+    return (raw, ) if raw.is_absolute() else (Path.cwd() / raw, _repo_root() / raw)
+
+
+def _existing_unique_paths(candidates: tuple[Path, ...]) -> tuple[Path, ...]:
+    existing: list[Path] = []
+    seen: set[Path] = set()
+    for candidate in candidates:
+        if not candidate.exists():
+            continue
+        resolved = candidate.resolve()
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        existing.append(resolved)
+    return tuple(existing)
+
+
+def _missing_secrets_message(raw: Path, source: str, candidates: tuple[Path, ...]) -> str:
+    checked = "\n".join(str(candidate) for candidate in candidates)
+    return f"Secrets file not found for {source}: {raw}\nChecked:\n{checked}"
+
+
+def _multiple_secrets_message(raw: Path, source: str, existing: tuple[Path, ...]) -> str:
+    joined = ", ".join(str(path) for path in existing)
+    return f"Multiple secrets files found for {source}: {raw}. Candidates: {joined}"
+
+
+def _resolve_secrets_location(spec: Path | str, *, source: str) -> Path:
+    raw = Path(spec).expanduser()
+    candidates = _candidate_paths(raw)
+    existing = _existing_unique_paths(candidates)
+    if len(existing) == 1:
+        return existing[0]
+    if not existing:
+        raise FileNotFoundError(_missing_secrets_message(raw, source, candidates))
+    raise RuntimeError(_multiple_secrets_message(raw, source, existing))
+
+
+def _load_normalized_secrets(location: Path) -> dict[str, Any]:
+    raw_config = OmegaConf.load(location)
+    config = OmegaConf.to_container(raw_config, resolve=True)
+    if not isinstance(config, dict):
+        raise ValueError("Secrets file must contain a mapping of credential keys.")
+    return {str(key).upper(): value for key, value in config.items()}
+
+
+def _require_secrets(normalized: dict[str, Any]) -> None:
+    required_keys = ["LABARCHIVES_AKID", "LABARCHIVES_PASSWORD", "LABARCHIVES_REGION"]
+    missing = [key for key in required_keys if not normalized.get(key)]
+    if missing:
+        joined = ", ".join(missing)
+        raise ValueError(f"Missing LabArchives secrets: {joined}")
+
+
+def _optional_str(normalized: dict[str, Any], key: str) -> str | None:
+    value = normalized.get(key)
+    return str(value) if value else None
+
+
+def _credentials_kwargs(normalized: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "akid": str(normalized["LABARCHIVES_AKID"]),
+        "password": str(normalized["LABARCHIVES_PASSWORD"]),
+        "region": cast(HttpUrl, str(normalized["LABARCHIVES_REGION"])),
+        "uid": _optional_str(normalized, "LABARCHIVES_UID"),
+        "auth_email": _optional_str(normalized, "LABARCHIVES_AUTH_EMAIL"),
+        "auth_code": _optional_str(normalized, "LABARCHIVES_AUTH_CODE"),
+    }
 
 
 class Credentials(BaseModel):
@@ -24,7 +100,7 @@ class Credentials(BaseModel):
 
     akid: str = Field(
         description="LabArchives Access Key ID (obtain from LabArchives support)",
-        examples=["Yale_Brudner_6gbfoL"],
+        examples=["example_akid"],
     )
     password: str = Field(
         description="LabArchives Access Password (HMAC-SHA512 signing key)",
@@ -55,49 +131,17 @@ class Credentials(BaseModel):
     @classmethod
     def from_file(cls, path: Path | str | None = None) -> Credentials:
         """Create credentials from a YAML secrets file located under ``conf/`` by default."""
-        import os
-
-        # Check environment variable first, then parameter, then default
         env_path = os.environ.get("LABARCHIVES_CONFIG_PATH")
-        location = (
-            Path(env_path)
-            if env_path
-            else (Path(path) if path is not None else Path("conf/secrets.yml"))
-        )
-        if not location.exists():
-            raise FileNotFoundError(f"Secrets file not found: {location}")
+        if env_path:
+            location = _resolve_secrets_location(env_path, source="LABARCHIVES_CONFIG_PATH")
+        elif path is not None:
+            location = _resolve_secrets_location(path, source="path")
+        else:
+            location = _resolve_secrets_location("conf/secrets.yml", source="default")
 
-        raw_config = OmegaConf.load(location)
-        config = OmegaConf.to_container(raw_config, resolve=True)
-        if not isinstance(config, dict):
-            raise ValueError("Secrets file must contain a mapping of credential keys.")
-
-        normalized = {str(key).upper(): value for key, value in config.items()}
-        required_keys = ["LABARCHIVES_AKID", "LABARCHIVES_PASSWORD", "LABARCHIVES_REGION"]
-        if missing := [key for key in required_keys if not normalized.get(key)]:
-            joined = ", ".join(missing)
-            raise ValueError(f"Missing LabArchives secrets: {joined}")
-
-        return cls(
-            akid=str(normalized["LABARCHIVES_AKID"]),
-            password=str(normalized["LABARCHIVES_PASSWORD"]),
-            region=cast(HttpUrl, str(normalized["LABARCHIVES_REGION"])),
-            uid=(
-                str(normalized.get("LABARCHIVES_UID"))
-                if normalized.get("LABARCHIVES_UID")
-                else None
-            ),
-            auth_email=(
-                str(normalized.get("LABARCHIVES_AUTH_EMAIL"))
-                if normalized.get("LABARCHIVES_AUTH_EMAIL")
-                else None
-            ),
-            auth_code=(
-                str(normalized.get("LABARCHIVES_AUTH_CODE"))
-                if normalized.get("LABARCHIVES_AUTH_CODE")
-                else None
-            ),
-        )
+        normalized = _load_normalized_secrets(location)
+        _require_secrets(normalized)
+        return cls(**_credentials_kwargs(normalized))
 
 
 class AuthenticationManager:
