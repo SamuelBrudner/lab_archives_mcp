@@ -486,7 +486,7 @@ class LabArchivesClient:
 
         Creates a page and either:
         - Adds the file contents as a page text entry (if request.create_as_text is True), or
-        - Uploads the file as an attachment (default behavior).
+        - Uploads the file as an attachment (if request.create_as_text is False).
 
         Always adds a provenance metadata entry when provided.
 
@@ -575,7 +575,7 @@ class LabArchivesClient:
             file_size_bytes_for_response = len(raw_bytes)
             logger.info(f"Added page text entry: {main_entry_eid}")
         else:
-            # Upload as attachment (default)
+            # Upload as attachment
             attachment_request = AttachmentUploadRequest(
                 notebook_id=request.notebook_id,
                 page_tree_id=page_result.tree_id,

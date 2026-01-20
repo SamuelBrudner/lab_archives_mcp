@@ -248,8 +248,11 @@ class UploadRequest(BaseModel):
     allow_dirty_git: bool = False
 
     # Store file contents as page text (Markdown → HTML for .md)
-    create_as_text: bool = False
+    create_as_text: bool = True
 ```
+
+By default, uploads prefer rich text entries. Set `create_as_text=False` when you want
+to preserve the original file as an attachment (recommended for binary files).
 
 ### UploadResponse
 ```python

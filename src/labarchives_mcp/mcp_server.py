@@ -741,6 +741,119 @@ async def run_server() -> None:
                     logger.error(f"Failed to upload to LabArchives: {exc}", exc_info=True)
                     raise
 
+            @server.tool()  # type: ignore[misc]
+            async def write_notebook_entry(
+                notebook_id: str,
+                content: str,
+                page_id: str | None = None,
+                page_title: str | None = None,
+                parent_folder_id: str | None = None,
+                content_format: str = "markdown",
+                caption: str | None = None,
+                change_description: str | None = None,
+            ) -> dict[str, Any]:
+                """Write a rich text entry directly to a LabArchives page.
+
+                If page_id is provided, appends to the existing page. Otherwise, creates
+                a new page using page_title (required) and writes the entry there.
+
+                Args:
+                    notebook_id: LabArchives notebook ID
+                    content: Entry content
+                    page_id: Existing page tree_id (optional)
+                    page_title: Title for a new page (required if page_id is not provided)
+                    parent_folder_id: Optional folder tree_id for new page
+                    content_format: "markdown", "html", or "plain"
+                    caption: Optional entry caption
+                    change_description: Optional audit log message
+
+                Returns:
+                    Dictionary with:
+                    - page_tree_id: Page ID
+                    - entry_id: Entry ID
+                    - page_url: LabArchives web URL
+                    - created_at: Entry creation timestamp
+                    - part_type: Entry type
+                """
+                from datetime import UTC, datetime
+
+                from labarchives_mcp.models.upload import PageCreationRequest
+
+                logger.info(
+                    "write_notebook_entry called: notebook=%s, page_id=%s, title=%s",
+                    notebook_id,
+                    page_id,
+                    page_title,
+                )
+
+                try:
+                    uid = await auth_manager.ensure_uid()
+
+                    if not content.strip():
+                        raise ValueError("content cannot be empty")
+
+                    if page_id:
+                        page_tree_id = page_id
+                    else:
+                        if not page_title:
+                            raise ValueError(
+                                "page_title is required when page_id is not provided"
+                            )
+                        page_request = PageCreationRequest(
+                            notebook_id=notebook_id,
+                            parent_tree_id=parent_folder_id or 0,
+                            display_text=page_title,
+                            is_folder=False,
+                        )
+                        page_result = await notebook_client.insert_node(uid, page_request)
+                        page_tree_id = page_result.tree_id
+
+                    normalized_format = content_format.strip().lower()
+                    if normalized_format in {"markdown", "md"}:
+                        entry_body = notebook_client._markdown_to_html(content)
+                        part_type = "text entry"
+                    elif normalized_format in {"html", "rich", "rich_text"}:
+                        entry_body = content
+                        part_type = "text entry"
+                    elif normalized_format in {"plain", "text", "plain_text"}:
+                        entry_body = content
+                        part_type = "plain text entry"
+                    else:
+                        raise ValueError(
+                            "content_format must be one of: markdown, html, plain"
+                        )
+
+                    created = await notebook_client.add_entry(
+                        uid=uid,
+                        notebook_id=notebook_id,
+                        page_tree_id=page_tree_id,
+                        part_type=part_type,
+                        entry_data=entry_body,
+                        caption=caption,
+                        change_description=change_description,
+                    )
+
+                    created_at = created.get("created_at")
+                    if created_at:
+                        created_at_str = created_at
+                    else:
+                        created_at_str = datetime.now(UTC).isoformat()
+
+                    page_url = (
+                        f"https://mynotebook.labarchives.com/share/{notebook_id}/{page_tree_id}"
+                    )
+
+                    return {
+                        "page_tree_id": page_tree_id,
+                        "entry_id": created.get("eid"),
+                        "page_url": page_url,
+                        "created_at": created_at_str,
+                        "part_type": created.get("part_type", part_type),
+                    }
+                except Exception as exc:
+                    logger.error(f"Failed to write notebook entry: {exc}", exc_info=True)
+                    raise
+
         else:
             logger.info("Upload functionality is DISABLED (LABARCHIVES_ENABLE_UPLOAD=false)")
 

@@ -95,10 +95,10 @@ class UploadRequest(BaseModel):
         False, description="Allow upload with dirty Git state (not recommended)"
     )
     create_as_text: bool = Field(
-        False,
+        True,
         description=(
             "If True, create a page and add the file contents as a text entry "
-            "instead of uploading it as an attachment."
+            "instead of uploading it as an attachment. Set False to force attachments."
         ),
     )
 

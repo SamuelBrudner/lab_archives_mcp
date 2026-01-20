@@ -343,6 +343,11 @@ For configuration examples for Windsurf and Claude Desktop (including environmen
 
 - **`read_notebook_page(notebook_id, page_id)`** - Read content from a specific page
 
+**Writing**:
+
+- **`write_notebook_entry(...)`** - Write rich text (Markdown/HTML/plain) to a page; create a page if needed
+- **`upload_to_labarchives(...)`** - Upload files with provenance metadata (attachments or page text)
+
 **Project state & heuristics**:
 
 - **`create_project(name, description, linked_notebook_ids=None)`** - Start and activate a project workspace
@@ -423,6 +428,27 @@ list_notebook_pages(notebook_id, folder_id="67890")
 }
 ```
 
+**`write_notebook_entry(...)`**
+
+```python
+# Write Markdown directly to a page (creates a new page if page_id is omitted)
+write_notebook_entry(
+  notebook_id="MTU2MTI4NS43...",
+  page_title="Protocol - 2025-10-02",
+  content="# Protocol\n\n- Step 1\n- Step 2",
+  content_format="markdown",
+  parent_folder_id="67890"  # optional folder tree_id
+)
+
+# Append HTML to an existing page
+write_notebook_entry(
+  notebook_id="MTU2MTI4NS43...",
+  page_id="12345",
+  content="<h2>Summary</h2><p>Results look promising.</p>",
+  content_format="html"
+)
+```
+
 **`upload_to_labarchives(...)`** ⭐ NEW
 
 See `docs/upload_api.md` for the complete API documentation and usage notes.
@@ -440,7 +466,7 @@ upload_to_labarchives(
   python_version="3.11.8",
   executed_at="2025-09-30T12:00:00Z",
   dependencies={"numpy": "1.26.0", "pandas": "2.1.0"},
-  as_page_text=True  # default: store contents as page text (Markdown → HTML)
+  as_page_text=True  # default: store contents as page text (set False for attachments)
 )
 
 # Returns:
