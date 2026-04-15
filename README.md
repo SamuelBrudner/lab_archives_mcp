@@ -31,6 +31,7 @@ A **Model Context Protocol (MCP) server** that connects AI assistants to LabArch
 - Upload API: `docs/upload_api.md`
 - Graph concepts ("The Lab Brain"): `docs/graph_concepts.md`
 - Vector backend design and ops: `README_VECTOR_BACKEND.md`
+- Semantic governance: `docs/semantic_governance.md`
 
 ## Features
 
