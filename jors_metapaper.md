@@ -117,10 +117,13 @@ In addition to automated checks, the MCP server has been tested against real Lab
 - **Source code repository**
   - Public Git repository: <https://github.com/SamuelBrudner/lab_archives_mcp>
   - Default development branch: `main`
+  - Current source-tree version: `0.3.3` (2025-12-16)
 
-- **Archived version**
-  - Zenodo: <https://doi.org/10.5281/zenodo.17728440>
+- **Archived JORS version**
+  - Zenodo DOI: <https://doi.org/10.5281/zenodo.17728440>
   - Git tag: `v0.3.2`
+  - Archived release date: 2025-11-30
+  - Version note: the current source tree is `0.3.3`, a post-archive maintenance release dated 2025-12-16. The JORS resubmission cites the archived `v0.3.2` Zenodo record as the stable reviewed snapshot; cite `0.3.3` only when referring specifically to post-archive maintenance changes.
 
 - **License**
   - Distributed under the MIT License.

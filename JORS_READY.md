@@ -15,6 +15,11 @@
 - [x] References are in `paper.bib`.
 
 ## Submission
-- [x] Create a release tag (e.g., `v0.3.0`) corresponding to the submission.
-- [ ] Archive the release on Zenodo (or similar) to get a DOI.
+- [x] Create a release tag (`v0.3.2`) corresponding to the archived JORS submission.
+- [x] Archive the release on Zenodo: <https://doi.org/10.5281/zenodo.17728440>.
 - [ ] Submit via the JORS portal.
+
+## Version and citation story
+- JORS archive/citation target: `v0.3.2`, DOI <https://doi.org/10.5281/zenodo.17728440>.
+- Current source tree: `0.3.3`, a post-archive maintenance release dated 2025-12-16.
+- Cite `0.3.3` only when discussing changes after the archived JORS snapshot.

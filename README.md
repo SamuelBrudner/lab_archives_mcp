@@ -649,6 +649,17 @@ All field descriptions, examples, and validation rules are in the Pydantic model
 
 See `CONTRIBUTING.md` for versioning, Conventional Commits, and release steps.
 
+For the JORS resubmission, cite the archived Zenodo snapshot:
+
+- Archived version: `v0.3.2`
+- DOI: <https://doi.org/10.5281/zenodo.17728440>
+- Git tag: <https://github.com/SamuelBrudner/lab_archives_mcp/releases/tag/v0.3.2>
+
+The current source tree is version `0.3.3`, a post-archive maintenance release
+recorded in `CITATION.cff` and `CHANGELOG.md`. Use the Zenodo DOI above for the
+reviewed JORS archive; cite `0.3.3` only when referring specifically to
+post-archive maintenance changes.
+
 ## Contributing
 
 We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for:
@@ -664,11 +675,12 @@ If you use this software in your research, please cite:
 
 ```bibtex
 @software{brudner2025labarchives,
-  author = {Brudner, Samuel},
+  author = {Brudner, Samuel N.},
   title = {LabArchives MCP Server: AI Integration for Electronic Lab Notebooks},
   year = {2025},
-  url = {https://github.com/SamuelBrudner/lab_archives_mcp},
-  version = {0.2.4}
+  version = {0.3.2},
+  doi = {10.5281/zenodo.17728440},
+  url = {https://doi.org/10.5281/zenodo.17728440}
 }
 ```
 

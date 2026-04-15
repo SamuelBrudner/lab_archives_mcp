@@ -1,5 +1,5 @@
 cff-version: 1.2.0
-message: "If you use this software, please cite it as below."
+message: "This file describes the current v0.3.3 source tree. For the JORS archived submission, cite the v0.3.2 Zenodo record: https://doi.org/10.5281/zenodo.17728440."
 type: software
 title: "LabArchives MCP Server: AI Integration for Electronic Lab Notebooks"
 version: 0.3.3
@@ -35,5 +35,6 @@ preferred-citation:
       given-names: "Samuel N."
       orcid: "https://orcid.org/0000-0002-6043-9328"
   year: 2025
-  version: 0.3.3
+  version: 0.3.2
+  doi: "10.5281/zenodo.17728440"
   repository-code: "https://github.com/SamuelBrudner/lab_archives_mcp"

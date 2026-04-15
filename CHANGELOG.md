@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Docs
 
 - scripts: sanitize helper scripts by removing hard-coded user paths and avoiding logging secret values
+- citation: note that the JORS archival citation remains the `v0.3.2` Zenodo
+  snapshot at <https://doi.org/10.5281/zenodo.17728440>; `v0.3.3` is a
+  post-archive maintenance release
 
 ### Chore
 

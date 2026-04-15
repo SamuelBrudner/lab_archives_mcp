@@ -159,8 +159,10 @@ Key dependencies include: FastMCP [4] (MCP server framework), httpx (async HTTP 
 | *Persistent identifier* | https://doi.org/10.5281/zenodo.17728440     |
 | *Licence*               | MIT License                                 |
 | *Publisher*             | Samuel N. Brudner                           |
-| *Version published*     | 0.3.2                                       |
-| *Date published*        | 23/11/2025                                  |
+| *Version published*     | v0.3.2                                      |
+| *Date published*        | 2025-11-30                                  |
+
+Version note: the current source tree is =0.3.3=, a post-archive maintenance release dated 2025-12-16. The JORS resubmission cites the archived =v0.3.2= Zenodo record as the stable reviewed snapshot; cite =0.3.3= only when referring specifically to post-archive maintenance changes.
 
 *** Code repository
 
@@ -168,7 +170,8 @@ Key dependencies include: FastMCP [4] (MCP server framework), httpx (async HTTP 
 | *Name*           | GitHub                                              |
 | *Identifier*     | https://github.com/SamuelBrudner/lab_archives_mcp   |
 | *Licence*        | MIT License                                         |
-| *Date published* | 23/11/2025                                          |
+| *Version*        | 0.3.3                                               |
+| *Date published* | 2025-12-16                                          |
 
 ** Language
 
