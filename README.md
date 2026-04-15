@@ -240,6 +240,8 @@ asyncio.run(test())
 - **Code organization and testing**
   - The MCP server is organized into logical modules with clear responsibilities.
   - Unit tests and integration tests cover key functionality, including authentication, notebook navigation, and upload workflows.
+  - GitHub Actions runs the non-integration test suite with `pytest --cov=src --cov-report=xml --cov-report=term`, writes the measured line coverage from `coverage.xml` to the job summary, and attempts a non-blocking Codecov upload on the Ubuntu/Python 3.11 job.
+  - The README intentionally avoids a fixed coverage percentage or badge; use the latest Actions summary, `coverage.xml`, or Codecov report for the current measured value.
 
 - **Security and authentication**
   - The MCP server uses HMAC-SHA512 signing for authentication, with credentials stored securely in environment variables or configuration files.
