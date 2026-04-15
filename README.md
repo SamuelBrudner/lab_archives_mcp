@@ -251,7 +251,7 @@ asyncio.run(test())
 ## Project state, graph navigation, and heuristics
 
 - **Persistent context**: The server maintains project-scoped memory (visited pages, findings, linked notebooks) in `~/.labarchives_state/session_state.json` by default so assistants can resume work across sessions and repositories. **Projects are required**—create one before logging visits or findings.
-- **Graph-backed navigation**: Every page visit and finding is added to a NetworkX graph, enabling related-page discovery (`get_related_pages`) and provenance tracing (`trace_provenance`).
+- **Graph-backed navigation**: Page visits and findings are added to a NetworkX graph with project, notebook, page, and finding nodes, enabling related-page discovery (`get_related_pages`) and provenance tracing (`trace_provenance`).
 - **Project tools**: Manage contexts with `create_project`, `list_projects`, `switch_project`, `delete_project`, inspect them with `get_current_context`, and log observations via `log_finding`. State is only persisted when a project is active.
 - **Lightweight guidance**: `suggest_next_steps` provides cold start detection and activity stats (not prescriptive workflow phases).
 - **Onboarding**: `get_onboard_payload` (or `labarchives-mcp --print-onboard`) returns usage guidance and sticky context.
@@ -341,7 +341,7 @@ For configuration examples for Windsurf and Claude Desktop (including environmen
 
 **Reading**:
 
-- **`read_notebook_page(notebook_id, page_id)`** - Read content from a specific page
+- **`read_notebook_page(notebook_id, page_id, track_visit=True, dry_run=False)`** - Read content from a specific page and optionally record the visit in the active project
 
 **Writing**:
 
@@ -350,11 +350,11 @@ For configuration examples for Windsurf and Claude Desktop (including environmen
 
 **Project state & heuristics**:
 
-- **`create_project(name, description, linked_notebook_ids=None)`** - Start and activate a project workspace
-- **`list_projects()`**, **`switch_project(project_id)`**, **`delete_project(project_id)`** - Manage project contexts
-- **`log_finding(content, source_url=None)`** - Append a finding to the active project
+- **`create_project(name, description, linked_notebook_ids=None, dry_run=False)`** - Start and activate a project workspace
+- **`list_projects()`**, **`switch_project(project_id, dry_run=False)`**, **`delete_project(project_id, dry_run=False)`** - Manage project contexts
+- **`log_finding(content, source_url=None, page_id=None, dry_run=False)`** - Append a finding to the active project; `page_id` links the finding back to evidence
 - **`get_current_context()`** - Return full project state (pages, findings, graph)
-- **`get_related_pages(notebook_id, page_id)`** - Find sibling/linked pages via the project graph and detected LabArchives links
+- **`get_related_pages(notebook_id, page_id, limit=20, offset=0)`** - Find sibling/linked pages via the project graph and detected LabArchives links; returns `items` plus pagination `meta`
 - **`trace_provenance(notebook_id, page_id, entry_id)`** - Trace sources and metadata for a specific entry
 - **`suggest_next_steps()`** - Get lightweight guidance based on your current project state (cold start vs active)
 
@@ -424,7 +424,10 @@ list_notebook_pages(notebook_id, folder_id="67890")
     "content": "<p>Entry text content...</p>",
     "created_at": "2025-01-01T00:00:00Z",
     "updated_at": "2025-01-02T08:30:00Z"
-  }]
+  }],
+  "tracked_in_project": "Mosquito Navigation Review",
+  "tracked": true,
+  "dry_run": false
 }
 ```
 
