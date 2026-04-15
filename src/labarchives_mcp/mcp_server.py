@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import html
 import inspect
 import os
+import re
 from collections.abc import Awaitable, Callable, Coroutine
 from importlib import metadata
 from typing import Any, cast
+from urllib.parse import unquote
 
 import httpx
 from loguru import logger
@@ -46,6 +49,38 @@ def _resolve_version() -> str:
 
 
 __version__ = _resolve_version()
+
+_LABARCHIVES_SHARE_URL_RE = re.compile(
+    r"(?:https?://)?(?:[A-Za-z0-9.-]+\.)?labarchives\.com/share/"
+    r"([^/\"'\s<>?#]+)/([^/\"'\s<>?#]+)",
+    re.IGNORECASE,
+)
+
+
+def _extract_labarchives_page_links(entries: list[dict[str, Any]]) -> list[tuple[str, str]]:
+    """Return unique (notebook_id, page_id) links detected in LabArchives entry content."""
+    links: list[tuple[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+
+    for entry in entries:
+        content = entry.get("content") or ""
+        if not isinstance(content, str):
+            continue
+
+        for notebook_id, page_id in _LABARCHIVES_SHARE_URL_RE.findall(html.unescape(content)):
+            notebook_id = unquote(notebook_id).strip()
+            page_id = unquote(page_id).split("&", maxsplit=1)[0].rstrip(".,;:)]}").strip()
+            if not notebook_id or not page_id:
+                continue
+
+            key = (notebook_id, page_id)
+            if key in seen:
+                continue
+
+            seen.add(key)
+            links.append(key)
+
+    return links
 
 
 def _paginate_items(
@@ -275,6 +310,11 @@ async def run_server() -> None:
                 if track_visit and not dry_run:
                     try:
                         state_manager.log_visit(notebook_id, page_id, page_title)
+                        state_manager.log_page_content_links(
+                            notebook_id,
+                            page_id,
+                            _extract_labarchives_page_links(entries),
+                        )
                         tracked = True
                     except Exception as e:
                         logger.warning(f"Failed to log page visit to state: {e}")
@@ -983,10 +1023,8 @@ async def run_server() -> None:
 
             Returns:
                 Dict with paginated related pages and metadata
-                (e.g., 'graph_neighbor', 'linked_in_content')
+                (e.g., 'content_link', 'graph_neighbor', 'project_sibling')
             """
-            import re
-
             import networkx as nx
 
             context = state_manager.get_active_context()
@@ -1001,8 +1039,34 @@ async def run_server() -> None:
                     },
                 }
 
-            related_pages = []
-            seen_ids = set()
+            related_pages: list[dict[str, Any]] = []
+            seen_ids: set[str] = set()
+
+            def _add_related_page(related_page_id: str, title: str, source: str) -> None:
+                if related_page_id == page_id or related_page_id in seen_ids:
+                    return
+
+                related_pages.append(
+                    {
+                        "page_id": related_page_id,
+                        "title": title,
+                        "source": source,
+                    }
+                )
+                seen_ids.add(related_page_id)
+
+            # Detect content links first so get_related_pages also upgrades the graph.
+            content_links: list[tuple[str, str]] = []
+            try:
+                uid = await auth_manager.ensure_uid()
+                entries = await notebook_client.get_page_entries(
+                    uid, notebook_id, page_id, include_data=True
+                )
+                content_links = _extract_labarchives_page_links(entries)
+                state_manager.log_page_content_links(notebook_id, page_id, content_links)
+                context = state_manager.get_active_context() or context
+            except Exception as e:
+                logger.warning(f"Content link parsing failed: {e}")
 
             # 1. Graph Neighbors (from NetworkX)
             try:
@@ -1010,74 +1074,60 @@ async def run_server() -> None:
                 page_node_id = f"page:{page_id}"
 
                 if graph.has_node(page_node_id):
-                    # Undirected view lets us traverse Page -> Project -> sibling Page.
-                    graph_undir = graph.to_undirected()
+                    def _page_title(node_id: str) -> str:
+                        node_data = graph.nodes[node_id]
+                        return str(node_data.get("label") or node_id.replace("page:", ""))
 
-                    # We want pages related via the Project (siblings) or direct links if any
-                    # Simple neighbor check on undirected graph:
+                    # Direct content links are the strongest page-to-page signal.
+                    for _, target, edge_data in graph.out_edges(page_node_id, data=True):
+                        target_data = graph.nodes[target]
+                        if (
+                            target_data.get("type") == "page"
+                            and edge_data.get("relation") == "content_link"
+                        ):
+                            _add_related_page(
+                                target.replace("page:", ""),
+                                _page_title(target),
+                                "content_link",
+                            )
+
+                    # Undirected view lets us traverse direct page edges and
+                    # Page -> Project -> sibling Page.
+                    graph_undir = graph.to_undirected()
                     for neighbor in graph_undir.neighbors(page_node_id):
                         node_data = graph.nodes[neighbor]
+                        if node_data.get("type") != "page":
+                            continue
 
-                        # If neighbor is Project, get its neighbors (siblings of current page)
+                        edge_data = graph.get_edge_data(
+                            page_node_id, neighbor
+                        ) or graph.get_edge_data(neighbor, page_node_id, default={})
+                        if edge_data.get("relation") == "content_link":
+                            continue
+
+                        _add_related_page(
+                            neighbor.replace("page:", ""),
+                            _page_title(neighbor),
+                            "graph_neighbor",
+                        )
+
+                    for neighbor in graph_undir.neighbors(page_node_id):
+                        node_data = graph.nodes[neighbor]
                         if node_data.get("type") == "project":
                             for sibling in graph_undir.neighbors(neighbor):
                                 sibling_data = graph.nodes[sibling]
                                 if sibling_data.get("type") == "page":
-                                    pid = sibling.replace("page:", "")
-                                    if pid != page_id and pid not in seen_ids:
-                                        related_pages.append(
-                                            {
-                                                "page_id": pid,
-                                                "title": sibling_data.get("label", "Unknown"),
-                                                "source": "project_sibling",
-                                            }
-                                        )
-                                        seen_ids.add(pid)
-
-                        # If neighbor is another page (direct link?), add it
-                        elif node_data.get("type") == "page":
-                            pid = neighbor.replace("page:", "")
-                            if pid != page_id and pid not in seen_ids:
-                                related_pages.append(
-                                    {
-                                        "page_id": pid,
-                                        "title": node_data.get("label", "Unknown"),
-                                        "source": "graph_neighbor",
-                                    }
-                                )
-                                seen_ids.add(pid)
+                                    _add_related_page(
+                                        sibling.replace("page:", ""),
+                                        str(sibling_data.get("label", "Unknown")),
+                                        "project_sibling",
+                                    )
             except Exception as e:
                 logger.warning(f"Graph query failed: {e}")
 
-            # 2. Content Links (Heuristic parsing)
-            try:
-                uid = await auth_manager.ensure_uid()
-                entries = await notebook_client.get_page_entries(
-                    uid, notebook_id, page_id, include_data=True
-                )
-
-                # Regex for LabArchives page links: https://.../share/NotebookID/PageID
-                # or internal links
-                link_pattern = re.compile(r'labarchives\.com/share/[^/]+/([^/"\s]+)')
-
-                for entry in entries:
-                    content = entry.get("content", "")
-                    if content:
-                        matches = link_pattern.findall(content)
-                        for match in matches:
-                            # match is likely a tree_id (PageID)
-                            if match != page_id and match not in seen_ids:
-                                # Title unknown without fetching page details
-                                related_pages.append(
-                                    {
-                                        "page_id": match,
-                                        "title": "Linked Page",
-                                        "source": "content_link",
-                                    }
-                                )
-                                seen_ids.add(match)
-            except Exception as e:
-                logger.warning(f"Content link parsing failed: {e}")
+            # If graph persistence failed, still surface detected content links for this call.
+            for _target_notebook_id, target_page_id in content_links:
+                _add_related_page(target_page_id, "Linked Page", "content_link")
 
             items, meta = _paginate_items(related_pages, limit=limit, offset=offset)
             return {"items": items, "meta": meta}

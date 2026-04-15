@@ -5,6 +5,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any, cast
 
+import networkx as nx
 import pytest
 
 from labarchives_mcp import mcp_server
@@ -391,9 +392,15 @@ def test_beads_related_pages_uses_graph_and_content_links(
         "truncated": False,
     }
     assert result["items"] == [
-        {"page_id": "page-b", "title": "Page B", "source": "project_sibling"},
         {"page_id": "page-c", "title": "Linked Page", "source": "content_link"},
+        {"page_id": "page-b", "title": "Page B", "source": "project_sibling"},
     ]
+
+    context = state_manager.get_active_context()
+    assert context is not None
+    graph = nx.node_link_graph(context.graph_data, edges="links")
+    assert graph.has_edge("page:page-a", "page:page-c")
+    assert graph.edges["page:page-a", "page:page-c"]["relation"] == "content_link"
 
 
 def test_beads_trace_provenance_combines_entry_and_graph_sources(

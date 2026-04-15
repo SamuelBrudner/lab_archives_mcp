@@ -33,6 +33,7 @@ The state is modeled as a directed graph using `networkx`, where nodes represent
 | `uses_notebook` | Project | Notebook | Connects project to notebooks it references. |
 | `contains` | Notebook | Page | Links a notebook to pages within it. |
 | `visited` | Project | Page | Records that a page was accessed during this project. |
+| `content_link` | Page | Page | Records LabArchives page URLs detected in page content. |
 | `discovered` | Project | Finding | Connects findings logged during the project. |
 | `evidence_from` | Page | Finding | Provenance link from a page to findings derived from it. |
 
@@ -43,8 +44,8 @@ The server exposes tools that leverage this graph to guide the AI assistant:
 ### `get_related_pages`
 Finds pages related to the current page by traversing the active project graph and parsing links in the current page content:
 - **Project siblings**: Other pages connected to the same active project.
-- **Graph neighbors**: Direct page-to-page neighbors if graph edges exist.
-- **Content links**: LabArchives page URLs detected inside page entries.
+- **Content links**: LabArchives page URLs detected inside page entries and persisted as direct `content_link` edges.
+- **Graph neighbors**: Other direct page-to-page neighbors if graph edges exist.
 
 The tool returns a paginated response with `items` and `meta` fields. `limit` defaults to `20`, `offset` defaults to `0`, and `meta.truncated` indicates whether more related pages are available.
 

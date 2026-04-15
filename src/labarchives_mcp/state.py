@@ -427,6 +427,130 @@ class StateManager:
         self._save_state()
         logger.debug(f"Logged visit to {title} in context {context.id}")
 
+    def log_page_content_links(
+        self,
+        source_notebook_id: str,
+        source_page_id: str,
+        links: list[tuple[str, str]],
+    ) -> int:
+        """Persist page-to-page links detected in page content.
+
+        Links are represented as directed Page → Page edges with relation
+        ``content_link``. The method records only graph structure; it does not
+        add target pages to visit history.
+        """
+        context = self.get_active_context()
+        if not context or not source_page_id:
+            return 0
+
+        normalized_links: list[tuple[str, str]] = []
+        seen_links: set[tuple[str, str]] = set()
+        for target_notebook_id, target_page_id in links:
+            target_page_id = str(target_page_id or "").strip()
+            target_notebook_id = str(target_notebook_id or source_notebook_id or "").strip()
+            if not target_page_id or target_page_id == source_page_id:
+                continue
+
+            key = (target_notebook_id, target_page_id)
+            if key in seen_links:
+                continue
+
+            seen_links.add(key)
+            normalized_links.append(key)
+
+        if not normalized_links:
+            return 0
+
+        try:
+            graph = nx.node_link_graph(context.graph_data, edges="links")
+            graph.graph.setdefault("schema_version", GRAPH_SCHEMA_VERSION)
+            now = time.time()
+
+            def _touch_notebook(notebook_id: str) -> str:
+                notebook_node_id = f"notebook:{notebook_id}"
+                if graph.has_node(notebook_node_id):
+                    node = graph.nodes[notebook_node_id]
+                    node.setdefault("first_seen", now)
+                    node["last_seen"] = now
+                    node["type"] = "notebook"
+                    node.setdefault("label", notebook_id)
+                else:
+                    graph.add_node(
+                        notebook_node_id,
+                        type="notebook",
+                        label=notebook_id,
+                        first_seen=now,
+                        last_seen=now,
+                    )
+                return notebook_node_id
+
+            def _touch_page(page_id: str, notebook_id: str, label: str) -> str:
+                page_node_id = f"page:{page_id}"
+                if graph.has_node(page_node_id):
+                    node = graph.nodes[page_node_id]
+                    node.setdefault("first_seen", now)
+                    node["last_seen"] = now
+                    node["type"] = "page"
+                    if notebook_id and not node.get("notebook_id"):
+                        node["notebook_id"] = notebook_id
+                    node.setdefault("label", label)
+                else:
+                    graph.add_node(
+                        page_node_id,
+                        type="page",
+                        label=label,
+                        notebook_id=notebook_id or None,
+                        first_seen=now,
+                        last_seen=now,
+                    )
+                return page_node_id
+
+            def _add_edge(src: str, dst: str, **attrs: Any) -> None:
+                if graph.has_edge(src, dst):
+                    edge = graph.edges[src, dst]
+                    edge.setdefault("created_at", now)
+                    edge["last_seen"] = now
+                    edge.update(attrs)
+                else:
+                    graph.add_edge(src, dst, created_at=now, last_seen=now, **attrs)
+
+            source_page_node_id = _touch_page(
+                source_page_id, source_notebook_id, source_page_id
+            )
+            if source_notebook_id:
+                source_notebook_node_id = _touch_notebook(source_notebook_id)
+                _add_edge(
+                    source_notebook_node_id,
+                    source_page_node_id,
+                    relation="contains",
+                )
+
+            for target_notebook_id, target_page_id in normalized_links:
+                target_page_node_id = _touch_page(
+                    target_page_id, target_notebook_id, "Linked Page"
+                )
+                if target_notebook_id:
+                    target_notebook_node_id = _touch_notebook(target_notebook_id)
+                    _add_edge(
+                        target_notebook_node_id,
+                        target_page_node_id,
+                        relation="contains",
+                    )
+
+                _add_edge(
+                    source_page_node_id,
+                    target_page_node_id,
+                    relation="content_link",
+                    source="page_content",
+                )
+
+            context.graph_data = nx.node_link_data(graph, edges="links")
+            self._save_state()
+            return len(normalized_links)
+        except Exception as e:
+            logger.error(f"Failed to update graph for content links: {e}")
+            return 0
+
     def log_finding(
         self, content: str, source_url: str | None = None, page_id: str | None = None
     ) -> None:

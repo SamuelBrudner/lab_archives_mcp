@@ -96,6 +96,28 @@ def test_log_visit(state_manager: StateManager) -> None:
     assert f"page:{visit.page_id}" in graph_nodes
 
 
+def test_log_page_content_links_adds_direct_edges(state_manager: StateManager) -> None:
+    """Detected content links should persist as Page -> Page graph edges."""
+    context = state_manager.create_project("Proj 1", "Desc 1")
+    state_manager.log_visit("nb1", "p1", "Page 1")
+
+    recorded = state_manager.log_page_content_links(
+        "nb1",
+        "p1",
+        [("nb1", "p2"), ("nb1", "p2"), ("nb1", "p1")],
+    )
+
+    graph = nx.node_link_graph(context.graph_data, edges="links")
+
+    assert recorded == 1
+    assert graph.has_node("page:p2")
+    assert graph.nodes["page:p2"]["type"] == "page"
+    assert graph.nodes["page:p2"]["notebook_id"] == "nb1"
+    assert graph.has_edge("page:p1", "page:p2")
+    assert graph.edges["page:p1", "page:p2"]["relation"] == "content_link"
+    assert [visit.page_id for visit in context.visited_pages] == ["p1"]
+
+
 def test_log_finding(state_manager: StateManager) -> None:
     """Test logging findings."""
     with pytest.raises(RuntimeError):
