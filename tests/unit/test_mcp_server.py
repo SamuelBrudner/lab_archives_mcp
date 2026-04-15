@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any, cast
 
 import pytest
 
 from labarchives_mcp import mcp_server
+from labarchives_mcp.state import StateManager
 
 
 class DummyCredentials:
@@ -56,6 +58,64 @@ class DummyFastMCP:
 
     async def run_async(self) -> None:
         await self.serve()
+
+
+def _run_server_with_test_state(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    *,
+    entries_by_page: dict[tuple[str, str], list[dict[str, Any]]] | None = None,
+) -> tuple[DummyFastMCP, StateManager]:
+    mcp_module = cast(Any, mcp_server)
+    state_manager = StateManager(storage_dir=tmp_path)
+    page_entries = entries_by_page or {}
+
+    monkeypatch.setattr(
+        mcp_module.Credentials,
+        "from_file",
+        classmethod(lambda cls: DummyCredentials()),
+    )
+    monkeypatch.setattr(mcp_module.httpx, "AsyncClient", DummyAsyncClient)
+    monkeypatch.setattr(mcp_module, "StateManager", lambda: state_manager)
+
+    class DummyAuthenticationManager:
+        def __init__(self, client: DummyAsyncClient, credentials: DummyCredentials) -> None:
+            self._client = client
+            self._credentials = credentials
+
+        async def ensure_uid(self) -> str:
+            return "uid-1"
+
+    class DummyLabArchivesClient:
+        def __init__(self, client: DummyAsyncClient, auth_manager: Any) -> None:
+            self._client = client
+            self._auth_manager = auth_manager
+
+        async def list_notebooks(self, _uid: str) -> list[Any]:
+            return []
+
+        async def get_page_entries(
+            self,
+            _uid: str,
+            notebook_id: str,
+            page_id: str,
+            include_data: bool = False,
+        ) -> list[dict[str, Any]]:
+            return page_entries.get((notebook_id, page_id), [])
+
+    monkeypatch.setattr(mcp_module, "AuthenticationManager", DummyAuthenticationManager)
+    monkeypatch.setattr(mcp_module, "LabArchivesClient", DummyLabArchivesClient)
+
+    fastmcp_instance = DummyFastMCP(
+        server_id="labarchives-mcp-pol",
+        name="",
+        version="",
+        description="",
+    )
+    monkeypatch.setattr(mcp_module, "FastMCP", lambda **kwargs: fastmcp_instance)
+
+    asyncio.run(mcp_server.run_server())
+    return fastmcp_instance, state_manager
 
 
 def test_notebooks_handler_propagates_errors(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -298,3 +358,104 @@ def test_upload_tool_registered_by_default(monkeypatch: pytest.MonkeyPatch) -> N
     assert (
         "upload_to_labarchives" in fastmcp_instance.tool_callbacks
     ), "upload_to_labarchives should be registered by default when env var is not set"
+
+
+def test_beads_related_pages_uses_graph_and_content_links(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    entries_by_page = {
+        ("nb1", "page-a"): [
+            {
+                "eid": "entry-1",
+                "content": (
+                    "See https://mynotebook.labarchives.com/share/nb1/page-c "
+                    "for the follow-up record."
+                ),
+            }
+        ]
+    }
+    fastmcp_instance, state_manager = _run_server_with_test_state(
+        monkeypatch, tmp_path, entries_by_page=entries_by_page
+    )
+    state_manager.create_project("Beads", "Regression coverage")
+    state_manager.log_visit("nb1", "page-a", "Page A")
+    state_manager.log_visit("nb1", "page-b", "Page B")
+
+    related_pages = fastmcp_instance.tool_callbacks["get_related_pages"]
+    result = asyncio.run(related_pages("nb1", "page-a", limit=10, offset=0))
+
+    assert result["meta"] == {
+        "total": 2,
+        "offset": 0,
+        "limit": 10,
+        "truncated": False,
+    }
+    assert result["items"] == [
+        {"page_id": "page-b", "title": "Page B", "source": "project_sibling"},
+        {"page_id": "page-c", "title": "Linked Page", "source": "content_link"},
+    ]
+
+
+def test_beads_trace_provenance_combines_entry_and_graph_sources(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    entries_by_page = {
+        ("nb1", "page-a"): [
+            {"eid": "entry-1", "content": "Derived From: assay_42"},
+            {
+                "eid": "meta-1",
+                "caption": "Code Provenance Metadata",
+                "content": "Git Commit SHA: abc123",
+            },
+        ]
+    }
+    fastmcp_instance, state_manager = _run_server_with_test_state(
+        monkeypatch, tmp_path, entries_by_page=entries_by_page
+    )
+    state_manager.create_project("Beads", "Regression coverage")
+    state_manager.log_visit("nb1", "page-a", "Page A")
+    state_manager.log_finding("Observed signal", page_id="page-a")
+
+    trace_provenance = fastmcp_instance.tool_callbacks["trace_provenance"]
+    result = asyncio.run(trace_provenance("nb1", "page-a", "entry-1"))
+
+    assert {
+        "id": "assay_42",
+        "type": "derived_from_text",
+        "description": "Found explicit citation in entry content",
+    } in result["sources"]
+    assert any(
+        source["type"] == "agent_finding"
+        and source["description"] == "Observed signal"
+        and source["id"]
+        for source in result["sources"]
+    )
+    assert result["metadata"]["code_provenance"]["eid"] == "meta-1"
+    assert result["metadata"]["code_provenance"]["content_snippet"].startswith(
+        "Git Commit SHA: abc123"
+    )
+
+
+def test_beads_suggest_next_steps_reports_context_phase(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    fastmcp_instance, state_manager = _run_server_with_test_state(monkeypatch, tmp_path)
+    suggest_next_steps = fastmcp_instance.tool_callbacks["suggest_next_steps"]
+
+    no_context = asyncio.run(suggest_next_steps())
+    assert no_context["phase"] == "no_context"
+
+    state_manager.create_project("Beads", "Regression coverage")
+    cold_start = asyncio.run(suggest_next_steps())
+    assert cold_start["phase"] == "cold_start"
+
+    state_manager.log_visit("nb1", "page-a", "Page A")
+    state_manager.log_finding("Observed signal", page_id="page-a")
+    active = asyncio.run(suggest_next_steps())
+
+    assert active["phase"] == "active"
+    assert active["stats"] == {
+        "pages_visited": 1,
+        "findings_logged": 1,
+        "project_name": "Beads",
+    }
