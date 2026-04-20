@@ -1,0 +1,259 @@
+"""Tests for PROV-O / JSON-LD export of project provenance graphs."""
+
+from __future__ import annotations
+
+import json
+from datetime import UTC, datetime
+from pathlib import Path
+
+import networkx as nx
+import pytest
+
+from labarchives_mcp.linked_data.provo_export import (
+    build_context,
+    export_graph_jsonld,
+    export_project_jsonld,
+    write_graph_jsonld,
+    write_project_jsonld,
+)
+from labarchives_mcp.models.upload import ProvenanceMetadata
+from labarchives_mcp.state import StateManager
+
+
+PROV_NS = "http://www.w3.org/ns/prov#"
+SCHEMA_NS = "http://schema.org/"
+
+
+@pytest.fixture
+def empty_graph() -> nx.DiGraph:
+    return nx.DiGraph()
+
+
+@pytest.fixture
+def legacy_graph() -> nx.DiGraph:
+    graph = nx.DiGraph()
+    graph.add_node("proj-1", type="project", label="Proj 1", description="Desc", created_at=1.0)
+    graph.add_node("notebook:nb1", type="notebook", label="nb1", notebook_id="nb1")
+    graph.add_node(
+        "page:p1",
+        type="page",
+        label="Page 1",
+        page_id="p1",
+        notebook_id="nb1",
+        first_seen=2.0,
+        last_seen=3.0,
+    )
+    graph.add_node("finding:f1", type="finding", label="Observation", full_content="Observation body")
+    graph.add_edge("proj-1", "notebook:nb1", relation="uses_notebook")
+    graph.add_edge("notebook:nb1", "page:p1", relation="contains")
+    graph.add_edge("proj-1", "page:p1", relation="visited")
+    graph.add_edge("proj-1", "finding:f1", relation="discovered")
+    graph.add_edge("page:p1", "finding:f1", relation="evidence_from")
+    return graph
+
+
+@pytest.fixture
+def enriched_graph() -> nx.DiGraph:
+    graph = nx.DiGraph()
+    graph.add_node("proj-1", type="project", label="Proj 1", description="Desc", created_at=1.0)
+    graph.add_node("notebook:nb1", type="notebook", label="nb1", notebook_id="nb1")
+    graph.add_node(
+        "page:page-123",
+        type="page",
+        label="Analysis Results",
+        page_id="page-123",
+        notebook_id="nb1",
+        page_url="https://example.org/page-123",
+        created_at="2026-04-20T14:02:11Z",
+    )
+    graph.add_node(
+        "artifact:page-123:ATTACH_123",
+        type="artifact",
+        label="analysis.ipynb",
+        filename="analysis.ipynb",
+        entry_id="ATTACH_123",
+        page_id="page-123",
+        file_size_bytes=1234,
+        encoding_format=".ipynb",
+        created_at="2026-04-20T14:02:11Z",
+    )
+    graph.add_node(
+        "activity:upload:page-123:ATTACH_123",
+        type="activity",
+        label="Upload analysis.ipynb",
+        executed_at=datetime(2026, 4, 20, 14, 1, 58, tzinfo=UTC),
+        completed_at=datetime(2026, 4, 20, 14, 2, 11, tzinfo=UTC),
+        git_commit_sha="a" * 40,
+        git_branch="main",
+        git_repo_url="https://github.com/SamuelBrudner/lab_archives_mcp",
+        git_is_dirty=False,
+        code_version="0.4.0",
+        python_version="3.11.8",
+        dependencies={"networkx": "3.4"},
+        os_name="Darwin",
+        hostname="host.local",
+        server_version="0.4.0",
+    )
+    graph.add_node("user:uid123", type="user", label="uid123", uid="uid123")
+    graph.add_node(
+        "software_agent:labarchives-mcp-pol",
+        type="software_agent",
+        label="LabArchives MCP Server",
+        identifier="labarchives-mcp-pol",
+        server_version="0.4.0",
+    )
+    graph.add_edge("proj-1", "notebook:nb1", relation="uses_notebook")
+    graph.add_edge("notebook:nb1", "page:page-123", relation="contains")
+    graph.add_edge("proj-1", "page:page-123", relation="tracked")
+    graph.add_edge("proj-1", "artifact:page-123:ATTACH_123", relation="tracked")
+    graph.add_edge("proj-1", "activity:upload:page-123:ATTACH_123", relation="tracked")
+    graph.add_edge("page:page-123", "artifact:page-123:ATTACH_123", relation="contains_artifact")
+    graph.add_edge(
+        "page:page-123", "activity:upload:page-123:ATTACH_123", relation="was_generated_by"
+    )
+    graph.add_edge(
+        "artifact:page-123:ATTACH_123",
+        "activity:upload:page-123:ATTACH_123",
+        relation="was_generated_by",
+    )
+    graph.add_edge("page:page-123", "user:uid123", relation="was_attributed_to")
+    graph.add_edge("artifact:page-123:ATTACH_123", "user:uid123", relation="was_attributed_to")
+    graph.add_edge(
+        "activity:upload:page-123:ATTACH_123",
+        "user:uid123",
+        relation="was_associated_with",
+    )
+    graph.add_edge(
+        "activity:upload:page-123:ATTACH_123",
+        "software_agent:labarchives-mcp-pol",
+        relation="was_associated_with",
+    )
+    return graph
+
+
+def _node_by_suffix(document: dict[str, object], suffix: str) -> dict[str, object]:
+    return next(node for node in document["@graph"] if str(node["@id"]).endswith(suffix))
+
+
+def test_build_context_binds_expected_namespaces() -> None:
+    context = build_context()
+    assert context["prov"] == PROV_NS
+    assert context["schema"] == SCHEMA_NS
+    assert context["hadMember"]["@id"] == "prov:hadMember"
+    assert context["isPartOf"]["@id"] == "schema:isPartOf"
+
+
+def test_empty_graph_produces_empty_graph_array(empty_graph: nx.DiGraph) -> None:
+    document = export_graph_jsonld(empty_graph)
+    assert document["@context"] == build_context()
+    assert document["@graph"] == []
+
+
+def test_legacy_graph_exports_membership_and_derivation(legacy_graph: nx.DiGraph) -> None:
+    document = export_graph_jsonld(legacy_graph)
+    project = _node_by_suffix(document, "project/proj-1")
+    notebook = _node_by_suffix(document, "notebook/nb1")
+    finding = _node_by_suffix(document, "finding/f1")
+
+    assert "labmcp:notebook/nb1" in str(project["hadMember"])
+    assert notebook["isPartOf"] == "labmcp:project/proj-1"
+    assert finding["wasDerivedFrom"] == "labmcp:page/p1"
+
+
+def test_enriched_graph_exports_upload_provenance(enriched_graph: nx.DiGraph) -> None:
+    document = export_graph_jsonld(enriched_graph)
+    page = _node_by_suffix(document, "page/page-123")
+    artifact = _node_by_suffix(document, "artifact/page-123/ATTACH_123")
+    activity = _node_by_suffix(document, "activity/upload/page-123/ATTACH_123")
+
+    assert page["wasGeneratedBy"] == "labmcp:activity/upload/page-123/ATTACH_123"
+    assert "labmcp:page/page-123" in str(artifact["isPartOf"])
+    assert activity["wasAssociatedWith"] == [
+        "labmcp:user/uid123",
+        "labmcp:software_agent/labarchives-mcp-pol",
+    ]
+    assert activity["labmcp:gitCommitSha"] == "a" * 40
+    assert activity["labmcp:serverVersion"] == "0.4.0"
+
+
+def test_datetimes_serialize_as_iso8601_z(enriched_graph: nx.DiGraph) -> None:
+    document = export_graph_jsonld(enriched_graph)
+    activity = _node_by_suffix(document, "activity/upload/page-123/ATTACH_123")
+    assert activity["startedAtTime"] == "2026-04-20T14:01:58Z"
+    assert activity["endedAtTime"] == "2026-04-20T14:02:11Z"
+
+
+def test_unknown_node_type_raises() -> None:
+    graph = nx.DiGraph()
+    graph.add_node("mystery", type="mystery")
+    with pytest.raises(ValueError, match="Unsupported graph node type"):
+        export_graph_jsonld(graph)
+
+
+def test_write_graph_jsonld_creates_file(enriched_graph: nx.DiGraph, tmp_path: Path) -> None:
+    output = tmp_path / "graph.jsonld"
+    write_graph_jsonld(enriched_graph, output)
+    written = json.loads(output.read_text())
+    assert "@context" in written
+    assert len(written["@graph"]) == 7
+
+
+def test_state_wrapper_loads_project_from_state(tmp_path: Path) -> None:
+    manager = StateManager(storage_dir=tmp_path)
+    context = manager.create_project("Proj 1", "Desc")
+    manager.log_visit("nb1", "p1", "Page 1")
+    metadata = ProvenanceMetadata(
+        git_commit_sha="b" * 40,
+        git_branch="main",
+        git_repo_url="https://github.com/SamuelBrudner/lab_archives_mcp",
+        git_is_dirty=False,
+        code_version="0.4.0",
+        executed_at=datetime(2026, 4, 20, 14, 1, 58, tzinfo=UTC),
+        python_version="3.11.8",
+        dependencies={"networkx": "3.4"},
+        os_name="Darwin",
+        hostname="host.local",
+    )
+    manager.record_upload_provenance(
+        uid="uid123",
+        notebook_id="nb1",
+        page_title="Analysis Results",
+        file_path=tmp_path / "analysis.ipynb",
+        page_tree_id="page-123",
+        entry_id="ATTACH_123",
+        page_url="https://example.org/page-123",
+        created_at="2026-04-20T14:02:11Z",
+        file_size_bytes=1234,
+        filename="analysis.ipynb",
+        metadata=metadata,
+        server_version="0.4.0",
+        as_page_text=False,
+    )
+
+    document = export_project_jsonld(context.id, state_dir=tmp_path)
+    assert any(node["@id"] == "labmcp:project/" + context.id for node in document["@graph"])
+    assert any("activity/upload/page-123/ATTACH_123" in str(node["@id"]) for node in document["@graph"])
+
+
+def test_write_project_jsonld_matches_in_memory_export(tmp_path: Path) -> None:
+    manager = StateManager(storage_dir=tmp_path)
+    context = manager.create_project("Proj 1", "Desc")
+    manager.log_visit("nb1", "p1", "Page 1")
+
+    output = tmp_path / "project.jsonld"
+    write_project_jsonld(context.id, output, state_dir=tmp_path)
+
+    written = json.loads(output.read_text())
+    expected = export_project_jsonld(context.id, state_dir=tmp_path)
+    assert written == expected
+
+
+def test_exported_jsonld_loads_in_rdflib(enriched_graph: nx.DiGraph) -> None:
+    rdflib = pytest.importorskip("rdflib")
+    document = export_graph_jsonld(enriched_graph)
+    graph = rdflib.Graph()
+    graph.parse(data=json.dumps(document), format="json-ld")
+    prov = rdflib.Namespace(PROV_NS)
+    rdf_type = rdflib.RDF.type
+    activities = list(graph.triples((None, rdf_type, prov.Activity)))
+    assert len(activities) == 1

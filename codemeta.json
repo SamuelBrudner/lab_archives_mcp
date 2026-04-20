@@ -1,0 +1,92 @@
+{
+  "@context": "https://doi.org/10.5063/schema/codemeta-2.0",
+  "@type": "SoftwareSourceCode",
+  "identifier": "https://doi.org/10.5281/zenodo.17728440",
+  "name": "LabArchives MCP Server",
+  "description": "A Model Context Protocol server that connects AI assistants to LabArchives electronic lab notebooks, with project-scoped provenance tracking and JSON-LD export aligned to PROV-O.",
+  "codeRepository": "https://github.com/SamuelBrudner/lab_archives_mcp",
+  "issueTracker": "https://github.com/SamuelBrudner/lab_archives_mcp/issues",
+  "license": "https://spdx.org/licenses/MIT",
+  "version": "0.4.0",
+  "datePublished": "2026-04-20",
+  "dateModified": "2026-04-20",
+  "programmingLanguage": [
+    {
+      "@type": "ComputerLanguage",
+      "name": "Python",
+      "version": ">=3.11"
+    }
+  ],
+  "runtimePlatform": "Python 3.11+",
+  "operatingSystem": [
+    "Linux",
+    "macOS",
+    "Windows"
+  ],
+  "softwareRequirements": [
+    {
+      "@type": "SoftwareApplication",
+      "name": "Python",
+      "version": ">=3.11"
+    },
+    {
+      "@type": "SoftwareApplication",
+      "name": "conda-lock"
+    }
+  ],
+  "keywords": [
+    "model-context-protocol",
+    "mcp",
+    "electronic-lab-notebook",
+    "eln",
+    "labarchives",
+    "research-data-management",
+    "fair-data",
+    "knowledge-graph",
+    "provenance",
+    "prov-o",
+    "linked-data",
+    "json-ld",
+    "semantic-search",
+    "reproducible-research"
+  ],
+  "developmentStatus": "active",
+  "applicationCategory": "Research Software",
+  "readme": "https://github.com/SamuelBrudner/lab_archives_mcp#readme",
+  "author": [
+    {
+      "@type": "Person",
+      "givenName": "Samuel",
+      "familyName": "Brudner",
+      "email": "samuel.brudner@yale.edu",
+      "@id": "https://orcid.org/0000-0002-6043-9328",
+      "affiliation": {
+        "@type": "Organization",
+        "name": "Yale University"
+      }
+    }
+  ],
+  "maintainer": [
+    {
+      "@type": "Person",
+      "givenName": "Samuel",
+      "familyName": "Brudner",
+      "email": "samuel.brudner@yale.edu"
+    }
+  ],
+  "citation": "https://github.com/SamuelBrudner/lab_archives_mcp/blob/main/CITATION.cff",
+  "relatedLink": [
+    "https://doi.org/10.5281/zenodo.17728440"
+  ],
+  "referencePublication": {
+    "@type": "ScholarlyArticle",
+    "name": "Integrating AI Assistants with Electronic Lab Notebooks using the LabArchives Model Context Protocol Server",
+    "author": {
+      "@type": "Person",
+      "givenName": "Samuel",
+      "familyName": "Brudner"
+    },
+    "publicationVenue": "Journal of Open Research Software",
+    "status": "under review"
+  }
+}

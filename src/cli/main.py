@@ -11,11 +11,13 @@ import logging
 import signal
 import sys
 from collections.abc import Sequence
+from pathlib import Path
 from types import FrameType
 from typing import Any
 
 from cli.version import __version__
 from labarchives_mcp import mcp_server
+from labarchives_mcp.linked_data import write_project_jsonld
 
 # Make version available as MCP_SERVER_VERSION for test compatibility
 MCP_SERVER_VERSION = __version__
@@ -139,6 +141,26 @@ def _run_cli(argv: Sequence[str] | None = None) -> int:
         action="store_true",
         help="Initialize the local state directory and exit.",
     )
+    subparsers = parser.add_subparsers(dest="command")
+    export_parser = subparsers.add_parser(
+        "export-provenance",
+        help="Export a project provenance graph as JSON-LD.",
+    )
+    export_parser.add_argument(
+        "--project",
+        required=True,
+        help="Project context ID to export.",
+    )
+    export_parser.add_argument(
+        "--output",
+        required=True,
+        help="Path to write the JSON-LD document.",
+    )
+    export_parser.add_argument(
+        "--state-dir",
+        default=None,
+        help="Optional state directory override (defaults to ~/.labarchives_state).",
+    )
 
     parsed = parser.parse_args(list(argv) if argv is not None else None)
 
@@ -152,6 +174,12 @@ def _run_cli(argv: Sequence[str] | None = None) -> int:
 
     if parsed.print_onboard:
         asyncio.run(_emit_onboard(parsed.print_onboard))
+        return 0
+
+    if parsed.command == "export-provenance":
+        output_path = Path(parsed.output)
+        write_project_jsonld(parsed.project, output_path, state_dir=parsed.state_dir)
+        print(output_path)
         return 0
 
     logger.info("Starting LabArchives MCP server")

@@ -1,6 +1,10 @@
-"""Entry point for running the MCP server as a module."""
+"""Module entry point routed through the shared CLI."""
 
-from .mcp_server import run
+from __future__ import annotations
+
+from cli.main import main
+
+__all__ = ["main"]
 
 if __name__ == "__main__":
-    run()
+    main()

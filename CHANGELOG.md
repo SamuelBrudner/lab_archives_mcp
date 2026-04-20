@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## v0.4.0 (2026-04-20)
+
+### Feat
+
+- provenance: record upload activities, artifacts, users, and software agents in the project graph
+- linked-data: add PROV-O / JSON-LD export through the MCP server and CLI
+
+### Docs
+
+- add linked-data export design notes and README / quickstart usage examples
+- add `codemeta.json` alongside the existing citation metadata
+
+### Test
+
+- add serializer, state, MCP, and CLI parity coverage for linked-data export
+
 ## v0.3.3 (2025-12-16)
 
 ### Fix

@@ -4,14 +4,19 @@ from __future__ import annotations
 
 import json
 import time
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import networkx as nx
 from loguru import logger
 from pydantic import BaseModel, Field
 
-GRAPH_SCHEMA_VERSION = 1
+if TYPE_CHECKING:
+    from .models.upload import ProvenanceMetadata
+
+
+GRAPH_SCHEMA_VERSION = 2
 
 
 class Finding(BaseModel):
@@ -246,6 +251,181 @@ class StateManager:
             "removed_edges": total_removed_edges,
             "contexts_checked": len(contexts),
         }
+
+    @staticmethod
+    def _coerce_timestamp(value: Any) -> float | None:
+        """Normalize timestamps from floats, datetimes, or ISO strings."""
+        if value is None:
+            return None
+        if isinstance(value, (int, float)):
+            return float(value)
+        if isinstance(value, datetime):
+            return value.timestamp()
+        if isinstance(value, str):
+            try:
+                return datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp()
+            except ValueError:
+                return None
+        return None
+
+    def record_upload_provenance(
+        self,
+        *,
+        uid: str,
+        notebook_id: str,
+        page_title: str,
+        file_path: Path | str,
+        page_tree_id: str,
+        entry_id: str | None,
+        page_url: str,
+        created_at: str | float | datetime | None,
+        file_size_bytes: int | None,
+        filename: str,
+        metadata: "ProvenanceMetadata",
+        server_version: str,
+        as_page_text: bool,
+    ) -> None:
+        """Record a successful upload as a provenance subgraph on the active project."""
+        context = self.get_active_context()
+        if not context:
+            return
+
+        try:
+            graph = nx.node_link_graph(context.graph_data, edges="links")
+            graph.graph.setdefault("schema_version", GRAPH_SCHEMA_VERSION)
+            now = time.time()
+            created_ts = (
+                self._coerce_timestamp(created_at)
+                or metadata.executed_at.timestamp()
+                or now
+            )
+            file_path_obj = Path(file_path)
+
+            def _touch_node(node_id: str, **attrs: Any) -> None:
+                default_attrs = {"first_seen": created_ts, "last_seen": now}
+                if graph.has_node(node_id):
+                    existing = graph.nodes[node_id]
+                    existing.setdefault("first_seen", created_ts)
+                    existing["last_seen"] = now
+                    existing.update({k: v for k, v in attrs.items() if v is not None})
+                else:
+                    default_attrs.update({k: v for k, v in attrs.items() if v is not None})
+                    graph.add_node(node_id, **default_attrs)
+
+            def _add_edge(src: str, dst: str, **attrs: Any) -> None:
+                if graph.has_edge(src, dst):
+                    edge = graph.edges[src, dst]
+                    edge["last_seen"] = now
+                    edge.update({k: v for k, v in attrs.items() if v is not None})
+                else:
+                    graph.add_edge(
+                        src,
+                        dst,
+                        created_at=created_ts,
+                        last_seen=now,
+                        **{k: v for k, v in attrs.items() if v is not None},
+                    )
+
+            artifact_suffix = entry_id or file_path_obj.stem or "upload"
+            page_node_id = f"page:{page_tree_id}"
+            notebook_node_id = f"notebook:{notebook_id}"
+            artifact_node_id = f"artifact:{page_tree_id}:{artifact_suffix}"
+            activity_node_id = f"activity:upload:{page_tree_id}:{artifact_suffix}"
+            user_node_id = f"user:{uid}"
+            software_node_id = "software_agent:labarchives-mcp-pol"
+
+            _touch_node(
+                context.id,
+                type="project",
+                label=context.name,
+                description=context.description,
+                created_at=context.created_at,
+            )
+            _touch_node(
+                notebook_node_id,
+                type="notebook",
+                label=notebook_id,
+                notebook_id=notebook_id,
+            )
+            _touch_node(
+                page_node_id,
+                type="page",
+                label=page_title,
+                page_id=page_tree_id,
+                notebook_id=notebook_id,
+                page_url=page_url,
+                created_at=created_ts,
+                upload_count=(graph.nodes[page_node_id].get("upload_count", 0) + 1)
+                if graph.has_node(page_node_id)
+                else 1,
+            )
+            _touch_node(
+                artifact_node_id,
+                type="artifact",
+                label=filename,
+                filename=filename,
+                entry_id=entry_id,
+                page_id=page_tree_id,
+                notebook_id=notebook_id,
+                page_url=page_url,
+                file_size_bytes=file_size_bytes,
+                created_at=created_ts,
+                encoding_format=file_path_obj.suffix.lower() or None,
+                entry_kind="page_text" if as_page_text else "attachment",
+            )
+            _touch_node(
+                activity_node_id,
+                type="activity",
+                label=f"Upload {filename}",
+                activity_type="upload_to_labarchives",
+                notebook_id=notebook_id,
+                page_id=page_tree_id,
+                entry_id=entry_id,
+                executed_at=metadata.executed_at.timestamp(),
+                completed_at=created_ts,
+                git_commit_sha=metadata.git_commit_sha,
+                git_branch=metadata.git_branch,
+                git_repo_url=metadata.git_repo_url,
+                git_is_dirty=metadata.git_is_dirty,
+                code_version=metadata.code_version or server_version,
+                python_version=metadata.python_version,
+                dependencies=metadata.dependencies,
+                os_name=metadata.os_name,
+                hostname=metadata.hostname,
+                server_version=server_version,
+            )
+            _touch_node(
+                user_node_id,
+                type="user",
+                label=uid,
+                uid=uid,
+            )
+            _touch_node(
+                software_node_id,
+                type="software_agent",
+                label="LabArchives MCP Server",
+                identifier="labarchives-mcp-pol",
+                server_version=server_version,
+                created_at=datetime.now(UTC).timestamp(),
+            )
+
+            _add_edge(context.id, notebook_node_id, relation="uses_notebook")
+            _add_edge(notebook_node_id, page_node_id, relation="contains")
+            _add_edge(context.id, page_node_id, relation="tracked")
+            _add_edge(context.id, artifact_node_id, relation="tracked")
+            _add_edge(context.id, activity_node_id, relation="tracked")
+            _add_edge(page_node_id, artifact_node_id, relation="contains_artifact")
+            _add_edge(page_node_id, activity_node_id, relation="was_generated_by")
+            _add_edge(artifact_node_id, activity_node_id, relation="was_generated_by")
+            _add_edge(page_node_id, user_node_id, relation="was_attributed_to")
+            _add_edge(artifact_node_id, user_node_id, relation="was_attributed_to")
+            _add_edge(activity_node_id, user_node_id, relation="was_associated_with")
+            _add_edge(activity_node_id, software_node_id, relation="was_associated_with")
+
+            context.graph_data = nx.node_link_data(graph, edges="links")
+            self._save_state()
+        except Exception as e:
+            logger.warning(f"Failed to record upload provenance in project graph: {e}")
 
     def create_project(
         self, name: str, description: str, linked_notebook_ids: list[str] | None = None

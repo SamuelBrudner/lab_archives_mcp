@@ -2,11 +2,16 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable
+from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any, cast
 
 import pytest
 
+from labarchives_mcp.linked_data import export_project_jsonld
+from labarchives_mcp.models.upload import ProvenanceMetadata
 from labarchives_mcp import mcp_server
+from labarchives_mcp.state import StateManager
 
 
 class DummyCredentials:
@@ -298,3 +303,84 @@ def test_upload_tool_registered_by_default(monkeypatch: pytest.MonkeyPatch) -> N
     assert (
         "upload_to_labarchives" in fastmcp_instance.tool_callbacks
     ), "upload_to_labarchives should be registered by default when env var is not set"
+
+
+def test_export_tool_registered_and_matches_state_wrapper(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The JSON-LD export tool should be registered and match the state wrapper output."""
+
+    mcp_module = cast(Any, mcp_server)
+    monkeypatch.delenv("LABARCHIVES_ENABLE_UPLOAD", raising=False)
+    monkeypatch.setattr(
+        mcp_module.Credentials,
+        "from_file",
+        classmethod(lambda cls: DummyCredentials()),
+    )
+    monkeypatch.setattr(mcp_module.httpx, "AsyncClient", DummyAsyncClient)
+
+    class DummyAuthenticationManager:
+        def __init__(self, client: DummyAsyncClient, credentials: DummyCredentials) -> None:
+            self._client = client
+            self._credentials = credentials
+
+        async def ensure_uid(self) -> str:
+            return "uid123"
+
+    class DummyLabArchivesClient:
+        def __init__(self, client: DummyAsyncClient, auth_manager: Any) -> None:
+            self._client = client
+            self._auth_manager = auth_manager
+
+        async def list_notebooks(self, _uid: str) -> list[Any]:
+            return []
+
+    state_manager = StateManager(storage_dir=tmp_path)
+    context = state_manager.create_project("Proj 1", "Desc")
+    metadata = ProvenanceMetadata(
+        git_commit_sha="f" * 40,
+        git_branch="main",
+        git_repo_url="https://github.com/SamuelBrudner/lab_archives_mcp",
+        git_is_dirty=False,
+        code_version="0.4.0",
+        executed_at=datetime(2026, 4, 20, 14, 1, 58, tzinfo=UTC),
+        python_version="3.11.8",
+        dependencies={"networkx": "3.4"},
+        os_name="Darwin",
+        hostname="host.local",
+    )
+    state_manager.record_upload_provenance(
+        uid="uid123",
+        notebook_id="nb1",
+        page_title="Analysis Results",
+        file_path=tmp_path / "analysis.ipynb",
+        page_tree_id="page-123",
+        entry_id="ATTACH_123",
+        page_url="https://example.org/page-123",
+        created_at="2026-04-20T14:02:11Z",
+        file_size_bytes=1234,
+        filename="analysis.ipynb",
+        metadata=metadata,
+        server_version="0.4.0",
+        as_page_text=False,
+    )
+
+    monkeypatch.setattr(mcp_module, "AuthenticationManager", DummyAuthenticationManager)
+    monkeypatch.setattr(mcp_module, "LabArchivesClient", DummyLabArchivesClient)
+    monkeypatch.setattr(mcp_module, "StateManager", lambda: state_manager)
+
+    fastmcp_instance = DummyFastMCP(
+        server_id="labarchives-mcp-pol",
+        name="",
+        version="",
+        description="",
+    )
+    monkeypatch.setattr(mcp_module, "FastMCP", lambda **kwargs: fastmcp_instance)
+
+    asyncio.run(mcp_server.run_server())
+
+    assert "export_provenance_jsonld" in fastmcp_instance.tool_callbacks
+    tool = fastmcp_instance.tool_callbacks["export_provenance_jsonld"]
+    result = asyncio.run(tool(context.id))
+
+    assert result == export_project_jsonld(context.id, state_dir=tmp_path)
