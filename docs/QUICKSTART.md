@@ -34,23 +34,23 @@ cat conf/secrets.yml
 - `get_onboard_payload(format="json"|"markdown")` — Fetch onboarding payload via MCP
 - `list_labarchives_notebooks()` — List all notebooks for the authenticated user
 - `list_notebook_pages(notebook_id, folder_id?)` — Navigate notebook hierarchy
-- `read_notebook_page(notebook_id, page_id)` — Fetch full page entries with metadata
+- `read_notebook_page(notebook_id, page_id, track_visit=True, dry_run=False)` — Fetch full page entries with metadata and optionally record the visit
 - `search_labarchives(query, limit=5)` — Semantic search across indexed notebooks
 - `sync_vector_index(...)` — Plan or run embedding/index updates
 - `upload_to_labarchives(...)` — Upload files with provenance metadata
 - `export_provenance_jsonld(project_id)` — Export one saved project context as JSON-LD
 - Project memory and graph tools:
-  - `create_project`, `list_projects`, `switch_project`, `delete_project`
-- `log_finding`, `get_current_context`
-- `get_related_pages`, `trace_provenance`, `suggest_next_steps`
-- State is tied to an active project; call `create_project` (or reuse a default) before logging visits/findings.
+  - `create_project(..., dry_run=False)`, `list_projects`, `switch_project(..., dry_run=False)`, `delete_project(..., dry_run=False)`
+- `log_finding(content, source_url=None, page_id=None, dry_run=False)`, `get_current_context`
+- `get_related_pages(notebook_id, page_id, limit=20, offset=0)`, `trace_provenance`, `suggest_next_steps`
+- State is tied to an active project; call `create_project` before logging visits/findings.
 
 **Resource**: `labarchives://notebooks` (same as list_labarchives_notebooks tool)
 
 > **Workflow tip:** Capture the CLI onboarding output once per session and persist the `sticky_context` block before invoking other tools.
 
 **State location:** Project state (active project, visited pages, findings, graph) persists to `~/.labarchives_state/session_state.json` by default so assistants can resume work across sessions.
-**Requirement:** No active project means visits are ignored and findings error; create/switch first.
+**Requirement:** No active project means visits are ignored and findings error; create or switch first.
 
 ## Indexing & Sync
 

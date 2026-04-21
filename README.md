@@ -33,6 +33,7 @@ A **Model Context Protocol (MCP) server** that connects AI assistants to LabArch
 - Graph concepts ("The Lab Brain"): `docs/graph_concepts.md`
 - Linked-data provenance export: `docs/linked_data.md`
 - Vector backend design and ops: `README_VECTOR_BACKEND.md`
+- Semantic governance: `docs/semantic_governance.md`
 
 ## Features
 
@@ -256,6 +257,8 @@ asyncio.run(test())
 - **Code organization and testing**
   - The MCP server is organized into logical modules with clear responsibilities.
   - Unit tests and integration tests cover key functionality, including authentication, notebook navigation, and upload workflows.
+  - GitHub Actions runs the non-integration test suite with `pytest --cov=src --cov-report=xml --cov-report=term`, writes the measured line coverage from `coverage.xml` to the job summary, and attempts a non-blocking Codecov upload on the Ubuntu/Python 3.11 job.
+  - The README intentionally avoids a fixed coverage percentage or badge; use the latest Actions summary, `coverage.xml`, or Codecov report for the current measured value.
 
 - **Security and authentication**
   - The MCP server uses HMAC-SHA512 signing for authentication, with credentials stored securely in environment variables or configuration files.
@@ -268,7 +271,7 @@ asyncio.run(test())
 ## Project state, graph navigation, and heuristics
 
 - **Persistent context**: The server maintains project-scoped memory (visited pages, findings, linked notebooks) in `~/.labarchives_state/session_state.json` by default so assistants can resume work across sessions and repositories. **Projects are required**—create one before logging visits or findings.
-- **Graph-backed navigation**: Every page visit and finding is added to a NetworkX graph, enabling related-page discovery (`get_related_pages`) and provenance tracing (`trace_provenance`).
+- **Graph-backed navigation**: Page visits and findings are added to a NetworkX graph with project, notebook, page, and finding nodes, enabling related-page discovery (`get_related_pages`) and provenance tracing (`trace_provenance`).
 - **Project tools**: Manage contexts with `create_project`, `list_projects`, `switch_project`, `delete_project`, inspect them with `get_current_context`, and log observations via `log_finding`. State is only persisted when a project is active.
 - **Lightweight guidance**: `suggest_next_steps` provides cold start detection and activity stats (not prescriptive workflow phases).
 - **Onboarding**: `get_onboard_payload` (or `labarchives-mcp --print-onboard`) returns usage guidance and sticky context.
@@ -358,7 +361,7 @@ For configuration examples for Windsurf and Claude Desktop (including environmen
 
 **Reading**:
 
-- **`read_notebook_page(notebook_id, page_id)`** - Read content from a specific page
+- **`read_notebook_page(notebook_id, page_id, track_visit=True, dry_run=False)`** - Read content from a specific page and optionally record the visit in the active project
 
 **Writing**:
 
@@ -367,11 +370,11 @@ For configuration examples for Windsurf and Claude Desktop (including environmen
 
 **Project state & heuristics**:
 
-- **`create_project(name, description, linked_notebook_ids=None)`** - Start and activate a project workspace
-- **`list_projects()`**, **`switch_project(project_id)`**, **`delete_project(project_id)`** - Manage project contexts
-- **`log_finding(content, source_url=None)`** - Append a finding to the active project
+- **`create_project(name, description, linked_notebook_ids=None, dry_run=False)`** - Start and activate a project workspace
+- **`list_projects()`**, **`switch_project(project_id, dry_run=False)`**, **`delete_project(project_id, dry_run=False)`** - Manage project contexts
+- **`log_finding(content, source_url=None, page_id=None, dry_run=False)`** - Append a finding to the active project; `page_id` links the finding back to evidence
 - **`get_current_context()`** - Return full project state (pages, findings, graph)
-- **`get_related_pages(notebook_id, page_id)`** - Find sibling/linked pages via the project graph and detected LabArchives links
+- **`get_related_pages(notebook_id, page_id, limit=20, offset=0)`** - Find sibling/linked pages via the project graph and detected LabArchives links; returns `items` plus pagination `meta`
 - **`trace_provenance(notebook_id, page_id, entry_id)`** - Trace sources and metadata for a specific entry
 - **`suggest_next_steps()`** - Get lightweight guidance based on your current project state (cold start vs active)
 
@@ -441,7 +444,10 @@ list_notebook_pages(notebook_id, folder_id="67890")
     "content": "<p>Entry text content...</p>",
     "created_at": "2025-01-01T00:00:00Z",
     "updated_at": "2025-01-02T08:30:00Z"
-  }]
+  }],
+  "tracked_in_project": "Mosquito Navigation Review",
+  "tracked": true,
+  "dry_run": false
 }
 ```
 
@@ -666,6 +672,17 @@ All field descriptions, examples, and validation rules are in the Pydantic model
 
 See `CONTRIBUTING.md` for versioning, Conventional Commits, and release steps.
 
+For the JORS resubmission, cite the archived Zenodo snapshot:
+
+- Archived version: `v0.3.2`
+- DOI: <https://doi.org/10.5281/zenodo.17728440>
+- Git tag: <https://github.com/SamuelBrudner/lab_archives_mcp/releases/tag/v0.3.2>
+
+The current source tree is version `0.3.3`, a post-archive maintenance release
+recorded in `CITATION.cff` and `CHANGELOG.md`. Use the Zenodo DOI above for the
+reviewed JORS archive; cite `0.3.3` only when referring specifically to
+post-archive maintenance changes.
+
 ## Contributing
 
 We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for:
@@ -681,11 +698,12 @@ If you use this software in your research, please cite:
 
 ```bibtex
 @software{brudner2025labarchives,
-  author = {Brudner, Samuel},
+  author = {Brudner, Samuel N.},
   title = {LabArchives MCP Server: AI Integration for Electronic Lab Notebooks},
   year = {2025},
-  url = {https://github.com/SamuelBrudner/lab_archives_mcp},
-  version = {0.2.4}
+  version = {0.3.2},
+  doi = {10.5281/zenodo.17728440},
+  url = {https://doi.org/10.5281/zenodo.17728440}
 }
 ```
 

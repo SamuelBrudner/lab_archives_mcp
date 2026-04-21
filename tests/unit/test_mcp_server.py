@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
 
+import networkx as nx
 import pytest
 
 from labarchives_mcp.linked_data import export_project_jsonld
@@ -61,6 +62,64 @@ class DummyFastMCP:
 
     async def run_async(self) -> None:
         await self.serve()
+
+
+def _run_server_with_test_state(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    *,
+    entries_by_page: dict[tuple[str, str], list[dict[str, Any]]] | None = None,
+) -> tuple[DummyFastMCP, StateManager]:
+    mcp_module = cast(Any, mcp_server)
+    state_manager = StateManager(storage_dir=tmp_path)
+    page_entries = entries_by_page or {}
+
+    monkeypatch.setattr(
+        mcp_module.Credentials,
+        "from_file",
+        classmethod(lambda cls: DummyCredentials()),
+    )
+    monkeypatch.setattr(mcp_module.httpx, "AsyncClient", DummyAsyncClient)
+    monkeypatch.setattr(mcp_module, "StateManager", lambda: state_manager)
+
+    class DummyAuthenticationManager:
+        def __init__(self, client: DummyAsyncClient, credentials: DummyCredentials) -> None:
+            self._client = client
+            self._credentials = credentials
+
+        async def ensure_uid(self) -> str:
+            return "uid-1"
+
+    class DummyLabArchivesClient:
+        def __init__(self, client: DummyAsyncClient, auth_manager: Any) -> None:
+            self._client = client
+            self._auth_manager = auth_manager
+
+        async def list_notebooks(self, _uid: str) -> list[Any]:
+            return []
+
+        async def get_page_entries(
+            self,
+            _uid: str,
+            notebook_id: str,
+            page_id: str,
+            include_data: bool = False,
+        ) -> list[dict[str, Any]]:
+            return page_entries.get((notebook_id, page_id), [])
+
+    monkeypatch.setattr(mcp_module, "AuthenticationManager", DummyAuthenticationManager)
+    monkeypatch.setattr(mcp_module, "LabArchivesClient", DummyLabArchivesClient)
+
+    fastmcp_instance = DummyFastMCP(
+        server_id="labarchives-mcp-pol",
+        name="",
+        version="",
+        description="",
+    )
+    monkeypatch.setattr(mcp_module, "FastMCP", lambda **kwargs: fastmcp_instance)
+
+    asyncio.run(mcp_server.run_server())
+    return fastmcp_instance, state_manager
 
 
 def test_notebooks_handler_propagates_errors(monkeypatch: pytest.MonkeyPatch) -> None:

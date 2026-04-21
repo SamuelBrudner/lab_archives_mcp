@@ -24,6 +24,7 @@ dependencies:
       # Vector backend dependencies
       - tiktoken>=0.7
       - langchain>=0.2
+      - langchain-text-splitters>=0.2
       - openai>=1.40
       - pandas>=2.2
       - pyarrow>=16.0
