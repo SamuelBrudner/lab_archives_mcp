@@ -30,7 +30,7 @@ cat conf/secrets.yml
 ## Available Tools
 
 - `labarchives-mcp --print-onboard json|markdown` — Print onboarding payload for agents
-- `labarchives-mcp export-provenance --project <id> --output graph.jsonld` — Write one project graph as JSON-LD
+- `labarchives-mcp export-provenance --project <id> --output graph.jsonld [--format json-ld|turtle|n-quads]` — Write one project graph as linked data (`turtle` and `n-quads` require `.[linked-data]`)
 - `get_onboard_payload(format="json"|"markdown")` — Fetch onboarding payload via MCP
 - `list_labarchives_notebooks()` — List all notebooks for the authenticated user
 - `list_notebook_pages(notebook_id, folder_id?)` — Navigate notebook hierarchy

@@ -70,6 +70,9 @@ dev = [
   "commitizen>=3.12",
   "types-Markdown>=0.1"
 ]
+linked-data = [
+  "rdflib>=7.0"
+]
 vector = [
   "qdrant-client>=1.9"
 ]

@@ -82,9 +82,10 @@ Project contexts can now be exported as JSON-LD using PROV-O for provenance sema
 ```bash
 labarchives-mcp export-provenance --project <project-id> --output graph.jsonld
 python -m labarchives_mcp export-provenance --project <project-id> --output graph.jsonld
+labarchives-mcp export-provenance --project <project-id> --output graph.ttl --format turtle
 ```
 
-The same export is available inside MCP clients through `export_provenance_jsonld(project_id)`. See `docs/linked_data.md` for the vocabulary mapping and supported graph shapes.
+Install `pip install -e ".[linked-data]"` to enable Turtle and N-Quads CLI output. The MCP tool remains `export_provenance_jsonld(project_id)`. See `docs/linked_data.md` for the vocabulary mapping and supported graph shapes.
 
 ---
 

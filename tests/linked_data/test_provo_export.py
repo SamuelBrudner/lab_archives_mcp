@@ -11,9 +11,11 @@ import pytest
 
 from labarchives_mcp.linked_data.provo_export import (
     CONTEXT_URL,
+    MissingLinkedDataDependencyError,
     build_context,
     export_graph_jsonld,
     export_project_jsonld,
+    write_graph_linked_data,
     write_graph_jsonld,
     write_project_jsonld,
 )
@@ -23,6 +25,38 @@ from labarchives_mcp.state import StateManager
 
 PROV_NS = "http://www.w3.org/ns/prov#"
 SCHEMA_NS = "http://schema.org/"
+
+
+class _FakeLinkedDataWriter:
+    def __init__(self, kind: str) -> None:
+        self.kind = kind
+        self.parse_data: str | None = None
+        self.parse_format: str | None = None
+        self.serialize_format: str | None = None
+
+    def parse(self, *, data: str, format: str) -> _FakeLinkedDataWriter:
+        self.parse_data = data
+        self.parse_format = format
+        return self
+
+    def serialize(self, *, format: str) -> str:
+        self.serialize_format = format
+        return f"{self.kind}:{format}"
+
+
+class _FakeRdflib:
+    def __init__(self) -> None:
+        self.instances: list[_FakeLinkedDataWriter] = []
+
+    def Graph(self) -> _FakeLinkedDataWriter:
+        writer = _FakeLinkedDataWriter("graph")
+        self.instances.append(writer)
+        return writer
+
+    def Dataset(self) -> _FakeLinkedDataWriter:
+        writer = _FakeLinkedDataWriter("dataset")
+        self.instances.append(writer)
+        return writer
 
 
 @pytest.fixture
@@ -258,6 +292,57 @@ def test_write_graph_jsonld_creates_file(enriched_graph: nx.DiGraph, tmp_path: P
     written = json.loads(output.read_text())
     assert "@context" in written
     assert len(written["@graph"]) == 7
+
+
+def test_write_graph_turtle_uses_rdflib_graph(
+    enriched_graph: nx.DiGraph,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake_rdflib = _FakeRdflib()
+    monkeypatch.setattr("labarchives_mcp.linked_data.provo_export._load_rdflib", lambda: fake_rdflib)
+
+    output = tmp_path / "graph.ttl"
+    write_graph_linked_data(enriched_graph, output, output_format="turtle")
+
+    writer = fake_rdflib.instances[0]
+    assert writer.kind == "graph"
+    assert writer.parse_format == "json-ld"
+    assert json.loads(writer.parse_data or "{}")["@context"] == build_context()
+    assert writer.serialize_format == "turtle"
+    assert output.read_text() == "graph:turtle\n"
+
+
+def test_write_graph_nquads_uses_rdflib_dataset(
+    enriched_graph: nx.DiGraph,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake_rdflib = _FakeRdflib()
+    monkeypatch.setattr("labarchives_mcp.linked_data.provo_export._load_rdflib", lambda: fake_rdflib)
+
+    output = tmp_path / "graph.nq"
+    write_graph_linked_data(enriched_graph, output, output_format="n-quads")
+
+    writer = fake_rdflib.instances[0]
+    assert writer.kind == "dataset"
+    assert writer.parse_format == "json-ld"
+    assert writer.serialize_format == "nquads"
+    assert output.read_text() == "dataset:nquads\n"
+
+
+def test_alternate_formats_require_optional_rdflib(
+    enriched_graph: nx.DiGraph,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def _missing_rdflib() -> object:
+        raise MissingLinkedDataDependencyError("install linked-data extra")
+
+    monkeypatch.setattr("labarchives_mcp.linked_data.provo_export._load_rdflib", _missing_rdflib)
+
+    with pytest.raises(MissingLinkedDataDependencyError, match="linked-data extra"):
+        write_graph_linked_data(enriched_graph, tmp_path / "graph.ttl", output_format="turtle")
 
 
 def test_state_wrapper_loads_project_from_state(tmp_path: Path) -> None:
