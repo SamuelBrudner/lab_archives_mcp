@@ -42,7 +42,7 @@ The intended users are wet-lab researchers, research data management teams, and 
 3. **MCP server (`mcp_server.py`)**
    - Exposes notebook operations as MCP tools using the FastMCP framework [@fastmcp].
    - Publishes self-describing tool schemas so AI assistants can autonomously decide when and how to call them.
-   - Groups tools into four main categories: **Discovery** (`list_notebooks`, `list_pages`), **Reading** (`read_page`), **Search** (`search_labarchives`), and **Index Management** (`sync_vector_index`). An experimental `upload_to_labarchives` tool enables upload of artefacts with provenance metadata.
+   - In `v0.4.0`, `mcp_server.py` registers 18 MCP tools by default: 16 discovery, reading, search/index, project-state, provenance, and onboarding tools, plus the write-capable `write_notebook_entry` and `upload_to_labarchives` tools. Setting `LABARCHIVES_ENABLE_UPLOAD=false` disables those two write-capable tools, leaving a 16-tool read/search/state surface.
 
 4. **Vector backend (`vector_backend/`)**
    - Implements a configuration-driven pipeline for semantic search.

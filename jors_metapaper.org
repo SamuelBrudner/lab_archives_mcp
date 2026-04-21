@@ -112,7 +112,7 @@ While LabArchives and other ELN platforms expose REST APIs for CRUD operations, 
 
 2. *API client* (=eln_client.py=): Wraps the LabArchives API using an async HTTP client, provides methods for listing notebooks, traversing page hierarchies, and reading entries, and translates XML responses into validated JSON using Pydantic [5] models.
 
-3. *MCP server* (=mcp_server.py=): Exposes notebook operations as MCP tools using the FastMCP framework [4]. Tools are grouped into Discovery (=list_notebooks=, =list_pages=), Reading (=read_page=), Search (=search_labarchives=), and Index Management (=sync_vector_index=). An experimental =upload_to_labarchives= tool enables upload of artefacts with provenance metadata.
+3. *MCP server* (=mcp_server.py=): Exposes notebook operations as MCP tools using the FastMCP framework [4]. In =v0.4.0=, =mcp_server.py= registers 18 MCP tools by default: 16 discovery, reading, search/index, project-state, provenance, and onboarding tools, plus the write-capable =write_notebook_entry= and =upload_to_labarchives= tools. Setting =LABARCHIVES_ENABLE_UPLOAD=false= disables those two write-capable tools, leaving a 16-tool read/search/state surface.
 
 4. *Vector backend* (=vector_backend/=): Implements a configuration-driven pipeline for semantic search with pluggable text chunking strategies, embedding providers, and vector indices (including Pinecone [7], Qdrant [8], and local Parquet-based storage). Uses Hydra-based [6] configuration so parameters are declared in YAML rather than hard-coded.
 
