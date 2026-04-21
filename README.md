@@ -43,13 +43,13 @@ A **Model Context Protocol (MCP) server** that connects AI assistants to LabArch
 - Navigate notebook pages and folders
 - Read page entries (text, headings, attachments)
 - Semantic search across notebook content (vector search)
-- Upload files with code provenance metadata (experimental)
+- Upload files with code provenance metadata
 - Export project provenance graphs as PROV-O / JSON-LD
 - Full HMAC-SHA512 authentication flow
 
 🚧 **Experimental**
 
-- File upload with Git/Python provenance tracking
+- Additional provenance enrichment and graph heuristics around upload workflows
 
 🔮 **Future**
 
@@ -679,10 +679,10 @@ For the JORS resubmission, cite the archived Zenodo snapshot:
 - DOI: <https://doi.org/10.5281/zenodo.17728440>
 - Git tag: <https://github.com/SamuelBrudner/lab_archives_mcp/releases/tag/v0.3.2>
 
-The current source tree is version `0.3.3`, a post-archive maintenance release
-recorded in `CITATION.cff` and `CHANGELOG.md`. Use the Zenodo DOI above for the
-reviewed JORS archive; cite `0.3.3` only when referring specifically to
-post-archive maintenance changes.
+The current source tree is version `0.4.0`, recorded in `CITATION.cff`,
+`codemeta.json`, and `CHANGELOG.md`. Use the Zenodo DOI above for the reviewed
+JORS archive; cite the current release when referring specifically to linked-data
+export or other post-archive changes.
 
 ## Contributing
 

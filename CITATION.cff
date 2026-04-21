@@ -1,5 +1,5 @@
 cff-version: 1.2.0
-message: "This file describes the current v0.3.3 source tree. For the JORS archived submission, cite the v0.3.2 Zenodo record: https://doi.org/10.5281/zenodo.17728440."
+message: "This file describes the current v0.4.0 source tree. For the JORS archived submission, cite the v0.3.2 Zenodo record: https://doi.org/10.5281/zenodo.17728440."
 type: software
 title: "LabArchives MCP Server: AI Integration for Electronic Lab Notebooks"
 version: 0.4.0
