@@ -4,8 +4,11 @@ Implements configurable chunking with token-aware splitting and boundary preserv
 All chunking is deterministic: same input + config → same chunks.
 """
 
+import re
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Protocol
+from functools import cache
+from typing import Any, Protocol
 
 import tiktoken
 
@@ -109,7 +112,7 @@ class RecursiveTokenChunker:
             config: Chunking configuration
         """
         self.config = config
-        self.encoding = tiktoken.get_encoding(config.tokenizer)
+        self.encoding = _get_token_encoding(config.tokenizer)
 
         # Langchain splitter with custom token counter
         self.splitter = RecursiveCharacterTextSplitter(

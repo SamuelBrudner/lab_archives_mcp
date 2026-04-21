@@ -1,5 +1,5 @@
 cff-version: 1.2.0
-message: "If you use this software, please cite it as below."
+message: "This file describes the current v0.3.3 source tree. For the JORS archived submission, cite the v0.3.2 Zenodo record: https://doi.org/10.5281/zenodo.17728440."
 type: software
 title: "LabArchives MCP Server: AI Integration for Electronic Lab Notebooks"
 version: 0.4.0
@@ -15,11 +15,11 @@ authors:
 repository-code: "https://github.com/SamuelBrudner/lab_archives_mcp"
 url: "https://github.com/SamuelBrudner/lab_archives_mcp"
 abstract: >-
-  A Model Context Protocol (MCP) server that connects AI assistants to
-  LabArchives electronic lab notebooks. Enables researchers to chat with
-  their lab data, search notebooks semantically using vector embeddings,
-  and integrate lab work into AI-assisted workflows. Includes a modular,
-  backend-agnostic vector database framework for semantic search.
+  A Python package that provides a Model Context Protocol (MCP) server for
+  LabArchives electronic lab notebooks and a configurable vector-search backend
+  for semantic retrieval over notebook content. The software exposes notebook
+  resources as typed MCP tools, supports project-scoped state across sessions,
+  and includes optional write and upload operations with provenance metadata.
 keywords:
   - electronic-lab-notebook
   - model-context-protocol

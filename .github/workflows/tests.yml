@@ -52,9 +52,37 @@ jobs:
       run: |
         conda run -p ./conda_envs/test-env pytest -v -m "not integration" --cov=src --cov-report=xml --cov-report=term
 
+    - name: Write coverage summary
+      shell: bash -el {0}
+      run: |
+        python - <<'PY'
+        import os
+        from pathlib import Path
+        import xml.etree.ElementTree as ET
+
+        summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
+        coverage_path = Path("coverage.xml")
+
+        if not summary_path or not coverage_path.exists():
+            raise SystemExit(0)
+
+        root = ET.parse(coverage_path).getroot()
+        line_rate = float(root.attrib["line-rate"]) * 100
+        lines_covered = int(root.attrib["lines-covered"])
+        lines_valid = int(root.attrib["lines-valid"])
+
+        with open(summary_path, "a", encoding="utf-8") as summary:
+            summary.write("### Coverage\n\n")
+            summary.write(f"Line coverage: {line_rate:.1f}% ({lines_covered}/{lines_valid} lines)\n\n")
+            summary.write(
+                "Coverage XML: `coverage.xml`; Codecov upload is best-effort and "
+                "non-blocking on Ubuntu/Python 3.11.\n"
+            )
+        PY
+
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4
-      # Upload coverage only on ubuntu with Python 3.11, skip if token not configured
+      # Upload coverage only on ubuntu with Python 3.11; keep it non-blocking.
       if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11'
       with:
         file: ./coverage.xml
