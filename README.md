@@ -372,9 +372,9 @@ For configuration examples for Windsurf and Claude Desktop (including environmen
 
 - **`create_project(name, description, linked_notebook_ids=None, dry_run=False)`** - Start and activate a project workspace
 - **`list_projects()`**, **`switch_project(project_id, dry_run=False)`**, **`delete_project(project_id, dry_run=False)`** - Manage project contexts
-- **`log_finding(content, source_url=None, page_id=None, dry_run=False)`** - Append a finding to the active project; `page_id` links the finding back to evidence
+- **`log_finding(content, source_url=None, page_id=None, notebook_id=None, dry_run=False)`** - Append a finding to the active project; `page_id` plus optional `notebook_id` links the finding back to evidence
 - **`get_current_context()`** - Return full project state (pages, findings, graph)
-- **`get_related_pages(notebook_id, page_id, limit=20, offset=0)`** - Find sibling/linked pages via the project graph and detected LabArchives links; returns `items` plus pagination `meta`
+- **`get_related_pages(notebook_id, page_id, limit=20, offset=0)`** - Find sibling/linked pages via the project graph and detected LabArchives links; returns actionable `items` with `notebook_id`, `page_id`, `title`, `source`, plus pagination `meta`
 - **`trace_provenance(notebook_id, page_id, entry_id)`** - Trace sources and metadata for a specific entry
 - **`suggest_next_steps()`** - Get lightweight guidance based on your current project state (cold start vs active)
 

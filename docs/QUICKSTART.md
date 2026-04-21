@@ -41,7 +41,7 @@ cat conf/secrets.yml
 - `export_provenance_jsonld(project_id)` — Export one saved project context as JSON-LD
 - Project memory and graph tools:
   - `create_project(..., dry_run=False)`, `list_projects`, `switch_project(..., dry_run=False)`, `delete_project(..., dry_run=False)`
-- `log_finding(content, source_url=None, page_id=None, dry_run=False)`, `get_current_context`
+- `log_finding(content, source_url=None, page_id=None, notebook_id=None, dry_run=False)`, `get_current_context`
 - `get_related_pages(notebook_id, page_id, limit=20, offset=0)`, `trace_provenance`, `suggest_next_steps`
 - State is tied to an active project; call `create_project` before logging visits/findings.
 

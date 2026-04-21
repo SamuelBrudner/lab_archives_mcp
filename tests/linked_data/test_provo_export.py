@@ -58,7 +58,7 @@ def enriched_graph() -> nx.DiGraph:
     graph.add_node("proj-1", type="project", label="Proj 1", description="Desc", created_at=1.0)
     graph.add_node("notebook:nb1", type="notebook", label="nb1", notebook_id="nb1")
     graph.add_node(
-        "page:page-123",
+        "page:nb1:page-123",
         type="page",
         label="Analysis Results",
         page_id="page-123",
@@ -103,20 +103,22 @@ def enriched_graph() -> nx.DiGraph:
         server_version="0.4.0",
     )
     graph.add_edge("proj-1", "notebook:nb1", relation="uses_notebook")
-    graph.add_edge("notebook:nb1", "page:page-123", relation="contains")
-    graph.add_edge("proj-1", "page:page-123", relation="tracked")
+    graph.add_edge("notebook:nb1", "page:nb1:page-123", relation="contains")
+    graph.add_edge("proj-1", "page:nb1:page-123", relation="tracked")
     graph.add_edge("proj-1", "artifact:page-123:ATTACH_123", relation="tracked")
     graph.add_edge("proj-1", "activity:upload:page-123:ATTACH_123", relation="tracked")
-    graph.add_edge("page:page-123", "artifact:page-123:ATTACH_123", relation="contains_artifact")
+    graph.add_edge("page:nb1:page-123", "artifact:page-123:ATTACH_123", relation="contains_artifact")
     graph.add_edge(
-        "page:page-123", "activity:upload:page-123:ATTACH_123", relation="was_generated_by"
+        "page:nb1:page-123",
+        "activity:upload:page-123:ATTACH_123",
+        relation="was_generated_by",
     )
     graph.add_edge(
         "artifact:page-123:ATTACH_123",
         "activity:upload:page-123:ATTACH_123",
         relation="was_generated_by",
     )
-    graph.add_edge("page:page-123", "user:uid123", relation="was_attributed_to")
+    graph.add_edge("page:nb1:page-123", "user:uid123", relation="was_attributed_to")
     graph.add_edge("artifact:page-123:ATTACH_123", "user:uid123", relation="was_attributed_to")
     graph.add_edge(
         "activity:upload:page-123:ATTACH_123",
@@ -162,12 +164,12 @@ def test_legacy_graph_exports_membership_and_derivation(legacy_graph: nx.DiGraph
 
 def test_enriched_graph_exports_upload_provenance(enriched_graph: nx.DiGraph) -> None:
     document = export_graph_jsonld(enriched_graph)
-    page = _node_by_suffix(document, "page/page-123")
+    page = _node_by_suffix(document, "page/nb1/page-123")
     artifact = _node_by_suffix(document, "artifact/page-123/ATTACH_123")
     activity = _node_by_suffix(document, "activity/upload/page-123/ATTACH_123")
 
     assert page["wasGeneratedBy"] == "labmcp:activity/upload/page-123/ATTACH_123"
-    assert "labmcp:page/page-123" in str(artifact["isPartOf"])
+    assert "labmcp:page/nb1/page-123" in str(artifact["isPartOf"])
     assert activity["wasAssociatedWith"] == [
         "labmcp:user/uid123",
         "labmcp:software_agent/labarchives-mcp-pol",

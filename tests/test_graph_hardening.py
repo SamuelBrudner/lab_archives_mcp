@@ -16,8 +16,8 @@ def _build_graph(project_id: str, pages: list[tuple[str, str]]) -> dict[str, Any
     graph = nx.DiGraph()
     graph.add_node(project_id, type="project")
     for page_id, notebook_id in pages:
-        node_id = f"page:{page_id}"
-        graph.add_node(node_id, type="page", notebook_id=notebook_id)
+        node_id = f"page:{notebook_id}:{page_id}"
+        graph.add_node(node_id, type="page", notebook_id=notebook_id, page_id=page_id)
         graph.add_edge(project_id, node_id, relation="visited")
     return cast(dict[str, Any], nx.node_link_data(graph, edges="links"))
 

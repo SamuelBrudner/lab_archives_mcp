@@ -19,7 +19,7 @@ from loguru import logger
 from . import onboard
 from .auth import AuthenticationManager, Credentials
 from .eln_client import LabArchivesClient
-from .state import StateManager
+from .state import PageReferenceError, StateManager, _parse_page_node_ref
 from .transform import LabArchivesAPIError, translate_labarchives_fault
 
 ResourceHandler = Callable[[], Awaitable[dict[str, Any]]]
@@ -986,29 +986,49 @@ async def run_server() -> None:
             content: str,
             source_url: str | None = None,
             page_id: str | None = None,
+            notebook_id: str | None = None,
             dry_run: bool = False,
         ) -> dict[str, Any]:
             """Record a key fact or finding in the current project context.
 
             Use this to "take notes" about what you've discovered. If you supply
-            a page_id, the finding is linked back to that page for provenance. Set dry_run
-            to preview without mutating state.
+            a page_id, the finding is linked back to that page for provenance. Supply
+            notebook_id when page IDs are not unique across notebooks. Set dry_run to
+            preview without mutating state.
             """
             try:
                 if dry_run:
+                    resolved_notebook_id = notebook_id
+                    if page_id and not resolved_notebook_id:
+                        resolved_page_node_id = state_manager.resolve_page_node_id(page_id=page_id)
+                        resolved_notebook_id, _ = _parse_page_node_ref(resolved_page_node_id)
                     return {
                         "status": "dry_run",
                         "content": content[:50] + "..." if len(content) > 50 else content,
                         "page_id": page_id,
+                        "notebook_id": resolved_notebook_id,
                     }
 
-                state_manager.log_finding(content, source_url=source_url, page_id=page_id)
+                state_manager.log_finding(
+                    content,
+                    source_url=source_url,
+                    page_id=page_id,
+                    notebook_id=notebook_id,
+                )
                 context = state_manager.get_active_context()
                 return {
                     "status": "ok",
                     "content": content[:50] + "..." if len(content) > 50 else content,
                     "project": context.name if context else "Unknown",
                     "project_id": context.id if context else None,
+                }
+            except PageReferenceError as e:
+                return {
+                    "status": "error",
+                    "code": e.code,
+                    "message": str(e),
+                    "page_id": page_id,
+                    "notebook_id": notebook_id,
                 }
             except RuntimeError as e:
                 return {"status": "error", "code": "no_active_context", "message": str(e)}
@@ -1065,20 +1085,37 @@ async def run_server() -> None:
                 }
 
             related_pages: list[dict[str, Any]] = []
-            seen_ids: set[str] = set()
+            seen_pages: set[tuple[str, str]] = set()
 
-            def _add_related_page(related_page_id: str, title: str, source: str) -> None:
-                if related_page_id == page_id or related_page_id in seen_ids:
+            def _add_related_page(
+                related_notebook_id: str | None,
+                related_page_id: str,
+                title: str,
+                source: str,
+            ) -> None:
+                normalized_related_page_id = str(related_page_id or "").strip()
+                normalized_related_notebook_id = str(related_notebook_id or "").strip()
+                if not normalized_related_page_id or not normalized_related_notebook_id:
+                    return
+                if (
+                    normalized_related_page_id == page_id
+                    and normalized_related_notebook_id == notebook_id
+                ):
+                    return
+
+                key = (normalized_related_notebook_id, normalized_related_page_id)
+                if key in seen_pages:
                     return
 
                 related_pages.append(
                     {
-                        "page_id": related_page_id,
+                        "notebook_id": normalized_related_notebook_id,
+                        "page_id": normalized_related_page_id,
                         "title": title,
                         "source": source,
                     }
                 )
-                seen_ids.add(related_page_id)
+                seen_pages.add(key)
 
             # Detect content links first so get_related_pages also upgrades the graph.
             content_links: list[tuple[str, str]] = []
@@ -1096,12 +1133,19 @@ async def run_server() -> None:
             # 1. Graph Neighbors (from NetworkX)
             try:
                 graph = nx.node_link_graph(context.graph_data, edges="links")
-                page_node_id = f"page:{page_id}"
+                page_node_id = state_manager.resolve_page_node_id(
+                    page_id=page_id,
+                    notebook_id=notebook_id,
+                )
 
                 if graph.has_node(page_node_id):
+                    def _page_ref(node_id: str) -> tuple[str | None, str | None]:
+                        return _parse_page_node_ref(str(node_id), graph.nodes[node_id])
+
                     def _page_title(node_id: str) -> str:
                         node_data = graph.nodes[node_id]
-                        return str(node_data.get("label") or node_id.replace("page:", ""))
+                        _, related_page_id = _page_ref(node_id)
+                        return str(node_data.get("label") or related_page_id or "Unknown")
 
                     # Direct content links are the strongest page-to-page signal.
                     for _, target, edge_data in graph.out_edges(page_node_id, data=True):
@@ -1109,9 +1153,12 @@ async def run_server() -> None:
                         if (
                             target_data.get("type") == "page"
                             and edge_data.get("relation") == "content_link"
+                            and not target_data.get("legacy_unqualified")
                         ):
+                            related_notebook_id, related_page_id = _page_ref(target)
                             _add_related_page(
-                                target.replace("page:", ""),
+                                related_notebook_id,
+                                related_page_id or "",
                                 _page_title(target),
                                 "content_link",
                             )
@@ -1121,7 +1168,7 @@ async def run_server() -> None:
                     graph_undir = graph.to_undirected()
                     for neighbor in graph_undir.neighbors(page_node_id):
                         node_data = graph.nodes[neighbor]
-                        if node_data.get("type") != "page":
+                        if node_data.get("type") != "page" or node_data.get("legacy_unqualified"):
                             continue
 
                         edge_data = graph.get_edge_data(
@@ -1130,8 +1177,10 @@ async def run_server() -> None:
                         if edge_data.get("relation") == "content_link":
                             continue
 
+                        related_notebook_id, related_page_id = _page_ref(neighbor)
                         _add_related_page(
-                            neighbor.replace("page:", ""),
+                            related_notebook_id,
+                            related_page_id or "",
                             _page_title(neighbor),
                             "graph_neighbor",
                         )
@@ -1141,18 +1190,25 @@ async def run_server() -> None:
                         if node_data.get("type") == "project":
                             for sibling in graph_undir.neighbors(neighbor):
                                 sibling_data = graph.nodes[sibling]
-                                if sibling_data.get("type") == "page":
+                                if (
+                                    sibling_data.get("type") == "page"
+                                    and not sibling_data.get("legacy_unqualified")
+                                ):
+                                    sibling_notebook_id, sibling_page_id = _page_ref(sibling)
                                     _add_related_page(
-                                        sibling.replace("page:", ""),
+                                        sibling_notebook_id,
+                                        sibling_page_id or "",
                                         str(sibling_data.get("label", "Unknown")),
                                         "project_sibling",
                                     )
+            except PageReferenceError as e:
+                logger.warning(f"Graph query skipped: {e}")
             except Exception as e:
                 logger.warning(f"Graph query failed: {e}")
 
             # If graph persistence failed, still surface detected content links for this call.
-            for _target_notebook_id, target_page_id in content_links:
-                _add_related_page(target_page_id, "Linked Page", "content_link")
+            for target_notebook_id, target_page_id in content_links:
+                _add_related_page(target_notebook_id, target_page_id, "Linked Page", "content_link")
 
             items, meta = _paginate_items(related_pages, limit=limit, offset=offset)
             return {"items": items, "meta": meta}
@@ -1228,7 +1284,10 @@ async def run_server() -> None:
                 context = state_manager.get_active_context()
                 if context:
                     graph = nx.node_link_graph(context.graph_data, edges="links")
-                    page_node_id = f"page:{page_id}"
+                    page_node_id = state_manager.resolve_page_node_id(
+                        page_id=page_id,
+                        notebook_id=notebook_id,
+                    )
 
                     if graph.has_node(page_node_id):
                         for successor in graph.successors(page_node_id):
@@ -1243,6 +1302,8 @@ async def run_server() -> None:
                                             "description": node_data.get("label", "Agent finding"),
                                         }
                                     )
+            except PageReferenceError as e:
+                logger.warning(f"Graph provenance check skipped: {e}")
             except Exception as e:
                 logger.warning(f"Graph provenance check failed: {e}")
 

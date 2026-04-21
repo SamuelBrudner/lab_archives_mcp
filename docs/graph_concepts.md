@@ -61,7 +61,7 @@ The tool returns a paginated response with `items` and `meta` fields. `limit` de
 Traces evidence for one entry by combining:
 - Explicit `Derived From:` or `Source:` text patterns in the entry content.
 - Sibling code-provenance metadata entries written by upload workflows.
-- Project-graph `evidence_from` edges created when `log_finding(..., page_id=...)` links a finding back to a source page.
+- Project-graph `evidence_from` edges created when `log_finding(..., page_id=..., notebook_id=...)` links a finding back to a source page. If `notebook_id` is omitted, the `page_id` must resolve uniquely in the active graph.
 
 ### `suggest_next_steps`
 Provides lightweight guidance based on project state:

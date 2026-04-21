@@ -443,3 +443,123 @@ def test_export_tool_registered_and_matches_state_wrapper(
     result = asyncio.run(tool(context.id))
 
     assert result == export_project_jsonld(context.id, state_dir=tmp_path)
+
+
+def test_get_related_pages_returns_actionable_cross_notebook_links(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Content links should preserve notebook identity in related-page results."""
+    fastmcp_instance, state_manager = _run_server_with_test_state(
+        monkeypatch,
+        tmp_path,
+        entries_by_page={
+            ("nb1", "page-a"): [
+                {
+                    "eid": "entry-1",
+                    "content": "See https://labarchives.com/share/nb2/page-c for details.",
+                }
+            ]
+        },
+    )
+    state_manager.create_project("Proj", "Desc")
+    state_manager.log_visit("nb1", "page-a", "Page A")
+
+    tool = fastmcp_instance.tool_callbacks["get_related_pages"]
+    result = asyncio.run(tool("nb1", "page-a"))
+
+    assert result["items"] == [
+        {
+            "notebook_id": "nb2",
+            "page_id": "page-c",
+            "title": "Linked Page",
+            "source": "content_link",
+        }
+    ]
+
+    context = state_manager.get_active_context()
+    assert context is not None
+    graph = nx.node_link_graph(context.graph_data, edges="links")
+    assert graph.has_edge("page:nb1:page-a", "page:nb2:page-c")
+    assert graph.edges["page:nb1:page-a", "page:nb2:page-c"]["relation"] == "content_link"
+
+
+def test_get_related_pages_keeps_same_page_id_from_multiple_notebooks(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Distinct notebook targets with the same page_id should both survive dedupe."""
+    fastmcp_instance, state_manager = _run_server_with_test_state(
+        monkeypatch,
+        tmp_path,
+        entries_by_page={
+            ("nb1", "page-a"): [
+                {
+                    "eid": "entry-1",
+                    "content": (
+                        "A https://labarchives.com/share/nb2/shared "
+                        "B https://labarchives.com/share/nb3/shared"
+                    ),
+                }
+            ]
+        },
+    )
+    state_manager.create_project("Proj", "Desc")
+    state_manager.log_visit("nb1", "page-a", "Page A")
+
+    tool = fastmcp_instance.tool_callbacks["get_related_pages"]
+    result = asyncio.run(tool("nb1", "page-a"))
+
+    assert result["items"] == [
+        {
+            "notebook_id": "nb2",
+            "page_id": "shared",
+            "title": "Linked Page",
+            "source": "content_link",
+        },
+        {
+            "notebook_id": "nb3",
+            "page_id": "shared",
+            "title": "Linked Page",
+            "source": "content_link",
+        },
+    ]
+
+
+def test_log_finding_tool_reports_ambiguous_page_ids(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Ambiguous bare page references should return a structured tool error."""
+    fastmcp_instance, state_manager = _run_server_with_test_state(monkeypatch, tmp_path)
+    state_manager.create_project("Proj", "Desc")
+    state_manager.log_visit("nb1", "shared", "Shared A")
+    state_manager.log_visit("nb2", "shared", "Shared B")
+
+    tool = fastmcp_instance.tool_callbacks["log_finding"]
+    result = asyncio.run(tool("A key fact", page_id="shared"))
+
+    assert result == {
+        "status": "error",
+        "code": "ambiguous_page_reference",
+        "message": "Page 'shared' matches multiple notebooks; provide notebook_id.",
+        "page_id": "shared",
+        "notebook_id": None,
+    }
+
+
+def test_log_finding_tool_links_page_with_notebook_id(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Explicit notebook_id should make provenance links actionable."""
+    fastmcp_instance, state_manager = _run_server_with_test_state(monkeypatch, tmp_path)
+    state_manager.create_project("Proj", "Desc")
+    state_manager.log_visit("nb1", "page-a", "Page A")
+
+    tool = fastmcp_instance.tool_callbacks["log_finding"]
+    result = asyncio.run(tool("A key fact", page_id="page-a", notebook_id="nb1"))
+
+    assert result["status"] == "ok"
+    context = state_manager.get_active_context()
+    assert context is not None
+    graph = nx.node_link_graph(context.graph_data, edges="links")
+    finding_nodes = [n for n, d in graph.nodes(data=True) if d.get("type") == "finding"]
+    assert finding_nodes
+    assert graph.has_edge("page:nb1:page-a", finding_nodes[0])

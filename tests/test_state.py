@@ -9,7 +9,13 @@ import networkx as nx
 import pytest
 
 from labarchives_mcp.models.upload import ProvenanceMetadata
-from labarchives_mcp.state import GRAPH_SCHEMA_VERSION, ProjectContext, StateManager
+from labarchives_mcp.state import (
+    GRAPH_SCHEMA_VERSION,
+    AmbiguousPageReferenceError,
+    PageReferenceNotFoundError,
+    ProjectContext,
+    StateManager,
+)
 
 
 @pytest.fixture  # type: ignore[misc]
@@ -95,7 +101,7 @@ def test_log_visit(state_manager: StateManager) -> None:
     # Graph should contain project and page nodes with a visited edge
     graph_nodes = {node["id"] for node in loaded_context.graph_data.get("nodes", [])}
     assert context.id in graph_nodes
-    assert f"page:{visit.page_id}" in graph_nodes
+    assert "page:nb1:p1" in graph_nodes
 
 
 def test_log_page_content_links_adds_direct_edges(state_manager: StateManager) -> None:
@@ -112,12 +118,35 @@ def test_log_page_content_links_adds_direct_edges(state_manager: StateManager) -
     graph = nx.node_link_graph(context.graph_data, edges="links")
 
     assert recorded == 1
-    assert graph.has_node("page:p2")
-    assert graph.nodes["page:p2"]["type"] == "page"
-    assert graph.nodes["page:p2"]["notebook_id"] == "nb1"
-    assert graph.has_edge("page:p1", "page:p2")
-    assert graph.edges["page:p1", "page:p2"]["relation"] == "content_link"
+    assert graph.has_node("page:nb1:p2")
+    assert graph.nodes["page:nb1:p2"]["type"] == "page"
+    assert graph.nodes["page:nb1:p2"]["notebook_id"] == "nb1"
+    assert graph.has_edge("page:nb1:p1", "page:nb1:p2")
+    assert graph.edges["page:nb1:p1", "page:nb1:p2"]["relation"] == "content_link"
     assert [visit.page_id for visit in context.visited_pages] == ["p1"]
+
+
+def test_log_page_content_links_keeps_duplicate_page_ids_separate(
+    state_manager: StateManager,
+) -> None:
+    """Cross-notebook links with the same page_id should stay distinct."""
+    context = state_manager.create_project("Proj 1", "Desc 1")
+    state_manager.log_visit("nb1", "shared", "Shared A")
+
+    recorded = state_manager.log_page_content_links(
+        "nb1",
+        "shared",
+        [("nb2", "shared")],
+    )
+
+    graph = nx.node_link_graph(context.graph_data, edges="links")
+
+    assert recorded == 1
+    assert graph.has_node("page:nb1:shared")
+    assert graph.has_node("page:nb2:shared")
+    assert graph.has_edge("page:nb1:shared", "page:nb2:shared")
+    assert graph.nodes["page:nb1:shared"]["label"] == "Shared A"
+    assert graph.nodes["page:nb2:shared"]["notebook_id"] == "nb2"
 
 
 def test_log_finding(state_manager: StateManager) -> None:
@@ -143,15 +172,36 @@ def test_log_finding(state_manager: StateManager) -> None:
 def test_log_finding_links_page(state_manager: StateManager) -> None:
     """Finding should be connected to a source page when provided."""
     context = state_manager.create_project("Proj 1", "Desc 1")
-    state_manager.log_finding("Fact 1", page_id="p1")
+    state_manager.log_visit("nb1", "p1", "Page 1")
+    state_manager.log_finding("Fact 1", page_id="p1", notebook_id="nb1")
 
     graph = nx.node_link_graph(context.graph_data, edges="links")
-    page_node_id = "page:p1"
+    page_node_id = "page:nb1:p1"
     finding_nodes = [n for n, d in graph.nodes(data=True) if d.get("type") == "finding"]
 
     assert graph.has_node(page_node_id)
     assert finding_nodes
     assert graph.has_edge(page_node_id, finding_nodes[0])
+
+
+def test_log_finding_requires_notebook_id_when_page_id_ambiguous(
+    state_manager: StateManager,
+) -> None:
+    """Bare page_id provenance should fail when multiple notebooks match."""
+    state_manager.create_project("Proj 1", "Desc 1")
+    state_manager.log_visit("nb1", "shared", "Shared A")
+    state_manager.log_visit("nb2", "shared", "Shared B")
+
+    with pytest.raises(AmbiguousPageReferenceError):
+        state_manager.log_finding("Fact 1", page_id="shared")
+
+
+def test_log_finding_raises_when_page_id_is_unknown(state_manager: StateManager) -> None:
+    """Unknown page references should fail explicitly."""
+    state_manager.create_project("Proj 1", "Desc 1")
+
+    with pytest.raises(PageReferenceNotFoundError):
+        state_manager.log_finding("Fact 1", page_id="missing")
 
 
 def test_graph_migration_adds_version_and_timestamps(temp_state_dir: Path) -> None:
@@ -166,7 +216,14 @@ def test_graph_migration_adds_version_and_timestamps(temp_state_dir: Path) -> No
                 "linked_notebook_ids": [],
                 "status": "active",
                 "created_at": 0,
-                "visited_pages": [],
+                "visited_pages": [
+                    {
+                        "page_id": "p1",
+                        "title": "Page 1",
+                        "notebook_id": "nb1",
+                        "timestamp": 0,
+                    }
+                ],
                 "findings": [],
                 "graph_data": {
                     "nodes": [
@@ -174,7 +231,13 @@ def test_graph_migration_adds_version_and_timestamps(temp_state_dir: Path) -> No
                             "id": "proj-1",
                             "type": "project",
                             # missing first_seen/last_seen to be backfilled
-                        }
+                        },
+                        {
+                            "id": "page:p1",
+                            "type": "page",
+                            "label": "Page 1",
+                            "page_id": "p1",
+                        },
                     ],
                     "links": [
                         {
@@ -201,6 +264,10 @@ def test_graph_migration_adds_version_and_timestamps(temp_state_dir: Path) -> No
 
     meta = context.graph_data.get("graph", {})
     assert meta.get("schema_version") == GRAPH_SCHEMA_VERSION
+
+    graph = nx.node_link_graph(context.graph_data, edges="links")
+    assert graph.has_node("page:nb1:p1")
+    assert not graph.has_node("page:p1")
 
     for node in context.graph_data.get("nodes", []):
         assert "first_seen" in node
@@ -272,7 +339,7 @@ def test_record_upload_provenance_adds_activity_subgraph(state_manager: StateMan
     )
 
     graph = nx.node_link_graph(context.graph_data, edges="links")
-    assert graph.nodes["page:page-123"]["type"] == "page"
+    assert graph.nodes["page:nb1:page-123"]["type"] == "page"
     assert graph.nodes["artifact:page-123:ATTACH_123"]["type"] == "artifact"
     assert graph.nodes["activity:upload:page-123:ATTACH_123"]["type"] == "activity"
     assert graph.nodes["user:uid123"]["type"] == "user"
