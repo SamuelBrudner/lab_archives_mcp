@@ -55,6 +55,8 @@ The activity node carries the metadata already validated by `ProvenanceMetadata`
 - CLI: `labarchives-mcp export-provenance --project <id> --output graph.jsonld [--state-dir <path>]`
 - Module form: `python -m labarchives_mcp export-provenance --project <id> --output graph.jsonld`
 
+Exports embed the full JSON-LD `@context` inline by default so they remain valid even when a hosted context is unavailable. The same context is also checked into `ns/context.jsonld` and `docs/ns/context.jsonld` so GitHub Pages deployments can serve the advertised compact context URL consistently.
+
 ## Non-goals
 
 - No ontology redesign beyond PROV-O + schema.org + a small `labmcp:` namespace

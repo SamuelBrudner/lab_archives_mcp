@@ -10,6 +10,7 @@ import networkx as nx
 import pytest
 
 from labarchives_mcp.linked_data.provo_export import (
+    CONTEXT_URL,
     build_context,
     export_graph_jsonld,
     export_project_jsonld,
@@ -147,6 +148,20 @@ def test_empty_graph_produces_empty_graph_array(empty_graph: nx.DiGraph) -> None
     document = export_graph_jsonld(empty_graph)
     assert document["@context"] == build_context()
     assert document["@graph"] == []
+
+
+def test_hosted_context_url_is_available_when_requested(empty_graph: nx.DiGraph) -> None:
+    document = export_graph_jsonld(empty_graph, inline_context=False)
+    assert document["@context"] == CONTEXT_URL
+
+
+def test_hosted_context_artifacts_match_inline_context() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    expected = build_context()
+
+    for relative_path in ("ns/context.jsonld", "docs/ns/context.jsonld"):
+        hosted_context = json.loads((repo_root / relative_path).read_text())
+        assert hosted_context == {"@context": expected}
 
 
 def test_legacy_graph_exports_membership_and_derivation(legacy_graph: nx.DiGraph) -> None:
