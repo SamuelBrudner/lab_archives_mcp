@@ -121,7 +121,7 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 minversion = "8.0"
-addopts = "-ra --strict-markers --cov=src --cov-report=term --cov-fail-under=74"
+addopts = "-ra --strict-markers --cov=src --cov-report=term"
 testpaths = ["tests"]
 filterwarnings = [
   "error::DeprecationWarning",

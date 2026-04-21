@@ -303,7 +303,7 @@ def test_write_graph_turtle_uses_rdflib_graph(
     monkeypatch.setattr("labarchives_mcp.linked_data.provo_export._load_rdflib", lambda: fake_rdflib)
 
     output = tmp_path / "graph.ttl"
-    write_graph_linked_data(enriched_graph, output, output_format="turtle")
+    write_graph_linked_data(enriched_graph, output, output_format="turtle", inline_context=False)
 
     writer = fake_rdflib.instances[0]
     assert writer.kind == "graph"

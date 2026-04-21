@@ -1,7 +1,0 @@
-{
-  "last_failure": "2026-04-20T23:46:39.850337-04:00",
-  "failure_count": 8,
-  "backoff_until": "2026-04-21T00:16:39.850338-04:00",
-  "needs_manual_sync": true,
-  "failure_reason": "git pull failed: exit status 1\nfatal: couldn't find remote ref run/20260421-013136-e06d5687\n"
-}

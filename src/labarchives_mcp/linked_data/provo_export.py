@@ -274,10 +274,13 @@ def serialize_linked_data_document(
     if output_format == "json-ld":
         return json.dumps(document, indent=indent) + "\n"
 
+    normalized_document = dict(document)
+    normalized_document["@context"] = build_context()
+
     rdflib = _load_rdflib()
     graph_factory = rdflib.Dataset if output_format == "n-quads" else rdflib.Graph
     graph = graph_factory()
-    graph.parse(data=json.dumps(document), format="json-ld")
+    graph.parse(data=json.dumps(normalized_document), format="json-ld")
 
     serialized = graph.serialize(format=_RDFLIB_FORMATS[output_format])
     if isinstance(serialized, bytes):
