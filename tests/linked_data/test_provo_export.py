@@ -177,6 +177,34 @@ def test_legacy_graph_exports_membership_and_derivation(legacy_graph: nx.DiGraph
     assert finding["wasDerivedFrom"] == "labmcp:page/p1"
 
 
+def test_was_derived_from_mints_stable_iris_across_mixed_entity_kinds() -> None:
+    graph = nx.DiGraph()
+    graph.add_node("proj-1", type="project", label="Proj 1")
+    graph.add_node("notebook:nb1", type="notebook", label="Notebook 1", notebook_id="nb1")
+    graph.add_node("page:p1", type="page", label="Page 1", page_id="p1")
+    graph.add_node(
+        "artifact:p1:ATTACH_123",
+        type="artifact",
+        label="analysis.ipynb",
+        entry_id="ATTACH_123",
+        page_id="p1",
+    )
+    graph.add_node("finding:f1", type="finding", label="Observation")
+
+    for source_node_id in ("proj-1", "notebook:nb1", "page:p1", "artifact:p1:ATTACH_123"):
+        graph.add_edge(source_node_id, "finding:f1", relation="evidence_from")
+
+    document = export_graph_jsonld(graph)
+    finding = _node_by_suffix(document, "finding/f1")
+
+    assert set(finding["wasDerivedFrom"]) == {
+        "labmcp:project/proj-1",
+        "labmcp:notebook/nb1",
+        "labmcp:page/p1",
+        "labmcp:artifact/p1/ATTACH_123",
+    }
+
+
 def test_enriched_graph_exports_upload_provenance(enriched_graph: nx.DiGraph) -> None:
     document = export_graph_jsonld(enriched_graph)
     page = _node_by_suffix(document, "page/page-123")
