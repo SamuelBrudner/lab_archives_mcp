@@ -680,12 +680,13 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for:
 If you use this software in your research, please cite:
 
 ```bibtex
-@software{brudner2025labarchives,
-  author = {Brudner, Samuel},
+@software{brudner2026labarchives,
+  author = {Brudner, Samuel N.},
   title = {LabArchives MCP Server: AI Integration for Electronic Lab Notebooks},
-  year = {2025},
-  url = {https://github.com/SamuelBrudner/lab_archives_mcp},
-  version = {0.2.4}
+  year = {2026},
+  doi = {10.5281/zenodo.17728440},
+  url = {https://doi.org/10.5281/zenodo.17728440},
+  version = {0.4.0}
 }
 ```
 
