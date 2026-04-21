@@ -2,11 +2,13 @@
 
 import json
 from collections.abc import Generator
+from datetime import UTC, datetime
 from pathlib import Path
 
 import networkx as nx
 import pytest
 
+from labarchives_mcp.models.upload import ProvenanceMetadata
 from labarchives_mcp.state import GRAPH_SCHEMA_VERSION, ProjectContext, StateManager
 
 
@@ -235,3 +237,82 @@ def test_visited_pages_capped(state_manager: StateManager) -> None:
     # Should retain the most recent MAX_VISITS
     assert context.visited_pages[0].page_id == "p100"
     assert context.visited_pages[-1].page_id == "p1099"
+
+
+def test_record_upload_provenance_adds_activity_subgraph(state_manager: StateManager) -> None:
+    """Uploads should add activity, artifact, user, and software-agent nodes."""
+    context = state_manager.create_project("Proj", "Desc")
+    metadata = ProvenanceMetadata(
+        git_commit_sha="d" * 40,
+        git_branch="main",
+        git_repo_url="https://github.com/SamuelBrudner/lab_archives_mcp",
+        git_is_dirty=False,
+        code_version="0.4.0",
+        executed_at=datetime(2026, 4, 20, 14, 1, 58, tzinfo=UTC),
+        python_version="3.11.8",
+        dependencies={"networkx": "3.4"},
+        os_name="Darwin",
+        hostname="host.local",
+    )
+
+    state_manager.record_upload_provenance(
+        uid="uid123",
+        notebook_id="nb1",
+        page_title="Analysis Results",
+        file_path=state_manager.storage_dir / "analysis.ipynb",
+        page_tree_id="page-123",
+        entry_id="ATTACH_123",
+        page_url="https://example.org/page-123",
+        created_at="2026-04-20T14:02:11Z",
+        file_size_bytes=1234,
+        filename="analysis.ipynb",
+        metadata=metadata,
+        server_version="0.4.0",
+        as_page_text=False,
+    )
+
+    graph = nx.node_link_graph(context.graph_data, edges="links")
+    assert graph.nodes["page:page-123"]["type"] == "page"
+    assert graph.nodes["artifact:page-123:ATTACH_123"]["type"] == "artifact"
+    assert graph.nodes["activity:upload:page-123:ATTACH_123"]["type"] == "activity"
+    assert graph.nodes["user:uid123"]["type"] == "user"
+    assert graph.nodes["software_agent:labarchives-mcp-pol"]["type"] == "software_agent"
+    assert graph.edges["artifact:page-123:ATTACH_123", "activity:upload:page-123:ATTACH_123"][
+        "relation"
+    ] == "was_generated_by"
+
+
+def test_record_upload_provenance_without_active_context_is_noop(
+    state_manager: StateManager,
+) -> None:
+    """Uploads should not create project state when no active project exists."""
+    metadata = ProvenanceMetadata(
+        git_commit_sha="e" * 40,
+        git_branch="main",
+        git_repo_url="https://github.com/SamuelBrudner/lab_archives_mcp",
+        git_is_dirty=False,
+        code_version="0.4.0",
+        executed_at=datetime(2026, 4, 20, 14, 1, 58, tzinfo=UTC),
+        python_version="3.11.8",
+        dependencies={"networkx": "3.4"},
+        os_name="Darwin",
+        hostname="host.local",
+    )
+
+    state_manager.record_upload_provenance(
+        uid="uid123",
+        notebook_id="nb1",
+        page_title="Analysis Results",
+        file_path=state_manager.storage_dir / "analysis.ipynb",
+        page_tree_id="page-123",
+        entry_id="ATTACH_123",
+        page_url="https://example.org/page-123",
+        created_at="2026-04-20T14:02:11Z",
+        file_size_bytes=1234,
+        filename="analysis.ipynb",
+        metadata=metadata,
+        server_version="0.4.0",
+        as_page_text=False,
+    )
+
+    assert state_manager._state.contexts == {}

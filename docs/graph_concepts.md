@@ -22,9 +22,13 @@ The state is modeled as a directed graph using `networkx`, where nodes represent
 | Node Type | Description | Properties |
 | :--- | :--- | :--- |
 | **Project** | The root of a research context. | `name`, `description`, `created_at` |
-| **Notebook** | A LabArchives notebook linked by a recorded visit. | `notebook_id`, timestamps |
+| **Notebook** | A LabArchives notebook referenced by the project. | `notebook_id` |
+| **Page** | A LabArchives page that has been visited or created. | `page_id`, `title`, `notebook_id`, `page_url` |
 | **Finding** | A key fact or insight logged by the user/agent. | `content`, `source_url`, `timestamp` |
-| **Page** | A LabArchives page that has been visited or cited. | `page_id`, `title`, `notebook_id`, `visit_count` |
+| **Artifact** | Uploaded content associated with a page. | `entry_id`, `filename`, `file_size_bytes` |
+| **Activity** | A recorded upload/provenance event. | `executed_at`, Git metadata, Python/environment metadata |
+| **User** | The authenticated LabArchives user. | `uid` |
+| **Software Agent** | The MCP server that executed the upload. | `identifier`, `server_version` |
 
 ### Edges
 
@@ -33,9 +37,13 @@ The state is modeled as a directed graph using `networkx`, where nodes represent
 | `uses_notebook` | Project | Notebook | Connects project to notebooks it references. |
 | `contains` | Notebook | Page | Links a notebook to pages within it. |
 | `visited` | Project | Page | Records that a page was accessed during this project. |
-| `content_link` | Page | Page | Records LabArchives page URLs detected in page content. |
+| `tracked` | Project | Activity / Artifact / Page | Marks provenance-bearing records as part of the project state. |
 | `discovered` | Project | Finding | Connects findings logged during the project. |
 | `evidence_from` | Page | Finding | Provenance link from a page to findings derived from it. |
+| `contains_artifact` | Page | Artifact | Links a page to uploaded content recorded on that page. |
+| `was_generated_by` | Page / Artifact | Activity | Records that an upload activity generated an entity. |
+| `was_attributed_to` | Page / Artifact | User | Captures ownership / authorship provenance. |
+| `was_associated_with` | Activity | User / Software Agent | Captures who ran an activity and which software executed it. |
 
 ## Agent Heuristics
 
@@ -67,8 +75,4 @@ The tool provides information, not prescriptive workflow rules. It's designed as
 
 The graph is serialized to JSON and stored locally in `~/.labarchives_state/session_state.json`. This ensures data sovereignty—the "brain" lives on your machine, not in the cloud—and allows the context to survive server restarts.
 
-The state file includes a graph `schema_version`; older graph payloads are migrated with baseline node and edge timestamps when loaded. Saves use an atomic write pattern, and unreadable state files are backed up before a fresh state is created.
-
-To keep the state layer bounded, `visited_pages` keeps the 1,000 most recent visits. Startup graph validation is also bounded: the server samples page nodes across contexts and prunes invalid page nodes without walking the entire LabArchives account.
-
-Mutating project tools support dry-run checks where applicable: `create_project`, `delete_project`, `switch_project`, and `log_finding` accept `dry_run=True`; `read_notebook_page(..., dry_run=True)` fetches content without recording a visit.
+In `v0.4.0`, the same saved graph can also be exported as JSON-LD through the CLI and MCP server. See `docs/linked_data.md` for the export mapping.

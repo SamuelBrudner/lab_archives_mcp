@@ -45,7 +45,7 @@ def _resolve_version() -> str:
     try:
         return metadata.version("labarchives-mcp-pol")
     except metadata.PackageNotFoundError:
-        return "0.3.3"
+        return "0.4.0"
 
 
 __version__ = _resolve_version()
@@ -741,7 +741,7 @@ async def run_server() -> None:
                         git_branch=git_branch,
                         git_repo_url=git_repo_url,
                         git_is_dirty=git_is_dirty,
-                        code_version=None,
+                        code_version=__version__,
                         executed_at=executed_at_dt,
                         python_version=python_version,
                         dependencies=dependencies or {},
@@ -764,6 +764,21 @@ async def run_server() -> None:
 
                     # Execute upload
                     result = await notebook_client.upload_to_labarchives(uid, upload_request)
+                    state_manager.record_upload_provenance(
+                        uid=uid,
+                        notebook_id=notebook_id,
+                        page_title=page_title,
+                        file_path=file_path_obj,
+                        page_tree_id=result.page_tree_id,
+                        entry_id=result.entry_id,
+                        page_url=result.page_url,
+                        created_at=result.created_at,
+                        file_size_bytes=result.file_size_bytes,
+                        filename=result.filename,
+                        metadata=metadata,
+                        server_version=__version__,
+                        as_page_text=as_page_text,
+                    )
                     logger.success(
                         f"Successfully uploaded {result.filename} to page {result.page_tree_id}"
                     )
@@ -1008,6 +1023,16 @@ async def run_server() -> None:
                     "message": "No project is currently active.",
                 }
             return context.model_dump()
+
+        @server.tool()  # type: ignore[misc]
+        async def export_provenance_jsonld(project_id: str) -> dict[str, Any]:
+            """Serialize one project context as JSON-LD aligned to PROV-O + schema.org."""
+            from labarchives_mcp.linked_data import export_project_context
+
+            context = state_manager._state.contexts.get(project_id)
+            if context is None:
+                raise ValueError(f"Unknown project_id: {project_id}")
+            return export_project_context(context)
 
         @server.tool()  # type: ignore[misc]
         async def get_related_pages(

@@ -142,6 +142,9 @@ class OnboardService:
                     "Find related pages via project graph or detected content links."
                 ),
                 "trace_provenance": "Discover the source and derivation history of an entry.",
+                "export_provenance_jsonld": (
+                    "Export one saved project context as JSON-LD aligned to PROV-O."
+                ),
                 "suggest_next_steps": "Get lightweight guidance from the current project state.",
                 "list_notebooks": "Enumerate notebooks available to the authenticated user.",
                 "list_notebook_pages": "Browse notebook structure to locate pages.",

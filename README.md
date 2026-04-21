@@ -16,6 +16,7 @@ A **Model Context Protocol (MCP) server** that connects AI assistants to LabArch
 - 🔍 **Semantic Search**: Vector-based search across notebook content with enhanced filters
 - 📖 **Read Access**: List notebooks, navigate pages, read entries
 - 🧠 **Persistent Context & Graphs**: Project-scoped memory with NetworkX-backed graphs, related-page lookups, provenance tracing, and AI heuristics
+- 🔗 **Linked-data Export**: Export project provenance as JSON-LD aligned to PROV-O and schema.org
 - 🤖 **AI Integration**: Works with Claude Desktop, Windsurf, and any MCP client
 - 🔐 **Secure**: API key authentication with HMAC-SHA512 signing
 - 📦 **Reproducible**: Conda-lock environment with pinned dependencies
@@ -30,6 +31,7 @@ A **Model Context Protocol (MCP) server** that connects AI assistants to LabArch
 - Onboarding walkthrough: see `docs/QUICKSTART.md` and `docs/agent_configuration.md`
 - Upload API: `docs/upload_api.md`
 - Graph concepts ("The Lab Brain"): `docs/graph_concepts.md`
+- Linked-data provenance export: `docs/linked_data.md`
 - Vector backend design and ops: `README_VECTOR_BACKEND.md`
 - Semantic governance: `docs/semantic_governance.md`
 
@@ -42,6 +44,7 @@ A **Model Context Protocol (MCP) server** that connects AI assistants to LabArch
 - Read page entries (text, headings, attachments)
 - Semantic search across notebook content (vector search)
 - Upload files with code provenance metadata (experimental)
+- Export project provenance graphs as PROV-O / JSON-LD
 - Full HMAC-SHA512 authentication flow
 
 🚧 **Experimental**
@@ -64,11 +67,25 @@ A **Model Context Protocol (MCP) server** that connects AI assistants to LabArch
 
   - `auth.py` – credential loading, HMAC signing, UID resolution.
   - `eln_client.py` – notebook navigation, page entry retrieval, upload orchestration.
-  - `models/upload.py` – Pydantic contracts for uploads and provenance metadata.
-  - `state.py` – persistent project contexts, graph construction, related-page heuristics, and next-step suggestions.
-  - `transform.py` – XML→JSON transforms and API fault translation.
-  - `mcp_server.py` – MCP server wiring and tool registration.
-  - `vector_backend/` – semantic search indexing and Pinecone/Qdrant integrations.
+- `models/upload.py` – Pydantic contracts for uploads and provenance metadata.
+- `state.py` – persistent project contexts, graph construction, related-page heuristics, and next-step suggestions.
+- `linked_data/` – JSON-LD export for legacy and enriched provenance graphs.
+- `transform.py` – XML→JSON transforms and API fault translation.
+- `mcp_server.py` – MCP server wiring and tool registration.
+- `vector_backend/` – semantic search indexing and Pinecone/Qdrant integrations.
+
+---
+
+## Linked-data Provenance Export
+
+Project contexts can now be exported as JSON-LD using PROV-O for provenance semantics and schema.org for descriptive metadata.
+
+```bash
+labarchives-mcp export-provenance --project <project-id> --output graph.jsonld
+python -m labarchives_mcp export-provenance --project <project-id> --output graph.jsonld
+```
+
+The same export is available inside MCP clients through `export_provenance_jsonld(project_id)`. See `docs/linked_data.md` for the vocabulary mapping and supported graph shapes.
 
 ---
 

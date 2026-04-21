@@ -30,6 +30,7 @@ cat conf/secrets.yml
 ## Available Tools
 
 - `labarchives-mcp --print-onboard json|markdown` — Print onboarding payload for agents
+- `labarchives-mcp export-provenance --project <id> --output graph.jsonld` — Write one project graph as JSON-LD
 - `get_onboard_payload(format="json"|"markdown")` — Fetch onboarding payload via MCP
 - `list_labarchives_notebooks()` — List all notebooks for the authenticated user
 - `list_notebook_pages(notebook_id, folder_id?)` — Navigate notebook hierarchy
@@ -37,6 +38,7 @@ cat conf/secrets.yml
 - `search_labarchives(query, limit=5)` — Semantic search across indexed notebooks
 - `sync_vector_index(...)` — Plan or run embedding/index updates
 - `upload_to_labarchives(...)` — Upload files with provenance metadata
+- `export_provenance_jsonld(project_id)` — Export one saved project context as JSON-LD
 - Project memory and graph tools:
   - `create_project(..., dry_run=False)`, `list_projects`, `switch_project(..., dry_run=False)`, `delete_project(..., dry_run=False)`
 - `log_finding(content, source_url=None, page_id=None, dry_run=False)`, `get_current_context`

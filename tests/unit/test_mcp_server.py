@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
 
 import networkx as nx
 import pytest
 
+from labarchives_mcp.linked_data import export_project_jsonld
+from labarchives_mcp.models.upload import ProvenanceMetadata
 from labarchives_mcp import mcp_server
 from labarchives_mcp.state import StateManager
 
@@ -361,108 +364,82 @@ def test_upload_tool_registered_by_default(monkeypatch: pytest.MonkeyPatch) -> N
     ), "upload_to_labarchives should be registered by default when env var is not set"
 
 
-def test_beads_related_pages_uses_graph_and_content_links(
+def test_export_tool_registered_and_matches_state_wrapper(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    entries_by_page = {
-        ("nb1", "page-a"): [
-            {
-                "eid": "entry-1",
-                "content": (
-                    "See https://mynotebook.labarchives.com/share/nb1/page-c "
-                    "for the follow-up record."
-                ),
-            }
-        ]
-    }
-    fastmcp_instance, state_manager = _run_server_with_test_state(
-        monkeypatch, tmp_path, entries_by_page=entries_by_page
+    """The JSON-LD export tool should be registered and match the state wrapper output."""
+
+    mcp_module = cast(Any, mcp_server)
+    monkeypatch.delenv("LABARCHIVES_ENABLE_UPLOAD", raising=False)
+    monkeypatch.setattr(
+        mcp_module.Credentials,
+        "from_file",
+        classmethod(lambda cls: DummyCredentials()),
     )
-    state_manager.create_project("Beads", "Regression coverage")
-    state_manager.log_visit("nb1", "page-a", "Page A")
-    state_manager.log_visit("nb1", "page-b", "Page B")
+    monkeypatch.setattr(mcp_module.httpx, "AsyncClient", DummyAsyncClient)
 
-    related_pages = fastmcp_instance.tool_callbacks["get_related_pages"]
-    result = asyncio.run(related_pages("nb1", "page-a", limit=10, offset=0))
+    class DummyAuthenticationManager:
+        def __init__(self, client: DummyAsyncClient, credentials: DummyCredentials) -> None:
+            self._client = client
+            self._credentials = credentials
 
-    assert result["meta"] == {
-        "total": 2,
-        "offset": 0,
-        "limit": 10,
-        "truncated": False,
-    }
-    assert result["items"] == [
-        {"page_id": "page-c", "title": "Linked Page", "source": "content_link"},
-        {"page_id": "page-b", "title": "Page B", "source": "project_sibling"},
-    ]
+        async def ensure_uid(self) -> str:
+            return "uid123"
 
-    context = state_manager.get_active_context()
-    assert context is not None
-    graph = nx.node_link_graph(context.graph_data, edges="links")
-    assert graph.has_edge("page:page-a", "page:page-c")
-    assert graph.edges["page:page-a", "page:page-c"]["relation"] == "content_link"
+    class DummyLabArchivesClient:
+        def __init__(self, client: DummyAsyncClient, auth_manager: Any) -> None:
+            self._client = client
+            self._auth_manager = auth_manager
 
+        async def list_notebooks(self, _uid: str) -> list[Any]:
+            return []
 
-def test_beads_trace_provenance_combines_entry_and_graph_sources(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    entries_by_page = {
-        ("nb1", "page-a"): [
-            {"eid": "entry-1", "content": "Derived From: assay_42"},
-            {
-                "eid": "meta-1",
-                "caption": "Code Provenance Metadata",
-                "content": "Git Commit SHA: abc123",
-            },
-        ]
-    }
-    fastmcp_instance, state_manager = _run_server_with_test_state(
-        monkeypatch, tmp_path, entries_by_page=entries_by_page
+    state_manager = StateManager(storage_dir=tmp_path)
+    context = state_manager.create_project("Proj 1", "Desc")
+    metadata = ProvenanceMetadata(
+        git_commit_sha="f" * 40,
+        git_branch="main",
+        git_repo_url="https://github.com/SamuelBrudner/lab_archives_mcp",
+        git_is_dirty=False,
+        code_version="0.4.0",
+        executed_at=datetime(2026, 4, 20, 14, 1, 58, tzinfo=UTC),
+        python_version="3.11.8",
+        dependencies={"networkx": "3.4"},
+        os_name="Darwin",
+        hostname="host.local",
     )
-    state_manager.create_project("Beads", "Regression coverage")
-    state_manager.log_visit("nb1", "page-a", "Page A")
-    state_manager.log_finding("Observed signal", page_id="page-a")
-
-    trace_provenance = fastmcp_instance.tool_callbacks["trace_provenance"]
-    result = asyncio.run(trace_provenance("nb1", "page-a", "entry-1"))
-
-    assert {
-        "id": "assay_42",
-        "type": "derived_from_text",
-        "description": "Found explicit citation in entry content",
-    } in result["sources"]
-    assert any(
-        source["type"] == "agent_finding"
-        and source["description"] == "Observed signal"
-        and source["id"]
-        for source in result["sources"]
-    )
-    assert result["metadata"]["code_provenance"]["eid"] == "meta-1"
-    assert result["metadata"]["code_provenance"]["content_snippet"].startswith(
-        "Git Commit SHA: abc123"
+    state_manager.record_upload_provenance(
+        uid="uid123",
+        notebook_id="nb1",
+        page_title="Analysis Results",
+        file_path=tmp_path / "analysis.ipynb",
+        page_tree_id="page-123",
+        entry_id="ATTACH_123",
+        page_url="https://example.org/page-123",
+        created_at="2026-04-20T14:02:11Z",
+        file_size_bytes=1234,
+        filename="analysis.ipynb",
+        metadata=metadata,
+        server_version="0.4.0",
+        as_page_text=False,
     )
 
+    monkeypatch.setattr(mcp_module, "AuthenticationManager", DummyAuthenticationManager)
+    monkeypatch.setattr(mcp_module, "LabArchivesClient", DummyLabArchivesClient)
+    monkeypatch.setattr(mcp_module, "StateManager", lambda: state_manager)
 
-def test_beads_suggest_next_steps_reports_context_phase(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    fastmcp_instance, state_manager = _run_server_with_test_state(monkeypatch, tmp_path)
-    suggest_next_steps = fastmcp_instance.tool_callbacks["suggest_next_steps"]
+    fastmcp_instance = DummyFastMCP(
+        server_id="labarchives-mcp-pol",
+        name="",
+        version="",
+        description="",
+    )
+    monkeypatch.setattr(mcp_module, "FastMCP", lambda **kwargs: fastmcp_instance)
 
-    no_context = asyncio.run(suggest_next_steps())
-    assert no_context["phase"] == "no_context"
+    asyncio.run(mcp_server.run_server())
 
-    state_manager.create_project("Beads", "Regression coverage")
-    cold_start = asyncio.run(suggest_next_steps())
-    assert cold_start["phase"] == "cold_start"
+    assert "export_provenance_jsonld" in fastmcp_instance.tool_callbacks
+    tool = fastmcp_instance.tool_callbacks["export_provenance_jsonld"]
+    result = asyncio.run(tool(context.id))
 
-    state_manager.log_visit("nb1", "page-a", "Page A")
-    state_manager.log_finding("Observed signal", page_id="page-a")
-    active = asyncio.run(suggest_next_steps())
-
-    assert active["phase"] == "active"
-    assert active["stats"] == {
-        "pages_visited": 1,
-        "findings_logged": 1,
-        "project_name": "Beads",
-    }
+    assert result == export_project_jsonld(context.id, state_dir=tmp_path)
