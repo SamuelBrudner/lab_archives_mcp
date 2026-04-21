@@ -51,8 +51,8 @@ def build_context() -> dict[str, Any]:
         "description": "schema:description",
         "identifier": "schema:identifier",
         "url": "schema:url",
-        "dateCreated": "schema:dateCreated",
-        "dateModified": "schema:dateModified",
+        "dateCreated": {"@id": "schema:dateCreated", "@type": "xsd:dateTime"},
+        "dateModified": {"@id": "schema:dateModified", "@type": "xsd:dateTime"},
         "contentSize": "schema:contentSize",
         "encodingFormat": "schema:encodingFormat",
         "softwareVersion": "schema:softwareVersion",
@@ -69,12 +69,21 @@ def build_context() -> dict[str, Any]:
     }
 
 
+def _require_timezone(value: datetime, *, original: Any) -> datetime:
+    """Reject naive datetimes so exported provenance timestamps stay unambiguous."""
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise ValueError(f"Naive datetime is not supported in JSON-LD export: {original!r}")
+    return value
+
+
 def _as_isoformat(value: Any) -> str | None:
     """Normalize timestamps from strings, datetimes, or epoch seconds."""
     if value is None:
         return None
     if isinstance(value, datetime):
-        return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
+        return _require_timezone(value, original=value).astimezone(UTC).isoformat().replace(
+            "+00:00", "Z"
+        )
     if isinstance(value, (int, float)):
         return datetime.fromtimestamp(float(value), tz=UTC).isoformat().replace("+00:00", "Z")
     if isinstance(value, str):
@@ -82,7 +91,9 @@ def _as_isoformat(value: Any) -> str | None:
             parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
         except ValueError:
             return value
-        return parsed.astimezone(UTC).isoformat().replace("+00:00", "Z")
+        return _require_timezone(parsed, original=value).astimezone(UTC).isoformat().replace(
+            "+00:00", "Z"
+        )
     return None
 
 

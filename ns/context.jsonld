@@ -8,8 +8,14 @@
     "description": "schema:description",
     "identifier": "schema:identifier",
     "url": "schema:url",
-    "dateCreated": "schema:dateCreated",
-    "dateModified": "schema:dateModified",
+    "dateCreated": {
+      "@id": "schema:dateCreated",
+      "@type": "xsd:dateTime"
+    },
+    "dateModified": {
+      "@id": "schema:dateModified",
+      "@type": "xsd:dateTime"
+    },
     "contentSize": "schema:contentSize",
     "encodingFormat": "schema:encodingFormat",
     "softwareVersion": "schema:softwareVersion",

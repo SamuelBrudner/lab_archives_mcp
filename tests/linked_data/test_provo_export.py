@@ -140,6 +140,8 @@ def test_build_context_binds_expected_namespaces() -> None:
     context = build_context()
     assert context["prov"] == PROV_NS
     assert context["schema"] == SCHEMA_NS
+    assert context["dateCreated"]["@type"] == "xsd:dateTime"
+    assert context["dateModified"]["@type"] == "xsd:dateTime"
     assert context["hadMember"]["@id"] == "prov:hadMember"
     assert context["isPartOf"]["@id"] == "schema:isPartOf"
 
@@ -193,9 +195,26 @@ def test_enriched_graph_exports_upload_provenance(enriched_graph: nx.DiGraph) ->
 
 def test_datetimes_serialize_as_iso8601_z(enriched_graph: nx.DiGraph) -> None:
     document = export_graph_jsonld(enriched_graph)
+    page = _node_by_suffix(document, "page/page-123")
     activity = _node_by_suffix(document, "activity/upload/page-123/ATTACH_123")
+    assert page["dateCreated"] == "2026-04-20T14:02:11Z"
     assert activity["startedAtTime"] == "2026-04-20T14:01:58Z"
     assert activity["endedAtTime"] == "2026-04-20T14:02:11Z"
+
+
+@pytest.mark.parametrize(
+    ("field_name", "value"),
+    [
+        ("executed_at", datetime(2026, 4, 20, 14, 1, 58)),
+        ("created_at", "2026-04-20T14:02:11"),
+    ],
+)
+def test_naive_datetimes_raise_loudly(field_name: str, value: object) -> None:
+    graph = nx.DiGraph()
+    graph.add_node("activity:upload:test", type="activity", **{field_name: value})
+
+    with pytest.raises(ValueError, match="Naive datetime"):
+        export_graph_jsonld(graph)
 
 
 def test_unknown_node_type_raises() -> None:
