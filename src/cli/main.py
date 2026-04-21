@@ -17,7 +17,11 @@ from typing import Any
 
 from cli.version import __version__
 from labarchives_mcp import mcp_server
-from labarchives_mcp.linked_data import write_project_jsonld
+from labarchives_mcp.linked_data import (
+    MissingLinkedDataDependencyError,
+    SUPPORTED_LINKED_DATA_FORMATS,
+    write_project_linked_data,
+)
 
 # Make version available as MCP_SERVER_VERSION for test compatibility
 MCP_SERVER_VERSION = __version__
@@ -144,7 +148,7 @@ def _run_cli(argv: Sequence[str] | None = None) -> int:
     subparsers = parser.add_subparsers(dest="command")
     export_parser = subparsers.add_parser(
         "export-provenance",
-        help="Export a project provenance graph as JSON-LD.",
+        help="Export a project provenance graph as linked data.",
     )
     export_parser.add_argument(
         "--project",
@@ -154,7 +158,13 @@ def _run_cli(argv: Sequence[str] | None = None) -> int:
     export_parser.add_argument(
         "--output",
         required=True,
-        help="Path to write the JSON-LD document.",
+        help="Path to write the linked-data document.",
+    )
+    export_parser.add_argument(
+        "--format",
+        default="json-ld",
+        choices=SUPPORTED_LINKED_DATA_FORMATS,
+        help="Serialization format to emit (default: json-ld).",
     )
     export_parser.add_argument(
         "--state-dir",
@@ -178,7 +188,15 @@ def _run_cli(argv: Sequence[str] | None = None) -> int:
 
     if parsed.command == "export-provenance":
         output_path = Path(parsed.output)
-        write_project_jsonld(parsed.project, output_path, state_dir=parsed.state_dir)
+        try:
+            write_project_linked_data(
+                parsed.project,
+                output_path,
+                state_dir=parsed.state_dir,
+                output_format=parsed.format,
+            )
+        except MissingLinkedDataDependencyError as exc:
+            parser.exit(1, f"{parser.prog}: error: {exc}\n")
         print(output_path)
         return 0
 

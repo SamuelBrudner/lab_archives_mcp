@@ -13,5 +13,16 @@ bd.sock
 db.sqlite
 bd.db
 
+# Local sync/runtime metadata
+.local_version
+last-touched
+metadata.json
+sync-state.json
+beads.left.meta.json
+daemon.lock
+
 # Keep JSONL exports (source of truth for git)
 !*.jsonl
+
+# Except daemon spill files
+beads.left.jsonl

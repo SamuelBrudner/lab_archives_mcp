@@ -267,6 +267,10 @@ def test_upload_tool_not_registered_when_disabled(monkeypatch: pytest.MonkeyPatc
     assert (
         "upload_to_labarchives" not in fastmcp_instance.tool_callbacks
     ), "upload_to_labarchives should not be registered when LABARCHIVES_ENABLE_UPLOAD=false"
+    assert (
+        "write_notebook_entry" not in fastmcp_instance.tool_callbacks
+    ), "write_notebook_entry should not be registered when LABARCHIVES_ENABLE_UPLOAD=false"
+    assert len(fastmcp_instance.tool_callbacks) == 16
 
 
 def test_upload_tool_registered_when_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -314,6 +318,10 @@ def test_upload_tool_registered_when_enabled(monkeypatch: pytest.MonkeyPatch) ->
     assert (
         "upload_to_labarchives" in fastmcp_instance.tool_callbacks
     ), "upload_to_labarchives should be registered when LABARCHIVES_ENABLE_UPLOAD=true"
+    assert (
+        "write_notebook_entry" in fastmcp_instance.tool_callbacks
+    ), "write_notebook_entry should be registered when LABARCHIVES_ENABLE_UPLOAD=true"
+    assert len(fastmcp_instance.tool_callbacks) == 18
 
 
 def test_upload_tool_registered_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -362,6 +370,10 @@ def test_upload_tool_registered_by_default(monkeypatch: pytest.MonkeyPatch) -> N
     assert (
         "upload_to_labarchives" in fastmcp_instance.tool_callbacks
     ), "upload_to_labarchives should be registered by default when env var is not set"
+    assert (
+        "write_notebook_entry" in fastmcp_instance.tool_callbacks
+    ), "write_notebook_entry should be registered by default when env var is not set"
+    assert len(fastmcp_instance.tool_callbacks) == 18
 
 
 def test_export_tool_registered_and_matches_state_wrapper(

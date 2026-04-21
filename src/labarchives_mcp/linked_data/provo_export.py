@@ -1,8 +1,9 @@
-"""Serialize LabArchives project provenance graphs to JSON-LD."""
+"""Serialize LabArchives project provenance graphs to linked-data formats."""
 
 from __future__ import annotations
 
 import json
+from importlib import import_module
 from collections.abc import Mapping
 from datetime import UTC, datetime
 from pathlib import Path
@@ -15,6 +16,11 @@ from labarchives_mcp.state import ProjectContext, StateManager
 
 LABMCP_BASE: Final[str] = "https://samuelbrudner.github.io/lab_archives_mcp/ns#"
 CONTEXT_URL: Final[str] = "https://samuelbrudner.github.io/lab_archives_mcp/ns/context.jsonld"
+SUPPORTED_LINKED_DATA_FORMATS: Final[tuple[str, ...]] = ("json-ld", "turtle", "n-quads")
+_RDFLIB_FORMATS: Final[dict[str, str]] = {
+    "turtle": "turtle",
+    "n-quads": "nquads",
+}
 
 _TYPE_MAP: Final[dict[str, list[str]]] = {
     "project": ["prov:Collection", "schema:Dataset"],
@@ -40,6 +46,25 @@ _ACTIVITY_FIELD_MAP: Final[dict[str, str]] = {
 }
 
 
+class MissingLinkedDataDependencyError(RuntimeError):
+    """Raised when an alternate linked-data serialization requires optional deps."""
+
+
+def _validate_output_format(output_format: str) -> None:
+    if output_format not in SUPPORTED_LINKED_DATA_FORMATS:
+        raise ValueError(f"Unsupported linked-data output format: {output_format!r}")
+
+
+def _load_rdflib() -> Any:
+    try:
+        return import_module("rdflib")
+    except ModuleNotFoundError as exc:
+        raise MissingLinkedDataDependencyError(
+            "Turtle and N-Quads export requires rdflib; install the optional "
+            "linked-data extra, e.g. pip install -e '.[linked-data]'."
+        ) from exc
+
+
 def build_context() -> dict[str, Any]:
     """Return the inline JSON-LD context."""
     return {
@@ -51,8 +76,8 @@ def build_context() -> dict[str, Any]:
         "description": "schema:description",
         "identifier": "schema:identifier",
         "url": "schema:url",
-        "dateCreated": "schema:dateCreated",
-        "dateModified": "schema:dateModified",
+        "dateCreated": {"@id": "schema:dateCreated", "@type": "xsd:dateTime"},
+        "dateModified": {"@id": "schema:dateModified", "@type": "xsd:dateTime"},
         "contentSize": "schema:contentSize",
         "encodingFormat": "schema:encodingFormat",
         "softwareVersion": "schema:softwareVersion",
@@ -69,12 +94,21 @@ def build_context() -> dict[str, Any]:
     }
 
 
+def _require_timezone(value: datetime, *, original: Any) -> datetime:
+    """Reject naive datetimes so exported provenance timestamps stay unambiguous."""
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise ValueError(f"Naive datetime is not supported in JSON-LD export: {original!r}")
+    return value
+
+
 def _as_isoformat(value: Any) -> str | None:
     """Normalize timestamps from strings, datetimes, or epoch seconds."""
     if value is None:
         return None
     if isinstance(value, datetime):
-        return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
+        return _require_timezone(value, original=value).astimezone(UTC).isoformat().replace(
+            "+00:00", "Z"
+        )
     if isinstance(value, (int, float)):
         return datetime.fromtimestamp(float(value), tz=UTC).isoformat().replace("+00:00", "Z")
     if isinstance(value, str):
@@ -82,7 +116,9 @@ def _as_isoformat(value: Any) -> str | None:
             parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
         except ValueError:
             return value
-        return parsed.astimezone(UTC).isoformat().replace("+00:00", "Z")
+        return _require_timezone(parsed, original=value).astimezone(UTC).isoformat().replace(
+            "+00:00", "Z"
+        )
     return None
 
 
@@ -227,6 +263,53 @@ def export_graph_jsonld(graph: nx.Graph, *, inline_context: bool = True) -> dict
     return {"@context": context, "@graph": list(documents.values())}
 
 
+def serialize_linked_data_document(
+    document: Mapping[str, Any],
+    *,
+    output_format: str = "json-ld",
+    indent: int = 2,
+) -> str:
+    """Serialize one JSON-LD document into the requested linked-data format."""
+    _validate_output_format(output_format)
+    if output_format == "json-ld":
+        return json.dumps(document, indent=indent) + "\n"
+
+    normalized_document = dict(document)
+    normalized_document["@context"] = build_context()
+
+    rdflib = _load_rdflib()
+    graph_factory = rdflib.Dataset if output_format == "n-quads" else rdflib.Graph
+    graph = graph_factory()
+    graph.parse(data=json.dumps(normalized_document), format="json-ld")
+
+    serialized = graph.serialize(format=_RDFLIB_FORMATS[output_format])
+    if isinstance(serialized, bytes):
+        text = serialized.decode("utf-8")
+    else:
+        text = str(serialized)
+    if not text.endswith("\n"):
+        text += "\n"
+    return text
+
+
+def write_graph_linked_data(
+    graph: nx.Graph,
+    output_path: Path | str,
+    *,
+    output_format: str = "json-ld",
+    inline_context: bool = True,
+    indent: int = 2,
+) -> Path:
+    """Serialize a graph and write the linked-data document to disk."""
+    path = Path(output_path)
+    document = export_graph_jsonld(graph, inline_context=inline_context)
+    path.write_text(
+        serialize_linked_data_document(document, output_format=output_format, indent=indent),
+        encoding="utf-8",
+    )
+    return path
+
+
 def write_graph_jsonld(
     graph: nx.Graph,
     output_path: Path | str,
@@ -235,10 +318,13 @@ def write_graph_jsonld(
     indent: int = 2,
 ) -> Path:
     """Serialize a graph and write the JSON-LD document to disk."""
-    path = Path(output_path)
-    document = export_graph_jsonld(graph, inline_context=inline_context)
-    path.write_text(json.dumps(document, indent=indent) + "\n", encoding="utf-8")
-    return path
+    return write_graph_linked_data(
+        graph,
+        output_path,
+        output_format="json-ld",
+        inline_context=inline_context,
+        indent=indent,
+    )
 
 
 def _graph_for_context(context: ProjectContext) -> nx.DiGraph:
@@ -281,7 +367,30 @@ def write_project_jsonld(
     indent: int = 2,
 ) -> Path:
     """Write one serialized project context to disk."""
+    return write_project_linked_data(
+        project_id,
+        output_path,
+        state_dir=state_dir,
+        output_format="json-ld",
+        inline_context=inline_context,
+        indent=indent,
+    )
+
+
+def write_project_linked_data(
+    project_id: str,
+    output_path: Path | str,
+    *,
+    state_dir: Path | str | None = None,
+    output_format: str = "json-ld",
+    inline_context: bool = True,
+    indent: int = 2,
+) -> Path:
+    """Write one serialized project context using the requested linked-data format."""
     document = export_project_jsonld(project_id, state_dir=state_dir, inline_context=inline_context)
     path = Path(output_path)
-    path.write_text(json.dumps(document, indent=indent) + "\n", encoding="utf-8")
+    path.write_text(
+        serialize_linked_data_document(document, output_format=output_format, indent=indent),
+        encoding="utf-8",
+    )
     return path

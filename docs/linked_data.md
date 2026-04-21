@@ -52,8 +52,12 @@ The activity node carries the metadata already validated by `ProvenanceMetadata`
 ## Interfaces
 
 - MCP tool: `export_provenance_jsonld(project_id)`
-- CLI: `labarchives-mcp export-provenance --project <id> --output graph.jsonld [--state-dir <path>]`
-- Module form: `python -m labarchives_mcp export-provenance --project <id> --output graph.jsonld`
+- CLI: `labarchives-mcp export-provenance --project <id> --output graph.jsonld [--format json-ld|turtle|n-quads] [--state-dir <path>]`
+- Module form: `python -m labarchives_mcp export-provenance --project <id> --output graph.jsonld [--format json-ld|turtle|n-quads]`
+
+Exports embed the full JSON-LD `@context` inline by default so they remain valid even when a hosted context is unavailable. The same context is also checked into `ns/context.jsonld` and `docs/ns/context.jsonld` so GitHub Pages deployments can serve the advertised compact context URL consistently.
+
+Install `pip install -e ".[linked-data]"` to enable the Turtle and N-Quads CLI serializations. JSON-LD remains available in the base install and in the MCP tool output.
 
 ## Non-goals
 

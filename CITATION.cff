@@ -3,6 +3,9 @@ message: "This file describes the current v0.3.3 source tree. For the JORS archi
 type: software
 title: "LabArchives MCP Server: AI Integration for Electronic Lab Notebooks"
 version: 0.4.0
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.17728440
 date-released: "2026-04-20"
 authors:
   - family-names: "Brudner"
@@ -34,6 +37,7 @@ preferred-citation:
     - family-names: "Brudner"
       given-names: "Samuel N."
       orcid: "https://orcid.org/0000-0002-6043-9328"
-  year: 2025
+  year: 2026
+  doi: 10.5281/zenodo.17728440
   version: 0.4.0
   repository-code: "https://github.com/SamuelBrudner/lab_archives_mcp"
