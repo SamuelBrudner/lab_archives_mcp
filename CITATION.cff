@@ -3,6 +3,9 @@ message: "If you use this software, please cite it as below."
 type: software
 title: "LabArchives MCP Server: AI Integration for Electronic Lab Notebooks"
 version: 0.4.0
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.17728440
 date-released: "2026-04-20"
 authors:
   - family-names: "Brudner"
