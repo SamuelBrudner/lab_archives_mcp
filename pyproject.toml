@@ -63,6 +63,7 @@ dev = [
   "ruff>=0.5",
   "black>=24.4",
   "isort>=5.13",
+  "interrogate>=1.5",
   "pre-commit>=3.7",
   "nbstripout>=0.6",
   "nbdime>=4.0",
@@ -117,7 +118,7 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 minversion = "8.0"
-addopts = "-ra --strict-markers"
+addopts = "-ra --strict-markers --cov=src --cov-report=term --cov-fail-under=74"
 testpaths = ["tests"]
 filterwarnings = [
   "error::DeprecationWarning",

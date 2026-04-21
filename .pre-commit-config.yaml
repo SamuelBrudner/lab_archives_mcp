@@ -45,7 +45,7 @@ repos:
     hooks:
       - id: interrogate
         args:
-          - --fail-under=0
+          - --fail-under=55
           - --quiet
 
   - repo: https://github.com/kynan/nbstripout

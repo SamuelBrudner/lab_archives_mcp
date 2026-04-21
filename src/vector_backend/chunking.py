@@ -8,7 +8,12 @@ from dataclasses import dataclass
 from typing import Protocol
 
 import tiktoken
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+
+try:
+    from langchain.text_splitter import RecursiveCharacterTextSplitter
+except ImportError:
+    # LangChain split text splitters into a dedicated package in newer releases.
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 
 @dataclass(frozen=True)
