@@ -4,14 +4,14 @@ Extracts searchable text from LabArchives notebook entries and prepares them
 for vector indexing.
 """
 
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from bs4 import BeautifulSoup
 from pydantic import BaseModel, Field
 
 
-class EntryType(str, Enum):
+class EntryType(StrEnum):
     """Types of LabArchives entries that can be indexed."""
 
     TEXT_ENTRY = "text_entry"
