@@ -36,13 +36,11 @@ def test_credentials_from_file_success(tmp_path: Path) -> None:
     conf_dir = tmp_path / "conf"
     conf_dir.mkdir(parents=True, exist_ok=True)
     secrets_file = conf_dir / "secrets.yml"
-    secrets_file.write_text(
-        """
+    secrets_file.write_text("""
 LABARCHIVES_AKID: example-akid
 LABARCHIVES_PASSWORD: example-pass
 LABARCHIVES_REGION: https://api.labarchives.com
-""".strip()
-    )
+""".strip())
 
     creds = Credentials.from_file(secrets_file)
 
