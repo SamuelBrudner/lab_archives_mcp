@@ -4,11 +4,9 @@ Implements configurable chunking with token-aware splitting and boundary preserv
 All chunking is deterministic: same input + config → same chunks.
 """
 
-import re
-from collections.abc import Callable
 from dataclasses import dataclass
 from functools import cache
-from typing import Any, Protocol
+from typing import Protocol
 
 import tiktoken
 
@@ -17,6 +15,15 @@ try:
 except ImportError:
     # LangChain split text splitters into a dedicated package in newer releases.
     from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+
+@cache
+def _get_token_encoding(tokenizer: str) -> tiktoken.Encoding:
+    """Return a cached tiktoken encoding for deterministic token counting."""
+    try:
+        return tiktoken.get_encoding(tokenizer)
+    except ValueError as exc:
+        raise ValueError(f"Unknown tokenizer: {tokenizer!r}") from exc
 
 
 @dataclass(frozen=True)

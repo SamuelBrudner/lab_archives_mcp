@@ -21,9 +21,7 @@ def test_release_metadata_files_share_version_doi_and_year() -> None:
     version = pyproject["project"]["version"]
     release_year = int(citation["date-released"].split("-", maxsplit=1)[0])
     doi = next(
-        identifier["value"]
-        for identifier in citation["identifiers"]
-        if identifier["type"] == "doi"
+        identifier["value"] for identifier in citation["identifiers"] if identifier["type"] == "doi"
     )
     doi_url = f"https://doi.org/{doi}"
 

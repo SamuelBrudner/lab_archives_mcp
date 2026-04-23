@@ -15,13 +15,12 @@ from labarchives_mcp.linked_data.provo_export import (
     build_context,
     export_graph_jsonld,
     export_project_jsonld,
-    write_graph_linked_data,
     write_graph_jsonld,
+    write_graph_linked_data,
     write_project_jsonld,
 )
 from labarchives_mcp.models.upload import ProvenanceMetadata
 from labarchives_mcp.state import StateManager
-
 
 PROV_NS = "http://www.w3.org/ns/prov#"
 SCHEMA_NS = "http://schema.org/"
@@ -48,12 +47,12 @@ class _FakeRdflib:
     def __init__(self) -> None:
         self.instances: list[_FakeLinkedDataWriter] = []
 
-    def Graph(self) -> _FakeLinkedDataWriter:
+    def Graph(self) -> _FakeLinkedDataWriter:  # noqa: N802 - mirrors rdflib API
         writer = _FakeLinkedDataWriter("graph")
         self.instances.append(writer)
         return writer
 
-    def Dataset(self) -> _FakeLinkedDataWriter:
+    def Dataset(self) -> _FakeLinkedDataWriter:  # noqa: N802 - mirrors rdflib API
         writer = _FakeLinkedDataWriter("dataset")
         self.instances.append(writer)
         return writer
@@ -78,7 +77,12 @@ def legacy_graph() -> nx.DiGraph:
         first_seen=2.0,
         last_seen=3.0,
     )
-    graph.add_node("finding:f1", type="finding", label="Observation", full_content="Observation body")
+    graph.add_node(
+        "finding:f1",
+        type="finding",
+        label="Observation",
+        full_content="Observation body",
+    )
     graph.add_edge("proj-1", "notebook:nb1", relation="uses_notebook")
     graph.add_edge("notebook:nb1", "page:p1", relation="contains")
     graph.add_edge("proj-1", "page:p1", relation="visited")
@@ -300,7 +304,10 @@ def test_write_graph_turtle_uses_rdflib_graph(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     fake_rdflib = _FakeRdflib()
-    monkeypatch.setattr("labarchives_mcp.linked_data.provo_export._load_rdflib", lambda: fake_rdflib)
+    monkeypatch.setattr(
+        "labarchives_mcp.linked_data.provo_export._load_rdflib",
+        lambda: fake_rdflib,
+    )
 
     output = tmp_path / "graph.ttl"
     write_graph_linked_data(enriched_graph, output, output_format="turtle", inline_context=False)
@@ -319,7 +326,10 @@ def test_write_graph_nquads_uses_rdflib_dataset(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     fake_rdflib = _FakeRdflib()
-    monkeypatch.setattr("labarchives_mcp.linked_data.provo_export._load_rdflib", lambda: fake_rdflib)
+    monkeypatch.setattr(
+        "labarchives_mcp.linked_data.provo_export._load_rdflib",
+        lambda: fake_rdflib,
+    )
 
     output = tmp_path / "graph.nq"
     write_graph_linked_data(enriched_graph, output, output_format="n-quads")
@@ -379,7 +389,9 @@ def test_state_wrapper_loads_project_from_state(tmp_path: Path) -> None:
 
     document = export_project_jsonld(context.id, state_dir=tmp_path)
     assert any(node["@id"] == "labmcp:project/" + context.id for node in document["@graph"])
-    assert any("activity/upload/page-123/ATTACH_123" in str(node["@id"]) for node in document["@graph"])
+    assert any(
+        "activity/upload/page-123/ATTACH_123" in str(node["@id"]) for node in document["@graph"]
+    )
 
 
 def test_write_project_jsonld_matches_in_memory_export(tmp_path: Path) -> None:

@@ -32,10 +32,10 @@ class _FakeLinkedDataWriter:
 
 
 class _FakeRdflib:
-    def Graph(self) -> _FakeLinkedDataWriter:
+    def Graph(self) -> _FakeLinkedDataWriter:  # noqa: N802 - mirrors rdflib API
         return _FakeLinkedDataWriter("graph")
 
-    def Dataset(self) -> _FakeLinkedDataWriter:
+    def Dataset(self) -> _FakeLinkedDataWriter:  # noqa: N802 - mirrors rdflib API
         return _FakeLinkedDataWriter("dataset")
 
 
@@ -73,7 +73,9 @@ def _seed_project(tmp_path: Path) -> tuple[StateManager, str]:
     return manager, context.id
 
 
-def test_export_provenance_cli_writes_jsonld(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_export_provenance_cli_writes_jsonld(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     _, project_id = _seed_project(tmp_path)
     output = tmp_path / "graph.jsonld"
 
@@ -160,7 +162,9 @@ def test_export_provenance_cli_reports_missing_rdflib(
     assert "install linked-data extra" in capsys.readouterr().err
 
 
-def test_python_module_entrypoint_routes_to_cli(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_python_module_entrypoint_routes_to_cli(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     _, project_id = _seed_project(tmp_path)
     output = tmp_path / "module-graph.jsonld"
     monkeypatch.setattr(

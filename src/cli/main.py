@@ -18,8 +18,8 @@ from typing import Any
 from cli.version import __version__
 from labarchives_mcp import mcp_server
 from labarchives_mcp.linked_data import (
-    MissingLinkedDataDependencyError,
     SUPPORTED_LINKED_DATA_FORMATS,
+    MissingLinkedDataDependencyError,
     write_project_linked_data,
 )
 

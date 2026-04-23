@@ -277,9 +277,12 @@ def test_record_upload_provenance_adds_activity_subgraph(state_manager: StateMan
     assert graph.nodes["activity:upload:page-123:ATTACH_123"]["type"] == "activity"
     assert graph.nodes["user:uid123"]["type"] == "user"
     assert graph.nodes["software_agent:labarchives-mcp-pol"]["type"] == "software_agent"
-    assert graph.edges["artifact:page-123:ATTACH_123", "activity:upload:page-123:ATTACH_123"][
-        "relation"
-    ] == "was_generated_by"
+    assert (
+        graph.edges["artifact:page-123:ATTACH_123", "activity:upload:page-123:ATTACH_123"][
+            "relation"
+        ]
+        == "was_generated_by"
+    )
 
 
 def test_record_upload_provenance_without_active_context_is_noop(

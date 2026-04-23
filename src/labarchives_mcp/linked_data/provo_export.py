@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import json
-from importlib import import_module
 from collections.abc import Mapping
 from datetime import UTC, datetime
+from importlib import import_module
 from pathlib import Path
 from typing import Any, Final
 from urllib.parse import quote
@@ -106,8 +106,11 @@ def _as_isoformat(value: Any) -> str | None:
     if value is None:
         return None
     if isinstance(value, datetime):
-        return _require_timezone(value, original=value).astimezone(UTC).isoformat().replace(
-            "+00:00", "Z"
+        return (
+            _require_timezone(value, original=value)
+            .astimezone(UTC)
+            .isoformat()
+            .replace("+00:00", "Z")
         )
     if isinstance(value, (int, float)):
         return datetime.fromtimestamp(float(value), tz=UTC).isoformat().replace("+00:00", "Z")
@@ -116,8 +119,11 @@ def _as_isoformat(value: Any) -> str | None:
             parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
         except ValueError:
             return value
-        return _require_timezone(parsed, original=value).astimezone(UTC).isoformat().replace(
-            "+00:00", "Z"
+        return (
+            _require_timezone(parsed, original=value)
+            .astimezone(UTC)
+            .isoformat()
+            .replace("+00:00", "Z")
         )
     return None
 
@@ -198,11 +204,15 @@ def _base_document(node_id: str, node_type: str, attrs: Mapping[str, Any]) -> di
             document["encodingFormat"] = encoding_format
 
     if node_type == "activity":
-        if (started := _as_isoformat(_first_present(attrs, "executed_at", "created_at"))) is not None:
+        if (
+            started := _as_isoformat(_first_present(attrs, "executed_at", "created_at"))
+        ) is not None:
             document["startedAtTime"] = started
         if (ended := _as_isoformat(_first_present(attrs, "completed_at", "last_seen"))) is not None:
             document["endedAtTime"] = ended
-        if (software_version := _first_present(attrs, "code_version", "server_version")) is not None:
+        if (
+            software_version := _first_present(attrs, "code_version", "server_version")
+        ) is not None:
             document["softwareVersion"] = software_version
         for attr_name, jsonld_key in _ACTIVITY_FIELD_MAP.items():
             value = attrs.get(attr_name)
@@ -339,7 +349,9 @@ def _graph_for_context(context: ProjectContext) -> nx.DiGraph:
     return graph
 
 
-def export_project_context(context: ProjectContext, *, inline_context: bool = True) -> dict[str, Any]:
+def export_project_context(
+    context: ProjectContext, *, inline_context: bool = True
+) -> dict[str, Any]:
     """Serialize one project context into JSON-LD."""
     return export_graph_jsonld(_graph_for_context(context), inline_context=inline_context)
 

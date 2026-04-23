@@ -281,7 +281,7 @@ class StateManager:
         created_at: str | float | datetime | None,
         file_size_bytes: int | None,
         filename: str,
-        metadata: "ProvenanceMetadata",
+        metadata: ProvenanceMetadata,
         server_version: str,
         as_page_text: bool,
     ) -> None:
@@ -295,9 +295,7 @@ class StateManager:
             graph.graph.setdefault("schema_version", GRAPH_SCHEMA_VERSION)
             now = time.time()
             created_ts = (
-                self._coerce_timestamp(created_at)
-                or metadata.executed_at.timestamp()
-                or now
+                self._coerce_timestamp(created_at) or metadata.executed_at.timestamp() or now
             )
             file_path_obj = Path(file_path)
 
@@ -355,9 +353,11 @@ class StateManager:
                 notebook_id=notebook_id,
                 page_url=page_url,
                 created_at=created_ts,
-                upload_count=(graph.nodes[page_node_id].get("upload_count", 0) + 1)
-                if graph.has_node(page_node_id)
-                else 1,
+                upload_count=(
+                    (graph.nodes[page_node_id].get("upload_count", 0) + 1)
+                    if graph.has_node(page_node_id)
+                    else 1
+                ),
             )
             _touch_node(
                 artifact_node_id,
@@ -694,9 +694,7 @@ class StateManager:
                 else:
                     graph.add_edge(src, dst, created_at=now, last_seen=now, **attrs)
 
-            source_page_node_id = _touch_page(
-                source_page_id, source_notebook_id, source_page_id
-            )
+            source_page_node_id = _touch_page(source_page_id, source_notebook_id, source_page_id)
             if source_notebook_id:
                 source_notebook_node_id = _touch_notebook(source_notebook_id)
                 _add_edge(
@@ -706,9 +704,7 @@ class StateManager:
                 )
 
             for target_notebook_id, target_page_id in normalized_links:
-                target_page_node_id = _touch_page(
-                    target_page_id, target_notebook_id, "Linked Page"
-                )
+                target_page_node_id = _touch_page(target_page_id, target_notebook_id, "Linked Page")
                 if target_notebook_id:
                     target_notebook_node_id = _touch_notebook(target_notebook_id)
                     _add_edge(

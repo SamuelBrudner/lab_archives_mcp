@@ -727,7 +727,7 @@ async def run_server() -> None:
 
                     # Validate file exists
                     file_path_obj = Path(file_path)
-                    if not file_path_obj.exists():
+                    if not await asyncio.to_thread(file_path_obj.exists):
                         raise FileNotFoundError(f"File not found: {file_path}")
 
                     # Parse execution timestamp
@@ -851,9 +851,7 @@ async def run_server() -> None:
                         page_tree_id = page_id
                     else:
                         if not page_title:
-                            raise ValueError(
-                                "page_title is required when page_id is not provided"
-                            )
+                            raise ValueError("page_title is required when page_id is not provided")
                         page_request = PageCreationRequest(
                             notebook_id=notebook_id,
                             parent_tree_id=parent_folder_id or 0,
@@ -874,9 +872,7 @@ async def run_server() -> None:
                         entry_body = content
                         part_type = "plain text entry"
                     else:
-                        raise ValueError(
-                            "content_format must be one of: markdown, html, plain"
-                        )
+                        raise ValueError("content_format must be one of: markdown, html, plain")
 
                     created = await notebook_client.add_entry(
                         uid=uid,
@@ -1099,6 +1095,7 @@ async def run_server() -> None:
                 page_node_id = f"page:{page_id}"
 
                 if graph.has_node(page_node_id):
+
                     def _page_title(node_id: str) -> str:
                         node_data = graph.nodes[node_id]
                         return str(node_data.get("label") or node_id.replace("page:", ""))

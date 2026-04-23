@@ -12,10 +12,10 @@ from .provo_export import (
     export_project_context,
     export_project_jsonld,
     serialize_linked_data_document,
-    write_graph_linked_data,
     write_graph_jsonld,
-    write_project_linked_data,
+    write_graph_linked_data,
     write_project_jsonld,
+    write_project_linked_data,
 )
 
 __all__ = [

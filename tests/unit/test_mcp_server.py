@@ -6,12 +6,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
 
-import networkx as nx
 import pytest
 
+from labarchives_mcp import mcp_server
 from labarchives_mcp.linked_data import export_project_jsonld
 from labarchives_mcp.models.upload import ProvenanceMetadata
-from labarchives_mcp import mcp_server
 from labarchives_mcp.state import StateManager
 
 
