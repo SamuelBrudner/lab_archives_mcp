@@ -9,8 +9,8 @@ from pathlib import Path
 import yaml
 
 
-def test_release_metadata_files_share_version_doi_and_year() -> None:
-    """Keep the public release metadata in sync across key entry points."""
+def test_release_metadata_files_distinguish_source_tree_and_jors_archive() -> None:
+    """Keep current release metadata separate from the reviewed JORS archive."""
 
     repo_root = Path(__file__).resolve().parents[1]
     pyproject = tomllib.loads((repo_root / "pyproject.toml").read_text())
@@ -19,23 +19,26 @@ def test_release_metadata_files_share_version_doi_and_year() -> None:
     readme = (repo_root / "README.md").read_text()
 
     version = pyproject["project"]["version"]
-    release_year = int(citation["date-released"].split("-", maxsplit=1)[0])
-    doi = next(
+    concept_doi = next(
         identifier["value"] for identifier in citation["identifiers"] if identifier["type"] == "doi"
     )
-    doi_url = f"https://doi.org/{doi}"
+    concept_doi_url = f"https://doi.org/{concept_doi}"
+    archived = citation["preferred-citation"]
+    archived_doi_url = f"https://doi.org/{archived['doi']}"
 
     assert citation["version"] == version
-    assert citation["preferred-citation"]["version"] == version
-    assert citation["preferred-citation"]["year"] == release_year
-    assert citation["preferred-citation"]["doi"] == doi
 
     assert codemeta["version"] == version
-    assert codemeta["identifier"] == doi_url
-    assert doi_url in codemeta["relatedLink"]
+    assert codemeta["identifier"] == concept_doi_url
+    assert concept_doi_url in codemeta["relatedLink"]
+    assert archived_doi_url in codemeta["relatedLink"]
 
-    assert f"[![DOI](https://zenodo.org/badge/DOI/{doi}.svg)]({doi_url})" in readme
-    assert f"year = {{{release_year}}}" in readme
-    assert f"doi = {{{doi}}}" in readme
-    assert f"url = {{{doi_url}}}" in readme
-    assert f"version = {{{version}}}" in readme
+    assert archived["version"] == "0.3.2"
+    assert archived["year"] == 2025
+
+    assert f"[![DOI](https://zenodo.org/badge/DOI/{concept_doi}.svg)]({concept_doi_url})" in readme
+    assert f"The current source tree is version `{version}`" in readme
+    assert f"year = {{{archived['year']}}}" in readme
+    assert f"doi = {{{archived['doi']}}}" in readme
+    assert f"url = {{{archived_doi_url}}}" in readme
+    assert f"version = {{{archived['version']}}}" in readme

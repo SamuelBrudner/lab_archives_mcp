@@ -4,6 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.17728440.svg)](https://doi.org/10.5281/zenodo.17728440)
+[![codecov](https://codecov.io/gh/SamuelBrudner/lab_archives_mcp/branch/main/graph/badge.svg)](https://codecov.io/gh/SamuelBrudner/lab_archives_mcp)
 
 
 ## Overview
@@ -676,13 +677,14 @@ See `CONTRIBUTING.md` for versioning, Conventional Commits, and release steps.
 For the JORS resubmission, cite the archived Zenodo snapshot:
 
 - Archived version: `v0.3.2`
-- DOI: <https://doi.org/10.5281/zenodo.17728440>
+- Version DOI: <https://doi.org/10.5281/zenodo.17772522>
+- Concept DOI: <https://doi.org/10.5281/zenodo.17728440>
 - Git tag: <https://github.com/SamuelBrudner/lab_archives_mcp/releases/tag/v0.3.2>
 
 The current source tree is version `0.4.0`, recorded in `CITATION.cff`,
-`codemeta.json`, and `CHANGELOG.md`. Use the Zenodo DOI above for the reviewed
-JORS archive; cite the current release when referring specifically to linked-data
-export or other post-archive changes.
+`codemeta.json`, `pyproject.toml`, and `CHANGELOG.md`. Use the version DOI above
+for the reviewed JORS archive; cite the current release when referring
+specifically to linked-data export or other post-archive changes.
 
 ## Contributing
 
@@ -701,10 +703,10 @@ If you use this software in your research, please cite:
 @software{brudner2026labarchives,
   author = {Brudner, Samuel N.},
   title = {LabArchives MCP Server: AI Integration for Electronic Lab Notebooks},
-  year = {2026},
-  doi = {10.5281/zenodo.17728440},
-  url = {https://doi.org/10.5281/zenodo.17728440},
-  version = {0.4.0}
+  year = {2025},
+  doi = {10.5281/zenodo.17772522},
+  url = {https://doi.org/10.5281/zenodo.17772522},
+  version = {0.3.2}
 }
 ```
 

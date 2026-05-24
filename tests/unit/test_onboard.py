@@ -90,7 +90,7 @@ def onboard_service(
     return OnboardService(
         auth_manager=mock_auth_manager,
         notebook_client=cast(LabArchivesClient, mock_notebook_client),
-        version="0.2.4",
+        version="0.4.0",
         cache_ttl_seconds=300,
         max_notebooks=5,
         recent_activity_limit=5,
@@ -106,7 +106,7 @@ async def test_get_payload_returns_valid_structure(
 
     assert isinstance(payload, OnboardPayload)
     assert payload.server == "lab_archives_mcp"
-    assert payload.version == "0.2.4"
+    assert payload.version == "0.4.0"
     assert payload.purpose == "Provide experimental context from LabArchives ELN."
     assert payload.banner
     assert payload.router_prompt
@@ -189,7 +189,7 @@ async def test_get_payload_cache_expires(
     service = OnboardService(
         auth_manager=mock_auth_manager,
         notebook_client=cast(LabArchivesClient, mock_notebook_client),
-        version="0.2.4",
+        version="0.4.0",
         cache_ttl_seconds=0,  # Immediate expiry
     )
 
@@ -262,7 +262,7 @@ async def test_empty_notebooks_handled_gracefully(
     service = OnboardService(
         auth_manager=mock_auth_manager,
         notebook_client=cast(LabArchivesClient, mock_client),
-        version="0.2.4",
+        version="0.4.0",
     )
 
     payload = await service.get_payload()
@@ -284,7 +284,7 @@ async def test_network_errors_during_scan_handled(
     service = OnboardService(
         auth_manager=mock_auth_manager,
         notebook_client=cast(LabArchivesClient, mock_notebook_client),
-        version="0.2.4",
+        version="0.4.0",
     )
 
     # Should not raise, but return payload with limited data
@@ -424,7 +424,7 @@ async def test_payload_size_with_large_dataset(
     service = OnboardService(
         auth_manager=mock_auth_manager,
         notebook_client=cast(LabArchivesClient, mock_client),
-        version="0.2.4",
+        version="0.4.0",
         max_notebooks=5,  # Limit to prevent size explosion
         recent_activity_limit=2,
     )
