@@ -359,18 +359,17 @@ For configuration examples for Windsurf and Claude Desktop (including environmen
 
 - **`list_labarchives_notebooks()`** - List all your notebooks
 - **`list_notebook_pages(notebook_id)`** - Show table of contents for a notebook
-- **`search_labarchives(query, limit=5)`** - Semantic search across indexed notebooks
 
 **Reading**:
 
 - **`read_notebook_page(notebook_id, page_id, track_visit=True, dry_run=False)`** - Read content from a specific page and optionally record the visit in the active project
 
-**Writing**:
+**Search & index**:
 
-- **`write_notebook_entry(...)`** - Write rich text (Markdown/HTML/plain) to a page; create a page if needed
-- **`upload_to_labarchives(...)`** - Upload files with provenance metadata (attachments or page text)
+- **`search_labarchives(query, limit=5)`** - Search indexed LabArchives notebooks semantically
+- **`sync_vector_index(force=False, dry_run=False, max_age_hours=None, notebook_id=None)`** - Plan or run a vector-index sync
 
-**Project state & heuristics**:
+**Project state & graph**:
 
 - **`create_project(name, description, linked_notebook_ids=None, dry_run=False)`** - Start and activate a project workspace
 - **`list_projects()`**, **`switch_project(project_id, dry_run=False)`**, **`delete_project(project_id, dry_run=False)`** - Manage project contexts
@@ -379,6 +378,14 @@ For configuration examples for Windsurf and Claude Desktop (including environmen
 - **`get_related_pages(notebook_id, page_id, limit=20, offset=0)`** - Find sibling/linked pages via the project graph and detected LabArchives links; returns `items` plus pagination `meta`
 - **`trace_provenance(notebook_id, page_id, entry_id)`** - Trace sources and metadata for a specific entry
 - **`suggest_next_steps()`** - Get lightweight guidance based on your current project state (cold start vs active)
+- **`export_provenance_jsonld(project_id)`** - Export a project graph as JSON-LD
+
+**Write & provenance**:
+
+- **`write_notebook_entry(...)`** - Write a rich text entry directly to a LabArchives page, appending to an existing page or creating a page when `page_id` is omitted
+- **`upload_to_labarchives(...)`** - Upload a file to LabArchives with code provenance metadata, creating a page and storing the file as page text or an attachment
+
+The support tool `get_onboard_payload(format="json")` returns usage guidance and sticky context for MCP clients.
 
 ### Indexing & Sync
 
