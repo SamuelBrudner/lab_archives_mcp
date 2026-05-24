@@ -141,43 +141,19 @@ Manual testing against real LabArchives notebooks follows a six-check protocol: 
   - Issues and feature requests are tracked via the GitHub issue tracker.
   - Contribution guidelines, including development setup, testing, and release procedures, are documented in `CONTRIBUTING.md`.
 
-# 5. Reuse Potential
+# 5. Reuse
 
-The design of `lab_archives_mcp` prioritizes reuse at three levels: as a concrete connector for LabArchives, as a reference architecture for ELN/AI integration, and as a set of reusable agent design patterns.
+## 5.1 Other applications
 
-## 5.1 Comparison to existing solutions
+The LabArchives-specific boundary is the API client in `eln_client.py`. A developer targeting another ELN-like store would implement equivalent notebook, page, entry, write, and upload calls while keeping the MCP tool shapes, project-state model, and vector indexing pipeline. The write path can also be used by analysis pipelines that need to publish notebooks, figures, or reports back to a governed record with Git and Python provenance metadata.
 
-While LabArchives and other ELN platforms expose REST APIs for CRUD operations, these interfaces typically rely on keyword search and leave indexing, semantic retrieval, and AI integration as downstream implementation details. Existing open‑source tools focus on exporting ELN data or integrating ELNs into LIMS workflows rather than exposing them directly to AI assistants. In contrast, `lab_archives_mcp` provides an MCP‑native connector that publishes LabArchives notebooks, pages, and entries as typed tools discoverable by AI assistants, together with a configuration‑driven semantic search backend. This offers a concrete, reusable pattern for bringing institutional ELNs and AI assistants into a single architecture without claiming that the pattern is specific to LabArchives.
+## 5.2 Extension points
 
-## 5.2 Template for other ELN and LIMS systems
+New MCP tools can be added at the server tool layer when an institution needs another LabArchives API operation, such as attachment download or filtered page search. The vector backend can be changed by implementing the `VectorIndex` interface used by `PineconeIndex`; the current `QdrantIndex` and `LocalEmbedding` classes are placeholders that raise `NotImplementedError`, so they mark extension points rather than supported runtime paths.
 
-- The separation between authentication, API client, MCP server, vector backend, and state management allows developers to replace only the `eln_client.py` layer when targeting a different ELN or LIMS.
-- The same MCP tooling patterns (list resources, read pages, search, upload), state management layer (`state.py`), and graph-based navigation can be reused, facilitating consistent assistant behaviour across multiple systems.
-- Developers adapting this architecture to other systems (e.g. BioRAFT, Benchling, or eLabFTW) can preserve the project context abstraction and graph navigation logic while swapping out only the underlying API calls.
+## 5.3 Integration
 
-## 5.3 Standalone vector backend
-
-- The vector backend can be used independently of LabArchives to build institutional RAG pipelines over other content types, such as lab wikis or institutional repositories.
-- Hydra-managed configuration makes it straightforward to tune chunking, embedding models, and storage backends for new domains without modifying code.
-
-## 5.4 Reusable agent architecture patterns
-
-- The **state management layer** (`state.py`) provides a general-purpose pattern for maintaining assistant memory across sessions, applicable to any MCP server that needs to track long-running tasks.
-- The **graph-based navigation** approach (using NetworkX to model semantic relationships) can be adapted to other domains where content relationships extend beyond hierarchical structure (e.g. citation networks, experimental lineages, or institutional knowledge graphs).
-- The **onboarding payload system** (`onboard.py`) offers a transparent, inspectable way to instruct assistants about server capabilities, reducing reliance on implicit prompt engineering.
-
-## 5.5 Institutional deployment patterns
-
-- Research data management teams can deploy the MCP server as part of an institutional AI assistant, exposing ELN content under existing authentication and logging policies.
-- The project documents multiple deployment options for the vector backend, including local Parquet persistence and self-hosted vector stores, allowing institutions to keep embeddings and metadata on-premise when required.
-- The state management layer operates entirely locally (`~/.labarchives_state` directory), ensuring that research context and findings remain under institutional control even when vector embeddings are delegated to third-party services. The use of a home-directory location allows researchers to access the same project contexts regardless of which repository or working directory they are in.
-
-## 5.6 Limitations and constraints
-
-- Full functionality requires access to the LabArchives API; institutions using other ELNs would need corresponding API access to build similar connectors.
-- When external vector stores (e.g. managed Pinecone or Qdrant instances) are used, embeddings and possibly derived text are stored on third-party infrastructure, introducing an additional data custody layer. Local and self-hosted options are provided for deployments that require stricter control.
-- The graph-based navigation and heuristics layers assume that assistants will engage in exploratory, multi-session research tasks; for simple, one-off queries, the overhead may not be justified.
-- Reuse is supported through the public GitHub issue tracker, the development and testing guidance in `CONTRIBUTING.md`, configuration examples in `docs/agent_configuration.md`, and the example onboarding payload in `docs/onboard_example.json`.
+The server runs over stdio and can be registered with any MCP-compatible client. `docs/agent_configuration.md` gives a Claude Desktop configuration that launches the `labarchives-mcp` command with LabArchives credentials, and the same command can be used from other MCP clients that accept a local stdio server. Project state is stored under `~/.labarchives_state`, so a user can keep the same project context across compatible clients on the same machine.
 
 # 6. Illustrative Example
 
