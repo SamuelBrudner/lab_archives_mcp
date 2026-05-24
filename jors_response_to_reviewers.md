@@ -56,7 +56,7 @@ Revised in commit `b5aa1ae`. The paper Availability section now includes one sup
 
 > One paragraph stating exactly what leaves the institution for Pinecone and Qdrant: vectors only, or vectors plus chunk text -- verify in code -- plus which metadata fields, and what stays local.
 
-Revised in commit `113a814`. The security and governance text now states that OpenAI receives chunk text and query text for embeddings, Pinecone receives embedding vectors plus chunk text and the specific metadata fields stored in `PineconeIndex.upsert`, and Qdrant receives no data in the current release because `QdrantIndex` raises `NotImplementedError`. It also states that local Parquet persistence stores text, vectors, and metadata on disk, while credentials and project graph state remain local unless copied elsewhere.
+Revised in commits `113a814` and `90eaa57`. The security and governance text now states that OpenAI receives chunk text and query text for embeddings, Pinecone receives embedding vectors plus chunk text and the specific metadata fields stored in `PineconeIndex.upsert`, and Qdrant receives no data in the current release because `QdrantIndex` raises `NotImplementedError`. It also states that local Parquet persistence stores text, vectors, and metadata on disk, while credentials and project graph state remain local unless copied elsewhere. The vector-backend wording now distinguishes Pinecone runtime support from Qdrant and local-embedding extension points.
 
 ## R3 Minor Sample Data Reference
 
