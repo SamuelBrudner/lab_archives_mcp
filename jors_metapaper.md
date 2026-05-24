@@ -138,8 +138,7 @@ Manual testing against real LabArchives notebooks follows a six-check protocol: 
   - Distributed under the MIT License.
 
 - **Support and contributions**
-  - Issues and feature requests are tracked via the GitHub issue tracker.
-  - Contribution guidelines, including development setup, testing, and release procedures, are documented in `CONTRIBUTING.md`.
+  - Support requests and bug reports should be filed at <https://github.com/SamuelBrudner/lab_archives_mcp/issues>; the maintainer can be contacted at <samuel.brudner@yale.edu> for security-sensitive or access-specific questions. The maintainer aims to respond to actionable issues within 14 calendar days. Contribution guidance, including setup, testing, and pull-request expectations, is maintained in <https://github.com/SamuelBrudner/lab_archives_mcp/blob/main/CONTRIBUTING.md>.
 
 # 5. Reuse
 
