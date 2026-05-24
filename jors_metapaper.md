@@ -29,7 +29,7 @@ The intended users are wet-lab researchers, research data management teams, and 
 
 ![System architecture showing Assistant, lab_archives_mcp components, and LabArchives API](docs/figures/architecture.png)
 
-**Figure 1.** High-level architecture of the MCP integration. The AI assistant communicates with the `lab_archives_mcp` server, which mediates access to the LabArchives API while isolating authentication, API-client, vector-search, state-management, and write/provenance responsibilities inside separable Python modules.
+**Figure 1.** Component and data-flow architecture of the MCP integration. An MCP client calls the FastMCP server tools, which mediate LabArchives API access, local project-state updates, embedding requests, vector-index writes, and ranked search-result retrieval.
 
 1. **Authentication layer (`auth.py`)**
    - Implements HMAC-SHA512 request signing for the LabArchives REST API [@labarchives].

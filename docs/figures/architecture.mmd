@@ -1,3 +1,16 @@
-graph LR
-    Assistant[AI Assistant] <--> MCP["lab_archives_mcp<br/>(Auth + Client + Vector + State)"]
-    MCP <--> API[LabArchives API]
+flowchart LR
+    Client["MCP client<br/>(Claude Desktop or other MCP-compatible client)"]
+    Tools["lab_archives_mcp FastMCP server tools<br/>discovery | reading | search/index | project graph | write & provenance"]
+    API["LabArchives API<br/>HMAC-signed notebook, page, entry, and upload calls"]
+    State["Local project state<br/>~/.labarchives_state/session_state.json<br/>NetworkX graph"]
+    Embed["Embedding provider<br/>OpenAI text-embedding-3-small by default"]
+    Vector["Vector backend<br/>Pinecone vectors + metadata<br/>local Parquet chunk persistence"]
+
+    Client <--> Tools
+    Tools <--> API
+    Tools <--> State
+    API -->|"page and entry text for indexing"| Tools
+    Tools -->|"chunk text"| Embed
+    Embed -->|"embedding vectors"| Tools
+    Tools -->|"vectors, chunk text, metadata"| Vector
+    Vector -->|"ranked page matches"| Tools

@@ -43,7 +43,7 @@ lab\_archives\_mcp is organized into six primary components that separate authen
 \begin{figure}[h]
     \centering
     \includegraphics[width=\linewidth]{docs/figures/architecture.png}
-    \caption{High-level architecture of the MCP integration. The AI assistant communicates with lab\_archives\_mcp, which mediates access to the LabArchives API while isolating authentication, API-client, vector-search, state-management, and write/provenance responsibilities inside separable Python modules.}
+    \caption{Component and data-flow architecture of the MCP integration. An MCP client calls the FastMCP server tools, which mediate LabArchives API access, local project-state updates, embedding requests, vector-index writes, and ranked search-result retrieval.}
     \label{fig:architecture}
 \end{figure}
 
