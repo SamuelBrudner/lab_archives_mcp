@@ -9,7 +9,7 @@
 
 ## Overview
 
-A **Model Context Protocol (MCP) server** that connects AI assistants to LabArchives electronic lab notebooks (ELN). This enables researchers to chat with their lab data, search notebooks semantically, and integrate lab work into AI-assisted workflows.
+A **Model Context Protocol (MCP) server** that connects AI assistants to LabArchives electronic lab notebooks (ELN). MCP is an open protocol that lets AI clients call external tools and data sources through structured requests. This server lets researchers query notebook records, search notebooks semantically, and integrate lab work into AI-assisted workflows.
 
 **Key Features:**
 
