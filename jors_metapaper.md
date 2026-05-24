@@ -140,21 +140,25 @@ Manual testing against real LabArchives notebooks follows a six-check protocol: 
 - **Support and contributions**
   - Support requests and bug reports should be filed at <https://github.com/SamuelBrudner/lab_archives_mcp/issues>; the maintainer can be contacted at <samuel.brudner@yale.edu> for security-sensitive or access-specific questions. The maintainer aims to respond to actionable issues within 14 calendar days. Contribution guidance, including setup, testing, and pull-request expectations, is maintained in <https://github.com/SamuelBrudner/lab_archives_mcp/blob/main/CONTRIBUTING.md>.
 
-# 5. Reuse
+# 5. Sample Data
 
-## 5.1 Other applications
+The repository includes small, non-private assets for smoke testing and configuration review. `notebooks/` contains a sample Jupyter notebook, `docs/onboard_example.json` records the onboarding payload schema used by MCP clients, and `conf/secrets.example.yml` documents the required LabArchives, OpenAI, and Pinecone configuration keys without real credentials. The README "Tool Schemas" section provides schema-shaped examples for notebook listing, page listing, page reading, writing, and upload responses; these examples are for contract inspection, not fixture-recorded LabArchives content.
+
+# 6. Reuse
+
+## 6.1 Other applications
 
 The LabArchives-specific boundary is the API client in `eln_client.py`. A developer targeting another ELN-like store would implement equivalent notebook, page, entry, write, and upload calls while keeping the MCP tool shapes, project-state model, and vector indexing pipeline. The write path can also be used by analysis pipelines that need to publish notebooks, figures, or reports back to a governed record with Git and Python provenance metadata.
 
-## 5.2 Extension points
+## 6.2 Extension points
 
 New MCP tools can be added at the server tool layer when an institution needs another LabArchives API operation, such as attachment download or filtered page search. The vector backend can be changed by implementing the `VectorIndex` interface used by `PineconeIndex`; the current `QdrantIndex` and `LocalEmbedding` classes are placeholders that raise `NotImplementedError`, so they mark extension points rather than supported runtime paths.
 
-## 5.3 Integration
+## 6.3 Integration
 
 The server runs over stdio and can be registered with any MCP-compatible client. `docs/agent_configuration.md` gives a Claude Desktop configuration that launches the `labarchives-mcp` command with LabArchives credentials, and the same command can be used from other MCP clients that accept a local stdio server. Project state is stored under `~/.labarchives_state`, so a user can keep the same project context across compatible clients on the same machine.
 
-# 6. Illustrative Example
+# 7. Illustrative Example
 
 The following transcript was captured by running the registered `write_notebook_entry` MCP tool in a local smoke harness with LabArchives network calls replaced by test doubles:
 
@@ -181,12 +185,12 @@ The following transcript was captured by running the registered `write_notebook_
 
 The transcript verifies the MCP tool schema, required arguments, page-creation path, LabArchives URL construction, timestamp handling, and returned entry metadata. A live run against LabArchives uses the same tool call but returns platform-generated page and entry identifiers.
 
-# 7. Conclusion
+# 8. Conclusion
 
 `lab_archives_mcp` demonstrates how an ELN can be exposed to AI assistants through typed MCP tools, semantic retrieval, persistent project state, and provenance-aware write operations. Its main contribution is not a replacement for institutional ELN infrastructure, but a modular bridge that lets assistants operate over existing notebook records while leaving authentication, data custody, and deployment policy under institutional control. The current implementation is limited by its dependence on LabArchives API access and by the privacy implications of optional managed embedding and vector services, but the separation between the ELN client, vector backend, state layer, and write/provenance layer provides a practical template for adapting the same approach to other research data systems.
 
-# 8. Funding and Acknowledgements
+# 9. Funding and Acknowledgements
 
 This work was performed independently by the author and tested against a LabArchives account at Yale University. The author thanks LabArchives for API documentation and technical support, and the FastMCP and Anthropic teams for the Model Context Protocol specification and reference implementations.
 
-# 9. References
+# 10. References
