@@ -46,7 +46,8 @@ The intended users are wet-lab researchers, research data management teams, and 
 
 4. **Vector backend (`vector_backend/`)**
    - Implements a configuration-driven pipeline for semantic search.
-   - Supports pluggable text chunking strategies, embedding providers, and vector indices (including Pinecone, Qdrant, and local Parquet-based storage).
+   - Uses OpenAI embeddings, Pinecone indexing, and local Parquet persistence in the implemented path.
+   - Keeps Qdrant and local embeddings as extension points; the current `QdrantIndex` and `LocalEmbedding` classes raise `NotImplementedError`.
    - Uses Hydra-based configuration so that chunking parameters, model choices, and storage backends are declared in YAML rather than hard-coded [@hydra].
    - The `sync_vector_index` tool uses a persisted build record to decide between skipping, incrementally updating, or fully rebuilding an index when embedding configurations or model versions change, enabling reproducible and efficient maintenance of large notebook indices.
 
@@ -96,7 +97,7 @@ This onboarding layer ensures that assistants are **contextually aware** of the 
 
 To support deployment in institutional environments with strict data governance requirements, the server implements several layers of security control beyond basic authentication:
 
-- **Namespace Isolation**: When using shared vector stores (e.g., Pinecone or Qdrant), the server supports strict namespace isolation. Embeddings are scoped to specific tenants or notebooks, preventing cross-user data leakage.
+- **Namespace Isolation**: When using Pinecone, the server supports namespace isolation. Embeddings can be scoped to specific tenants or notebooks, preventing cross-user data leakage when the deployment uses separate namespaces.
 - **Write Control**: The upload functionality can be globally disabled via the `LABARCHIVES_ENABLE_UPLOAD=false` environment variable, allowing administrators to deploy read-only instances for safety.
 - **Data Sovereignty**: The vector backend supports a **local Parquet** storage option. When combined with locally hosted embedding models, this ensures that research data never leaves the institution's infrastructure, keeping all vector embeddings and metadata on-premise (e.g., on a secure research file server) rather than sending data to third-party cloud services.
 - **Credential Scoping**: Access to the LabArchives API is scoped via standard API keys and user IDs, ensuring that the MCP server operates with the exact permissions of the authenticated user.

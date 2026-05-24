@@ -73,7 +73,7 @@ A **Model Context Protocol (MCP) server** that connects AI assistants to LabArch
 - `linked_data/` – JSON-LD export for legacy and enriched provenance graphs.
 - `transform.py` – XML→JSON transforms and API fault translation.
 - `mcp_server.py` – MCP server wiring and tool registration.
-- `vector_backend/` – semantic search indexing and Pinecone/Qdrant integrations.
+- `vector_backend/` – semantic search indexing with Pinecone and local Parquet persistence; Qdrant is a placeholder extension point.
 
 ---
 
@@ -222,8 +222,8 @@ asyncio.run(test())
   - When these backends are enabled, text content and/or embeddings will be sent to the corresponding provider; institutions should review their data-governance policies before enabling them.
 
 - **On-premise and open backends**
-  - The core vector backend and Pydantic models are designed to work without LabArchives and without any commercial vector store.
-  - Institutions can plug in a local or on-prem backend (for example, a filesystem or database-backed index) to keep all embeddings and metadata on institutional hardware.
+  - Qdrant, local embeddings, and fully on-premise vector search are extension points, not supported runtime paths in the current release.
+  - The current code raises `NotImplementedError` for `QdrantIndex` and `LocalEmbedding`; deployments that need those paths must implement and review the corresponding backend before use.
 
 - **Intended usage**
   - `lab_archives_mcp` is designed as an integration layer between ELNs and AI assistants, not as a general-purpose ELN or standalone LIMS.
