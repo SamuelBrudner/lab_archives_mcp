@@ -72,21 +72,30 @@ Search-result validation happens in three steps: \texttt{SearchRequest} bounds t
 Manual testing against real LabArchives notebooks follows a six-check protocol: verify UID resolution, list notebooks, traverse one notebook tree, read one page, run one semantic search against an indexed notebook, and write or upload to a designated test page only when \texttt{LABARCHIVES\_ENABLE\_UPLOAD=true}. Lightweight example assets, including \texttt{notebooks/}, \texttt{docs/onboard\_example.json}, \texttt{conf/secrets.example.yml}, and the README schema examples, are included to support smoke testing without exposing private ELN content.
 
 \subsection*{Illustrative example}
-Once credentials are configured and the MCP server is registered with an AI assistant, researchers can query their notebooks conversationally:
+The following transcript was captured by running the registered \texttt{write\_notebook\_entry} MCP tool in a local smoke harness with LabArchives network calls replaced by test doubles:
 
-\textbf{Researcher:} "I'm starting a new analysis of the mosquito wind tunnel data. Create a project for this."
+\begin{verbatim}
+{
+  "call": {
+    "tool": "write_notebook_entry",
+    "arguments": {
+      "notebook_id": "NBID-demo",
+      "page_title": "QC note",
+      "content": "# QC note\n\nCaptured from local revision test.",
+      "content_format": "markdown"
+    }
+  },
+  "response": {
+    "page_tree_id": "page-42",
+    "entry_id": "entry-7",
+    "page_url": "https://mynotebook.labarchives.com/share/NBID-demo/page-42",
+    "created_at": "2026-05-24T21:45:00+00:00",
+    "part_type": "text entry"
+  }
+}
+\end{verbatim}
 
-\textbf{Assistant:} Creates a create\_project task named "Mosquito Analysis" with the description "Wind tunnel data analysis," then confirms readiness.
-
-\textbf{Researcher:} "Find the calibration protocols we used last summer."
-
-\textbf{Assistant:} Runs semantic search for "wind tunnel calibration protocol summer 2024" and opens the resulting page (ID 12345), summarizing the IR tracking setup.
-
-\textbf{Researcher:} "Log that as a key finding, and check if there are any related experiment runs linked to it."
-
-\textbf{Assistant:} Logs the calibration finding on page 12345, retrieves related pages, and reports the linked experiment runs.
-
-This workflow shows the assistant managing research context, using semantic search for entry points, and logging findings to build a persistent model of the investigation.
+The transcript verifies the MCP tool schema, required arguments, page-creation path, LabArchives URL construction, timestamp handling, and returned entry metadata. A live run against LabArchives uses the same tool call but returns platform-generated page and entry identifiers.
 
 \section*{(2) Availability}
 

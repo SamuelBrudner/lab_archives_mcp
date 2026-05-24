@@ -286,44 +286,32 @@ asyncio.run(test())
   - Current lab notebook snapshot and sticky context block to persist in responses
 - Persist the returned `sticky_context` in your agent memory before invoking other tools.
 
-### 6. Example: Querying Your Notebooks with AI
+### 6. Captured MCP Tool Transcript
 
-Once configured with an AI assistant (Windsurf or Claude Desktop), you can conversationally interact with your lab notebooks:
+This transcript was captured by running the registered `write_notebook_entry` MCP tool in a local smoke harness with LabArchives network calls replaced by test doubles:
 
-```CHATBOT
-You: "What protocols did I document for my navigation experiments?"
-
-AI: [Automatically calls list_labarchives_notebooks(),
-     list_notebook_pages(), read_notebook_page()]
-
-AI: "In your 'Mosquito Navigation' notebook, you documented three main protocols:
-
-1. Wind tunnel setup with IR tracking (updated Aug 12, 2024)
-   - Camera calibration procedure
-   - LED array configuration
-   - Temperature and humidity controls
-
-2. Odor delivery system calibration (updated Aug 13, 2024)
-   - Olfactometer settings
-   - Odor concentration measurements
-   - Flow rate verification
-
-3. Flight trajectory analysis pipeline (updated Aug 15, 2024)
-   - Video preprocessing steps
-   - Tracking algorithm parameters
-   - Statistical analysis methods
-
-Would you like me to retrieve specific details from any of these protocols?"
+```json
+{
+  "call": {
+    "tool": "write_notebook_entry",
+    "arguments": {
+      "notebook_id": "NBID-demo",
+      "page_title": "QC note",
+      "content": "# QC note\n\nCaptured from local revision test.",
+      "content_format": "markdown"
+    }
+  },
+  "response": {
+    "page_tree_id": "page-42",
+    "entry_id": "entry-7",
+    "page_url": "https://mynotebook.labarchives.com/share/NBID-demo/page-42",
+    "created_at": "2026-05-24T21:45:00+00:00",
+    "part_type": "text entry"
+  }
+}
 ```
 
-The AI assistant autonomously:
-
-- Searches through your notebooks to find relevant content
-- Reads the appropriate pages and entries
-- Synthesizes the information into a coherent answer
-- Maintains context for follow-up questions
-
-You can also use semantic search: *"Find experiments related to olfactory behavior"* will retrieve conceptually related content even if exact keywords differ.
+Live LabArchives runs use the same tool call and return platform-generated page and entry identifiers.
 
 ### 7. Run the MCP Server
 
@@ -568,25 +556,9 @@ asyncio.run(main())
 
 > **🔒 Security Note**: The upload tool is enabled by default. For production deployments or shared environments, **disable write capabilities** by setting `LABARCHIVES_ENABLE_UPLOAD=false` in the environment configuration above. This prevents AI assistants from unintentionally modifying your research records.
 
-#### Example Agent Workflow
+#### Example Scope
 
-```Chat
-User: "What notebooks do I have?"
-Agent: calls list_labarchives_notebooks()
-→ Shows: Mosquito Navigation, Odor motion PNAS, etc.
-
-User: "What's in my Mosquito Navigation notebook?"
-Agent: calls list_notebook_pages("MTU2MTI4NS43...")
-→ Shows: Protocols (folder), Sample Log (folder), Experiment Data (folder), etc.
-
-User: "What's in the Protocols folder?"
-Agent: calls list_notebook_pages("MTU2MTI4NS43...", folder_id="MS4z...")
-→ Shows: Pages and sub-folders inside Protocols
-
-User: "Show me the first page"
-Agent: calls read_notebook_page("MTU2MTI4NS43...", "12345")
-→ Returns: All text entries, headings, and attachment info from that page
-```text
+The captured transcript above is the repository-maintained tool example. Notebook names, page IDs, and entry IDs are institution-specific, so conversational examples with invented notebook contents are intentionally omitted.
 
 ---
 

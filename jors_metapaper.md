@@ -157,28 +157,30 @@ The server runs over stdio and can be registered with any MCP-compatible client.
 
 # 6. Illustrative Example
 
-Once credentials are configured and the MCP server is registered with an AI assistant, researchers can query their notebooks conversationally. For example:
+The following transcript was captured by running the registered `write_notebook_entry` MCP tool in a local smoke harness with LabArchives network calls replaced by test doubles:
 
-**Researcher:** "I'm starting a new analysis of the mosquito wind tunnel data. Create a project for this."
+```json
+{
+  "call": {
+    "tool": "write_notebook_entry",
+    "arguments": {
+      "notebook_id": "NBID-demo",
+      "page_title": "QC note",
+      "content": "# QC note\n\nCaptured from local revision test.",
+      "content_format": "markdown"
+    }
+  },
+  "response": {
+    "page_tree_id": "page-42",
+    "entry_id": "entry-7",
+    "page_url": "https://mynotebook.labarchives.com/share/NBID-demo/page-42",
+    "created_at": "2026-05-24T21:45:00+00:00",
+    "part_type": "text entry"
+  }
+}
+```
 
-**Assistant:** Creates a `create_project` task named "Mosquito Analysis" with the description "Wind tunnel data analysis."
-
-**Assistant:**
-"Project 'Mosquito Analysis' created. I'm ready to help."
-
-**Researcher:** "Find the calibration protocols we used last summer."
-
-**Assistant:** Runs semantic search for "wind tunnel calibration protocol summer 2024" and opens the resulting page (ID 12345).
-
-**Assistant:** "I found the 'Wind Tunnel Calibration (Aug 2024)' page. It details the IR tracking setup."
-
-**Researcher:** "Log that as a key finding, and check if there are any related experiment runs linked to it."
-
-**Assistant:** Logs the calibration finding on page 12345, then retrieves related pages linked to that entry.
-
-**Assistant:** "Finding logged. I also found three linked experiment pages: 'Run 14', 'Run 15', and 'Run 16' that cite this calibration."
-
-In this workflow, the assistant explicitly manages the research context by creating a project, then uses semantic search to find entry points. By logging findings and traversing the graph, it builds a persistent model of the investigation that can be resumed in future sessions. Similar conversations can drive related queries (e.g. "Find experiments related to olfactory navigation behaviour") and upload new analysis artefacts with provenance metadata.
+The transcript verifies the MCP tool schema, required arguments, page-creation path, LabArchives URL construction, timestamp handling, and returned entry metadata. A live run against LabArchives uses the same tool call but returns platform-generated page and entry identifiers.
 
 # 7. Conclusion
 
