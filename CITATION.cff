@@ -1,5 +1,5 @@
 cff-version: 1.2.0
-message: "This file describes the current v0.4.0 source tree: https://doi.org/10.5281/zenodo.19672568. For the JORS archived submission, cite the v0.3.2 Zenodo record: https://doi.org/10.5281/zenodo.17772522."
+message: "Primary identifier is the Zenodo concept DOI for this software. For the JORS reviewed archive, cite the v0.3.2 Zenodo version record: https://doi.org/10.5281/zenodo.17772522. The current v0.4.0 version record is https://doi.org/10.5281/zenodo.19672568."
 type: software
 title: "LabArchives MCP Server: AI Integration for Electronic Lab Notebooks"
 version: 0.4.0

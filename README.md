@@ -653,18 +653,17 @@ All field descriptions, examples, and validation rules are in the Pydantic model
 
 See `CONTRIBUTING.md` for versioning, Conventional Commits, and release steps.
 
-For the JORS resubmission, cite the archived Zenodo snapshot:
+Use this citation policy consistently:
 
-- Archived version: `v0.3.2`
-- Archived version DOI: <https://doi.org/10.5281/zenodo.17772522>
-- Concept DOI: <https://doi.org/10.5281/zenodo.17728440>
-- Git tag: <https://github.com/SamuelBrudner/lab_archives_mcp/releases/tag/v0.3.2>
+- Software concept DOI: <https://doi.org/10.5281/zenodo.17728440>
+- JORS reviewed archive: `v0.3.2`, version DOI <https://doi.org/10.5281/zenodo.17772522>, Git tag <https://github.com/SamuelBrudner/lab_archives_mcp/releases/tag/v0.3.2>
+- Current source tree: `0.4.0`, version DOI <https://doi.org/10.5281/zenodo.19672568>
 
-The current source tree is version `0.4.0`, recorded in `CITATION.cff`,
-`codemeta.json`, `pyproject.toml`, and `CHANGELOG.md`. The current Zenodo
-version DOI is <https://doi.org/10.5281/zenodo.19672568>. Use the archived
-version DOI above for the reviewed JORS archive; cite the current release when
-referring specifically to linked-data export or other post-archive changes.
+The DOI badge, `CITATION.cff` primary identifier, and `codemeta.json`
+identifier use the concept DOI. The README BibTeX and `CITATION.cff`
+preferred citation use the reviewed `v0.3.2` version DOI for the JORS archive.
+Cite the current `0.4.0` version DOI only when referring specifically to
+linked-data export or other post-archive changes.
 
 ## Contributing
 
