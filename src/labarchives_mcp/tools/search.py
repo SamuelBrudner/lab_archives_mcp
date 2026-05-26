@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import contextlib
 import os
 from datetime import datetime
 from pathlib import Path
@@ -29,106 +28,92 @@ async def search_labarchives(
 
     logger.info(f"search_labarchives called: query='{query}', limit={limit}")
 
-    try:
-        env_path = os.environ.get("LABARCHIVES_CONFIG_PATH")
-        secrets_path = Path(env_path) if env_path else Path("conf/secrets.yml")
+    env_path = os.environ.get("LABARCHIVES_CONFIG_PATH")
+    secrets_path = Path(env_path) if env_path else Path("conf/secrets.yml")
 
-        async with aiofiles.open(secrets_path) as f:
-            content = await f.read()
-            secrets = yaml.safe_load(content)
+    async with aiofiles.open(secrets_path) as f:
+        content = await f.read()
+        secrets = yaml.safe_load(content)
 
-        config = load_config("default")
-        embedding_client = create_embedding_client(config.embedding)
+    config = load_config("default")
+    embedding_client = create_embedding_client(config.embedding)
 
-        index = PineconeIndex(
-            index_name="labarchives-test",
-            api_key=secrets["PINECONE_API_KEY"],
-            environment=secrets.get("PINECONE_ENVIRONMENT", "us-east-1"),
-            namespace=None,
+    index = PineconeIndex(
+        index_name="labarchives-test",
+        api_key=secrets["PINECONE_API_KEY"],
+        environment=secrets.get("PINECONE_ENVIRONMENT", "us-east-1"),
+        namespace=None,
+    )
+
+    healthy = await index.health_check()
+    if not healthy:
+        raise RuntimeError("Pinecone index not reachable. Check network, API key, or environment.")
+
+    logger.debug("Generating query embedding...")
+    query_vector = await embedding_client.embed_single(query)
+
+    candidate_k = max(min(limit * 3, 100), limit)
+    search_request = SearchRequest(query=query, limit=candidate_k, filters=None)
+    results = await index.search(request=search_request, query_vector=query_vector)
+
+    if not results:
+        logger.info("No results found")
+        return []
+
+    logger.info(f"Found {len(results)} results")
+
+    seen_pages: set[tuple[str, str]] = set()
+    unique_results: list[Any] = []
+    for result in results:
+        key = (result.chunk.metadata.notebook_id, result.chunk.metadata.page_id)
+        if key in seen_pages:
+            continue
+        seen_pages.add(key)
+        unique_results.append(result)
+        if len(unique_results) >= limit:
+            break
+
+    uid = await context.auth_manager.ensure_uid()
+    output = []
+
+    for result in unique_results:
+        chunk = result.chunk
+        metadata = chunk.metadata
+
+        entries = await context.notebook_client.get_page_entries(
+            uid, metadata.notebook_id, metadata.page_id
         )
 
-        healthy = await index.health_check()
-        if not healthy:
-            raise RuntimeError(
-                "Pinecone index not reachable. Check network, API key, or environment."
-            )
+        full_text = []
+        for entry in entries:
+            entry_type = entry.get("part_type", "").lower().replace(" ", "_")
+            entry_content = entry.get("content", "")
 
-        logger.debug("Generating query embedding...")
-        query_vector = await embedding_client.embed_single(query)
+            if entry_type == "text_entry" and entry_content:
+                cleaned = clean_html(entry_content)
+                if cleaned:
+                    full_text.append(cleaned)
+            elif entry_type in ["heading", "plain_text"] and entry_content:
+                full_text.append(entry_content.strip())
 
-        candidate_k = max(min(limit * 3, 100), limit)
-        search_request = SearchRequest(query=query, limit=candidate_k, filters=None)
-        results = await index.search(request=search_request, query_vector=query_vector)
+        page_content = "\n\n".join(full_text) if full_text else "(No text content on this page)"
 
-        if not results:
-            logger.info("No results found")
-            return []
+        output.append(
+            {
+                "score": result.score,
+                "notebook_name": metadata.notebook_name,
+                "page_title": metadata.page_title,
+                "page_id": metadata.page_id,
+                "notebook_id": metadata.notebook_id,
+                "url": metadata.labarchives_url,
+                "author": metadata.author,
+                "date": str(metadata.date),
+                "content": page_content,
+            }
+        )
 
-        logger.info(f"Found {len(results)} results")
-
-        seen_pages: set[tuple[str, str]] = set()
-        unique_results: list[Any] = []
-        for result in results:
-            key = (result.chunk.metadata.notebook_id, result.chunk.metadata.page_id)
-            if key in seen_pages:
-                continue
-            seen_pages.add(key)
-            unique_results.append(result)
-            if len(unique_results) >= limit:
-                break
-
-        uid = await context.auth_manager.ensure_uid()
-        output = []
-
-        for result in unique_results:
-            chunk = result.chunk
-            metadata = chunk.metadata
-
-            try:
-                entries = await context.notebook_client.get_page_entries(
-                    uid, metadata.notebook_id, metadata.page_id
-                )
-
-                full_text = []
-                for entry in entries:
-                    entry_type = entry.get("part_type", "").lower().replace(" ", "_")
-                    entry_content = entry.get("content", "")
-
-                    if entry_type == "text_entry" and entry_content:
-                        cleaned = clean_html(entry_content)
-                        if cleaned:
-                            full_text.append(cleaned)
-                    elif entry_type in ["heading", "plain_text"] and entry_content:
-                        full_text.append(entry_content.strip())
-
-                page_content = (
-                    "\n\n".join(full_text) if full_text else "(No text content on this page)"
-                )
-
-            except Exception as e:
-                logger.warning(f"Failed to fetch full page content: {e}")
-                page_content = f"(Error fetching page: {e})"
-
-            output.append(
-                {
-                    "score": result.score,
-                    "notebook_name": metadata.notebook_name,
-                    "page_title": metadata.page_title,
-                    "page_id": metadata.page_id,
-                    "notebook_id": metadata.notebook_id,
-                    "url": metadata.labarchives_url,
-                    "author": metadata.author,
-                    "date": str(metadata.date),
-                    "content": page_content,
-                }
-            )
-
-        logger.success(f"Successfully returned {len(output)} search results")
-        return output
-
-    except Exception as exc:
-        logger.error(f"Failed to search LabArchives: {exc}", exc_info=True)
-        raise
+    logger.success(f"Successfully returned {len(output)} search results")
+    return output
 
 
 async def sync_vector_index(
@@ -234,11 +219,7 @@ async def sync_vector_index(
             for node in pages:
                 pid = str(node.get("tree_id"))
                 title = node.get("display_text", "") or node.get("name", "") or pid
-                try:
-                    entries = await nb_client.get_page_entries(uid, nbid, pid)
-                except Exception as exc:  # pragma: no cover - network errors
-                    logger.warning(f"Failed to fetch entries for page {pid}: {exc}")
-                    continue
+                entries = await nb_client.get_page_entries(uid, nbid, pid)
 
                 selected_entries = (
                     select_incremental_entries(entries, built_at_dt) if built_at_dt else entries
@@ -261,8 +242,7 @@ async def sync_vector_index(
                 processed_pages += 1
                 indexed_chunks += int(res.get("indexed_count", 0))
 
-    with contextlib.suppress(Exception):
-        save_build_record(record_path, build_record_from_config(config))
+    save_build_record(record_path, build_record_from_config(config))
     return {
         **decision,
         "processed_pages": processed_pages,

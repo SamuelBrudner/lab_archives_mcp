@@ -38,71 +38,66 @@ async def upload_to_labarchives(
         f"title={page_title}"
     )
 
-    try:
-        uid = await context.auth_manager.ensure_uid()
-        logger.debug(f"Obtained UID: {uid[:20]}...")
+    uid = await context.auth_manager.ensure_uid()
+    logger.debug(f"Obtained UID: {uid[:20]}...")
 
-        file_path_obj = Path(file_path)
-        if not await asyncio.to_thread(file_path_obj.exists):
-            raise FileNotFoundError(f"File not found: {file_path}")
+    file_path_obj = Path(file_path)
+    if not await asyncio.to_thread(file_path_obj.exists):
+        raise FileNotFoundError(f"File not found: {file_path}")
 
-        executed_at_dt = datetime.fromisoformat(executed_at.replace("Z", "+00:00"))
+    executed_at_dt = datetime.fromisoformat(executed_at.replace("Z", "+00:00"))
 
-        metadata = ProvenanceMetadata(
-            git_commit_sha=git_commit_sha,
-            git_branch=git_branch,
-            git_repo_url=git_repo_url,
-            git_is_dirty=git_is_dirty,
-            code_version=context.server_version,
-            executed_at=executed_at_dt,
-            python_version=python_version,
-            dependencies=dependencies or {},
-            os_name=platform.system(),
-            hostname=platform.node(),
-        )
+    metadata = ProvenanceMetadata(
+        git_commit_sha=git_commit_sha,
+        git_branch=git_branch,
+        git_repo_url=git_repo_url,
+        git_is_dirty=git_is_dirty,
+        code_version=context.server_version,
+        executed_at=executed_at_dt,
+        python_version=python_version,
+        dependencies=dependencies or {},
+        os_name=platform.system(),
+        hostname=platform.node(),
+    )
 
-        upload_request = UploadRequest(
-            notebook_id=notebook_id,
-            parent_folder_id=parent_folder_id,
-            page_title=page_title,
-            file_path=file_path_obj,
-            caption=caption,
-            change_description=None,
-            metadata=metadata,
-            allow_dirty_git=allow_dirty_git,
-            create_as_text=as_page_text,
-        )
+    upload_request = UploadRequest(
+        notebook_id=notebook_id,
+        parent_folder_id=parent_folder_id,
+        page_title=page_title,
+        file_path=file_path_obj,
+        caption=caption,
+        change_description=None,
+        metadata=metadata,
+        allow_dirty_git=allow_dirty_git,
+        create_as_text=as_page_text,
+    )
 
-        result = await context.notebook_client.upload_to_labarchives(uid, upload_request)
-        context.state_manager.record_upload_provenance(
-            uid=uid,
-            notebook_id=notebook_id,
-            page_title=page_title,
-            file_path=file_path_obj,
-            page_tree_id=result.page_tree_id,
-            entry_id=result.entry_id,
-            page_url=result.page_url,
-            created_at=result.created_at,
-            file_size_bytes=result.file_size_bytes,
-            filename=result.filename,
-            metadata=metadata,
-            server_version=context.server_version,
-            as_page_text=as_page_text,
-        )
-        logger.success(f"Successfully uploaded {result.filename} to page {result.page_tree_id}")
+    result = await context.notebook_client.upload_to_labarchives(uid, upload_request)
+    context.state_manager.record_upload_provenance(
+        uid=uid,
+        notebook_id=notebook_id,
+        page_title=page_title,
+        file_path=file_path_obj,
+        page_tree_id=result.page_tree_id,
+        entry_id=result.entry_id,
+        page_url=result.page_url,
+        created_at=result.created_at,
+        file_size_bytes=result.file_size_bytes,
+        filename=result.filename,
+        metadata=metadata,
+        server_version=context.server_version,
+        as_page_text=as_page_text,
+    )
+    logger.success(f"Successfully uploaded {result.filename} to page {result.page_tree_id}")
 
-        return {
-            "page_tree_id": result.page_tree_id,
-            "entry_id": result.entry_id,
-            "page_url": result.page_url,
-            "created_at": result.created_at.isoformat(),
-            "file_size_bytes": result.file_size_bytes,
-            "filename": result.filename,
-        }
-
-    except Exception as exc:
-        logger.error(f"Failed to upload to LabArchives: {exc}", exc_info=True)
-        raise
+    return {
+        "page_tree_id": result.page_tree_id,
+        "entry_id": result.entry_id,
+        "page_url": result.page_url,
+        "created_at": result.created_at.isoformat(),
+        "file_size_bytes": result.file_size_bytes,
+        "filename": result.filename,
+    }
 
 
 async def write_notebook_entry(
@@ -124,67 +119,63 @@ async def write_notebook_entry(
         page_title,
     )
 
-    try:
-        uid = await context.auth_manager.ensure_uid()
+    uid = await context.auth_manager.ensure_uid()
 
-        if not content.strip():
-            raise ValueError("content cannot be empty")
+    if not content.strip():
+        raise ValueError("content cannot be empty")
 
-        if page_id:
-            page_tree_id = page_id
-        else:
-            if not page_title:
-                raise ValueError("page_title is required when page_id is not provided")
-            page_request = PageCreationRequest(
-                notebook_id=notebook_id,
-                parent_tree_id=parent_folder_id or 0,
-                display_text=page_title,
-                is_folder=False,
-            )
-            page_result = await context.notebook_client.insert_node(uid, page_request)
-            page_tree_id = page_result.tree_id
-
-        normalized_format = content_format.strip().lower()
-        if normalized_format in {"markdown", "md"}:
-            entry_body = context.notebook_client._markdown_to_html(content)
-            part_type = "text entry"
-        elif normalized_format in {"html", "rich", "rich_text"}:
-            entry_body = content
-            part_type = "text entry"
-        elif normalized_format in {"plain", "text", "plain_text"}:
-            entry_body = content
-            part_type = "plain text entry"
-        else:
-            raise ValueError("content_format must be one of: markdown, html, plain")
-
-        created = await context.notebook_client.add_entry(
-            uid=uid,
+    if page_id:
+        page_tree_id = page_id
+    else:
+        if not page_title:
+            raise ValueError("page_title is required when page_id is not provided")
+        page_request = PageCreationRequest(
             notebook_id=notebook_id,
-            page_tree_id=page_tree_id,
-            part_type=part_type,
-            entry_data=entry_body,
-            caption=caption,
-            change_description=change_description,
+            parent_tree_id=parent_folder_id or 0,
+            display_text=page_title,
+            is_folder=False,
         )
+        page_result = await context.notebook_client.insert_node(uid, page_request)
+        page_tree_id = page_result.tree_id
 
-        created_at = created.get("created_at")
-        if created_at:
-            created_at_str = created_at
-        else:
-            created_at_str = datetime.now(UTC).isoformat()
+    normalized_format = content_format.strip().lower()
+    if normalized_format in {"markdown", "md"}:
+        entry_body = context.notebook_client._markdown_to_html(content)
+        part_type = "text entry"
+    elif normalized_format in {"html", "rich", "rich_text"}:
+        entry_body = content
+        part_type = "text entry"
+    elif normalized_format in {"plain", "text", "plain_text"}:
+        entry_body = content
+        part_type = "plain text entry"
+    else:
+        raise ValueError("content_format must be one of: markdown, html, plain")
 
-        page_url = f"https://mynotebook.labarchives.com/share/{notebook_id}/{page_tree_id}"
+    created = await context.notebook_client.add_entry(
+        uid=uid,
+        notebook_id=notebook_id,
+        page_tree_id=page_tree_id,
+        part_type=part_type,
+        entry_data=entry_body,
+        caption=caption,
+        change_description=change_description,
+    )
 
-        return {
-            "page_tree_id": page_tree_id,
-            "entry_id": created.get("eid"),
-            "page_url": page_url,
-            "created_at": created_at_str,
-            "part_type": created.get("part_type", part_type),
-        }
-    except Exception as exc:
-        logger.error(f"Failed to write notebook entry: {exc}", exc_info=True)
-        raise
+    created_at = created.get("created_at")
+    if created_at:
+        created_at_str = created_at
+    else:
+        created_at_str = datetime.now(UTC).isoformat()
+
+    page_url = f"https://mynotebook.labarchives.com/share/{notebook_id}/{page_tree_id}"
+
+    return {
+        "page_tree_id": page_tree_id,
+        "entry_id": created.get("eid"),
+        "page_url": page_url,
+        "created_at": created_at_str,
+        "part_type": created.get("part_type", part_type),
+    }
 
 
 _upload_to_labarchives = upload_to_labarchives

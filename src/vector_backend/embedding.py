@@ -137,7 +137,7 @@ class OpenAIEmbedding:
 
                     try:
                         ordered = sorted(data, key=lambda item: int(item.get("index", 0)))
-                    except Exception:
+                    except (TypeError, ValueError):
                         ordered = data
 
                     embeddings = [item.get("embedding", []) for item in ordered]

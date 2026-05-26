@@ -9,7 +9,15 @@ import networkx as nx
 import pytest
 
 from labarchives_mcp.models.upload import ProvenanceMetadata
-from labarchives_mcp.state import GRAPH_SCHEMA_VERSION, ProjectContext, SessionState, StateManager
+from labarchives_mcp.state import (
+    GRAPH_SCHEMA_VERSION,
+    GraphUpdateError,
+    ProjectContext,
+    SessionState,
+    StateLoadError,
+    StateManager,
+    StateSaveError,
+)
 
 
 @pytest.fixture  # type: ignore[misc]
@@ -22,6 +30,21 @@ def temp_state_dir(tmp_path: Path) -> Generator[Path, None, None]:
 def state_manager(temp_state_dir: Path) -> StateManager:
     """Provide a StateManager instance using the temp directory."""
     return StateManager.from_path(storage_dir=temp_state_dir)
+
+
+def _provenance_metadata() -> ProvenanceMetadata:
+    return ProvenanceMetadata(
+        git_commit_sha="d" * 40,
+        git_branch="main",
+        git_repo_url="https://github.com/SamuelBrudner/lab_archives_mcp",
+        git_is_dirty=False,
+        code_version="0.4.0",
+        executed_at=datetime(2026, 4, 20, 14, 1, 58, tzinfo=UTC),
+        python_version="3.11.8",
+        dependencies={"networkx": "3.4"},
+        os_name="Darwin",
+        hostname="host.local",
+    )
 
 
 def test_initial_state(state_manager: StateManager) -> None:
@@ -43,6 +66,33 @@ def test_constructor_accepts_preloaded_state_without_loading_disk(tmp_path: Path
 
     assert manager._state is preloaded
     assert not state_file.with_suffix(".json.bak").exists()
+
+
+def test_corrupt_state_load_backs_up_and_raises(tmp_path: Path) -> None:
+    """Existing corrupt state must not be replaced with a blank session."""
+    state_file = tmp_path / "session_state.json"
+    state_file.write_text("{invalid-json", encoding="utf-8")
+
+    with pytest.raises(StateLoadError):
+        StateManager.from_path(storage_dir=tmp_path)
+
+    assert state_file.with_suffix(".json.bak").exists()
+
+
+def test_save_failure_raises_state_save_error(
+    state_manager: StateManager, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """State save failures should propagate instead of being logged and ignored."""
+
+    def fail_fsync(_fd: int) -> None:
+        raise OSError("disk full")
+
+    monkeypatch.setattr("labarchives_mcp.state.os.fsync", fail_fsync)
+
+    with pytest.raises(StateSaveError):
+        state_manager.create_project("Test Project", "Testing description")
+
+    assert not state_manager.state_file.with_suffix(".tmp").exists()
 
 
 def test_create_project(state_manager: StateManager) -> None:
@@ -134,6 +184,30 @@ def test_log_page_content_links_adds_direct_edges(state_manager: StateManager) -
     assert [visit.page_id for visit in context.visited_pages] == ["p1"]
 
 
+def test_log_visit_graph_failure_raises(
+    state_manager: StateManager, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Visit logging must not report success when graph updates fail."""
+    context = state_manager.create_project("Proj 1", "Desc 1")
+    monkeypatch.setattr("labarchives_mcp.state.nx.node_link_graph", lambda *_args, **_kw: [])
+
+    with pytest.raises(GraphUpdateError):
+        state_manager.log_visit("nb1", "p1", "Page 1")
+
+    assert context.visited_pages == []
+
+
+def test_log_page_content_links_graph_failure_raises(
+    state_manager: StateManager, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Content-link graph failures should propagate to callers."""
+    state_manager.create_project("Proj 1", "Desc 1")
+    monkeypatch.setattr("labarchives_mcp.state.nx.node_link_graph", lambda *_args, **_kw: [])
+
+    with pytest.raises(GraphUpdateError):
+        state_manager.log_page_content_links("nb1", "p1", [("nb1", "p2")])
+
+
 def test_log_finding(state_manager: StateManager) -> None:
     """Test logging findings."""
     with pytest.raises(RuntimeError):
@@ -166,6 +240,19 @@ def test_log_finding_links_page(state_manager: StateManager) -> None:
     assert graph.has_node(page_node_id)
     assert finding_nodes
     assert graph.has_edge(page_node_id, finding_nodes[0])
+
+
+def test_log_finding_graph_failure_raises(
+    state_manager: StateManager, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Finding graph failures should not be hidden behind a successful save."""
+    context = state_manager.create_project("Proj 1", "Desc 1")
+    monkeypatch.setattr("labarchives_mcp.state.nx.node_link_graph", lambda *_args, **_kw: [])
+
+    with pytest.raises(GraphUpdateError):
+        state_manager.log_finding("Fact 1")
+
+    assert context.findings == []
 
 
 def test_graph_migration_adds_version_and_timestamps(temp_state_dir: Path) -> None:
@@ -297,6 +384,31 @@ def test_record_upload_provenance_adds_activity_subgraph(state_manager: StateMan
         ]
         == "was_generated_by"
     )
+
+
+def test_record_upload_provenance_graph_failure_raises(
+    state_manager: StateManager, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Upload provenance graph failures should propagate to the upload tool."""
+    state_manager.create_project("Proj", "Desc")
+    monkeypatch.setattr("labarchives_mcp.state.nx.node_link_graph", lambda *_args, **_kw: [])
+
+    with pytest.raises(GraphUpdateError):
+        state_manager.record_upload_provenance(
+            uid="uid123",
+            notebook_id="nb1",
+            page_title="Analysis Results",
+            file_path=state_manager.storage_dir / "analysis.ipynb",
+            page_tree_id="page-123",
+            entry_id="ATTACH_123",
+            page_url="https://example.org/page-123",
+            created_at="2026-04-20T14:02:11Z",
+            file_size_bytes=1234,
+            filename="analysis.ipynb",
+            metadata=_provenance_metadata(),
+            server_version="0.4.0",
+            as_page_text=False,
+        )
 
 
 def test_record_upload_provenance_without_active_context_is_noop(

@@ -6,6 +6,9 @@ import asyncio
 import re
 import time
 
+import httpx
+from lxml.etree import XMLSyntaxError
+
 from labarchives_mcp.auth import AuthenticationManager
 from labarchives_mcp.eln_client import LabArchivesClient
 from labarchives_mcp.schemas.onboard import (
@@ -66,7 +69,7 @@ class OnboardService:
 
         try:
             notebooks = await self._notebook_client.list_notebooks(uid)
-        except Exception:
+        except (httpx.HTTPError, RuntimeError, ValueError, XMLSyntaxError):
             notebooks = []
 
         notebook_summaries: list[NotebookSummary] = []
@@ -76,7 +79,7 @@ class OnboardService:
             page_nodes = []
             try:
                 page_nodes = await self._notebook_client.get_notebook_tree(uid, notebook.nbid, 0)
-            except Exception:
+            except (httpx.HTTPError, RuntimeError, ValueError, XMLSyntaxError):
                 page_nodes = []
 
             n_pages = sum(1 for node in page_nodes if node.get("is_page"))
@@ -101,7 +104,7 @@ class OnboardService:
                     entries = await self._notebook_client.get_page_entries(
                         uid, notebook.nbid, str(page_id), include_data=True
                     )
-                except Exception:
+                except (httpx.HTTPError, RuntimeError, ValueError, XMLSyntaxError):
                     entries = []
 
                 if not entries:

@@ -9,12 +9,7 @@ from functools import cache
 from typing import Protocol
 
 import tiktoken
-
-try:
-    from langchain.text_splitter import RecursiveCharacterTextSplitter
-except ImportError:
-    # LangChain split text splitters into a dedicated package in newer releases.
-    from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 
 @cache

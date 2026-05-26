@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, cast
+from typing import Any
 
 from .. import onboard
 from .context import ToolContext
@@ -18,8 +18,8 @@ async def get_onboard_payload(context: ToolContext, format: str = "json") -> dic
     )
     payload = await service.get_payload()
     if format.lower() == "markdown":
-        return cast(str, payload.markdown)
-    return cast(dict[str, Any], payload.model_dump())
+        return payload.markdown
+    return payload.model_dump()
 
 
 _get_onboard_payload = get_onboard_payload

@@ -6,7 +6,7 @@ import html as _html
 import re
 from collections.abc import Callable
 from datetime import UTC
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import httpx
 from loguru import logger
@@ -78,8 +78,18 @@ class LabArchivesClient:
         bold/italic, code blocks, inline code, paragraphs).
         """
         try:
-            import markdown as _md  # type: ignore[import-untyped]
-
+            import markdown as _md
+        except ModuleNotFoundError as e:
+            if require_lib:
+                raise RuntimeError(
+                    "High-fidelity Markdown conversion requires the 'markdown' package. "
+                    "Install it (e.g., 'pip install markdown' or add to your environment)"
+                ) from e
+            # Fall back to a lightweight converter with a warning
+            logger.warning(
+                f"High-fidelity Markdown conversion not available ({e}); using fallback converter."
+            )
+        else:
             return str(
                 _md.markdown(
                     markdown_text,
@@ -91,18 +101,8 @@ class LabArchivesClient:
                         "attr_list",
                         "codehilite",
                     ],
-                    output_format="html5",
+                    output_format=cast(Any, "html5"),
                 )
-            )
-        except Exception as e:
-            if require_lib:
-                raise RuntimeError(
-                    "High-fidelity Markdown conversion requires the 'markdown' package. "
-                    "Install it (e.g., 'pip install markdown' or add to your environment)"
-                ) from e
-            # Fall back to a lightweight converter with a warning
-            logger.warning(
-                f"High-fidelity Markdown conversion not available ({e}); using fallback converter."
             )
 
         text = markdown_text.replace("\r\n", "\n").replace("\r", "\n")

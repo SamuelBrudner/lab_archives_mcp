@@ -89,29 +89,18 @@ def shutdown_handler(signum: int, frame: FrameType | None) -> None:
 
     # Perform server cleanup if server instance exists
     if server_instance:
-        try:
-            logger.info(
-                "Shutting down MCP server instance",
-                extra={"operation": "shutdown_handler", "event": "server_shutdown"},
-            )
+        logger.info(
+            "Shutting down MCP server instance",
+            extra={"operation": "shutdown_handler", "event": "server_shutdown"},
+        )
 
-            # Perform any necessary server cleanup
-            # Note: FastMCP handles most cleanup automatically
-            server_instance = None
-
-        except Exception as e:
-            logger.error(
-                f"Error during server shutdown: {str(e)}",
-                extra={
-                    "operation": "shutdown_handler",
-                    "error": str(e),
-                    "error_type": type(e).__name__,
-                },
-            )
+        # Perform any necessary server cleanup.
+        # Note: FastMCP handles most cleanup automatically.
+        server_instance = None
 
     # Flush all log handlers to ensure messages are written
     for handler in logger.handlers:
-        with contextlib.suppress(Exception):
+        with contextlib.suppress(OSError, ValueError):
             handler.flush()
     # Log successful shutdown completion
     logger.info(

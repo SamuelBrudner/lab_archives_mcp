@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, cast
+from typing import Any
 
 from .context import ToolContext
 from .decorators import tool
@@ -67,7 +67,7 @@ async def switch_project(
 
 async def list_projects(context: ToolContext) -> list[dict[str, Any]]:
     """List all projects and their status."""
-    return cast(list[dict[str, Any]], context.state_manager.list_projects())
+    return context.state_manager.list_projects()
 
 
 async def log_finding(
@@ -106,7 +106,7 @@ async def get_current_context(context: ToolContext) -> dict[str, Any]:
             "status": "no_active_context",
             "message": "No project is currently active.",
         }
-    return cast(dict[str, Any], active_context.model_dump())
+    return active_context.model_dump()
 
 
 async def export_provenance_jsonld(context: ToolContext, project_id: str) -> dict[str, Any]:
@@ -116,7 +116,7 @@ async def export_provenance_jsonld(context: ToolContext, project_id: str) -> dic
     project_context = context.state_manager._state.contexts.get(project_id)
     if project_context is None:
         raise ValueError(f"Unknown project_id: {project_id}")
-    return cast(dict[str, Any], export_project_context(project_context))
+    return export_project_context(project_context)
 
 
 _create_project = create_project

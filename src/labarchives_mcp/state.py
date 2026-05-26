@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
+import os
+import shutil
 import time
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -11,13 +14,30 @@ from typing import TYPE_CHECKING, Any, Self
 
 import networkx as nx
 from loguru import logger
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 if TYPE_CHECKING:
     from .models.upload import ProvenanceMetadata
 
 
 GRAPH_SCHEMA_VERSION = 2
+GRAPH_UPDATE_ERRORS = (nx.NetworkXException, TypeError, ValueError, KeyError, AttributeError)
+
+
+class StatePersistenceError(RuntimeError):
+    """Base exception for persistent state load/save failures."""
+
+
+class StateLoadError(StatePersistenceError):
+    """Raised when an existing state file cannot be loaded safely."""
+
+
+class StateSaveError(StatePersistenceError):
+    """Raised when state cannot be persisted to disk."""
+
+
+class GraphUpdateError(RuntimeError):
+    """Raised when a project graph mutation cannot be completed."""
 
 
 class Finding(BaseModel):
@@ -87,21 +107,19 @@ class StateRepository:
         try:
             with open(self.state_file, encoding="utf-8") as f:
                 data = json.load(f)
-                migrated = self.migrate_state_dict(data)
-                return SessionState.model_validate(migrated)
-        except Exception as e:
-            logger.error(f"Failed to load state: {e}. Backing up and starting fresh.")
-            # Backup corrupted state
+            if not isinstance(data, dict):
+                raise TypeError("State file must contain a JSON object")
+            migrated = self.migrate_state_dict(data)
+            return SessionState.model_validate(migrated)
+        except (OSError, json.JSONDecodeError, TypeError, ValidationError, ValueError) as exc:
             backup_path = self.state_file.with_suffix(".json.bak")
             try:
-                import shutil
-
                 shutil.copy(self.state_file, backup_path)
                 logger.warning(f"Corrupted state backed up to {backup_path}")
-            except Exception as backup_err:
-                logger.error(f"Failed to backup corrupted state: {backup_err}")
+            except OSError as backup_err:
+                logger.error(f"Failed to backup unreadable state: {backup_err}")
 
-            return SessionState(active_context_id=None, contexts={})
+            raise StateLoadError(f"Failed to load state from {self.state_file}") from exc
 
     def save(self, state: SessionState) -> None:
         """Persist current state to disk using atomic write pattern."""
@@ -113,16 +131,17 @@ class StateRepository:
             with open(temp_file, "w", encoding="utf-8") as f:
                 f.write(state.model_dump_json(indent=2))
                 f.flush()
-                import os
-
                 os.fsync(f.fileno())
 
             # Atomic rename
             temp_file.replace(self.state_file)
-        except Exception as e:
-            logger.error(f"Failed to save state: {e}")
-            if temp_file.exists():
-                temp_file.unlink()
+        except (OSError, TypeError, ValueError) as exc:
+            try:
+                if temp_file.exists():
+                    temp_file.unlink()
+            except OSError as cleanup_err:
+                logger.error(f"Failed to remove temporary state file {temp_file}: {cleanup_err}")
+            raise StateSaveError(f"Failed to save state to {self.state_file}") from exc
 
     def migrate_state_dict(self, data: dict[str, Any]) -> dict[str, Any]:
         """Ensure graph data carries schema version and baseline metadata."""
@@ -198,39 +217,35 @@ class GraphValidationService:
         self, context: ProjectContext, check_page_exists: Any, max_checks: int
     ) -> dict[str, int]:
         """Prune invalid page nodes from a single context graph."""
-        try:
-            graph = nx.node_link_graph(context.graph_data, edges="links")
-            page_nodes = [
-                (node, data) for node, data in graph.nodes(data=True) if data.get("type") == "page"
-            ]
+        graph = nx.node_link_graph(context.graph_data, edges="links")
+        page_nodes = [
+            (node, data) for node, data in graph.nodes(data=True) if data.get("type") == "page"
+        ]
 
-            if max_checks > 0 and len(page_nodes) > max_checks:
-                page_nodes = page_nodes[:max_checks]
+        if max_checks > 0 and len(page_nodes) > max_checks:
+            page_nodes = page_nodes[:max_checks]
 
-            removed_nodes = 0
-            removed_edges = 0
-            initial_edge_count = graph.number_of_edges()
+        removed_nodes = 0
+        removed_edges = 0
+        initial_edge_count = graph.number_of_edges()
 
-            for node, data in page_nodes:
-                page_id = node.replace("page:", "")
-                notebook_id = data.get("notebook_id")
+        for node, data in page_nodes:
+            page_id = node.replace("page:", "")
+            notebook_id = data.get("notebook_id")
 
-                if notebook_id and page_id:
-                    exists = await check_page_exists(notebook_id, page_id)
-                    if not exists:
-                        graph.remove_node(node)
-                        removed_nodes += 1
-                        logger.warning(f"Pruning invalid page node: {node}")
+            if notebook_id and page_id:
+                exists = await check_page_exists(notebook_id, page_id)
+                if not exists:
+                    graph.remove_node(node)
+                    removed_nodes += 1
+                    logger.warning(f"Pruning invalid page node: {node}")
 
-            if removed_nodes > 0:
-                removed_edges = max(0, initial_edge_count - graph.number_of_edges())
-                context.graph_data = nx.node_link_data(graph, edges="links")
-                self._save_state()
+        if removed_nodes > 0:
+            removed_edges = max(0, initial_edge_count - graph.number_of_edges())
+            context.graph_data = nx.node_link_data(graph, edges="links")
+            self._save_state()
 
-            return {"removed_nodes": removed_nodes, "removed_edges": removed_edges}
-        except Exception as e:
-            logger.error(f"Graph validation failed for context {context.id}: {e}")
-            return {"removed_nodes": 0, "removed_edges": 0}
+        return {"removed_nodes": removed_nodes, "removed_edges": removed_edges}
 
     async def validate_graph(
         self, check_page_exists: Any, max_checks: int = 10, include_all_contexts: bool = False
@@ -460,8 +475,10 @@ class ProvenanceService:
 
             context.graph_data = nx.node_link_data(graph, edges="links")
             self._save_state()
-        except Exception as e:
-            logger.warning(f"Failed to record upload provenance in project graph: {e}")
+        except GRAPH_UPDATE_ERRORS as exc:
+            raise GraphUpdateError(
+                f"Failed to record upload provenance in project graph for page {page_tree_id}"
+            ) from exc
 
 
 class ProjectService:
@@ -598,6 +615,8 @@ class KnowledgeGraph:
             # If no context is active, we just ignore (or could log a warning)
             return
 
+        original_visited_pages = list(context.visited_pages)
+
         # 1. Add to visited_pages list
         visit = VisitedPage(page_id=page_id, title=title, notebook_id=notebook_id)
         context.visited_pages.append(visit)
@@ -668,8 +687,9 @@ class KnowledgeGraph:
 
             # Serialize back
             context.graph_data = nx.node_link_data(graph, edges="links")
-        except Exception as e:
-            logger.error(f"Failed to update graph for visit: {e}")
+        except GRAPH_UPDATE_ERRORS as exc:
+            context.visited_pages = original_visited_pages
+            raise GraphUpdateError(f"Failed to update graph for visit to page {page_id}") from exc
 
         self._save_state()
         logger.debug(f"Logged visit to {title} in context {context.id}")
@@ -790,9 +810,10 @@ class KnowledgeGraph:
             context.graph_data = nx.node_link_data(graph, edges="links")
             self._save_state()
             return len(normalized_links)
-        except Exception as e:
-            logger.error(f"Failed to update graph for content links: {e}")
-            return 0
+        except GRAPH_UPDATE_ERRORS as exc:
+            raise GraphUpdateError(
+                f"Failed to update graph content links for page {source_page_id}"
+            ) from exc
 
     def log_finding(
         self, content: str, source_url: str | None = None, page_id: str | None = None
@@ -804,6 +825,8 @@ class KnowledgeGraph:
         context = self.get_active_context()
         if not context:
             raise RuntimeError("No active project context. Create or switch to a project first.")
+
+        original_findings = list(context.findings)
 
         # 1. Add to findings list
         finding = Finding(content=content, source_url=source_url)
@@ -820,10 +843,7 @@ class KnowledgeGraph:
                 graph.add_node(context.id, type="project", label=context.name, first_seen=now)
             graph.nodes[context.id]["last_seen"] = now
 
-            # Add Finding Node
-            # Use a hash or timestamp for ID since content can be long
-            import hashlib
-
+            # Add Finding Node. Use a hash because content can be long.
             finding_hash = hashlib.md5(content.encode()).hexdigest()[:8]
             finding_node_id = f"finding:{finding_hash}"
 
@@ -883,8 +903,9 @@ class KnowledgeGraph:
 
             # Serialize back
             context.graph_data = nx.node_link_data(graph, edges="links")
-        except Exception as e:
-            logger.error(f"Failed to update graph for finding: {e}")
+        except GRAPH_UPDATE_ERRORS as exc:
+            context.findings = original_findings
+            raise GraphUpdateError("Failed to update graph for finding") from exc
 
         self._save_state()
         logger.info(f"Logged finding in context {context.id}")

@@ -8,8 +8,12 @@ Covers:
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 from pathlib import Path
+
+import pytest
+from pydantic import ValidationError
 
 from vector_backend.build_state import (
     build_record_from_config,
@@ -119,10 +123,17 @@ class TestBuildRecordPersistence:
         path = tmp_path / "does_not_exist.json"
         assert load_build_record(path) is None
 
-    def test_load_invalid_json_returns_none(self, tmp_path: Path) -> None:
+    def test_load_invalid_json_raises(self, tmp_path: Path) -> None:
         path = tmp_path / "bad.json"
         path.write_text("{not: valid json]")
-        assert load_build_record(path) is None
+        with pytest.raises(json.JSONDecodeError):
+            load_build_record(path)
+
+    def test_load_invalid_schema_raises(self, tmp_path: Path) -> None:
+        path = tmp_path / "bad-schema.json"
+        path.write_text("{}")
+        with pytest.raises(ValidationError):
+            load_build_record(path)
 
 
 class TestRebuildDecision:

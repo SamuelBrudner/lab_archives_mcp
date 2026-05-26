@@ -58,13 +58,10 @@ def compute_config_fingerprint(config: VectorSearchConfig) -> str:
 
 def load_build_record(path: Path) -> BuildRecord | None:
     """Load build record from path if it exists, else return None."""
-    try:
-        if not path.exists():
-            return None
-        data = json.loads(path.read_text())
-        return BuildRecord.model_validate(data)
-    except Exception:
+    if not path.exists():
         return None
+    data = json.loads(path.read_text())
+    return BuildRecord.model_validate(data)
 
 
 def save_build_record(path: Path, record: BuildRecord) -> None:

@@ -26,38 +26,33 @@ async def list_notebook_pages(
         f"list_notebook_pages called with notebook_id={notebook_id}, folder_id={folder_id}"
     )
 
-    try:
-        uid = await context.auth_manager.ensure_uid()
-        logger.debug(f"Obtained UID: {uid[:20]}...")
+    uid = await context.auth_manager.ensure_uid()
+    logger.debug(f"Obtained UID: {uid[:20]}...")
 
-        parent_tree_id: int | str
-        if folder_id:
-            parent_tree_id = folder_id
-            logger.debug(f"Using folder_id as parent_tree_id: {folder_id}")
-        else:
-            parent_tree_id = 0
+    parent_tree_id: int | str
+    if folder_id:
+        parent_tree_id = folder_id
+        logger.debug(f"Using folder_id as parent_tree_id: {folder_id}")
+    else:
+        parent_tree_id = 0
 
-        logger.debug(f"Fetching tree for notebook {notebook_id}, parent_tree_id={parent_tree_id}")
-        tree_nodes = await context.notebook_client.get_notebook_tree(
-            uid, notebook_id, parent_tree_id=parent_tree_id
-        )
-        logger.info(f"Retrieved {len(tree_nodes)} nodes from notebook tree")
+    logger.debug(f"Fetching tree for notebook {notebook_id}, parent_tree_id={parent_tree_id}")
+    tree_nodes = await context.notebook_client.get_notebook_tree(
+        uid, notebook_id, parent_tree_id=parent_tree_id
+    )
+    logger.info(f"Retrieved {len(tree_nodes)} nodes from notebook tree")
 
-        result = [
-            {
-                "tree_id": node["tree_id"],
-                "title": node["display_text"],
-                "is_page": node["is_page"],
-                "is_folder": node["is_folder"],
-            }
-            for node in tree_nodes
-        ]
-        logger.success(f"Successfully listed {len(result)} pages/folders")
-        return result
-
-    except Exception as exc:
-        logger.error(f"Failed to list notebook pages: {exc}", exc_info=True)
-        raise
+    result = [
+        {
+            "tree_id": node["tree_id"],
+            "title": node["display_text"],
+            "is_page": node["is_page"],
+            "is_folder": node["is_folder"],
+        }
+        for node in tree_nodes
+    ]
+    logger.success(f"Successfully listed {len(result)} pages/folders")
+    return result
 
 
 async def read_notebook_page(
@@ -70,51 +65,43 @@ async def read_notebook_page(
     """Read all entries from a specific page in a LabArchives notebook."""
     logger.info(f"read_notebook_page called with notebook_id={notebook_id}, page_id={page_id}")
 
-    try:
-        uid = await context.auth_manager.ensure_uid()
-        logger.debug(f"Obtained UID: {uid[:20]}...")
+    uid = await context.auth_manager.ensure_uid()
+    logger.debug(f"Obtained UID: {uid[:20]}...")
 
-        logger.debug(f"Fetching entries for page {page_id} in notebook {notebook_id}")
+    logger.debug(f"Fetching entries for page {page_id} in notebook {notebook_id}")
 
-        entries = await context.notebook_client.get_page_entries(
-            uid, notebook_id, page_id, include_data=True
+    entries = await context.notebook_client.get_page_entries(
+        uid, notebook_id, page_id, include_data=True
+    )
+    logger.info(f"Retrieved {len(entries)} entries from page")
+
+    for i, entry in enumerate(entries[:3]):
+        logger.debug(
+            f"Entry {i}: type={entry.get('part_type')}, "
+            f"eid={entry.get('eid')}, "
+            f"has_content={bool(entry.get('content'))}"
         )
-        logger.info(f"Retrieved {len(entries)} entries from page")
 
-        for i, entry in enumerate(entries[:3]):
-            logger.debug(
-                f"Entry {i}: type={entry.get('part_type')}, "
-                f"eid={entry.get('eid')}, "
-                f"has_content={bool(entry.get('content'))}"
-            )
+    page_title = "Unknown Title"
+    tracked = False
+    if track_visit and not dry_run:
+        context.state_manager.log_visit(notebook_id, page_id, page_title)
+        context.state_manager.log_page_content_links(
+            notebook_id,
+            page_id,
+            _extract_labarchives_page_links(entries),
+        )
+        tracked = True
 
-        page_title = "Unknown Title"
-        tracked = False
-        if track_visit and not dry_run:
-            try:
-                context.state_manager.log_visit(notebook_id, page_id, page_title)
-                context.state_manager.log_page_content_links(
-                    notebook_id,
-                    page_id,
-                    _extract_labarchives_page_links(entries),
-                )
-                tracked = True
-            except Exception as e:
-                logger.warning(f"Failed to log page visit to state: {e}")
-
-        active_context = context.state_manager.get_active_context()
-        return {
-            "notebook_id": notebook_id,
-            "page_id": page_id,
-            "entries": entries,
-            "tracked_in_project": active_context.name if active_context else None,
-            "tracked": tracked,
-            "dry_run": dry_run,
-        }
-
-    except Exception as exc:
-        logger.error(f"Failed to read notebook page: {exc}", exc_info=True)
-        raise
+    active_context = context.state_manager.get_active_context()
+    return {
+        "notebook_id": notebook_id,
+        "page_id": page_id,
+        "entries": entries,
+        "tracked_in_project": active_context.name if active_context else None,
+        "tracked": tracked,
+        "dry_run": dry_run,
+    }
 
 
 _list_labarchives_notebooks = list_labarchives_notebooks

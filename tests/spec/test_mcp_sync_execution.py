@@ -167,6 +167,7 @@ def test_sync_incremental_exec_indexes_changed(
     mcp_env_exec["module"].LabArchivesClient = lambda *_: NB()
 
     # Stub embedding + index
+    import vector_backend.build_state as vbs
     import vector_backend.embedding as vbe
     import vector_backend.index as vbi
 
@@ -198,6 +199,7 @@ def test_sync_incremental_exec_indexes_changed(
 
     monkeypatch.setattr(vbe, "create_embedding_client", lambda cfg: DummyEmbed())
     monkeypatch.setattr(vbi, "PineconeIndex", DummyIndex)
+    monkeypatch.setattr(vbs, "save_build_record", lambda *_args, **_kwargs: None)
 
     tool = mcp_env_exec["tool_callbacks"]["sync_vector_index"]
     result = asyncio.run(tool(force=False, dry_run=False, max_age_hours=24, notebook_id="nb1"))
@@ -307,3 +309,102 @@ def test_sync_rebuild_exec_indexes_all_and_saves_record(
     assert result["processed_pages"] == 2
     assert result["indexed_chunks"] >= 2
     assert saved["calls"] >= 1
+
+
+def test_sync_exec_propagates_page_entry_fetch_failure(
+    monkeypatch: pytest.MonkeyPatch, mcp_env_exec: dict[str, Any]
+) -> None:
+    import importlib
+
+    from vector_backend.sync import plan_sync as _plan
+
+    _mod_sync = importlib.import_module(_plan.__module__)
+    monkeypatch.setattr(
+        _mod_sync,
+        "plan_sync",
+        lambda *_, **__: {"action": "rebuild", "reason": "no_record", "built_at": None},
+    )
+
+    class NB:
+        async def get_notebook_tree(
+            self, uid: str, nbid: str, parent_tree_id: int | str = 0
+        ) -> list[dict[str, Any]]:  # noqa: ARG002
+            return [
+                {
+                    "tree_id": "p1",
+                    "display_text": "Page 1",
+                    "is_page": True,
+                    "is_folder": False,
+                }
+            ]
+
+        async def get_page_entries(
+            self, uid: str, nbid: str, pid: str
+        ) -> list[dict[str, Any]]:  # noqa: ARG002
+            raise RuntimeError("entry fetch failed")
+
+    mcp_env_exec["module"].LabArchivesClient = lambda *_: NB()
+
+    import vector_backend.embedding as vbe
+    import vector_backend.index as vbi
+
+    class DummyEmbed:
+        async def embed_batch(self, texts: list[str]) -> list[list[float]]:  # noqa: D401
+            return [[0.0] * 1536 for _ in texts]
+
+    class DummyIndex:
+        def __init__(self, *args: Any, **kwargs: Any) -> None:  # noqa: D401, ARG002
+            pass
+
+    monkeypatch.setattr(vbe, "create_embedding_client", lambda cfg: DummyEmbed())
+    monkeypatch.setattr(vbi, "PineconeIndex", DummyIndex)
+
+    tool = mcp_env_exec["tool_callbacks"]["sync_vector_index"]
+    with pytest.raises(RuntimeError, match="entry fetch failed"):
+        asyncio.run(tool(force=False, dry_run=False, max_age_hours=None, notebook_id="nb1"))
+
+
+def test_sync_exec_propagates_build_record_save_failure(
+    monkeypatch: pytest.MonkeyPatch, mcp_env_exec: dict[str, Any]
+) -> None:
+    import importlib
+
+    from vector_backend.sync import plan_sync as _plan
+
+    _mod_sync = importlib.import_module(_plan.__module__)
+    monkeypatch.setattr(
+        _mod_sync,
+        "plan_sync",
+        lambda *_, **__: {"action": "rebuild", "reason": "no_record", "built_at": None},
+    )
+
+    class NB:
+        async def get_notebook_tree(
+            self, uid: str, nbid: str, parent_tree_id: int | str = 0
+        ) -> list[dict[str, Any]]:  # noqa: ARG002
+            return []
+
+    mcp_env_exec["module"].LabArchivesClient = lambda *_: NB()
+
+    import vector_backend.build_state as vbs
+    import vector_backend.embedding as vbe
+    import vector_backend.index as vbi
+
+    class DummyEmbed:
+        async def embed_batch(self, texts: list[str]) -> list[list[float]]:  # noqa: D401
+            return [[0.0] * 1536 for _ in texts]
+
+    class DummyIndex:
+        def __init__(self, *args: Any, **kwargs: Any) -> None:  # noqa: D401, ARG002
+            pass
+
+    def fail_save(path: Any, record: Any) -> None:  # noqa: ANN401, ARG001
+        raise RuntimeError("record save failed")
+
+    monkeypatch.setattr(vbe, "create_embedding_client", lambda cfg: DummyEmbed())
+    monkeypatch.setattr(vbi, "PineconeIndex", DummyIndex)
+    monkeypatch.setattr(vbs, "save_build_record", fail_save)
+
+    tool = mcp_env_exec["tool_callbacks"]["sync_vector_index"]
+    with pytest.raises(RuntimeError, match="record save failed"):
+        asyncio.run(tool(force=False, dry_run=False, max_age_hours=None, notebook_id="nb1"))

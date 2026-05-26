@@ -84,7 +84,7 @@ def _parse_when(s: str | None) -> datetime | None:
     try:
         # Accept Z suffix
         return datetime.fromisoformat(s.replace("Z", "+00:00"))
-    except Exception:
+    except ValueError:
         return None
 
 

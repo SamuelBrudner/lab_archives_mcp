@@ -11,7 +11,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
-from typing import ParamSpec, TypeVar
+from typing import Any, TypeVar
 
 from vector_backend.models import (
     ChunkMetadata,
@@ -117,15 +117,14 @@ class PineconeIndex(VectorIndex):
         self.pc = Pinecone(api_key=api_key)
         self.index = self.pc.Index(index_name)
 
-    _P = ParamSpec("_P")
     _T = TypeVar("_T")
 
     async def _call_with_timeout(
         self,
-        func: Callable[_P, _T],
+        func: Callable[..., _T],
         /,
-        *args: _P.args,
-        **kwargs: _P.kwargs,
+        *args: Any,
+        **kwargs: Any,
     ) -> _T:
         """Run a blocking Pinecone call in a thread with an async timeout."""
         import asyncio
@@ -220,23 +219,24 @@ class PineconeIndex(VectorIndex):
             # Reconstruct metadata
             from datetime import datetime as dt
 
+            match_metadata = match.metadata or {}
             metadata = ChunkMetadata(
-                notebook_id=match.metadata["notebook_id"],
-                notebook_name=match.metadata["notebook_name"],
-                page_id=match.metadata["page_id"],
-                page_title=match.metadata["page_title"],
-                entry_id=match.metadata["entry_id"],
-                entry_type=match.metadata["entry_type"],
-                author=match.metadata["author"],
-                date=dt.fromisoformat(match.metadata["date"]),
-                labarchives_url=match.metadata["labarchives_url"],
-                embedding_version=match.metadata["embedding_version"],
+                notebook_id=match_metadata["notebook_id"],
+                notebook_name=match_metadata["notebook_name"],
+                page_id=match_metadata["page_id"],
+                page_title=match_metadata["page_title"],
+                entry_id=match_metadata["entry_id"],
+                entry_type=match_metadata["entry_type"],
+                author=match_metadata["author"],
+                date=dt.fromisoformat(match_metadata["date"]),
+                labarchives_url=match_metadata["labarchives_url"],
+                embedding_version=match_metadata["embedding_version"],
             )
 
             # Reconstruct chunk (use dummy vector since we don't return values from Pinecone)
             chunk = EmbeddedChunk(
                 id=match.id,
-                text=match.metadata["text"],
+                text=match_metadata["text"],
                 vector=[0.0] * 1536,  # Dummy vector to satisfy Pydantic validation
                 metadata=metadata,
             )
@@ -277,7 +277,7 @@ class PineconeIndex(VectorIndex):
             # Try to get stats as a health check (with timeout)
             await self._call_with_timeout(self.index.describe_index_stats)
             return True
-        except Exception:
+        except (TimeoutError, RuntimeError, OSError):
             return False
 
 
@@ -527,8 +527,20 @@ class LocalPersistence:
                 return
 
             try:
+                from dvc.exceptions import DvcException
                 from dvc.repo import Repo
+            except ImportError as e:
+                self.is_dvc_enabled = False
+                import warnings
 
+                warnings.warn(
+                    f"DVC initialization failed: {e}. DVC tracking disabled.",
+                    UserWarning,
+                    stacklevel=2,
+                )
+                return
+
+            try:
                 # Initialize DVC without SCM (git not required)
                 Repo.init(self.base_path, no_scm=True)
 
@@ -545,7 +557,7 @@ class LocalPersistence:
                 ):
                     gitignore.write_text(f"{gitignore_content}\n/{self.version}\n")
 
-            except (ImportError, Exception) as e:
+            except (DvcException, OSError) as e:
                 # DVC not installed or failed - disable DVC tracking
                 self.is_dvc_enabled = False
                 import warnings
@@ -566,14 +578,21 @@ class LocalPersistence:
             return
 
         try:
+            from dvc.exceptions import DvcException
             from dvc.repo import Repo
+        except ImportError as e:
+            import warnings
 
+            warnings.warn(f"DVC tracking failed for {file_path}: {e}", UserWarning, stacklevel=2)
+            return
+
+        try:
             # Open repo and add file
             repo = Repo(self.base_path)
             repo.add(str(file_path))
             repo.close()
 
-        except (ImportError, Exception) as e:
+        except (DvcException, OSError) as e:
             import warnings
 
             warnings.warn(f"DVC tracking failed for {file_path}: {e}", UserWarning, stacklevel=2)

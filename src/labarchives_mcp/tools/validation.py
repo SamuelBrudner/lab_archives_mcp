@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import asyncio
 
+import httpx
 from loguru import logger
+from lxml.etree import XMLSyntaxError
 
 from .context import ToolContext
 
@@ -20,7 +22,7 @@ async def validate_graph_task(context: ToolContext) -> None:
             await context.notebook_client.get_page_entries(uid, nb_id, p_id)
             await asyncio.sleep(0)
             return True
-        except Exception:
+        except (httpx.HTTPError, RuntimeError, ValueError, XMLSyntaxError):
             return False
 
     stats = await context.state_manager.validate_graph(

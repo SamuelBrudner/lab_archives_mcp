@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable
+from types import SimpleNamespace
 from typing import Any, cast
 
 import pytest
@@ -218,3 +219,94 @@ def test_search_page_limit_dedup(monkeypatch: pytest.MonkeyPatch, mcp_env: dict[
     # Ensure we got unique pages
     page_ids = [r["page_id"] for r in result]
     assert len(set(page_ids)) == len(page_ids)
+
+
+def test_search_propagates_selected_page_fetch_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import sys
+    import types
+
+    import yaml  # type: ignore[import-untyped]
+
+    import vector_backend.config as vbc
+    import vector_backend.embedding as vbe
+    import vector_backend.index as vbi
+    from labarchives_mcp.tools.search import search_labarchives
+    from vector_backend import models as vm
+
+    fake_aiofiles = types.ModuleType("aiofiles")
+
+    def _fake_open(_path: str) -> Any:  # noqa: ANN001
+        class _C:
+            async def __aenter__(self) -> Any:  # noqa: D401
+                class _F:
+                    async def read(self) -> str:
+                        return "{}"
+
+                return _F()
+
+            async def __aexit__(self, *exc_info: Any) -> None:  # noqa: ANN002
+                return None
+
+        return _C()
+
+    fake_aiofiles.open = _fake_open  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "aiofiles", fake_aiofiles)
+    monkeypatch.setattr(yaml, "safe_load", lambda _: {"PINECONE_API_KEY": "key"})
+    monkeypatch.setattr(vbc, "load_config", lambda _name: SimpleNamespace(embedding=object()))
+
+    class DummyEmbed:
+        async def embed_single(self, text: str) -> list[float]:  # noqa: ARG002
+            return [0.1] * 1536
+
+    class DummyIndex:
+        def __init__(self, *args: Any, **kwargs: Any) -> None:  # noqa: ARG002
+            pass
+
+        async def health_check(self) -> bool:
+            return True
+
+        async def search(
+            self, request: Any, query_vector: list[float]
+        ) -> list[vm.SearchResult]:  # noqa: ANN401, ARG002
+            meta = vm.ChunkMetadata(
+                notebook_id="nb1",
+                notebook_name="Example",
+                page_id="p1",
+                page_title="Page p1",
+                entry_id="e1",
+                entry_type="text_entry",
+                author="test@example.com",
+                date=__import__("datetime").datetime.now(),
+                labarchives_url="https://example.com",
+                embedding_version="v1",
+            )
+            chunk = vm.EmbeddedChunk(
+                id="nb1_p1_e1_0",
+                text="t",
+                vector=[0.0] * 1536,
+                metadata=meta,
+            )
+            return [vm.SearchResult(chunk=chunk, score=0.9, rank=1)]
+
+    class DummyAuth:
+        async def ensure_uid(self) -> str:
+            return "uid-1"
+
+    class FailingNotebookClient:
+        async def get_page_entries(
+            self, uid: str, notebook_id: str, page_id: str
+        ) -> list[dict[str, Any]]:  # noqa: ARG002
+            raise RuntimeError("page fetch failed")
+
+    monkeypatch.setattr(vbe, "create_embedding_client", lambda _cfg: DummyEmbed())
+    monkeypatch.setattr(vbi, "PineconeIndex", DummyIndex)
+
+    context = SimpleNamespace(
+        auth_manager=DummyAuth(),
+        notebook_client=FailingNotebookClient(),
+    )
+
+    with pytest.raises(RuntimeError, match="page fetch failed"):
+        asyncio.run(search_labarchives(cast(Any, context), "query", limit=1))
