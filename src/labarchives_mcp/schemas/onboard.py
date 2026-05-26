@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import cast
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from .tool_responses import JsonObject
 
 MAX_ONBOARD_PAYLOAD_BYTES = 16384
 
@@ -108,7 +110,7 @@ class OnboardPayload(BaseModel):
         payload_dict = self.model_dump(by_alias=True, exclude_none=True)
         return json.dumps(payload_dict, separators=(",", ":")).encode("utf-8")
 
-    def as_dict(self) -> dict[str, Any]:
+    def as_dict(self) -> JsonObject:
         """Return a JSON-serializable representation for MCP responses."""
 
-        return self.model_dump(by_alias=True, exclude_none=True)
+        return cast(JsonObject, self.model_dump(by_alias=True, exclude_none=True))

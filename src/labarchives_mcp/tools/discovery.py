@@ -2,25 +2,36 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from loguru import logger
 
+from ..eln_client import NotebookRecord
+from ..schemas.tool_responses import (
+    NotebookPageResponse,
+    NotebookResponse,
+    PageEntryResponse,
+    ReadNotebookPageResponse,
+)
 from .context import ToolContext
 from .decorators import tool
 from .utils import _extract_labarchives_page_links
 
 
-async def list_labarchives_notebooks(context: ToolContext) -> list[dict[str, Any]]:
+def _notebook_response(notebook: NotebookRecord) -> NotebookResponse:
+    return cast(NotebookResponse, notebook.model_dump(by_alias=True))
+
+
+async def list_labarchives_notebooks(context: ToolContext) -> list[NotebookResponse]:
     """List all LabArchives notebooks for the authenticated user."""
     uid = await context.auth_manager.ensure_uid()
-    notebooks = await context.notebook_client.list_notebooks(uid)
-    return [notebook.model_dump(by_alias=True) for notebook in notebooks]
+    notebooks = cast(list[NotebookRecord], await context.notebook_client.list_notebooks(uid))
+    return [_notebook_response(notebook) for notebook in notebooks]
 
 
 async def list_notebook_pages(
     context: ToolContext, notebook_id: str, folder_id: str | None = None
-) -> list[dict[str, Any]]:
+) -> list[NotebookPageResponse]:
     """List all pages and folders in a LabArchives notebook."""
     logger.info(
         f"list_notebook_pages called with notebook_id={notebook_id}, folder_id={folder_id}"
@@ -42,12 +53,12 @@ async def list_notebook_pages(
     )
     logger.info(f"Retrieved {len(tree_nodes)} nodes from notebook tree")
 
-    result = [
+    result: list[NotebookPageResponse] = [
         {
-            "tree_id": node["tree_id"],
-            "title": node["display_text"],
-            "is_page": node["is_page"],
-            "is_folder": node["is_folder"],
+            "tree_id": cast(str | None, node["tree_id"]),
+            "title": cast(str | None, node["display_text"]),
+            "is_page": bool(node["is_page"]),
+            "is_folder": bool(node["is_folder"]),
         }
         for node in tree_nodes
     ]
@@ -61,7 +72,7 @@ async def read_notebook_page(
     page_id: str,
     track_visit: bool = True,
     dry_run: bool = False,
-) -> dict[str, Any]:
+) -> ReadNotebookPageResponse:
     """Read all entries from a specific page in a LabArchives notebook."""
     logger.info(f"read_notebook_page called with notebook_id={notebook_id}, page_id={page_id}")
 
@@ -69,9 +80,11 @@ async def read_notebook_page(
     logger.debug(f"Obtained UID: {uid[:20]}...")
 
     logger.debug(f"Fetching entries for page {page_id} in notebook {notebook_id}")
-
-    entries = await context.notebook_client.get_page_entries(
-        uid, notebook_id, page_id, include_data=True
+    entries = cast(
+        list[PageEntryResponse],
+        await context.notebook_client.get_page_entries(
+            uid, notebook_id, page_id, include_data=True
+        ),
     )
     logger.info(f"Retrieved {len(entries)} entries from page")
 
@@ -113,7 +126,7 @@ def register_discovery_tools(server: Any, context: ToolContext) -> None:
     """Register notebook discovery and reading tools."""
 
     @tool(server)
-    async def list_labarchives_notebooks() -> list[dict[str, Any]]:
+    async def list_labarchives_notebooks() -> list[NotebookResponse]:
         """List all LabArchives notebooks for the authenticated user.
 
         Returns a list of notebooks with metadata including:
@@ -129,7 +142,7 @@ def register_discovery_tools(server: Any, context: ToolContext) -> None:
     @tool(server)
     async def list_notebook_pages(
         notebook_id: str, folder_id: str | None = None
-    ) -> list[dict[str, Any]]:
+    ) -> list[NotebookPageResponse]:
         """List all pages and folders in a LabArchives notebook.
 
         Shows the table of contents at the specified level. Pass folder_id to navigate
@@ -143,7 +156,7 @@ def register_discovery_tools(server: Any, context: ToolContext) -> None:
         page_id: str,
         track_visit: bool = True,
         dry_run: bool = False,
-    ) -> dict[str, Any]:
+    ) -> ReadNotebookPageResponse:
         """Read all entries from a specific page in a LabArchives notebook."""
         return await _read_notebook_page(
             context,

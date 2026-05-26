@@ -8,6 +8,8 @@ from typing import Any, cast
 
 from lxml import etree
 
+from .schemas.tool_responses import LabArchivesErrorResponse
+
 
 @dataclass(slots=True)
 class LabArchivesAPIError(Exception):
@@ -132,7 +134,7 @@ class NotebookTransformer:
         return parsed.replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
-def translate_labarchives_fault(error: LabArchivesAPIError) -> dict[str, Any]:
+def translate_labarchives_fault(error: LabArchivesAPIError) -> LabArchivesErrorResponse:
     """Convert a LabArchives-specific error into an MCP error payload."""
 
     retryable = error.code in {4505, 4506}

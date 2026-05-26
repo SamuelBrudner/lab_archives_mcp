@@ -4,23 +4,29 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from loguru import logger
 
+from ..schemas.tool_responses import (
+    NotebookTreeNodeResponse,
+    PageEntryResponse,
+    SearchResultResponse,
+    SyncVectorIndexResponse,
+)
 from .context import ToolContext
 from .decorators import tool
 
 
 async def search_labarchives(
     context: ToolContext, query: str, limit: int = 5
-) -> list[dict[str, Any]]:
+) -> list[SearchResultResponse]:
     """Search indexed LabArchives notebooks semantically."""
     from vector_backend.config import load_config
     from vector_backend.embedding import create_embedding_client
     from vector_backend.index import PineconeIndex
     from vector_backend.labarchives_indexer import clean_html
-    from vector_backend.models import SearchRequest
+    from vector_backend.models import SearchRequest, SearchResult
 
     logger.info(f"search_labarchives called: query='{query}', limit={limit}")
 
@@ -63,7 +69,7 @@ async def search_labarchives(
     logger.info(f"Found {len(results)} results")
 
     seen_pages: set[tuple[str, str]] = set()
-    unique_results: list[Any] = []
+    unique_results: list[SearchResult] = []
     for result in results:
         key = (result.chunk.metadata.notebook_id, result.chunk.metadata.page_id)
         if key in seen_pages:
@@ -74,20 +80,23 @@ async def search_labarchives(
             break
 
     uid = await context.auth_manager.ensure_uid()
-    output = []
+    output: list[SearchResultResponse] = []
 
     for result in unique_results:
         chunk = result.chunk
         metadata = chunk.metadata
 
-        entries = await context.notebook_client.get_page_entries(
-            uid, metadata.notebook_id, metadata.page_id
+        entries = cast(
+            list[PageEntryResponse],
+            await context.notebook_client.get_page_entries(
+                uid, metadata.notebook_id, metadata.page_id
+            ),
         )
 
-        full_text = []
+        full_text: list[str] = []
         for entry in entries:
-            entry_type = entry.get("part_type", "").lower().replace(" ", "_")
-            entry_content = entry.get("content", "")
+            entry_type = (entry.get("part_type") or "").lower().replace(" ", "_")
+            entry_content = entry.get("content") or ""
 
             if entry_type == "text_entry" and entry_content:
                 cleaned = clean_html(entry_content)
@@ -123,7 +132,7 @@ async def sync_vector_index(
     dry_run: bool = False,
     max_age_hours: int | None = None,
     notebook_id: str | None = None,
-) -> dict[str, Any]:
+) -> SyncVectorIndexResponse:
     """Plan and optionally execute a vector-index sync."""
     from vector_backend.build_state import (
         build_record_from_config,
@@ -151,7 +160,12 @@ async def sync_vector_index(
     )
 
     if dry_run or decision["action"] == "skip":
-        return {**decision, "dry_run": dry_run}
+        return {
+            "action": decision["action"],
+            "reason": decision["reason"],
+            "built_at": decision["built_at"],
+            "dry_run": dry_run,
+        }
 
     action = decision["action"]
     processed_pages = 0
@@ -173,12 +187,15 @@ async def sync_vector_index(
                 else datetime.now()
             )
 
-        async def _collect_pages(nbid: str) -> list[dict[str, Any]]:
-            pages: list[dict[str, Any]] = []
+        async def _collect_pages(nbid: str) -> list[NotebookTreeNodeResponse]:
+            pages: list[NotebookTreeNodeResponse] = []
 
             async def _walk(parent: int | str = 0) -> None:
                 parent_id: int | str = parent
-                tree = await nb_client.get_notebook_tree(uid, nbid, parent_tree_id=parent_id)
+                tree = cast(
+                    list[NotebookTreeNodeResponse],
+                    await nb_client.get_notebook_tree(uid, nbid, parent_tree_id=parent_id),
+                )
                 for node in tree:
                     if node.get("is_page"):
                         pages.append(node)
@@ -195,7 +212,14 @@ async def sync_vector_index(
         else:
             if built_at_dt is not None:
                 _ = select_incremental_entries([], built_at_dt)
-            return {**decision, "dry_run": False, "processed_pages": 0, "indexed_chunks": 0}
+            return {
+                "action": decision["action"],
+                "reason": decision["reason"],
+                "built_at": decision["built_at"],
+                "dry_run": False,
+                "processed_pages": 0,
+                "indexed_chunks": 0,
+            }
 
         embed_client = create_embedding_client(config.embedding)
         index_client = PineconeIndex(
@@ -218,11 +242,17 @@ async def sync_vector_index(
             notebook_name = f"Notebook {nbid}"
             for node in pages:
                 pid = str(node.get("tree_id"))
-                title = node.get("display_text", "") or node.get("name", "") or pid
-                entries = await nb_client.get_page_entries(uid, nbid, pid)
+                title = node.get("display_text") or node.get("name") or pid
+                entries = cast(
+                    list[PageEntryResponse],
+                    await nb_client.get_page_entries(uid, nbid, pid),
+                )
 
+                entry_dicts = cast(list[dict[str, Any]], entries)
                 selected_entries = (
-                    select_incremental_entries(entries, built_at_dt) if built_at_dt else entries
+                    select_incremental_entries(entry_dicts, built_at_dt)
+                    if built_at_dt
+                    else entry_dicts
                 )
                 if not selected_entries:
                     continue
@@ -244,7 +274,9 @@ async def sync_vector_index(
 
     save_build_record(record_path, build_record_from_config(config))
     return {
-        **decision,
+        "action": decision["action"],
+        "reason": decision["reason"],
+        "built_at": decision["built_at"],
         "processed_pages": processed_pages,
         "indexed_chunks": indexed_chunks,
     }
@@ -258,7 +290,7 @@ def register_search_tools(server: Any, context: ToolContext) -> None:
     """Register search and vector sync tools."""
 
     @tool(server)
-    async def search_labarchives(query: str, limit: int = 5) -> list[dict[str, Any]]:
+    async def search_labarchives(query: str, limit: int = 5) -> list[SearchResultResponse]:
         """Search your indexed LabArchives notebooks semantically."""
         return await _search_labarchives(context, query, limit)
 
@@ -269,7 +301,7 @@ def register_search_tools(server: Any, context: ToolContext) -> None:
         dry_run: bool = False,
         max_age_hours: int | None = None,
         notebook_id: str | None = None,
-    ) -> dict[str, Any]:
+    ) -> SyncVectorIndexResponse:
         """Plan and (optionally) execute a vector-index sync."""
         return await _sync_vector_index(
             context,

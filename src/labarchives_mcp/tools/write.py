@@ -6,11 +6,18 @@ import asyncio
 import platform
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from loguru import logger
 
-from ..models.upload import PageCreationRequest, ProvenanceMetadata, UploadRequest
+from ..models.upload import (
+    PageCreationRequest,
+    PageCreationResult,
+    ProvenanceMetadata,
+    UploadRequest,
+    UploadResponse,
+)
+from ..schemas.tool_responses import UploadToLabArchivesResponse, WriteNotebookEntryResponse
 from .context import ToolContext
 from .decorators import tool
 
@@ -31,7 +38,7 @@ async def upload_to_labarchives(
     allow_dirty_git: bool = False,
     dependencies: dict[str, str] | None = None,
     as_page_text: bool = True,
-) -> dict[str, Any]:
+) -> UploadToLabArchivesResponse:
     """Upload a file to LabArchives with code provenance metadata."""
     logger.info(
         f"upload_to_labarchives called: file={file_path}, notebook={notebook_id}, "
@@ -72,7 +79,10 @@ async def upload_to_labarchives(
         create_as_text=as_page_text,
     )
 
-    result = await context.notebook_client.upload_to_labarchives(uid, upload_request)
+    result = cast(
+        UploadResponse,
+        await context.notebook_client.upload_to_labarchives(uid, upload_request),
+    )
     context.state_manager.record_upload_provenance(
         uid=uid,
         notebook_id=notebook_id,
@@ -110,7 +120,7 @@ async def write_notebook_entry(
     content_format: str = "markdown",
     caption: str | None = None,
     change_description: str | None = None,
-) -> dict[str, Any]:
+) -> WriteNotebookEntryResponse:
     """Write a rich text entry directly to a LabArchives page."""
     logger.info(
         "write_notebook_entry called: notebook=%s, page_id=%s, title=%s",
@@ -135,12 +145,15 @@ async def write_notebook_entry(
             display_text=page_title,
             is_folder=False,
         )
-        page_result = await context.notebook_client.insert_node(uid, page_request)
+        page_result = cast(
+            PageCreationResult,
+            await context.notebook_client.insert_node(uid, page_request),
+        )
         page_tree_id = page_result.tree_id
 
     normalized_format = content_format.strip().lower()
     if normalized_format in {"markdown", "md"}:
-        entry_body = context.notebook_client._markdown_to_html(content)
+        entry_body = cast(str, context.notebook_client._markdown_to_html(content))
         part_type = "text entry"
     elif normalized_format in {"html", "rich", "rich_text"}:
         entry_body = content
@@ -151,14 +164,17 @@ async def write_notebook_entry(
     else:
         raise ValueError("content_format must be one of: markdown, html, plain")
 
-    created = await context.notebook_client.add_entry(
-        uid=uid,
-        notebook_id=notebook_id,
-        page_tree_id=page_tree_id,
-        part_type=part_type,
-        entry_data=entry_body,
-        caption=caption,
-        change_description=change_description,
+    created = cast(
+        dict[str, str],
+        await context.notebook_client.add_entry(
+            uid=uid,
+            notebook_id=notebook_id,
+            page_tree_id=page_tree_id,
+            part_type=part_type,
+            entry_data=entry_body,
+            caption=caption,
+            change_description=change_description,
+        ),
     )
 
     created_at = created.get("created_at")
@@ -206,7 +222,7 @@ def register_write_tools(server: Any, context: ToolContext, *, upload_enabled: b
         allow_dirty_git: bool = False,
         dependencies: dict[str, str] | None = None,
         as_page_text: bool = True,
-    ) -> dict[str, Any]:
+    ) -> UploadToLabArchivesResponse:
         """Upload a file to LabArchives with code provenance metadata."""
         return await _upload_to_labarchives(
             context,
@@ -236,7 +252,7 @@ def register_write_tools(server: Any, context: ToolContext, *, upload_enabled: b
         content_format: str = "markdown",
         caption: str | None = None,
         change_description: str | None = None,
-    ) -> dict[str, Any]:
+    ) -> WriteNotebookEntryResponse:
         """Write a rich text entry directly to a LabArchives page."""
         return await _write_notebook_entry(
             context,

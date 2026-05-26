@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import html
 import re
-from typing import Any
+from collections.abc import Mapping, Sequence
+from typing import TypeVar
 from urllib.parse import unquote
+
+from ..schemas.tool_responses import PaginationMetaResponse
 
 _LABARCHIVES_SHARE_URL_RE = re.compile(
     r"(?:https?://)?(?:[A-Za-z0-9.-]+\.)?labarchives\.com/share/"
@@ -13,8 +16,12 @@ _LABARCHIVES_SHARE_URL_RE = re.compile(
     re.IGNORECASE,
 )
 
+T = TypeVar("T")
 
-def _extract_labarchives_page_links(entries: list[dict[str, Any]]) -> list[tuple[str, str]]:
+
+def _extract_labarchives_page_links(
+    entries: Sequence[Mapping[str, object]],
+) -> list[tuple[str, str]]:
     """Return unique (notebook_id, page_id) links detected in LabArchives entry content."""
     links: list[tuple[str, str]] = []
     seen: set[tuple[str, str]] = set()
@@ -41,17 +48,17 @@ def _extract_labarchives_page_links(entries: list[dict[str, Any]]) -> list[tuple
 
 
 def _paginate_items(
-    items: list[dict[str, Any]], limit: int | None = None, offset: int = 0
-) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    items: Sequence[T], limit: int | None = None, offset: int = 0
+) -> tuple[list[T], PaginationMetaResponse]:
     """Slice items with limit/offset and emit truncation metadata."""
     total = len(items)
     start = max(offset, 0)
     if limit is None or limit <= 0:
-        return items, {"total": total, "offset": start, "limit": limit, "truncated": False}
+        return list(items), {"total": total, "offset": start, "limit": limit, "truncated": False}
 
     end = start + limit
     truncated = total > end
-    return items[start:end], {
+    return list(items[start:end]), {
         "total": total,
         "offset": start,
         "limit": limit,

@@ -3,10 +3,19 @@
 from __future__ import annotations
 
 import re
-from typing import Any
+from typing import Any, cast
 
 import networkx as nx
 
+from ..schemas.tool_responses import (
+    JsonObject,
+    PageEntryResponse,
+    ProvenanceSourceResponse,
+    RelatedPageResponse,
+    RelatedPagesResponse,
+    SuggestNextStepsResponse,
+    TraceProvenanceResponse,
+)
 from .context import ToolContext
 from .decorators import tool
 from .utils import _extract_labarchives_page_links, _paginate_items
@@ -14,7 +23,7 @@ from .utils import _extract_labarchives_page_links, _paginate_items
 
 async def get_related_pages(
     context: ToolContext, notebook_id: str, page_id: str, limit: int | None = 20, offset: int = 0
-) -> dict[str, Any]:
+) -> RelatedPagesResponse:
     """Find pages related to the given page using the project graph and content links."""
     active_context = context.state_manager.get_active_context()
     if not active_context:
@@ -28,7 +37,7 @@ async def get_related_pages(
             },
         }
 
-    related_pages: list[dict[str, Any]] = []
+    related_pages: list[RelatedPageResponse] = []
     seen_ids: set[str] = set()
 
     def _add_related_page(related_page_id: str, title: str, source: str) -> None:
@@ -46,8 +55,11 @@ async def get_related_pages(
 
     content_links: list[tuple[str, str]] = []
     uid = await context.auth_manager.ensure_uid()
-    entries = await context.notebook_client.get_page_entries(
-        uid, notebook_id, page_id, include_data=True
+    entries = cast(
+        list[PageEntryResponse],
+        await context.notebook_client.get_page_entries(
+            uid, notebook_id, page_id, include_data=True
+        ),
     )
     content_links = _extract_labarchives_page_links(entries)
     context.state_manager.log_page_content_links(notebook_id, page_id, content_links)
@@ -110,21 +122,24 @@ async def get_related_pages(
 
 async def trace_provenance(
     context: ToolContext, notebook_id: str, page_id: str, entry_id: str
-) -> dict[str, Any]:
+) -> TraceProvenanceResponse:
     """Trace the provenance of a specific entry."""
-    sources: list[dict[str, str]] = []
-    metadata: dict[str, Any] = {}
+    sources: list[ProvenanceSourceResponse] = []
+    metadata: JsonObject = {}
 
     uid = await context.auth_manager.ensure_uid()
-    entries = await context.notebook_client.get_page_entries(
-        uid, notebook_id, page_id, include_data=True
+    entries = cast(
+        list[PageEntryResponse],
+        await context.notebook_client.get_page_entries(
+            uid, notebook_id, page_id, include_data=True
+        ),
     )
 
     target_entry = next((entry for entry in entries if entry.get("eid") == entry_id), None)
     if not target_entry:
         return {"error": f"Entry {entry_id} not found on page {page_id}"}
 
-    content = target_entry.get("content", "")
+    content = target_entry.get("content") or ""
     source_pattern = re.compile(r"(?:Derived From|Source):\s*([a-zA-Z0-9_\-]+)")
 
     matches = source_pattern.findall(content)
@@ -139,7 +154,7 @@ async def trace_provenance(
 
     for entry in entries:
         caption = entry.get("caption", "") or ""
-        e_content = entry.get("content", "")
+        e_content = entry.get("content") or ""
 
         if "Code Provenance Metadata" in caption or "Git Commit SHA" in e_content:
             metadata["code_provenance"] = {
@@ -162,14 +177,14 @@ async def trace_provenance(
                             {
                                 "id": successor.replace("finding:", ""),
                                 "type": "agent_finding",
-                                "description": node_data.get("label", "Agent finding"),
+                                "description": str(node_data.get("label", "Agent finding")),
                             }
                         )
 
     return {"sources": sources, "metadata": metadata}
 
 
-async def suggest_next_steps(context: ToolContext) -> dict[str, Any]:
+async def suggest_next_steps(context: ToolContext) -> SuggestNextStepsResponse:
     """Provide lightweight heuristics on next actions based on current project state."""
     active_context = context.state_manager.get_active_context()
     if not active_context:
@@ -222,18 +237,20 @@ def register_provenance_tools(server: Any, context: ToolContext) -> None:
     @tool(server)
     async def get_related_pages(
         notebook_id: str, page_id: str, limit: int | None = 20, offset: int = 0
-    ) -> dict[str, Any]:
+    ) -> RelatedPagesResponse:
         """Find pages related to the given page using the project graph and content links."""
         return await _get_related_pages(
             context, notebook_id, page_id, limit=limit, offset=offset
         )
 
     @tool(server)
-    async def trace_provenance(notebook_id: str, page_id: str, entry_id: str) -> dict[str, Any]:
+    async def trace_provenance(
+        notebook_id: str, page_id: str, entry_id: str
+    ) -> TraceProvenanceResponse:
         """Trace the provenance of a specific entry."""
         return await _trace_provenance(context, notebook_id, page_id, entry_id)
 
     @tool(server)
-    async def suggest_next_steps() -> dict[str, Any]:
+    async def suggest_next_steps() -> SuggestNextStepsResponse:
         """Provide lightweight heuristics on next actions based on current project state."""
         return await _suggest_next_steps(context)
