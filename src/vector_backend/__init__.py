@@ -6,8 +6,8 @@ consumes this backend as a service layer.
 
 Architecture:
     - chunking: Text splitting with configurable strategies
-    - embedding: Model-agnostic embedding client (OpenAI, local models)
-    - indexing: Pinecone/Qdrant integration with DVC-tracked persistence
+    - embedding: OpenAI embedding client, with local models left as an extension point
+    - indexing: Pinecone integration with local Parquet persistence
     - retrieval: Semantic search with metadata filtering
     - models: Pydantic schemas for chunks, embeddings, search results
 

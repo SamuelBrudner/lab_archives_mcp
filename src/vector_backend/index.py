@@ -1,6 +1,6 @@
 """Vector index management and search operations.
 
-Provides unified interface for Pinecone and Qdrant backends with:
+Provides a vector-index interface and the implemented Pinecone backend with:
 - Bulk upsert with retry logic
 - Semantic search with metadata filtering
 - Index statistics and health checks
@@ -282,10 +282,7 @@ class PineconeIndex(VectorIndex):
 
 
 class QdrantIndex(VectorIndex):
-    """Qdrant vector index implementation.
-
-    TODO: Implement using qdrant-client library.
-    """
+    """Placeholder for a future Qdrant vector index implementation."""
 
     def __init__(
         self,

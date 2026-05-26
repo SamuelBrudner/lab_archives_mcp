@@ -1,7 +1,7 @@
 # Vector Backend Module
 
-**Status:** ✅ Production-ready (2025-10-01)
-**Tests:** 100 passing (92 unit/integration, 6 Pinecone skipped)
+**Status:** Implemented path supports OpenAI embeddings, Pinecone indexing, and local Parquet persistence (2025-10-01)
+**Tests:** Covered by `tests/test_vector_backend/` and the repository `pytest` suite.
 **Documentation:** See `docs/vector_approach.md` for design details (use alongside the MCP onboarding guidance in `docs/onboard_example.json`)
 
 ## Overview
@@ -15,9 +15,9 @@ src/vector_backend/
 ├── __init__.py          # Package exports
 ├── models.py            # Pydantic data models
 ├── chunking.py          # Text chunking strategies
-├── embedding.py         # Embedding client (OpenAI, local models)
+├── embedding.py         # Embedding client (OpenAI; local models are an extension point)
 ├── config.py            # Hydra configuration management
-└── index.py             # Vector index operations (Pinecone, Qdrant)
+└── index.py             # Vector index operations (Pinecone; Qdrant is an extension point)
 ```
 
 ## Key Components
@@ -41,10 +41,10 @@ Token-aware text splitting:
 
 ### 3. **Embedding** (`embedding.py`)
 
-Model-agnostic embedding client:
+Embedding client:
 
 - OpenAI API with retry logic and batching
-- Extensible to local models (sentence-transformers, etc.)
+- Local models are an extension point; `LocalEmbedding` raises `NotImplementedError`
 - Exponential backoff for rate limits
 
 ### 4. **Configuration** (`config.py`)
@@ -59,7 +59,7 @@ Hydra-based config management:
 
 Vector index abstraction:
 
-- Unified interface for Pinecone and Qdrant
+- Implemented Pinecone index and Qdrant interface placeholder
 - Local persistence with Parquet + DVC tracking
 - Bulk upsert, search, delete operations
 - Version isolation for reproducible reindexing
@@ -72,11 +72,14 @@ Vector index abstraction:
 pip install -e .
 ```
 
-### Optional vector backends (Qdrant)
+### Optional vector backend dependencies
 
 ```bash
 pip install -e ".[vector]"
 ```
+
+This installs optional dependencies for extension work. The current `QdrantIndex`
+class raises `NotImplementedError` until that backend is implemented.
 
 ### Development dependencies
 
@@ -206,7 +209,7 @@ notebook_ids = persistence.list_notebooks()
 - **Read operations**: Always safe, no locking overhead
 - **DVC initialization**: Protected by lock to prevent race conditions
 
-For very high-throughput multi-user scenarios (>100 concurrent writers), **Pinecone** or **Qdrant** may offer better performance.
+For high-throughput multi-user scenarios (>100 concurrent writers), Pinecone is the implemented managed-index path. Qdrant remains planned work in this repository.
 
 ## Testing
 
@@ -248,7 +251,7 @@ pytest tests/vector_backend/unit/test_chunking.py --benchmark-only
 - [x] Notebook indexer (end-to-end workflow)
 - [x] Local persistence (Parquet)
 - [x] DVC tracking integration
-- [x] Test structure and fixtures (92 tests passing)
+- [x] Test structure and fixtures
 - [x] Documentation
 
 ### 📋 Planned

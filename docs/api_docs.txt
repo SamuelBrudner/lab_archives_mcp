@@ -220,7 +220,7 @@ LabArchives API Notebook Hierarchy (Checklist)
         The **site_license_tools** group provides administrative reports and configuration methods intended for site administrators with Site API Access Rights.  Each call requires the `uid` of a user with site‑level API rights.
 
         [x] usage_report
-            Downloads a detailed site usage report.  Requires **uid** and returns a comprehensive usage report for the site.
+            Downloads a detailed site usage report.  Requires **uid** and returns a full usage report for the site.
         [x] notebook_usage_report
             Downloads a site‑level notebook usage report.  Requires **uid** and returns a report summarizing notebook usage across the site.
         [x] pdf_generation_report

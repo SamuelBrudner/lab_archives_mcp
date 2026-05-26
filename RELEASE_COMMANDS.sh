@@ -62,7 +62,7 @@ Core Features:
 - Read-only MCP server for LabArchives ELN
 - Semantic vector search across notebook content
 - Integration with Claude Desktop and Windsurf
-- Comprehensive test suite and CI
+- Test suite and CI
 - MIT licensed
 
 See CHANGELOG.md for full release notes."

@@ -5,7 +5,7 @@
 
 ## Summary
 
-Comprehensive revision to align with FAIR principles, academic biology development guidelines, and production readiness requirements.
+Revision to align with FAIR principles, academic biology development guidelines, and production readiness requirements.
 
 ## Major Additions
 
@@ -28,7 +28,7 @@ Comprehensive revision to align with FAIR principles, academic biology developme
 - Parquet storage format with DVC tracking
 
 ### 4. **Error Handling & Reliability (§6.1)**
-- Comprehensive failure modes table (7 scenarios)
+- Failure modes table (7 scenarios)
 - Dead-letter queue design for failed embeddings
 - Exponential backoff retry logic
 - Structured logging with metrics (p50/p95/p99 latencies)
