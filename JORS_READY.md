@@ -1,6 +1,6 @@
 # JORS Submission Checklist
 
-Final pre-upload check for the 15 April 2026 JORS resubmission.
+Final pre-upload check for the 26 May 2026 JORS resubmission.
 
 ## Upload package
 
@@ -31,16 +31,18 @@ Supporting source files to keep with the repository package:
 - [x] Bibliography is present as `paper.bib`.
 - [x] Repository metadata files are present: `README.md`, `CITATION.cff`, `LICENSE`, `CONTRIBUTING.md`, and `CODE_OF_CONDUCT.md`.
 - [x] The reviewed archive tag exists locally as `v0.3.2`.
-- [x] The reviewed archive DOI is recorded consistently as <https://doi.org/10.5281/zenodo.17728440>.
+- [x] The reviewed archive version DOI is recorded consistently as <https://doi.org/10.5281/zenodo.17772522>.
+- [x] The current source-tree version DOI is recorded as <https://doi.org/10.5281/zenodo.19672568>.
 - [x] No compulsory editor or reviewer item remains unaddressed in `jors_response_to_reviewers.md`.
-- [x] Local validation passed: `conda run -n labarchives-mcp-pol pytest -q` completed with 217 passed and 6 skipped on 15 April 2026.
+- [x] Local validation passed during the revision: `conda run -p ./conda_envs/test-env pytest -q -m "not integration" --cov=src --cov-report=term --cov-report=xml` completed with 239 passing tests, one skipped test, six deselected integration tests, and 74% total line coverage.
 
 ## Version and citation story
 
-- JORS archive/citation target: `v0.3.2`, DOI <https://doi.org/10.5281/zenodo.17728440>.
-- Archived release date: 2025-11-30.
-- Current source tree: `0.3.3`, a post-archive maintenance release dated 2025-12-16.
-- Cite `0.3.3` only when discussing changes after the archived JORS snapshot.
+- JORS archive/citation target: `v0.3.2`, version DOI <https://doi.org/10.5281/zenodo.17772522>.
+- Zenodo concept DOI: <https://doi.org/10.5281/zenodo.17728440>.
+- Archived release date: 2025-12-01.
+- Current source tree: `0.4.0`, version DOI <https://doi.org/10.5281/zenodo.19672568>, Git tag dated 2026-04-20 and Zenodo publication dated 2026-04-21.
+- Cite `0.4.0` only when discussing linked-data export or other changes after the archived JORS snapshot.
 
 ## Final submission status
 

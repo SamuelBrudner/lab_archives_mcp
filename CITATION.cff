@@ -1,11 +1,13 @@
 cff-version: 1.2.0
-message: "This file describes the current v0.4.0 source tree. For the JORS archived submission, cite the v0.3.2 Zenodo record: https://doi.org/10.5281/zenodo.17772522."
+message: "This file describes the current v0.4.0 source tree: https://doi.org/10.5281/zenodo.19672568. For the JORS archived submission, cite the v0.3.2 Zenodo record: https://doi.org/10.5281/zenodo.17772522."
 type: software
 title: "LabArchives MCP Server: AI Integration for Electronic Lab Notebooks"
 version: 0.4.0
 identifiers:
   - type: doi
     value: 10.5281/zenodo.17728440
+  - type: doi
+    value: 10.5281/zenodo.19672568
 date-released: "2026-04-20"
 authors:
   - family-names: "Brudner"

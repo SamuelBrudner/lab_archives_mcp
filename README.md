@@ -656,14 +656,15 @@ See `CONTRIBUTING.md` for versioning, Conventional Commits, and release steps.
 For the JORS resubmission, cite the archived Zenodo snapshot:
 
 - Archived version: `v0.3.2`
-- Version DOI: <https://doi.org/10.5281/zenodo.17772522>
+- Archived version DOI: <https://doi.org/10.5281/zenodo.17772522>
 - Concept DOI: <https://doi.org/10.5281/zenodo.17728440>
 - Git tag: <https://github.com/SamuelBrudner/lab_archives_mcp/releases/tag/v0.3.2>
 
 The current source tree is version `0.4.0`, recorded in `CITATION.cff`,
-`codemeta.json`, `pyproject.toml`, and `CHANGELOG.md`. Use the version DOI above
-for the reviewed JORS archive; cite the current release when referring
-specifically to linked-data export or other post-archive changes.
+`codemeta.json`, `pyproject.toml`, and `CHANGELOG.md`. The current Zenodo
+version DOI is <https://doi.org/10.5281/zenodo.19672568>. Use the archived
+version DOI above for the reviewed JORS archive; cite the current release when
+referring specifically to linked-data export or other post-archive changes.
 
 ## Contributing
 

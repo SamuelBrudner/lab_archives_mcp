@@ -33,7 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - scripts: sanitize helper scripts by removing hard-coded user paths and avoiding logging secret values
 - citation: note that the JORS archival citation remains the `v0.3.2` Zenodo
-  snapshot at <https://doi.org/10.5281/zenodo.17728440>; `v0.3.3` is a
+  snapshot at <https://doi.org/10.5281/zenodo.17772522>; `v0.3.3` is a
   post-archive maintenance release
 
 ### Chore
@@ -115,7 +115,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Conda-lock environment with reproducible dependencies
 - Pre-commit hooks: Ruff, Black, isort, mypy, interrogate, Commitizen
-- Comprehensive test suite (unit + integration)
+- Unit and integration test suite
 - GitHub Actions CI workflow
 - MIT License
 
@@ -227,7 +227,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **upload**: implement insert_node, add_attachment, add_entry, and upload_to_labarchives methods
 - **upload**: add mandatory ProvenanceMetadata for code/notebook reproducibility
 - add folder navigation to list_notebook_pages with folder_id parameter
-- add comprehensive logging to page reading tools for debugging
+- add detailed logging to page reading tools for debugging
 - add page-level reading tools (list_notebook_pages, read_notebook_page)
 - add list_labarchives_notebooks tool for better MCP client discovery
 - add agent connectivity with console script and configuration guide
