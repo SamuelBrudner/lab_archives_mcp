@@ -3,7 +3,7 @@
 Tests the complete save/load cycle for embedded chunks using Parquet format.
 These tests create real files in a temporary directory.
 
-Run with: pytest tests/test_vector_backend/integration/test_local_persistence.py -v
+Run with: pytest tests/integration/vector_backend/test_local_persistence.py -v
 """
 
 # mypy: disable-error-code="no-untyped-def,import-untyped"

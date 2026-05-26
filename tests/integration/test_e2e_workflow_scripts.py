@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Any, cast
 
 # Add src to path
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
 import yaml  # type: ignore[import-untyped]
 
@@ -36,7 +36,7 @@ from vector_backend.models import ChunkMetadata, EmbeddedChunk, SearchRequest
 def load_secrets() -> dict[str, Any]:
     """Load credentials from `conf/secrets.yml`."""
 
-    secrets_path = Path(__file__).parent.parent / "conf" / "secrets.yml"
+    secrets_path = Path(__file__).resolve().parents[2] / "conf" / "secrets.yml"
     with secrets_path.open() as fh:
         loaded = yaml.safe_load(fh)
     return cast(dict[str, Any], loaded or {})

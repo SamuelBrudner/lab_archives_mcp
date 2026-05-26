@@ -196,7 +196,7 @@ def test_hosted_context_url_is_available_when_requested(empty_graph: nx.DiGraph)
 
 
 def test_hosted_context_artifacts_match_inline_context() -> None:
-    repo_root = Path(__file__).resolve().parents[2]
+    repo_root = Path(__file__).resolve().parents[3]
     expected = build_context()
 
     for relative_path in ("ns/context.jsonld", "docs/ns/context.jsonld"):

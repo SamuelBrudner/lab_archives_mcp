@@ -73,7 +73,7 @@ OPENAI_API_KEY: SET
 ### **Test 2: Run Integration Tests**
 
 ```bash
-pytest tests/test_vector_backend/integration/ -v -m integration
+pytest tests/integration/vector_backend/ -v -m integration
 ```
 
 Expected:

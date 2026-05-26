@@ -12,7 +12,7 @@ import yaml
 def test_release_metadata_files_distinguish_source_tree_and_jors_archive() -> None:
     """Keep current release metadata separate from the reviewed JORS archive."""
 
-    repo_root = Path(__file__).resolve().parents[1]
+    repo_root = Path(__file__).resolve().parents[2]
     pyproject = tomllib.loads((repo_root / "pyproject.toml").read_text())
     citation = yaml.safe_load((repo_root / "CITATION.cff").read_text())
     codemeta = json.loads((repo_root / "codemeta.json").read_text())
@@ -37,7 +37,7 @@ def test_release_metadata_files_distinguish_source_tree_and_jors_archive() -> No
     assert archived["year"] == 2025
 
     assert f"[![DOI](https://zenodo.org/badge/DOI/{concept_doi}.svg)]({concept_doi_url})" in readme
-    assert f"The current source tree is version `{version}`" in readme
+    assert f"Current source tree: `{version}`" in readme
     assert f"year = {{{archived['year']}}}" in readme
     assert f"doi = {{{archived['doi']}}}" in readme
     assert f"url = {{{archived_doi_url}}}" in readme

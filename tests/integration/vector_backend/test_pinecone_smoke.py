@@ -5,7 +5,7 @@ These tests require:
 - PINECONE_ENVIRONMENT environment variable
 - Active Pinecone index (will use test index: 'labarchives-test')
 
-Run with: pytest tests/test_vector_backend/integration/ -v -m integration
+Run with: pytest tests/integration/vector_backend/ -v -m integration
 """
 
 import os

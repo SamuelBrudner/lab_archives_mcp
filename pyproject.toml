@@ -113,7 +113,7 @@ plugins = []
 exclude = ["tests/", "scripts/", "conda_envs/"]
 
 [[tool.mypy.overrides]]
-module = "tests.test_vector_backend.integration.*"
+module = "tests.integration.vector_backend.*"
 disable_error_code = ["no-untyped-def", "import-untyped"]
 
 [[tool.mypy.overrides]]
@@ -130,6 +130,7 @@ filterwarnings = [
 ]
 markers = [
   "integration: marks tests that hit external services (deselect with '-m \"not integration\"')",
+  "asyncio: marks tests that require an asyncio event loop",
   "slow: marks tests that take longer than expected"
 ]
 asyncio_mode = "auto"
