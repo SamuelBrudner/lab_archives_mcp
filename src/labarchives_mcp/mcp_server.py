@@ -20,6 +20,7 @@ from .tools import ToolContext, register_mcp_surface
 from .tools.utils import _extract_labarchives_page_links, _paginate_items
 from .tools.validation import validate_graph_task
 
+# Lazy import keeps FastMCP monkeypatchable in tests and preserves a clear missing-dependency error.
 FastMCP: type[Any] | None = None
 
 __all__ = [
