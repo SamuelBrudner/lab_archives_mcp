@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import time
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Self
@@ -68,33 +69,17 @@ class SessionState(BaseModel):
     contexts: dict[str, ProjectContext] = Field(default_factory=dict)
 
 
-class StateManager:
-    """Manages persistence and modification of agent state.
+class StateRepository:
+    """Loads, migrates, and saves session state on disk."""
 
-    The constructor accepts already-loaded state and performs no disk I/O. Use
-    :meth:`from_path` when state should be loaded from persistent storage.
-    """
-
-    MAX_VISITS = 1000
-
-    def __init__(
-        self, state: SessionState | None = None, storage_dir: Path | str | None = None
-    ) -> None:
+    def __init__(self, storage_dir: Path | str | None = None) -> None:
         if storage_dir is None:
             # Default to home directory for cross-repository access
             storage_dir = Path.home() / ".labarchives_state"
         self.storage_dir = Path(storage_dir)
         self.state_file = self.storage_dir / "session_state.json"
-        self._state: SessionState = state if state is not None else SessionState()
 
-    @classmethod
-    def from_path(cls, storage_dir: Path | str | None = None) -> Self:
-        """Create a manager by loading state from disk."""
-        manager = cls(storage_dir=storage_dir)
-        manager._state = manager._load_state()
-        return manager
-
-    def _load_state(self) -> SessionState:
+    def load(self) -> SessionState:
         """Load state from disk or create fresh."""
         if not self.state_file.exists():
             return SessionState(active_context_id=None, contexts={})
@@ -102,7 +87,7 @@ class StateManager:
         try:
             with open(self.state_file, encoding="utf-8") as f:
                 data = json.load(f)
-                migrated = self._migrate_state_dict(data)
+                migrated = self.migrate_state_dict(data)
                 return SessionState.model_validate(migrated)
         except Exception as e:
             logger.error(f"Failed to load state: {e}. Backing up and starting fresh.")
@@ -118,7 +103,7 @@ class StateManager:
 
             return SessionState(active_context_id=None, contexts={})
 
-    def _save_state(self) -> None:
+    def save(self, state: SessionState) -> None:
         """Persist current state to disk using atomic write pattern."""
         self.storage_dir.mkdir(parents=True, exist_ok=True)
 
@@ -126,7 +111,7 @@ class StateManager:
         temp_file = self.state_file.with_suffix(".tmp")
         try:
             with open(temp_file, "w", encoding="utf-8") as f:
-                f.write(self._state.model_dump_json(indent=2))
+                f.write(state.model_dump_json(indent=2))
                 f.flush()
                 import os
 
@@ -139,7 +124,7 @@ class StateManager:
             if temp_file.exists():
                 temp_file.unlink()
 
-    def _migrate_state_dict(self, data: dict[str, Any]) -> dict[str, Any]:
+    def migrate_state_dict(self, data: dict[str, Any]) -> dict[str, Any]:
         """Ensure graph data carries schema version and baseline metadata."""
         contexts = data.get("contexts") or {}
         now = time.time()
@@ -151,12 +136,12 @@ class StateManager:
             if not isinstance(ctx, dict):
                 continue
             graph_data = ctx.get("graph_data") or {}
-            ctx["graph_data"] = self._migrate_graph_data(graph_data, now)
+            ctx["graph_data"] = self.migrate_graph_data(graph_data, now)
 
         data["contexts"] = contexts
         return data
 
-    def _migrate_graph_data(
+    def migrate_graph_data(
         self, graph_data: dict[str, Any], default_ts: float | None = None
     ) -> dict[str, Any]:
         """Backfill schema_version and timing metadata for nodes/edges."""
@@ -188,6 +173,26 @@ class StateManager:
         graph_data.setdefault("directed", True)
         graph_data.setdefault("multigraph", False)
         return graph_data
+
+
+class GraphValidationService:
+    """Validates serialized project graph data."""
+
+    def __init__(
+        self,
+        state: SessionState,
+        save_state: Callable[[], None],
+        get_active_context: Callable[[], ProjectContext | None],
+    ) -> None:
+        self._state = state
+        self._save_state_callback = save_state
+        self._get_active_context = get_active_context
+
+    def _save_state(self) -> None:
+        self._save_state_callback()
+
+    def get_active_context(self) -> ProjectContext | None:
+        return self._get_active_context()
 
     async def _prune_context_graph(
         self, context: ProjectContext, check_page_exists: Any, max_checks: int
@@ -264,6 +269,24 @@ class StateManager:
             "removed_edges": total_removed_edges,
             "contexts_checked": len(contexts),
         }
+
+
+class ProvenanceService:
+    """Records upload provenance subgraphs."""
+
+    def __init__(
+        self,
+        get_active_context: Callable[[], ProjectContext | None],
+        save_state: Callable[[], None],
+    ) -> None:
+        self._get_active_context = get_active_context
+        self._save_state_callback = save_state
+
+    def get_active_context(self) -> ProjectContext | None:
+        return self._get_active_context()
+
+    def _save_state(self) -> None:
+        self._save_state_callback()
 
     @staticmethod
     def _coerce_timestamp(value: Any) -> float | None:
@@ -440,6 +463,17 @@ class StateManager:
         except Exception as e:
             logger.warning(f"Failed to record upload provenance in project graph: {e}")
 
+
+class ProjectService:
+    """Handles project lifecycle and active-context selection."""
+
+    def __init__(self, state: SessionState, save_state: Callable[[], None]) -> None:
+        self._state = state
+        self._save_state_callback = save_state
+
+    def _save_state(self) -> None:
+        self._save_state_callback()
+
     def create_project(
         self, name: str, description: str, linked_notebook_ids: list[str] | None = None
     ) -> ProjectContext:
@@ -532,6 +566,26 @@ class StateManager:
         self._save_state()
         logger.info("Created singleton default project context")
         return context
+
+
+class KnowledgeGraph:
+    """Records visits, content links, and findings in project graphs."""
+
+    def __init__(
+        self,
+        get_active_context: Callable[[], ProjectContext | None],
+        save_state: Callable[[], None],
+        max_visits: int,
+    ) -> None:
+        self._get_active_context = get_active_context
+        self._save_state_callback = save_state
+        self.MAX_VISITS = max_visits
+
+    def get_active_context(self) -> ProjectContext | None:
+        return self._get_active_context()
+
+    def _save_state(self) -> None:
+        self._save_state_callback()
 
     def log_visit(self, notebook_id: str, page_id: str, title: str) -> None:
         """Log a page visit to the active context and update the graph.
@@ -834,3 +888,156 @@ class StateManager:
 
         self._save_state()
         logger.info(f"Logged finding in context {context.id}")
+
+
+class StateManager:
+    """Facade over persistent state, project lifecycle, and graph services.
+
+    The constructor accepts already-loaded state and performs no disk I/O. Use
+    :meth:`from_path` when state should be loaded from persistent storage.
+    """
+
+    MAX_VISITS = 1000
+
+    def __init__(
+        self, state: SessionState | None = None, storage_dir: Path | str | None = None
+    ) -> None:
+        self._repository = StateRepository(storage_dir)
+        self.storage_dir = self._repository.storage_dir
+        self.state_file = self._repository.state_file
+        self._state: SessionState = (
+            state if state is not None else SessionState(active_context_id=None, contexts={})
+        )
+        self._wire_services()
+
+    @classmethod
+    def from_path(cls, storage_dir: Path | str | None = None) -> Self:
+        """Create a manager by loading state from disk."""
+        repository = StateRepository(storage_dir)
+        return cls(state=repository.load(), storage_dir=repository.storage_dir)
+
+    def _wire_services(self) -> None:
+        self._project_service = ProjectService(self._state, self._save_state)
+        self._graph_validation = GraphValidationService(
+            self._state,
+            self._save_state,
+            self.get_active_context,
+        )
+        self._provenance_service = ProvenanceService(
+            self.get_active_context,
+            self._save_state,
+        )
+        self._knowledge_graph = KnowledgeGraph(
+            self.get_active_context,
+            self._save_state,
+            self.MAX_VISITS,
+        )
+
+    def _load_state(self) -> SessionState:
+        return self._repository.load()
+
+    def _save_state(self) -> None:
+        self._repository.save(self._state)
+
+    def _migrate_state_dict(self, data: dict[str, Any]) -> dict[str, Any]:
+        return self._repository.migrate_state_dict(data)
+
+    def _migrate_graph_data(
+        self, graph_data: dict[str, Any], default_ts: float | None = None
+    ) -> dict[str, Any]:
+        return self._repository.migrate_graph_data(graph_data, default_ts)
+
+    async def _prune_context_graph(
+        self, context: ProjectContext, check_page_exists: Any, max_checks: int
+    ) -> dict[str, int]:
+        return await self._graph_validation._prune_context_graph(
+            context,
+            check_page_exists,
+            max_checks,
+        )
+
+    async def validate_graph(
+        self, check_page_exists: Any, max_checks: int = 10, include_all_contexts: bool = False
+    ) -> dict[str, int]:
+        return await self._graph_validation.validate_graph(
+            check_page_exists,
+            max_checks=max_checks,
+            include_all_contexts=include_all_contexts,
+        )
+
+    @staticmethod
+    def _coerce_timestamp(value: Any) -> float | None:
+        return ProvenanceService._coerce_timestamp(value)
+
+    def record_upload_provenance(
+        self,
+        *,
+        uid: str,
+        notebook_id: str,
+        page_title: str,
+        file_path: Path | str,
+        page_tree_id: str,
+        entry_id: str | None,
+        page_url: str,
+        created_at: str | float | datetime | None,
+        file_size_bytes: int | None,
+        filename: str,
+        metadata: ProvenanceMetadata,
+        server_version: str,
+        as_page_text: bool,
+    ) -> None:
+        self._provenance_service.record_upload_provenance(
+            uid=uid,
+            notebook_id=notebook_id,
+            page_title=page_title,
+            file_path=file_path,
+            page_tree_id=page_tree_id,
+            entry_id=entry_id,
+            page_url=page_url,
+            created_at=created_at,
+            file_size_bytes=file_size_bytes,
+            filename=filename,
+            metadata=metadata,
+            server_version=server_version,
+            as_page_text=as_page_text,
+        )
+
+    def create_project(
+        self, name: str, description: str, linked_notebook_ids: list[str] | None = None
+    ) -> ProjectContext:
+        return self._project_service.create_project(name, description, linked_notebook_ids)
+
+    def delete_project(self, project_id: str) -> bool:
+        return self._project_service.delete_project(project_id)
+
+    def switch_project(self, project_id: str) -> ProjectContext:
+        return self._project_service.switch_project(project_id)
+
+    def get_active_context(self) -> ProjectContext | None:
+        return self._project_service.get_active_context()
+
+    def list_projects(self) -> list[dict[str, Any]]:
+        return self._project_service.list_projects()
+
+    def _ensure_default_context(self) -> ProjectContext:
+        return self._project_service._ensure_default_context()
+
+    def log_visit(self, notebook_id: str, page_id: str, title: str) -> None:
+        self._knowledge_graph.log_visit(notebook_id, page_id, title)
+
+    def log_page_content_links(
+        self,
+        source_notebook_id: str,
+        source_page_id: str,
+        links: list[tuple[str, str]],
+    ) -> int:
+        return self._knowledge_graph.log_page_content_links(
+            source_notebook_id,
+            source_page_id,
+            links,
+        )
+
+    def log_finding(
+        self, content: str, source_url: str | None = None, page_id: str | None = None
+    ) -> None:
+        self._knowledge_graph.log_finding(content, source_url=source_url, page_id=page_id)
