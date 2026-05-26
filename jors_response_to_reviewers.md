@@ -2,13 +2,13 @@
 
 Manuscript: "Integrating AI Assistants with Electronic Lab Notebooks using the LabArchives Model Context Protocol Server"
 
-Revision date: 24 May 2026
+Revision date: 26 May 2026
 
 ## R3.1 Version Mismatch
 
 > README BibTeX v0.2.4 -> v0.3.2. Grep repo for "0.2.4"; reconcile every occurrence. Confirm Zenodo, paper, README, CITATION.cff, codemeta.json, pyproject.toml all agree.
 
-Revised in commit `e2715e1`. The README BibTeX now cites the reviewed Zenodo `v0.3.2` archive with version DOI `10.5281/zenodo.17772522`, while `pyproject.toml`, `CITATION.cff`, and `codemeta.json` continue to describe the current `0.4.0` source tree. The paper Availability section now states both the version DOI and concept DOI and distinguishes the archived JORS snapshot from the current mainline release. The remaining `0.2.4` strings are the historical `CHANGELOG.md` entry and the `notebook_shim` dependency version in `conda-lock.yml`; stale onboarding-test version literals were changed to `0.4.0`.
+Revised in commits `e2715e1` and `bc5448a`. The README BibTeX now cites the reviewed Zenodo `v0.3.2` archive with version DOI `10.5281/zenodo.17772522`, while `pyproject.toml`, `CITATION.cff`, and `codemeta.json` describe the current `0.4.0` source tree. A follow-up Zenodo API check confirmed that the concept DOI `10.5281/zenodo.17728440` currently resolves to `v0.4.0` at version DOI `10.5281/zenodo.19672568`, so the README, paper Availability section, `CITATION.cff`, `codemeta.json`, and `JORS_READY.md` now record both the reviewed archive DOI and the current source-tree DOI. The remaining `0.2.4` strings are the historical `CHANGELOG.md` heading and the `notebook_shim` dependency version in `conda-lock.yml`.
 
 ## R3.2 Write And Provenance Tool Surface
 
@@ -56,7 +56,7 @@ Revised in commit `b5aa1ae`. The paper Availability section now includes one sup
 
 > One paragraph stating exactly what leaves the institution for Pinecone and Qdrant: vectors only, or vectors plus chunk text -- verify in code -- plus which metadata fields, and what stays local.
 
-Revised in commits `113a814` and `90eaa57`. The security and governance text now states that OpenAI receives chunk text and query text for embeddings, Pinecone receives embedding vectors plus chunk text and the specific metadata fields stored in `PineconeIndex.upsert`, and Qdrant receives no data in the current release because `QdrantIndex` raises `NotImplementedError`. It also states that local Parquet persistence stores text, vectors, and metadata on disk, while credentials and project graph state remain local unless copied elsewhere. The vector-backend wording now distinguishes Pinecone runtime support from Qdrant and local-embedding extension points.
+Revised in commits `113a814`, `90eaa57`, `bc5448a`, and `2edee13`. The security and governance text now states that OpenAI receives chunk text and query text for embeddings, Pinecone receives embedding vectors plus chunk text and the specific metadata fields stored in `PineconeIndex.upsert`, and Qdrant receives no data in the current release because `QdrantIndex` raises `NotImplementedError`. It also states that local Parquet persistence stores text, vectors, and metadata on disk, while credentials and project graph state remain local unless copied elsewhere. The follow-up pass removed wording that implied a fully local embedding runtime path and updated vector-backend docs to describe Qdrant and local embeddings as extension points only.
 
 ## R3 Minor Sample Data Reference
 
@@ -74,4 +74,4 @@ Revised in commit `847d949`. The README first mention now defines MCP as an open
 
 > Final pass: read aloud. Anything that sounds like a chatbot -- delete or rewrite.
 
-Revised in commit `78ebaf3`. The final wording pass removed promotional language from the paper, README-adjacent docs, one CLI docstring, and one test name. A banned-phrase scan over the edited manuscript, README, response file, selected docs, source, and tests returns no matches outside historical bead records.
+Revised in commits `78ebaf3`, `bc5448a`, and `2edee13`. The final wording pass removed promotional language from the paper, README-adjacent docs, one CLI docstring, and one test name, then tightened the Org manuscript source and vector-backend documentation. A repository-wide banned-phrase scan on 26 May 2026 returned no matches.
