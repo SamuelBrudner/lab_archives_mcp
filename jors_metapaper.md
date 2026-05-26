@@ -67,7 +67,7 @@ The vector backend and state management layer are separate Python modules. Insti
 
 ## 2.1 Agent State Management and Project Contexts
 
-`lab_archives_mcp` implements a persistent **state management layer** (`state.py`) for long-running research contexts. Similar approaches have been used in MCP servers dedicated to task management (e.g., the "Beads" system for agentic issue tracking [@beads]).
+`lab_archives_mcp` implements a persistent **state management layer** (`state.py`) for long-running research contexts.
 
 - **Project contexts**: Researchers can create named projects (via `create_project`) that scope subsequent interactions. Each project tracks visited pages, logged findings, and linked notebook IDs.
 - **Persistence**: State is persisted to `~/.labarchives_state` as JSON. Findings and navigation history survive server restarts and can be read from different working directories.
