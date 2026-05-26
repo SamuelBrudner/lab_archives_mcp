@@ -92,6 +92,7 @@ cat conf/secrets.yml
 
 ## Documentation
 
-- **Full setup**: [README.md](README.md)
-- **Agent configuration**: [docs/agent_configuration.md](docs/agent_configuration.md)
-- **API docs**: [docs/api_docs.txt](docs/api_docs.txt)
+- **Full setup**: [README.md](../README.md)
+- **Agent configuration**: [agent_configuration.md](agent_configuration.md)
+- **Upload API**: [upload_api.md](upload_api.md)
+- **Vector backend**: [README_VECTOR_BACKEND.md](../README_VECTOR_BACKEND.md)

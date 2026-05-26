@@ -43,15 +43,15 @@ python scripts/setup_pinecone.py
 
 Expected output:
 ```
-🔧 Setting up Pinecone...
+Setting up Pinecone...
 
-📝 Creating index 'labarchives-test'...
-  • Dimension: 1536
-  • Metric: cosine
-  • Spec: Serverless (us-east-1)
-✅ Index 'labarchives-test' created successfully!
+Creating index 'labarchives-test'...
+  - Dimension: 1536
+  - Metric: cosine
+  - Spec: Serverless (us-east-1)
+Index 'labarchives-test' created successfully.
 
-🎉 Pinecone setup complete!
+Pinecone setup complete.
 ```
 
 ---
@@ -213,10 +213,10 @@ export PINECONE_ENVIRONMENT="us-east-1"  # or your region
 
 Once setup is complete:
 
-1. ✅ Run integration tests
-2. ✅ Run E2E workflow
-3. 🚀 Index real LabArchives data
-4. 🔍 Test semantic search quality
-5. 📊 Benchmark performance
+1. Run integration tests
+2. Run E2E workflow
+3. Index real LabArchives data
+4. Test semantic search quality
+5. Benchmark performance
 
 See `README_VECTOR_BACKEND.md` for full usage guide.

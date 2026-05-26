@@ -2,7 +2,7 @@
 
 **Status:** Implemented path supports OpenAI embeddings, Pinecone indexing, and local Parquet persistence (2025-10-01)
 **Tests:** Covered by `tests/test_vector_backend/` and the repository `pytest` suite.
-**Documentation:** See `docs/vector_approach.md` for design details (use alongside the MCP onboarding guidance in `docs/onboard_example.json`)
+**Documentation:** This file is the vector backend guide. MCP onboarding payload examples live in `docs/onboard_example.json`.
 
 ## Overview
 
@@ -202,7 +202,7 @@ notebook_ids = persistence.list_notebooks()
 5. Reproducible: version bump + reindex creates new tracked snapshots
 
 **Concurrency Support:**
-✅ LocalPersistence is **safe for concurrent writes** using per-notebook file locking:
+LocalPersistence is **safe for concurrent writes** using per-notebook file locking:
 
 - **Multiple processes writing different notebooks**: Fully concurrent (separate locks)
 - **Multiple processes writing same notebook**: Serialized via 30s timeout locks
@@ -239,29 +239,21 @@ pytest tests/vector_backend/unit/test_chunking.py --benchmark-only
 
 ## Implementation Status
 
-### ✅ Completed
+Implemented in this repository:
 
-- [x] Package structure
-- [x] Pydantic models with validation
-- [x] Chunking implementation with tests
-- [x] Embedding client abstraction (OpenAI)
-- [x] Configuration management with Hydra
-- [x] Pinecone index integration
-- [x] LabArchives indexer (HTML cleaning, entry extraction)
-- [x] Notebook indexer (end-to-end workflow)
-- [x] Local persistence (Parquet)
-- [x] DVC tracking integration
-- [x] Test structure and fixtures
-- [x] Documentation
+- Pydantic schemas for chunks, embeddings, search requests, search results, and build records
+- Token-aware chunking with tests
+- OpenAI embedding client
+- Hydra configuration at `conf/vector_search/default.yaml`
+- Pinecone index integration
+- LabArchives notebook indexing
+- Local Parquet persistence with optional DVC tracking
+- MCP `sync_vector_index` planning and execution
 
-### 📋 Planned
+Declared but not implemented:
 
-- [ ] Qdrant index integration
-- [ ] CLI for bulk indexing and reindexing
-- [ ] Incremental update scheduler
-- [ ] Evaluation benchmark
-- [ ] Local embedding models (sentence-transformers)
-- [ ] Production deployment guide
+- `QdrantIndex`
+- `LocalEmbedding`
 
 ## Build Records
 
@@ -318,51 +310,13 @@ Response (example):
 }
 ```
 
-## Design Principles
-
-Following the global development guidelines:
-
-1. **FAIR** - DVC tracking, versioned configs, reproducible pipeline
-2. **Modular** - Pure functions, protocol-based interfaces
-3. **Config-driven** - Hydra YAML, no magic numbers
-4. **Fail fast** - Pydantic validation, explicit error handling
-5. **Tested** - 90% coverage target for pure functions
-6. **Documented** - Docstrings, type hints, design docs
-
-## Development Status
-
-**Completed Phases:**
-
-1. ✅ **Phase 1:** Pinecone integration with retry logic
-2. ✅ **Phase 2:** Local Parquet persistence with DVC tracking
-3. ✅ **Phase 3:** Working indexing scripts (`scripts/index_real_notebook.py`)
-4. ✅ **Phase 4:** MCP server integration complete
-
-**Optional Enhancements:**
-
-- See `FUTURE_DIRECTIONS.md` for planned improvements (CLI, local models, optimization)
-
 ## Related Documentation
 
-- **Design doc:** `docs/vector_approach.md`
-- **Changelog:** `docs/vector_approach_changelog.md`
-- **API reference:** (auto-generated from docstrings)
-- **MCP integration:** `src/labarchives_mcp/` (separate package)
-
-## Contributing
-
-This module follows TDD:
-
-1. Write tests first (red)
-2. Implement minimal solution (green)
-3. Refactor for clarity (refactor)
-
-Run pre-commit hooks before committing:
-
-```bash
-pre-commit install
-pre-commit run --all-files
-```
+- **Setup:** `docs/QUICKSTART.md`
+- **Pinecone configuration:** `docs/PINECONE_SETUP.md`
+- **MCP integration:** `src/labarchives_mcp/`
+- **Vector backend code:** `src/vector_backend/`
+- **Tests:** `tests/vector_backend/`
 
 ## License
 

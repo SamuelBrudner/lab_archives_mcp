@@ -13,14 +13,14 @@ A **Model Context Protocol (MCP) server** that connects AI assistants to LabArch
 
 **Key Features:**
 
-- 🧭 **Agent Onboarding**: `onboard()` returns a structured lab overview, sticky context, and usage guidance
-- 🔍 **Semantic Search**: Vector-based search across notebook content with enhanced filters
-- 📖 **Read Access**: List notebooks, navigate pages, read entries
-- 🧠 **Persistent Context & Graphs**: Project-scoped memory with NetworkX-backed graphs, related-page lookups, provenance tracing, and AI heuristics
-- 🔗 **Linked-data Export**: Export project provenance as JSON-LD aligned to PROV-O and schema.org
-- 🤖 **AI Integration**: Works with Claude Desktop, Windsurf, and any MCP client
-- 🔐 **Secure**: API key authentication with HMAC-SHA512 signing
-- 📦 **Reproducible**: Conda-lock environment with pinned dependencies
+- **Agent Onboarding**: `onboard()` returns a structured lab overview, sticky context, and usage guidance
+- **Semantic Search**: Vector-based search across notebook content with metadata filters
+- **Read Access**: List notebooks, navigate pages, read entries
+- **Persistent Context & Graphs**: Project-scoped memory with NetworkX-backed graphs, related-page lookups, provenance tracing, and AI heuristics
+- **Linked-data Export**: Export project provenance as JSON-LD aligned to PROV-O and schema.org
+- **AI Integration**: Works with Claude Desktop, Windsurf, and any MCP client
+- **Secure**: API key authentication with HMAC-SHA512 signing
+- **Reproducible**: Conda-lock environment with pinned dependencies
 
 ---
 
@@ -38,7 +38,7 @@ A **Model Context Protocol (MCP) server** that connects AI assistants to LabArch
 
 ## Features
 
-✅ **Implemented**
+**Implemented**
 
 - List all notebooks for a user
 - Navigate notebook pages and folders

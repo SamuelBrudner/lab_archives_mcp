@@ -217,7 +217,7 @@ class ProvenanceMetadata(BaseModel):
 - Commit: `a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0`
 - Branch: `analysis-temporal-integration`
 - Repository: https://github.com/SamuelBrudner/temporal-integration-analysis
-- Status: ✅ Clean (no uncommitted changes)
+- Status: Clean (no uncommitted changes)
 
 **Execution Context**
 - Executed: 2025-09-30 12:19:03 UTC
