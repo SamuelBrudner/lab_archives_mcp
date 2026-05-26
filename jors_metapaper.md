@@ -16,6 +16,8 @@ bibliography: paper.bib
 
 Electronic Lab Notebooks (ELNs) store protocols, observations, analysis notes, and audit records that AI assistants cannot inspect unless a tool exposes those records with authentication and a defined schema. Large Language Model (LLM) clients can call external tools, but the tool boundary must preserve notebook permissions and record provenance.
 
+Without authenticated access to ELN content, an assistant can answer only from its model weights and the material supplied in the prompt. It cannot discover which notebooks exist, retrieve observations from prior pages, inspect audit context, or connect a figure or notebook output to the code and environment that produced it.
+
 `lab_archives_mcp` addresses this gap by providing a Model Context Protocol (MCP) server that connects AI assistants to LabArchives, a widely used commercial ELN [@labarchives].
 The server exposes notebooks, pages, and entries as typed tools, provides a modular vector backend for semantic search, and maintains persistent project contexts with graph-based provenance tracking. LabArchives was selected as the integration target because it has a documented API and a hierarchy of notebooks, pages, entries, and folders that maps directly to MCP navigation tools. The package lets AI assistants navigate notebooks, run concept-level search, maintain multi-session project contexts, and archive computational outputs with provenance metadata while leaving authoritative ELN records in LabArchives.
 
