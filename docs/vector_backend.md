@@ -1,7 +1,8 @@
 # Vector Backend Module
 
 **Status:** Implemented path supports OpenAI embeddings, Pinecone indexing, and local Parquet persistence (2025-10-01)
-**Tests:** Covered by `tests/test_vector_backend/` and the repository `pytest` suite.
+**Tests:** Covered by `tests/unit/vector_backend/`, `tests/integration/vector_backend/`,
+and the repository `pytest` suite.
 **Documentation:** This file is the vector backend guide. MCP onboarding payload examples live in `docs/onboard_example.json`.
 
 ## Overview
@@ -216,25 +217,25 @@ For high-throughput multi-user scenarios (>100 concurrent writers), Pinecone is 
 ### Run all tests
 
 ```bash
-pytest tests/vector_backend/ -v
+pytest tests/unit/vector_backend tests/integration/vector_backend -v
 ```
 
 ### Run with coverage
 
 ```bash
-pytest tests/vector_backend/ --cov=vector_backend --cov-report=html
+pytest tests/unit/vector_backend tests/integration/vector_backend --cov=vector_backend --cov-report=html
 ```
 
 ### Run property-based tests
 
 ```bash
-pytest tests/vector_backend/unit/test_chunking.py -v --hypothesis-show-statistics
+pytest tests/unit/vector_backend/test_chunking.py -v --hypothesis-show-statistics
 ```
 
 ### Run benchmarks
 
 ```bash
-pytest tests/vector_backend/unit/test_chunking.py --benchmark-only
+pytest tests/unit/vector_backend/test_chunking.py --benchmark-only
 ```
 
 ## Implementation Status
@@ -316,7 +317,7 @@ Response (example):
 - **Pinecone configuration:** `docs/PINECONE_SETUP.md`
 - **MCP integration:** `src/labarchives_mcp/`
 - **Vector backend code:** `src/vector_backend/`
-- **Tests:** `tests/vector_backend/`
+- **Tests:** `tests/unit/vector_backend/` and `tests/integration/vector_backend/`
 
 ## License
 

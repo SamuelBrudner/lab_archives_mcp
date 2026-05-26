@@ -219,4 +219,4 @@ Once setup is complete:
 4. Test semantic search quality
 5. Benchmark performance
 
-See `README_VECTOR_BACKEND.md` for full usage guide.
+See [docs/vector_backend.md](vector_backend.md) for the full usage guide.

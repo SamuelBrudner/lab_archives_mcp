@@ -33,7 +33,7 @@ A **Model Context Protocol (MCP) server** that connects AI assistants to LabArch
 - Upload API: `docs/upload_api.md`
 - Graph concepts ("The Lab Brain"): `docs/graph_concepts.md`
 - Linked-data provenance export: `docs/linked_data.md`
-- Vector backend design and ops: `README_VECTOR_BACKEND.md`
+- Vector backend design and ops: [`docs/vector_backend.md`](docs/vector_backend.md)
 - Semantic governance: `docs/semantic_governance.md`
 
 ## Features
@@ -394,7 +394,7 @@ The support tool `get_onboard_payload(format="json")` returns usage guidance and
       - `rebuild` when embedding version or config fingerprint changed, or `force=True`
     - Use `dry_run=True` to return the plan without any side effects
 - Details of the build record and planning are documented in
-  `README_VECTOR_BACKEND.md` under “Build Records” and “MCP Sync”.
+  `docs/vector_backend.md` under “Build Records” and “MCP Sync”.
 
 #### Tool Schemas
 

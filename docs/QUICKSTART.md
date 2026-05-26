@@ -69,7 +69,7 @@ cat conf/secrets.yml
     - Rebuild: re-indexes all entries on that notebook's pages
 
 - Configuration lives at `conf/vector_search/default.yaml` and the persisted build record path is
-  `incremental_updates.last_indexed_file`. See `README_VECTOR_BACKEND.md` for details.
+  `incremental_updates.last_indexed_file`. See `docs/vector_backend.md` for details.
 
 ## Troubleshooting
 
@@ -95,4 +95,4 @@ cat conf/secrets.yml
 - **Full setup**: [README.md](../README.md)
 - **Agent configuration**: [agent_configuration.md](agent_configuration.md)
 - **Upload API**: [upload_api.md](upload_api.md)
-- **Vector backend**: [README_VECTOR_BACKEND.md](../README_VECTOR_BACKEND.md)
+- **Vector backend**: [docs/vector_backend.md](vector_backend.md)
