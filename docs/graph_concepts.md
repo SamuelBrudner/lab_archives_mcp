@@ -47,7 +47,7 @@ The state is modeled as a directed graph using `networkx`, where nodes represent
 
 ## Agent Heuristics
 
-The server exposes tools that leverage this graph to guide the AI assistant:
+The server exposes tools that use this graph to guide the AI assistant:
 
 ### `get_related_pages`
 Finds pages related to the current page by traversing the active project graph and parsing links in the current page content:

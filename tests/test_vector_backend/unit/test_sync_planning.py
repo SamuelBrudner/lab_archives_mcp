@@ -100,7 +100,7 @@ class TestIncrementalSelection:
         # eid 2 and 3 are after built_at; eid 1 is not
         assert [e["eid"] for e in selected] == ["2", "3"]
 
-    def test_robust_to_missing_or_invalid_dates(self) -> None:
+    def test_handles_missing_or_invalid_dates(self) -> None:
         built_at = datetime(2025, 10, 1, 12, 0, 0, tzinfo=UTC)
         entries: list[dict[str, object]] = [
             {"eid": "1", "created_at": None, "updated_at": None},

@@ -2,98 +2,76 @@
 
 Manuscript: "Integrating AI Assistants with Electronic Lab Notebooks using the LabArchives Model Context Protocol Server"
 
-Revision date: 15 April 2026
+Revision date: 24 May 2026
 
-The comments below are paraphrased from the April 2026 JORS revision tracker rather than reproduced verbatim. Each response identifies the manuscript section or repository file changed, or explains why no additional change was made.
+## R3.1 Version Mismatch
 
-## Editor Comments
+> README BibTeX v0.2.4 -> v0.3.2. Grep repo for "0.2.4"; reconcile every occurrence. Confirm Zenodo, paper, README, CITATION.cff, codemeta.json, pyproject.toml all agree.
 
-### E1. Version, release, and citation metadata should be internally consistent
+Revised in commit `e2715e1`. The README BibTeX now cites the reviewed Zenodo `v0.3.2` archive with version DOI `10.5281/zenodo.17772522`, while `pyproject.toml`, `CITATION.cff`, and `codemeta.json` continue to describe the current `0.4.0` source tree. The paper Availability section now states both the version DOI and concept DOI and distinguishes the archived JORS snapshot from the current mainline release. The remaining `0.2.4` strings are the historical `CHANGELOG.md` entry and the `notebook_shim` dependency version in `conda-lock.yml`; stale onboarding-test version literals were changed to `0.4.0`.
 
-**Comment.** The manuscript and repository metadata should present one coherent citation and archive story, including the relationship between the reviewed Zenodo archive and the current source tree.
+## R3.2 Write And Provenance Tool Surface
 
-**Response.** Revised. The manuscript Availability section now distinguishes the reviewed JORS archive from the current source tree: `v0.3.2` is the archived JORS version with DOI <https://doi.org/10.5281/zenodo.17728440>, while `0.3.3` is described as a post-archive maintenance release dated 2025-12-16. The same distinction is recorded in `JORS_READY.md`, `README.md`, and `CITATION.cff`. The README citation block now cites the Zenodo DOI and `v0.3.2`; `CITATION.cff` describes the current `0.3.3` source tree but sets the preferred citation to the archived `0.3.2` record.
+> Add a fifth MCP tool category -- "write & provenance" -- listing `write_notebook_entry` and `upload_to_labarchives` with one-sentence descriptions matching the docstrings. No over-description.
 
-**Where changed.** `jors_metapaper.md`, section 4; `README.md`, "Versioning & Release Management" and "Citation"; `CITATION.cff`; `JORS_READY.md`.
+Revised in commit `636e9e6`. The paper Implementation and Architecture section and README Available Tools section now group the MCP tools into five user-facing categories and add `write & provenance` as the fifth category. The descriptions state that `write_notebook_entry` writes a rich text entry to a LabArchives page and that `upload_to_labarchives` uploads a file with code provenance metadata, matching the tool docstrings without adding new capabilities.
 
-### E2. Provide a response package that maps comments to revisions
+## R2 And R3.3 Architecture Figure
 
-**Comment.** The resubmission should include a point-by-point response and cover letter that allow editors to map each concern to the revised manuscript or repository.
+> One component/data-flow diagram, Mermaid or SVG, committed to repo, rendered in paper. Layers: MCP client <-> server tools <-> LabArchives API <-> vector backend. Cap at two figures total.
 
-**Response.** Completed. This file provides the point-by-point mapping, and `jors_cover_letter.md` summarizes the main changes for the editor. The response is organized around the tracked editor and reviewer concerns and names the revised sections and files for each item.
+Revised in commit `50fa8f7`. The repository now includes a Mermaid source file plus rendered SVG and PNG assets at `docs/figures/architecture.*`. Figure 1 in the paper renders the PNG and shows the MCP client, FastMCP server tool layer, LabArchives API, local project state, embedding provider, and vector backend data flow. No second figure was added.
 
-**Where changed.** `jors_response_to_reviewers.md`; `jors_cover_letter.md`.
+## R2 And R3 Minor Quality Control
 
-## Reviewer Comments
+> Add: test coverage % (pytest-cov + Codecov badge), integration test description (what they exercise -- live API or recorded fixtures), error-handling strategy (fail-loud, schema validation points), search-result validation method, manual-testing protocol on real notebooks. Numbers, not adjectives.
 
-### R1. Strengthen the research-software motivation and problem statement
+Revised in commit `ba99702`. The paper Quality Control section now reports the measured local command, 239 passing non-integration tests, one skipped test, six deselected integration tests, and 74% line coverage. It states that the six Pinecone integration tests are live, credential-gated tests rather than recorded fixtures, lists the operations they exercise, and records the local skip result when `PINECONE_API_KEY` was absent. The same section now describes schema validation, write-path failures, LabArchives fault translation, search-result reconstruction and deduplication, and the six-check manual testing protocol.
 
-**Comment.** The original paper read too much like product documentation and needed a clearer explanation of the research problem, intended users, and contribution.
+## R2 Reuse Section
 
-**Response.** Revised. The Overview now motivates the work around the disconnect between ELN records and AI assistants, identifies wet-lab researchers, research data management teams, and institutional platform engineers as intended users, and states three concrete contributions: an MCP-based LabArchives connector, a reusable vector-search backend, and a graph-based state-management layer.
+> New section, three short subsections: (a) other applications (other ELN-like stores, provenance-tracked uploads from pipelines), (b) extension points (new MCP tools, swap vector backend), (c) integration (any MCP-compatible client; example with Claude). Concrete, no speculation.
 
-**Where changed.** `jors_metapaper.md`, section 1.
+Revised in commit `50f9d21`. The paper Reuse section now has exactly three subsections: Other applications, Extension points, and Integration. It names `eln_client.py`, the MCP tool layer, the `VectorIndex` interface, the current `QdrantIndex` and `LocalEmbedding` placeholders, and the Claude Desktop configuration in `docs/agent_configuration.md`.
 
-### R2. Compare the software to existing ELN, LIMS, and retrieval approaches without unsupported novelty claims
+## R2 Input And Output Example Fidelity
 
-**Comment.** The manuscript should situate the package relative to existing ELN/LIMS APIs and RAG-style integration approaches, while avoiding overbroad novelty claims.
+> Replace any example not produced by the actual software with a real captured transcript. Verify by re-running.
 
-**Response.** Revised. The Reuse Potential section now explains that existing ELN APIs generally provide CRUD and keyword-search interfaces while leaving assistant tool schemas, semantic retrieval, and stateful context to downstream implementers. The wording was also made more conservative by removing the unsupported "first academic application" claim and describing the project as a concrete reusable pattern instead.
+Revised in commit `4c9cdf6`. The fabricated conversational example was removed from the paper and README. The replacement transcript was captured by re-running the registered `write_notebook_entry` MCP tool in a local smoke harness with LabArchives network calls replaced by test doubles, yielding the shown `page_tree_id`, `entry_id`, URL, timestamp, and `part_type` response.
 
-**Where changed.** `jors_metapaper.md`, sections 5.1 through 5.4.
+## R2 Abstract Rewrite
 
-### R3. Correct the architecture description and document the complete MCP tool surface
+> Formal, sober. Include one copy-pasteable example invocation (MCP tool call with arguments and abbreviated response). Cut adjectives.
 
-**Comment.** Reviewer 3 identified factual gaps in the architecture section, especially around the current tool names, stateful tools, and mutating write/provenance functionality.
+Revised in commit `a7833a7`. The abstract now states what the package exposes, defines MCP, and includes a one-line JSON `write_notebook_entry` invocation with an abbreviated response. Promotional phrasing was removed, and a later cleanup pass in commit `78ebaf3` removed remaining banned phrasing from the manuscript.
 
-**Response.** Revised. The Implementation and Architecture section now describes six components rather than five, adding a distinct upload and provenance layer. The MCP server description now lists the current tool categories and tool names, including discovery, reading, search, index management, project state, graph navigation, and optional writing/provenance tools. The upload section explicitly names `write_notebook_entry` and `upload_to_labarchives` and describes the provenance metadata captured with uploaded computational artifacts.
+## R2 Support Mechanisms
 
-**Where changed.** `jors_metapaper.md`, section 2, especially the MCP server and upload/provenance component descriptions.
+> One paragraph: GitHub Issues URL, maintainer contact, response-time expectation, contribution-guide link.
 
-### R4. Add a figure that makes the architecture easier to inspect
+Revised in commit `b5aa1ae`. The paper Availability section now includes one support paragraph with the GitHub Issues URL, maintainer email, 14-day response target for actionable issues, and the `CONTRIBUTING.md` link.
 
-**Comment.** The manuscript should include visual material so readers can understand the system architecture and component boundaries more quickly.
+## R3 Minor Data Residency
 
-**Response.** Revised. The manuscript now includes an architecture figure showing the AI assistant, `lab_archives_mcp` components, and the LabArchives API, with an explanatory caption. A separate workflow figure was not added in this conservative revision because the architecture figure, expanded component list, and illustrative example together cover the main data flow without adding another asset to maintain.
+> One paragraph stating exactly what leaves the institution for Pinecone and Qdrant: vectors only, or vectors plus chunk text -- verify in code -- plus which metadata fields, and what stays local.
 
-**Where changed.** `jors_metapaper.md`, section 2; figure asset in `docs/figures/architecture.png` with source in `docs/figures/architecture.mmd`.
+Revised in commits `113a814` and `90eaa57`. The security and governance text now states that OpenAI receives chunk text and query text for embeddings, Pinecone receives embedding vectors plus chunk text and the specific metadata fields stored in `PineconeIndex.upsert`, and Qdrant receives no data in the current release because `QdrantIndex` raises `NotImplementedError`. It also states that local Parquet persistence stores text, vectors, and metadata on disk, while credentials and project graph state remain local unless copied elsewhere. The vector-backend wording now distinguishes Pinecone runtime support from Qdrant and local-embedding extension points.
 
-### R5. Expand quality-control claims with test scope, CI behavior, and validation evidence
+## R3 Minor Sample Data Reference
 
-**Comment.** The manuscript should give enough detail for readers to assess the trustworthiness of the software, including automated tests, integration tests, and validation behavior.
+> Cite `notebooks/`, `docs/onboard_example.json`, `conf/secrets.example.yml`, and README schema examples in the Sample Data section.
 
-**Response.** Revised. The Quality Control section now identifies the main unit-test areas, including authentication, notebook navigation, upload validation, state persistence, graph traversal, pagination, and vector-backend components. It also describes credential-gated integration tests for live LabArchives workflows, CI execution on Linux and macOS for Python 3.11+, and the local revision validation result. The manuscript now states that `pytest -q` completed with 217 passing tests and six credential-gated Pinecone smoke tests skipped during the revision. Runtime validation behavior is described through Pydantic request models, missing-file and empty-content checks, bounded pagination, and translated API faults.
+Revised in commit `fddc484`. The paper now has a Sample Data section naming `notebooks/`, `docs/onboard_example.json`, `conf/secrets.example.yml`, and the README Tool Schemas examples. It states that these assets support smoke testing and contract inspection without exposing private ELN records.
 
-**Where changed.** `jors_metapaper.md`, section 3; `.github/workflows/tests.yml`.
+## R3 Minor MCP One-Liner
 
-### R6. Avoid overstating coverage reporting
+> First mention of MCP gets one defining sentence for non-specialists.
 
-**Comment.** Coverage evidence should be stated accurately and should not imply a public or complete coverage metric that the repository does not guarantee.
+Revised in commit `847d949`. The README first mention now defines MCP as an open protocol that lets AI clients call external tools and data sources through structured requests. The paper abstract also defines MCP on first use.
 
-**Response.** Addressed conservatively. The CI workflow generates `coverage.xml` for the unit-test job and attempts Codecov upload on Ubuntu with Python 3.11 when a token is available, but the manuscript does not claim a specific public coverage percentage. No coverage badge or numeric coverage claim was added because that would overstate the currently guaranteed evidence. Instead, the revised Quality Control section focuses on test scope, CI behavior, and observed local test results.
+## Final Style Pass
 
-**Where changed.** `jors_metapaper.md`, section 3; `.github/workflows/tests.yml`.
+> Final pass: read aloud. Anything that sounds like a chatbot -- delete or rewrite.
 
-### R7. Clarify sample assets, support mechanisms, and reuse pathways
-
-**Comment.** The manuscript should make reuse easier to assess by naming available example assets, support mechanisms, and adaptation paths.
-
-**Response.** Revised. The Quality Control section now names lightweight example assets that can support smoke testing without exposing private ELN content, including `docs/onboard_example.json`, `notebooks/test.ipynb`, and configuration templates under `conf/`. The Availability and Reuse Potential sections now identify GitHub issues, `CONTRIBUTING.md`, `docs/agent_configuration.md`, and the onboarding payload example as support and reuse resources. The manuscript also clarifies how the architecture can be adapted to other ELNs or LIMS by replacing the API-client layer while preserving MCP tool patterns, state management, graph navigation, and the vector backend.
-
-**Where changed.** `jors_metapaper.md`, sections 3, 4, 5.2, 5.3, 5.4, and 5.6.
-
-### R8. Discuss privacy, data residency, and managed vector services
-
-**Comment.** The manuscript should distinguish local or self-hosted deployment from managed embedding and vector-search services, especially for ELN-derived data.
-
-**Response.** Revised. A new security and governance subsection now discusses namespace isolation, write control, data sovereignty, and credential scoping. It explicitly distinguishes a local Parquet index with local embeddings, which keeps notebook text, embeddings, and project state under institutional control, from managed embedding or vector-store services such as Pinecone and Qdrant, which may receive notebook-derived text, embeddings, metadata, or both depending on configuration. The limitations section also identifies external vector stores as an additional data-custody layer.
-
-**Where changed.** `jors_metapaper.md`, sections 2.4, 5.5, and 5.6; `docs/semantic_governance.md`.
-
-### R9. Add broader implications, limitations, and a structured conclusion
-
-**Comment.** The paper should end with a clearer statement of contributions, implications, and constraints rather than stopping after examples and acknowledgements.
-
-**Response.** Revised. The manuscript now includes a Conclusion section that summarizes the software as a modular bridge between ELNs and AI assistants, emphasizes that it complements rather than replaces institutional ELN infrastructure, and states the key limitations: dependence on LabArchives API access and the privacy implications of optional managed embedding and vector services.
-
-**Where changed.** `jors_metapaper.md`, section 7.
+Revised in commit `78ebaf3`. The final wording pass removed promotional language from the paper, README-adjacent docs, one CLI docstring, and one test name. A banned-phrase scan over the edited manuscript, README, response file, selected docs, source, and tests returns no matches outside historical bead records.

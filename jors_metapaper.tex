@@ -25,15 +25,15 @@ Samuel N. Brudner
 1. Researcher, Molecular, Cellular, and Developmental Biology, Yale University, USA. ORCID: 0000-0002-6043-9328
 
 \subsection*{Abstract}
-Electronic lab notebooks (ELNs), including LabArchives, are widely used for experimental record management, but their contents are typically accessed through platform-specific interfaces that are not designed for direct use by AI assistants. lab\_archives\_mcp is a Python package that provides a Model Context Protocol (MCP) server for LabArchives and a configurable vector-search backend for semantic retrieval over notebook content. The server exposes notebooks, pages, and entries as typed MCP tools, supports project-scoped state across sessions, and provides optional write and upload operations that record provenance metadata for computational outputs. By keeping records in the institutional ELN while mediating access through explicit API calls and configurable indexing backends, the software supports reusable ELN integration patterns for AI-assisted research workflows.
+Electronic lab notebooks (ELNs), including LabArchives, store experimental records behind platform interfaces and platform-specific APIs. lab\_archives\_mcp is a Python package that exposes LabArchives notebooks, pages, entries, semantic search, project state, and optional write/upload operations as typed Model Context Protocol (MCP) tools. MCP is an open protocol for connecting AI clients to external tools and data sources through structured calls. Example invocation: \texttt{\{"tool":"write\_notebook\_entry","arguments":\{"notebook\_id":"NBID-demo","page\_title":"QC note","content":"\# QC note\textbackslash{}n\textbackslash{}nCaptured from local revision test.","content\_format":"markdown"\}\}}. Abbreviated response: \texttt{\{"page\_tree\_id":"page-42","entry\_id":"entry-7","part\_type":"text entry"\}}. The package keeps authoritative records in LabArchives while adding explicit tool boundaries, local project-state storage, vector-search indexing, and provenance metadata for computational outputs.
 
 \subsection*{Keywords}
 electronic lab notebook; Model Context Protocol; AI assistant; semantic search; research data management; LabArchives; vector database; retrieval-augmented generation
 
 \subsection*{Introduction}
-As AI capabilities advance, context-aware architectures have the potential to participate in scientific research as cognitive assistants. To be most helpful, these systems need information about the past and ongoing work and processes of the lab. Electronic Lab Notebooks (ELNs) serve as central repositories for research data and laboratory records, while Large Language Models (LLMs) offer powerful interfaces for querying complex information. However, these systems are often disconnected: ELN records are siloed within their platforms, and LLMs are restricted to their pre-trained knowledge.
+Electronic Lab Notebooks (ELNs) store protocols, observations, analysis notes, and audit records that AI assistants cannot inspect unless a tool exposes those records with authentication and a defined schema. Large Language Model (LLM) clients can call external tools, but the tool boundary must preserve notebook permissions and record provenance.
 
-lab\_archives\_mcp addresses this gap by providing a Model Context Protocol (MCP) server that connects AI assistants to LabArchives, a widely used commercial ELN \cite{labarchives}. The server exposes notebooks, pages, and entries as typed tools, provides a modular vector backend for semantic search, and maintains persistent project contexts with graph-based provenance tracking. LabArchives was selected as the integration target because it is a dominant platform in academic research with widespread institutional licensing (e.g., at Yale University, Cornell, Caltech), offers a comprehensive and documented API, and provides a hierarchical structure (Notebooks $>$ Pages $>$ Entries, with folder organization) that maps naturally to file-system-like navigation. The result is a system that allows AI assistants to navigate notebooks, perform concept-level search, maintain multi-session project contexts, and archive computational outputs with rich provenance metadata, without duplicating ELN records outside institutional infrastructure.
+lab\_archives\_mcp addresses this gap by providing a Model Context Protocol (MCP) server that connects AI assistants to LabArchives, a widely used commercial ELN \cite{labarchives}. The server exposes notebooks, pages, and entries as typed tools, provides a modular vector backend for semantic search, and maintains persistent project contexts with graph-based provenance tracking. LabArchives was selected as the integration target because it has a documented API and a hierarchy of notebooks, pages, entries, and folders that maps directly to MCP navigation tools. The result is a system that allows AI assistants to navigate notebooks, perform concept-level search, maintain multi-session project contexts, and archive computational outputs with provenance metadata, without duplicating ELN records outside institutional infrastructure.
 
 The intended users are wet-lab researchers, research data management teams, and institutional platform engineers who want to make ELN content available to AI assistants. The main contributions are (i) an MCP-based connector for LabArchives that can serve as a template for other ELNs and Laboratory Information Management Systems (LIMS), (ii) a reusable vector search backend that can be adopted independently of LabArchives for institutional retrieval-augmented generation (RAG) workflows, and (iii) a graph-based state management layer that models research context as a persistent network of pages and findings.
 
@@ -43,15 +43,15 @@ lab\_archives\_mcp is organized into six primary components that separate authen
 \begin{figure}[h]
     \centering
     \includegraphics[width=\linewidth]{docs/figures/architecture.png}
-    \caption{High-level architecture of the MCP integration. The AI assistant communicates with lab\_archives\_mcp, which mediates access to the LabArchives API while isolating authentication, API-client, vector-search, state-management, and write/provenance responsibilities inside separable Python modules.}
+    \caption{Component and data-flow architecture of the MCP integration. An MCP client calls the FastMCP server tools, which mediate LabArchives API access, local project-state updates, embedding requests, vector-index writes, and ranked search-result retrieval.}
     \label{fig:architecture}
 \end{figure}
 
 \begin{enumerate}
     \item \textbf{Authentication layer (auth.py)} implements HMAC-SHA512 request signing for the LabArchives REST API \cite{labarchives}, manages secure credential loading, and provides user ID resolution flows.
     \item \textbf{API client (eln\_client.py)} wraps the LabArchives API using an async HTTP client and translates XML responses into validated JSON using Pydantic \cite{pydantic}.
-    \item \textbf{MCP server (mcp\_server.py)} exposes notebook operations as MCP tools using the FastMCP framework \cite{fastmcp}. In v0.4.0, mcp\_server.py registers 18 MCP tools by default: 16 discovery, reading, search/index, project-state, provenance, and onboarding tools, plus the write-capable \texttt{write\_notebook\_entry} and \texttt{upload\_to\_labarchives} tools. Setting \texttt{LABARCHIVES\_ENABLE\_UPLOAD=false} disables those two write-capable tools, leaving a 16-tool read/search/state surface.
-    \item \textbf{Vector backend (vector\_backend/)} implements a configuration-driven pipeline for semantic search with pluggable chunking strategies, embedding providers, and vector indices such as Pinecone \cite{pinecone} and Qdrant \cite{qdrant} using Hydra-managed configuration \cite{hydra}.
+    \item \textbf{MCP server (mcp\_server.py)} exposes notebook operations as MCP tools using the FastMCP framework \cite{fastmcp}. In v0.4.0, mcp\_server.py registers 18 MCP tools by default. The tool surface has five user-facing categories: discovery (\texttt{list\_labarchives\_notebooks}, \texttt{list\_notebook\_pages}), reading (\texttt{read\_notebook\_page}), search and indexing (\texttt{search\_labarchives}, \texttt{sync\_vector\_index}), project state and graph navigation (\texttt{create\_project}, \texttt{list\_projects}, \texttt{switch\_project}, \texttt{delete\_project}, \texttt{log\_finding}, \texttt{get\_current\_context}, \texttt{get\_related\_pages}, \texttt{trace\_provenance}, \texttt{suggest\_next\_steps}, \texttt{export\_provenance\_jsonld}), and write \& provenance (\texttt{write\_notebook\_entry}, \texttt{upload\_to\_labarchives}). \texttt{write\_notebook\_entry} writes a rich text entry directly to a LabArchives page, appending to an existing page or creating a page when \texttt{page\_id} is omitted. \texttt{upload\_to\_labarchives} uploads a file to LabArchives with code provenance metadata, creating a page and storing the file as page text or an attachment. The \texttt{get\_onboard\_payload} support tool returns usage guidance for MCP clients. Setting \texttt{LABARCHIVES\_ENABLE\_UPLOAD=false} disables the two write \& provenance tools, leaving a 16-tool read/search/state surface.
+    \item \textbf{Vector backend (vector\_backend/)} implements a configuration-driven pipeline for semantic search using OpenAI embeddings, Pinecone indexing \cite{pinecone}, and local Parquet persistence in the implemented path. Qdrant \cite{qdrant} and local embeddings are extension points; the current \texttt{QdrantIndex} and \texttt{LocalEmbedding} classes raise \texttt{NotImplementedError}.
     \item \textbf{State management layer (state.py)} maintains persistent project contexts modeled as NetworkX graphs, tracking relationships between pages, findings, and projects.
     \item \textbf{Upload and provenance layer (models/upload.py, write\_notebook\_entry, upload\_to\_labarchives)} provides a high-level write and upload API that appends rich text entries, archives computational artefacts, and captures provenance metadata, including Git commit, branch, repository URL, execution timestamp, and dependency versions.
 \end{enumerate}
@@ -60,25 +60,44 @@ The vector backend and state management layer are intentionally packaged as reus
 
 To support deployment in institutional environments with strict data governance requirements, the server implements multiple security controls: namespace isolation for shared vector stores, optional read-only deployments, local Parquet storage for data sovereignty, and credential scoping aligned with LabArchives API permissions.
 
+The current implemented semantic-search path sends chunk text and query text to the configured OpenAI embedding endpoint. Pinecone receives embedding vectors plus chunk text and the following metadata fields: \texttt{notebook\_id}, \texttt{notebook\_name}, \texttt{page\_id}, \texttt{page\_title}, \texttt{entry\_id}, \texttt{entry\_type}, \texttt{author}, \texttt{date}, \texttt{labarchives\_url}, and \texttt{embedding\_version}; search queries send the query vector to Pinecone and request metadata without returning stored vectors. \texttt{QdrantIndex} and \texttt{LocalEmbedding} raise \texttt{NotImplementedError} in the current code, so no data is sent to Qdrant by this release. Local Parquet persistence stores chunk text, vectors, and metadata on disk, while credentials and project graph state remain local in configuration files and \texttt{\textasciitilde{}/.labarchives\_state} unless an operator copies them elsewhere.
+
 \subsection*{Quality control}
-The project employs automated unit tests covering authentication, notebook navigation, upload validation, state persistence, graph traversal, pagination, vector backend components, and integration workflows (listing notebooks, reading pages, running semantic search, performing uploads). Integration tests can target a live LabArchives account when credentials are available, while credential-gated smoke tests are skipped when the corresponding external service configuration is absent. Continuous integration via GitHub Actions runs these tests on Linux and macOS for Python 3.11+, ensuring consistent dependency sets via a pinned conda-lock environment. During this revision, the local \texttt{pytest -q} suite completed with 217 passing tests and six credential-gated Pinecone smoke tests skipped. Manual testing against real LabArchives notebooks verified notebook listing, navigation, semantic search behaviour, and upload workflows. Runtime validation relies on typed Pydantic request models, explicit checks for missing files and empty write content, bounded pagination, and translated LabArchives API faults. Lightweight example assets, including \texttt{docs/onboard\_example.json}, \texttt{notebooks/test.ipynb}, and configuration templates under \texttt{conf/}, are included to support smoke testing and reuse without exposing private ELN content.
+The automated test suite covers authentication, notebook navigation, upload validation, state persistence, graph traversal, pagination, linked-data export, CLI behavior, and vector-backend components. The local revision run \texttt{conda run -p ./conda\_envs/test-env pytest -q -m "not integration" --cov=src --cov-report=term --cov-report=xml} completed with 239 passing tests, one skipped test, six deselected integration tests, and 74\% total line coverage. The repository uses \texttt{pytest-cov} in local and CI runs, writes \texttt{coverage.xml}, and exposes current main-branch coverage through the Codecov badge in the README.
+
+The integration suite is credential-gated rather than fixture-recorded. The six tests in \texttt{tests/test\_vector\_backend/integration/test\_pinecone\_smoke.py} exercise live Pinecone health checks, statistics retrieval, single-chunk upsert, empty-upsert failure, vector search, and deletion against the \texttt{labarchives-test} index when \texttt{PINECONE\_API\_KEY} is set. In this revision environment, \texttt{conda run -p ./conda\_envs/test-env pytest -q -m integration} reported six skipped tests and 240 deselected tests because \texttt{PINECONE\_API\_KEY} was not configured. LabArchives API behavior is covered by unit and specification tests with local XML payloads and test doubles; live LabArchives checks require local credentials and are not run by default in CI.
+
+The error-handling strategy is fail-loud at the tool boundary. Pydantic models validate credentials, notebook records, upload metadata, chunk metadata, search requests, and search results. The write path raises \texttt{FileNotFoundError} for missing upload files and \texttt{ValueError} for empty write content, missing \texttt{page\_title} on new-page writes, invalid \texttt{content\_format}, dirty Git uploads without override, and missing provenance metadata for code, notebooks, or generated figures. LabArchives XML faults are translated into structured MCP-facing errors, and vector search performs a Pinecone health check before embedding the query.
+
+Search-result validation happens in three steps: \texttt{SearchRequest} bounds the query and result limit, \texttt{PineconeIndex.search} reconstructs each match as \texttt{ChunkMetadata}, \texttt{EmbeddedChunk}, and \texttt{SearchResult}, and the MCP tool deduplicates matches by \texttt{(notebook\_id, page\_id)} before fetching full page text from LabArchives. \texttt{tests/spec/test\_search\_page\_limit.py} verifies page-level deduplication with duplicate chunk hits.
+
+Manual testing against real LabArchives notebooks follows a six-check protocol: verify UID resolution, list notebooks, traverse one notebook tree, read one page, run one semantic search against an indexed notebook, and write or upload to a designated test page only when \texttt{LABARCHIVES\_ENABLE\_UPLOAD=true}. Lightweight example assets, including \texttt{notebooks/}, \texttt{docs/onboard\_example.json}, \texttt{conf/secrets.example.yml}, and the README schema examples, are included to support smoke testing without exposing private ELN content.
 
 \subsection*{Illustrative example}
-Once credentials are configured and the MCP server is registered with an AI assistant, researchers can query their notebooks conversationally:
+The following transcript was captured by running the registered \texttt{write\_notebook\_entry} MCP tool in a local smoke harness with LabArchives network calls replaced by test doubles:
 
-\textbf{Researcher:} "I'm starting a new analysis of the mosquito wind tunnel data. Create a project for this."
+\begin{verbatim}
+{
+  "call": {
+    "tool": "write_notebook_entry",
+    "arguments": {
+      "notebook_id": "NBID-demo",
+      "page_title": "QC note",
+      "content": "# QC note\n\nCaptured from local revision test.",
+      "content_format": "markdown"
+    }
+  },
+  "response": {
+    "page_tree_id": "page-42",
+    "entry_id": "entry-7",
+    "page_url": "https://mynotebook.labarchives.com/share/NBID-demo/page-42",
+    "created_at": "2026-05-24T21:45:00+00:00",
+    "part_type": "text entry"
+  }
+}
+\end{verbatim}
 
-\textbf{Assistant:} Creates a create\_project task named "Mosquito Analysis" with the description "Wind tunnel data analysis," then confirms readiness.
-
-\textbf{Researcher:} "Find the calibration protocols we used last summer."
-
-\textbf{Assistant:} Runs semantic search for "wind tunnel calibration protocol summer 2024" and opens the resulting page (ID 12345), summarizing the IR tracking setup.
-
-\textbf{Researcher:} "Log that as a key finding, and check if there are any related experiment runs linked to it."
-
-\textbf{Assistant:} Logs the calibration finding on page 12345, retrieves related pages, and reports the linked experiment runs.
-
-This workflow shows the assistant managing research context, using semantic search for entry points, and logging findings to build a persistent model of the investigation.
+The transcript verifies the MCP tool schema, required arguments, page-creation path, LabArchives URL construction, timestamp handling, and returned entry metadata. A live run against LabArchives uses the same tool call but returns platform-generated page and entry identifiers.
 
 \section*{(2) Availability}
 
@@ -101,35 +120,45 @@ Samuel N. Brudner (design, implementation, documentation)
 \textbf{Archive}
 \begin{description}[leftmargin=!,labelwidth=3cm]
     \item[Name:] Zenodo
-    \item[Persistent identifier:] \href{https://doi.org/10.5281/zenodo.17728440}{10.5281/zenodo.17728440}
+    \item[Version identifier:] \href{https://doi.org/10.5281/zenodo.17772522}{10.5281/zenodo.17772522}
+    \item[Concept identifier:] \href{https://doi.org/10.5281/zenodo.17728440}{10.5281/zenodo.17728440}
     \item[Licence:] MIT
     \item[Publisher:] Samuel N. Brudner
     \item[Version published:] v0.3.2
-    \item[Date published:] 2025-11-30
+    \item[Date published:] 2025-12-01
 \end{description}
-Version note: the current source tree is \texttt{0.3.3}, a post-archive maintenance release dated 2025-12-16. The JORS resubmission cites the archived \texttt{v0.3.2} Zenodo record as the stable reviewed snapshot; cite \texttt{0.3.3} only when referring specifically to post-archive maintenance changes.
+Version note: the JORS resubmission cites the archived \texttt{v0.3.2} Zenodo record. The current \texttt{main} source tree is \texttt{0.4.0}; cite it when referring to linked-data export or other post-archive changes.
 
 \textbf{Code repository}
 \begin{description}[leftmargin=!,labelwidth=3cm]
     \item[Name:] GitHub
     \item[Persistent identifier:] \href{https://github.com/SamuelBrudner/lab_archives_mcp}{github.com/SamuelBrudner/lab\_archives\_mcp}
     \item[Licence:] MIT
-    \item[Version:] 0.3.3
-    \item[Date published:] 2025-12-16
+    \item[Version:] 0.4.0
+    \item[Date published:] 2026-04-20
 \end{description}
 
 \textbf{Emulation environment}
 Not applicable.
 
+\subsection*{Sample data}
+The repository includes small, non-private assets for smoke testing and configuration review. \texttt{notebooks/} contains a sample Jupyter notebook, \texttt{docs/onboard\_example.json} records the onboarding payload schema used by MCP clients, and \texttt{conf/secrets.example.yml} documents the required LabArchives, OpenAI, and Pinecone configuration keys without real credentials. The README ``Tool Schemas'' section provides schema-shaped examples for notebook listing, page listing, page reading, writing, and upload responses; these examples are for contract inspection, not fixture-recorded LabArchives content.
+
+\subsection*{Support}
+Support requests and bug reports should be filed at \href{https://github.com/SamuelBrudner/lab_archives_mcp/issues}{github.com/SamuelBrudner/lab\_archives\_mcp/issues}; the maintainer can be contacted at \href{mailto:samuel.brudner@yale.edu}{samuel.brudner@yale.edu} for security-sensitive or access-specific questions. The maintainer aims to respond to actionable issues within 14 calendar days. Contribution guidance, including setup, testing, and pull-request expectations, is maintained in \href{https://github.com/SamuelBrudner/lab_archives_mcp/blob/main/CONTRIBUTING.md}{CONTRIBUTING.md}.
+
 \subsection*{Language}
 English
 
 \section*{(3) Reuse potential}
-The design prioritizes reuse at three levels: as a concrete LabArchives connector, as a reference architecture for ELN/AI integration, and as a collection of reusable agent design patterns. While LabArchives and other ELN platforms expose REST APIs for CRUD operations, those APIs typically leave semantic retrieval, assistant tool schemas, stateful context, and provenance-aware write operations to downstream implementers. lab\_archives\_mcp provides one concrete MCP-native pattern for connecting institutional notebook records to AI assistants without claiming that the pattern is unique to LabArchives.
+\subsection*{Other applications}
+The LabArchives-specific boundary is the API client in \texttt{eln\_client.py}. A developer targeting another ELN-like store would implement equivalent notebook, page, entry, write, and upload calls while keeping the MCP tool shapes, project-state model, and vector indexing pipeline. The write path can also be used by analysis pipelines that need to publish notebooks, figures, or reports back to a governed record with Git and Python provenance metadata.
 
-The separation between authentication, API client, MCP server, vector backend, state management, and upload/provenance layers allows developers to replace only the ELN-specific client when targeting other platforms (e.g., Benchling, eLabFTW). The vector backend can be adopted independently for institutional RAG pipelines, while the state management layer offers a general-purpose approach to assistant memory.
+\subsection*{Extension points}
+New MCP tools can be added at the server tool layer when an institution needs another LabArchives API operation, such as attachment download or filtered page search. The vector backend can be changed by implementing the \texttt{VectorIndex} interface used by \texttt{PineconeIndex}; the current \texttt{QdrantIndex} and \texttt{LocalEmbedding} classes are placeholders that raise \texttt{NotImplementedError}, so they mark extension points rather than supported runtime paths.
 
-Institutions can deploy the MCP server under existing governance policies, selecting local or hosted vector stores as needed. A local Parquet index combined with a local embedding model keeps notebook text, embeddings, and project state under institutional control. Managed embedding providers or vector stores such as Pinecone and Qdrant may store notebook-derived text, embeddings, metadata, or both on third-party infrastructure, so those backends should be treated as explicit deployment choices requiring local data-governance review. Support and reuse guidance are provided through the public GitHub issue tracker, \texttt{CONTRIBUTING.md}, configuration examples in \texttt{docs/agent\_configuration.md}, and the example onboarding payload in \texttt{docs/onboard\_example.json}. Limitations include the requirement for LabArchives API access, adaptation work for other ELNs, and additional data custody considerations when using managed vector or embedding services. Future work includes adding more ELN connectors and expanding semantic search coverage.
+\subsection*{Integration}
+The server runs over stdio and can be registered with any MCP-compatible client. \texttt{docs/agent\_configuration.md} gives a Claude Desktop configuration that launches the \texttt{labarchives-mcp} command with LabArchives credentials, and the same command can be used from other MCP clients that accept a local stdio server. Project state is stored under \texttt{\textasciitilde{}/.labarchives\_state}, so a user can keep the same project context across compatible clients on the same machine.
 
 \section*{Conclusion}
 lab\_archives\_mcp demonstrates how an ELN can be exposed to AI assistants through typed MCP tools, semantic retrieval, persistent project state, and provenance-aware write operations. Its main contribution is not a replacement for institutional ELN infrastructure, but a modular bridge that lets assistants operate over existing notebook records while leaving authentication, data custody, and deployment policy under institutional control. The current implementation is limited by its dependence on LabArchives API access and by the privacy implications of optional managed embedding and vector services, but the separation between the ELN client, vector backend, state layer, and write/provenance layer provides a practical template for adapting the same approach to other research data systems.

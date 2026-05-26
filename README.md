@@ -4,11 +4,12 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.17728440.svg)](https://doi.org/10.5281/zenodo.17728440)
+[![codecov](https://codecov.io/gh/SamuelBrudner/lab_archives_mcp/branch/main/graph/badge.svg)](https://codecov.io/gh/SamuelBrudner/lab_archives_mcp)
 
 
 ## Overview
 
-A **Model Context Protocol (MCP) server** that connects AI assistants to LabArchives electronic lab notebooks (ELN). This enables researchers to chat with their lab data, search notebooks semantically, and integrate lab work into AI-assisted workflows.
+A **Model Context Protocol (MCP) server** that connects AI assistants to LabArchives electronic lab notebooks (ELN). MCP is an open protocol that lets AI clients call external tools and data sources through structured requests. This server lets researchers query notebook records, search notebooks semantically, and integrate lab work into AI-assisted workflows.
 
 **Key Features:**
 
@@ -72,7 +73,7 @@ A **Model Context Protocol (MCP) server** that connects AI assistants to LabArch
 - `linked_data/` – JSON-LD export for legacy and enriched provenance graphs.
 - `transform.py` – XML→JSON transforms and API fault translation.
 - `mcp_server.py` – MCP server wiring and tool registration.
-- `vector_backend/` – semantic search indexing and Pinecone/Qdrant integrations.
+- `vector_backend/` – semantic search indexing with Pinecone and local Parquet persistence; Qdrant is a placeholder extension point.
 
 ---
 
@@ -221,8 +222,8 @@ asyncio.run(test())
   - When these backends are enabled, text content and/or embeddings will be sent to the corresponding provider; institutions should review their data-governance policies before enabling them.
 
 - **On-premise and open backends**
-  - The core vector backend and Pydantic models are designed to work without LabArchives and without any commercial vector store.
-  - Institutions can plug in a local or on-prem backend (for example, a filesystem or database-backed index) to keep all embeddings and metadata on institutional hardware.
+  - Qdrant, local embeddings, and fully on-premise vector search are extension points, not supported runtime paths in the current release.
+  - The current code raises `NotImplementedError` for `QdrantIndex` and `LocalEmbedding`; deployments that need those paths must implement and review the corresponding backend before use.
 
 - **Intended usage**
   - `lab_archives_mcp` is designed as an integration layer between ELNs and AI assistants, not as a general-purpose ELN or standalone LIMS.
@@ -259,7 +260,7 @@ asyncio.run(test())
   - The MCP server is organized into logical modules with clear responsibilities.
   - Unit tests and integration tests cover key functionality, including authentication, notebook navigation, and upload workflows.
   - GitHub Actions runs the non-integration test suite with `pytest --cov=src --cov-report=xml --cov-report=term`, writes the measured line coverage from `coverage.xml` to the job summary, and attempts a non-blocking Codecov upload on the Ubuntu/Python 3.11 job.
-  - The README intentionally avoids a fixed coverage percentage or badge; use the latest Actions summary, `coverage.xml`, or Codecov report for the current measured value.
+  - The local revision run on Python 3.11 reported 239 passing non-integration tests, one skipped test, six deselected integration tests, and 74% total line coverage. Use the Codecov badge for the current main-branch value.
 
 - **Security and authentication**
   - The MCP server uses HMAC-SHA512 signing for authentication, with credentials stored securely in environment variables or configuration files.
@@ -285,44 +286,32 @@ asyncio.run(test())
   - Current lab notebook snapshot and sticky context block to persist in responses
 - Persist the returned `sticky_context` in your agent memory before invoking other tools.
 
-### 6. Example: Querying Your Notebooks with AI
+### 6. Captured MCP Tool Transcript
 
-Once configured with an AI assistant (Windsurf or Claude Desktop), you can conversationally interact with your lab notebooks:
+This transcript was captured by running the registered `write_notebook_entry` MCP tool in a local smoke harness with LabArchives network calls replaced by test doubles:
 
-```CHATBOT
-You: "What protocols did I document for my navigation experiments?"
-
-AI: [Automatically calls list_labarchives_notebooks(),
-     list_notebook_pages(), read_notebook_page()]
-
-AI: "In your 'Mosquito Navigation' notebook, you documented three main protocols:
-
-1. Wind tunnel setup with IR tracking (updated Aug 12, 2024)
-   - Camera calibration procedure
-   - LED array configuration
-   - Temperature and humidity controls
-
-2. Odor delivery system calibration (updated Aug 13, 2024)
-   - Olfactometer settings
-   - Odor concentration measurements
-   - Flow rate verification
-
-3. Flight trajectory analysis pipeline (updated Aug 15, 2024)
-   - Video preprocessing steps
-   - Tracking algorithm parameters
-   - Statistical analysis methods
-
-Would you like me to retrieve specific details from any of these protocols?"
+```json
+{
+  "call": {
+    "tool": "write_notebook_entry",
+    "arguments": {
+      "notebook_id": "NBID-demo",
+      "page_title": "QC note",
+      "content": "# QC note\n\nCaptured from local revision test.",
+      "content_format": "markdown"
+    }
+  },
+  "response": {
+    "page_tree_id": "page-42",
+    "entry_id": "entry-7",
+    "page_url": "https://mynotebook.labarchives.com/share/NBID-demo/page-42",
+    "created_at": "2026-05-24T21:45:00+00:00",
+    "part_type": "text entry"
+  }
+}
 ```
 
-The AI assistant autonomously:
-
-- Searches through your notebooks to find relevant content
-- Reads the appropriate pages and entries
-- Synthesizes the information into a coherent answer
-- Maintains context for follow-up questions
-
-You can also use semantic search: *"Find experiments related to olfactory behavior"* will retrieve conceptually related content even if exact keywords differ.
+Live LabArchives runs use the same tool call and return platform-generated page and entry identifiers.
 
 ### 7. Run the MCP Server
 
@@ -358,18 +347,17 @@ For configuration examples for Windsurf and Claude Desktop (including environmen
 
 - **`list_labarchives_notebooks()`** - List all your notebooks
 - **`list_notebook_pages(notebook_id)`** - Show table of contents for a notebook
-- **`search_labarchives(query, limit=5)`** - Semantic search across indexed notebooks
 
 **Reading**:
 
 - **`read_notebook_page(notebook_id, page_id, track_visit=True, dry_run=False)`** - Read content from a specific page and optionally record the visit in the active project
 
-**Writing**:
+**Search & index**:
 
-- **`write_notebook_entry(...)`** - Write rich text (Markdown/HTML/plain) to a page; create a page if needed
-- **`upload_to_labarchives(...)`** - Upload files with provenance metadata (attachments or page text)
+- **`search_labarchives(query, limit=5)`** - Search indexed LabArchives notebooks semantically
+- **`sync_vector_index(force=False, dry_run=False, max_age_hours=None, notebook_id=None)`** - Plan or run a vector-index sync
 
-**Project state & heuristics**:
+**Project state & graph**:
 
 - **`create_project(name, description, linked_notebook_ids=None, dry_run=False)`** - Start and activate a project workspace
 - **`list_projects()`**, **`switch_project(project_id, dry_run=False)`**, **`delete_project(project_id, dry_run=False)`** - Manage project contexts
@@ -378,6 +366,14 @@ For configuration examples for Windsurf and Claude Desktop (including environmen
 - **`get_related_pages(notebook_id, page_id, limit=20, offset=0)`** - Find sibling/linked pages via the project graph and detected LabArchives links; returns `items` plus pagination `meta`
 - **`trace_provenance(notebook_id, page_id, entry_id)`** - Trace sources and metadata for a specific entry
 - **`suggest_next_steps()`** - Get lightweight guidance based on your current project state (cold start vs active)
+- **`export_provenance_jsonld(project_id)`** - Export a project graph as JSON-LD
+
+**Write & provenance**:
+
+- **`write_notebook_entry(...)`** - Write a rich text entry directly to a LabArchives page, appending to an existing page or creating a page when `page_id` is omitted
+- **`upload_to_labarchives(...)`** - Upload a file to LabArchives with code provenance metadata, creating a page and storing the file as page text or an attachment
+
+The support tool `get_onboard_payload(format="json")` returns usage guidance and sticky context for MCP clients.
 
 ### Indexing & Sync
 
@@ -560,25 +556,9 @@ asyncio.run(main())
 
 > **🔒 Security Note**: The upload tool is enabled by default. For production deployments or shared environments, **disable write capabilities** by setting `LABARCHIVES_ENABLE_UPLOAD=false` in the environment configuration above. This prevents AI assistants from unintentionally modifying your research records.
 
-#### Example Agent Workflow
+#### Example Scope
 
-```Chat
-User: "What notebooks do I have?"
-Agent: calls list_labarchives_notebooks()
-→ Shows: Mosquito Navigation, Odor motion PNAS, etc.
-
-User: "What's in my Mosquito Navigation notebook?"
-Agent: calls list_notebook_pages("MTU2MTI4NS43...")
-→ Shows: Protocols (folder), Sample Log (folder), Experiment Data (folder), etc.
-
-User: "What's in the Protocols folder?"
-Agent: calls list_notebook_pages("MTU2MTI4NS43...", folder_id="MS4z...")
-→ Shows: Pages and sub-folders inside Protocols
-
-User: "Show me the first page"
-Agent: calls read_notebook_page("MTU2MTI4NS43...", "12345")
-→ Returns: All text entries, headings, and attachment info from that page
-```text
+The captured transcript above is the repository-maintained tool example. Notebook names, page IDs, and entry IDs are institution-specific, so conversational examples with invented notebook contents are intentionally omitted.
 
 ---
 
@@ -676,13 +656,14 @@ See `CONTRIBUTING.md` for versioning, Conventional Commits, and release steps.
 For the JORS resubmission, cite the archived Zenodo snapshot:
 
 - Archived version: `v0.3.2`
-- DOI: <https://doi.org/10.5281/zenodo.17728440>
+- Version DOI: <https://doi.org/10.5281/zenodo.17772522>
+- Concept DOI: <https://doi.org/10.5281/zenodo.17728440>
 - Git tag: <https://github.com/SamuelBrudner/lab_archives_mcp/releases/tag/v0.3.2>
 
 The current source tree is version `0.4.0`, recorded in `CITATION.cff`,
-`codemeta.json`, and `CHANGELOG.md`. Use the Zenodo DOI above for the reviewed
-JORS archive; cite the current release when referring specifically to linked-data
-export or other post-archive changes.
+`codemeta.json`, `pyproject.toml`, and `CHANGELOG.md`. Use the version DOI above
+for the reviewed JORS archive; cite the current release when referring
+specifically to linked-data export or other post-archive changes.
 
 ## Contributing
 
@@ -701,10 +682,10 @@ If you use this software in your research, please cite:
 @software{brudner2026labarchives,
   author = {Brudner, Samuel N.},
   title = {LabArchives MCP Server: AI Integration for Electronic Lab Notebooks},
-  year = {2026},
-  doi = {10.5281/zenodo.17728440},
-  url = {https://doi.org/10.5281/zenodo.17728440},
-  version = {0.4.0}
+  year = {2025},
+  doi = {10.5281/zenodo.17772522},
+  url = {https://doi.org/10.5281/zenodo.17772522},
+  version = {0.3.2}
 }
 ```
 

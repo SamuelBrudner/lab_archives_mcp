@@ -270,7 +270,7 @@ def main() -> None:
     server startup including argument parsing, configuration loading, logging setup,
     authentication, resource management, and MCP server initialization.
 
-    The function implements a comprehensive startup sequence:
+    The function implements the startup sequence:
     1. Parse CLI arguments using parse_and_dispatch_cli() from cli_parser
     2. Handle special cases like --help and --version display
     3. Load and validate configuration using load_configuration() from config
