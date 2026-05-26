@@ -14,8 +14,7 @@ Primary files for the JORS portal:
 
 Supporting source files to keep with the repository package:
 
-- `jors_metapaper.tex` - LaTeX rendering of the revised metapaper.
-- `jors_metapaper.org` - Org source used for the manuscript history.
+- `jors_metapaper.md` is the canonical manuscript source; generated TeX, Org, or PDF renderings should not be committed.
 - `docs/figures/architecture.mmd` - source for the architecture diagram.
 - `docs/figures/architecture.svg` - vector rendering of the architecture diagram.
 - `CITATION.cff` - repository citation metadata.

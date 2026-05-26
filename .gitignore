@@ -60,6 +60,9 @@ conf/secrets.yml
 data/.last_indexed
 
 # LaTeX build artifacts
+jors_metapaper.tex
+jors_metapaper.org
+jors_metapaper.pdf
 *.aux
 *.bbl
 *.blg
