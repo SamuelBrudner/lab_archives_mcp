@@ -12,18 +12,29 @@ Architecture:
     - models: Pydantic schemas for chunks, embeddings, search results
 
 Usage:
-    >>> from vector_backend import VectorIndex
-    >>> index = VectorIndex.from_config("conf/vector_search/default.yaml")
-    >>> results = index.search("protein aggregation in neurons", limit=10)
+    >>> from vector_backend import PineconeIndex, SearchRequest
+    >>> index = PineconeIndex(index_name="labarchives", api_key="...", environment="us-east-1")
+    >>> results = await index.search(SearchRequest(query="protein aggregation", limit=10))
 """
 
 __version__ = "0.4.0"
 
-from vector_backend.models import BuildRecord, ChunkMetadata, EmbeddedChunk, SearchResult
+from vector_backend.index import PineconeIndex, QdrantIndex, VectorIndex
+from vector_backend.models import (
+    BuildRecord,
+    ChunkMetadata,
+    EmbeddedChunk,
+    SearchRequest,
+    SearchResult,
+)
 
 __all__ = [
+    "VectorIndex",
+    "PineconeIndex",
+    "QdrantIndex",
     "ChunkMetadata",
     "EmbeddedChunk",
+    "SearchRequest",
     "SearchResult",
     "BuildRecord",
 ]

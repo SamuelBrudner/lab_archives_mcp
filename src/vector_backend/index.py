@@ -7,11 +7,10 @@ Provides a vector-index interface and the implemented Pinecone backend with:
 - DVC-tracked local persistence
 """
 
-from abc import ABC, abstractmethod
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import TYPE_CHECKING, Any, Protocol, TypeVar, runtime_checkable
 
 from vector_backend.models import (
     ChunkMetadata,
@@ -22,10 +21,10 @@ from vector_backend.models import (
 )
 
 
-class VectorIndex(ABC):
-    """Abstract base class for vector index implementations."""
+@runtime_checkable
+class VectorIndex(Protocol):
+    """Structural interface for vector index implementations."""
 
-    @abstractmethod
     async def upsert(self, chunks: list[EmbeddedChunk]) -> None:
         """Insert or update chunks in the index.
 
@@ -38,7 +37,6 @@ class VectorIndex(ABC):
         """
         ...
 
-    @abstractmethod
     async def delete(self, chunk_ids: list[str]) -> None:
         """Delete chunks from the index by ID.
 
@@ -47,7 +45,6 @@ class VectorIndex(ABC):
         """
         ...
 
-    @abstractmethod
     async def search(self, request: SearchRequest) -> list[SearchResult]:
         """Perform semantic search.
 
@@ -62,7 +59,6 @@ class VectorIndex(ABC):
         """
         ...
 
-    @abstractmethod
     async def stats(self) -> IndexStats:
         """Get index statistics.
 
@@ -71,7 +67,6 @@ class VectorIndex(ABC):
         """
         ...
 
-    @abstractmethod
     async def health_check(self) -> bool:
         """Check if index is accessible and healthy.
 
@@ -81,7 +76,7 @@ class VectorIndex(ABC):
         ...
 
 
-class PineconeIndex(VectorIndex):
+class PineconeIndex:
     """Pinecone vector index implementation with timeouts.
 
     Wraps blocking Pinecone client calls in a background thread and applies an
@@ -281,7 +276,7 @@ class PineconeIndex(VectorIndex):
             return False
 
 
-class QdrantIndex(VectorIndex):
+class QdrantIndex:
     """Placeholder for a future Qdrant vector index implementation."""
 
     def __init__(
@@ -321,6 +316,11 @@ class QdrantIndex(VectorIndex):
     async def health_check(self) -> bool:
         """Check Qdrant collection health."""
         raise NotImplementedError
+
+
+if TYPE_CHECKING:
+    _pinecone_index_protocol: VectorIndex = PineconeIndex.__new__(PineconeIndex)
+    _qdrant_index_protocol: VectorIndex = QdrantIndex.__new__(QdrantIndex)
 
 
 class LocalPersistence:
