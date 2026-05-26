@@ -1067,6 +1067,7 @@ class StateManager:
     :meth:`from_path` when state should be loaded from persistent storage.
     """
 
+    # Bound each project history to recent context while keeping state files small.
     MAX_VISITS = 1000
 
     def __init__(
