@@ -26,6 +26,104 @@ GRAPH_SCHEMA_VERSION = 2
 GRAPH_UPDATE_ERRORS = (nx.NetworkXException, TypeError, ValueError, KeyError, AttributeError)
 
 
+def _graph_attrs(attrs: dict[str, Any], *, drop_none: bool) -> dict[str, Any]:
+    if drop_none:
+        return {key: value for key, value in attrs.items() if value is not None}
+    return attrs
+
+
+def _touch_graph_node(
+    graph: nx.Graph,
+    node_id: str,
+    *,
+    now: float,
+    first_seen: float | None = None,
+    drop_none: bool = False,
+    **attrs: Any,
+) -> None:
+    seen_at = now if first_seen is None else first_seen
+    update_attrs = _graph_attrs(attrs, drop_none=drop_none)
+    if graph.has_node(node_id):
+        node = graph.nodes[node_id]
+        node.setdefault("first_seen", seen_at)
+        node["last_seen"] = now
+        node.update(update_attrs)
+        return
+
+    graph.add_node(node_id, first_seen=seen_at, last_seen=now, **update_attrs)
+
+
+def _upsert_graph_edge(
+    graph: nx.Graph,
+    src: str,
+    dst: str,
+    *,
+    now: float,
+    default_created_at: float | None = None,
+    setdefault_created_at: bool = False,
+    drop_none: bool = False,
+    **attrs: Any,
+) -> None:
+    update_attrs = _graph_attrs(attrs, drop_none=drop_none)
+    if graph.has_edge(src, dst):
+        edge = graph.edges[src, dst]
+        if setdefault_created_at and default_created_at is not None:
+            edge.setdefault("created_at", default_created_at)
+        edge["last_seen"] = now
+        edge.update(update_attrs)
+        return
+
+    edge_attrs = dict(update_attrs)
+    if default_created_at is not None and "created_at" not in edge_attrs:
+        edge_attrs["created_at"] = default_created_at
+    graph.add_edge(src, dst, last_seen=now, **edge_attrs)
+
+
+def _touch_notebook_node(graph: nx.Graph, notebook_id: str, *, now: float) -> str:
+    notebook_node_id = f"notebook:{notebook_id}"
+    if graph.has_node(notebook_node_id):
+        node = graph.nodes[notebook_node_id]
+        node.setdefault("first_seen", now)
+        node["last_seen"] = now
+        node["type"] = "notebook"
+        node.setdefault("label", notebook_id)
+        return notebook_node_id
+
+    graph.add_node(
+        notebook_node_id,
+        type="notebook",
+        label=notebook_id,
+        first_seen=now,
+        last_seen=now,
+    )
+    return notebook_node_id
+
+
+def _touch_page_node(
+    graph: nx.Graph, page_id: str, notebook_id: str, label: str, *, now: float
+) -> str:
+    page_node_id = f"page:{page_id}"
+    if graph.has_node(page_node_id):
+        node = graph.nodes[page_node_id]
+        node.setdefault("first_seen", now)
+        node["last_seen"] = now
+        node["type"] = "page"
+        if notebook_id and not node.get("notebook_id"):
+            node["notebook_id"] = notebook_id
+        node.setdefault("label", label)
+        return page_node_id
+
+    graph.add_node(
+        page_node_id,
+        type="page",
+        label=label,
+        notebook_id=notebook_id or None,
+        first_seen=now,
+        last_seen=now,
+    )
+    return page_node_id
+
+
 class StatePersistenceError(RuntimeError):
     """Base exception for persistent state load/save failures."""
 
@@ -351,31 +449,6 @@ class ProvenanceService:
             )
             file_path_obj = Path(file_path)
 
-            def _touch_node(node_id: str, **attrs: Any) -> None:
-                default_attrs = {"first_seen": created_ts, "last_seen": now}
-                if graph.has_node(node_id):
-                    existing = graph.nodes[node_id]
-                    existing.setdefault("first_seen", created_ts)
-                    existing["last_seen"] = now
-                    existing.update({k: v for k, v in attrs.items() if v is not None})
-                else:
-                    default_attrs.update({k: v for k, v in attrs.items() if v is not None})
-                    graph.add_node(node_id, **default_attrs)
-
-            def _add_edge(src: str, dst: str, **attrs: Any) -> None:
-                if graph.has_edge(src, dst):
-                    edge = graph.edges[src, dst]
-                    edge["last_seen"] = now
-                    edge.update({k: v for k, v in attrs.items() if v is not None})
-                else:
-                    graph.add_edge(
-                        src,
-                        dst,
-                        created_at=created_ts,
-                        last_seen=now,
-                        **{k: v for k, v in attrs.items() if v is not None},
-                    )
-
             artifact_suffix = entry_id or file_path_obj.stem or "upload"
             page_node_id = f"page:{page_tree_id}"
             notebook_node_id = f"notebook:{notebook_id}"
@@ -384,21 +457,33 @@ class ProvenanceService:
             user_node_id = f"user:{uid}"
             software_node_id = "software_agent:labarchives-mcp-pol"
 
-            _touch_node(
+            _touch_graph_node(
+                graph,
                 context.id,
+                now=now,
+                first_seen=created_ts,
+                drop_none=True,
                 type="project",
                 label=context.name,
                 description=context.description,
                 created_at=context.created_at,
             )
-            _touch_node(
+            _touch_graph_node(
+                graph,
                 notebook_node_id,
+                now=now,
+                first_seen=created_ts,
+                drop_none=True,
                 type="notebook",
                 label=notebook_id,
                 notebook_id=notebook_id,
             )
-            _touch_node(
+            _touch_graph_node(
+                graph,
                 page_node_id,
+                now=now,
+                first_seen=created_ts,
+                drop_none=True,
                 type="page",
                 label=page_title,
                 page_id=page_tree_id,
@@ -411,8 +496,12 @@ class ProvenanceService:
                     else 1
                 ),
             )
-            _touch_node(
+            _touch_graph_node(
+                graph,
                 artifact_node_id,
+                now=now,
+                first_seen=created_ts,
+                drop_none=True,
                 type="artifact",
                 label=filename,
                 filename=filename,
@@ -425,8 +514,12 @@ class ProvenanceService:
                 encoding_format=file_path_obj.suffix.lower() or None,
                 entry_kind="page_text" if as_page_text else "attachment",
             )
-            _touch_node(
+            _touch_graph_node(
+                graph,
                 activity_node_id,
+                now=now,
+                first_seen=created_ts,
+                drop_none=True,
                 type="activity",
                 label=f"Upload {filename}",
                 activity_type="upload_to_labarchives",
@@ -446,14 +539,22 @@ class ProvenanceService:
                 hostname=metadata.hostname,
                 server_version=server_version,
             )
-            _touch_node(
+            _touch_graph_node(
+                graph,
                 user_node_id,
+                now=now,
+                first_seen=created_ts,
+                drop_none=True,
                 type="user",
                 label=uid,
                 uid=uid,
             )
-            _touch_node(
+            _touch_graph_node(
+                graph,
                 software_node_id,
+                now=now,
+                first_seen=created_ts,
+                drop_none=True,
                 type="software_agent",
                 label="LabArchives MCP Server",
                 identifier="labarchives-mcp-pol",
@@ -461,18 +562,102 @@ class ProvenanceService:
                 created_at=datetime.now(UTC).timestamp(),
             )
 
-            _add_edge(context.id, notebook_node_id, relation="uses_notebook")
-            _add_edge(notebook_node_id, page_node_id, relation="contains")
-            _add_edge(context.id, page_node_id, relation="tracked")
-            _add_edge(context.id, artifact_node_id, relation="tracked")
-            _add_edge(context.id, activity_node_id, relation="tracked")
-            _add_edge(page_node_id, artifact_node_id, relation="contains_artifact")
-            _add_edge(page_node_id, activity_node_id, relation="was_generated_by")
-            _add_edge(artifact_node_id, activity_node_id, relation="was_generated_by")
-            _add_edge(page_node_id, user_node_id, relation="was_attributed_to")
-            _add_edge(artifact_node_id, user_node_id, relation="was_attributed_to")
-            _add_edge(activity_node_id, user_node_id, relation="was_associated_with")
-            _add_edge(activity_node_id, software_node_id, relation="was_associated_with")
+            _upsert_graph_edge(
+                graph,
+                context.id,
+                notebook_node_id,
+                now=now,
+                default_created_at=created_ts,
+                relation="uses_notebook",
+            )
+            _upsert_graph_edge(
+                graph,
+                notebook_node_id,
+                page_node_id,
+                now=now,
+                default_created_at=created_ts,
+                relation="contains",
+            )
+            _upsert_graph_edge(
+                graph,
+                context.id,
+                page_node_id,
+                now=now,
+                default_created_at=created_ts,
+                relation="tracked",
+            )
+            _upsert_graph_edge(
+                graph,
+                context.id,
+                artifact_node_id,
+                now=now,
+                default_created_at=created_ts,
+                relation="tracked",
+            )
+            _upsert_graph_edge(
+                graph,
+                context.id,
+                activity_node_id,
+                now=now,
+                default_created_at=created_ts,
+                relation="tracked",
+            )
+            _upsert_graph_edge(
+                graph,
+                page_node_id,
+                artifact_node_id,
+                now=now,
+                default_created_at=created_ts,
+                relation="contains_artifact",
+            )
+            _upsert_graph_edge(
+                graph,
+                page_node_id,
+                activity_node_id,
+                now=now,
+                default_created_at=created_ts,
+                relation="was_generated_by",
+            )
+            _upsert_graph_edge(
+                graph,
+                artifact_node_id,
+                activity_node_id,
+                now=now,
+                default_created_at=created_ts,
+                relation="was_generated_by",
+            )
+            _upsert_graph_edge(
+                graph,
+                page_node_id,
+                user_node_id,
+                now=now,
+                default_created_at=created_ts,
+                relation="was_attributed_to",
+            )
+            _upsert_graph_edge(
+                graph,
+                artifact_node_id,
+                user_node_id,
+                now=now,
+                default_created_at=created_ts,
+                relation="was_attributed_to",
+            )
+            _upsert_graph_edge(
+                graph,
+                activity_node_id,
+                user_node_id,
+                now=now,
+                default_created_at=created_ts,
+                relation="was_associated_with",
+            )
+            _upsert_graph_edge(
+                graph,
+                activity_node_id,
+                software_node_id,
+                now=now,
+                default_created_at=created_ts,
+                relation="was_associated_with",
+            )
 
             context.graph_data = nx.node_link_data(graph, edges="links")
             self._save_state()
@@ -632,29 +817,16 @@ class KnowledgeGraph:
             graph.graph.setdefault("schema_version", GRAPH_SCHEMA_VERSION)
             now = time.time()
 
-            def _touch_node(node_id: str, **attrs: Any) -> None:
-                """Create or update a node while preserving first_seen/last_seen."""
-                default_attrs = {
-                    "first_seen": now,
-                    "last_seen": now,
-                }
-                if graph.has_node(node_id):
-                    existing = graph.nodes[node_id]
-                    existing.setdefault("first_seen", now)
-                    existing["last_seen"] = now
-                    existing.update(attrs)
-                else:
-                    default_attrs.update(attrs)
-                    graph.add_node(node_id, **default_attrs)
-
             # Add Project Node (root)
-            _touch_node(context.id, type="project", label=context.name)
+            _touch_graph_node(graph, context.id, now=now, type="project", label=context.name)
 
             # Add Notebook Node
             if notebook_id:
                 notebook_node_id = f"notebook:{notebook_id}"
-                _touch_node(
+                _touch_graph_node(
+                    graph,
                     notebook_node_id,
+                    now=now,
                     type="notebook",
                     label=notebook_id,
                 )
@@ -663,28 +835,38 @@ class KnowledgeGraph:
             page_node_id = f"page:{page_id}"
             existing_page = graph.nodes[page_node_id] if graph.has_node(page_node_id) else {}
             visit_count = existing_page.get("visit_count", 0) + 1
-            _touch_node(
+            _touch_graph_node(
+                graph,
                 page_node_id,
+                now=now,
                 type="page",
                 label=title,
                 notebook_id=notebook_id,
                 visit_count=visit_count,
             )
 
-            def _add_edge(src: str, dst: str, **attrs: Any) -> None:
-                if graph.has_edge(src, dst):
-                    edge = graph.edges[src, dst]
-                    edge["last_seen"] = now
-                    edge.update(attrs)
-                else:
-                    graph.add_edge(src, dst, last_seen=now, **attrs)
-
             # Edges
             if notebook_id:
-                _add_edge(context.id, notebook_node_id, relation="uses_notebook", created_at=now)
-                _add_edge(notebook_node_id, page_node_id, relation="contains", created_at=now)
+                _upsert_graph_edge(
+                    graph,
+                    context.id,
+                    notebook_node_id,
+                    now=now,
+                    relation="uses_notebook",
+                    created_at=now,
+                )
+                _upsert_graph_edge(
+                    graph,
+                    notebook_node_id,
+                    page_node_id,
+                    now=now,
+                    relation="contains",
+                    created_at=now,
+                )
 
-            _add_edge(context.id, page_node_id, relation="visited", created_at=now)
+            _upsert_graph_edge(
+                graph, context.id, page_node_id, now=now, relation="visited", created_at=now
+            )
 
             # Serialize back
             context.graph_data = nx.node_link_data(graph, edges="links")
@@ -734,76 +916,46 @@ class KnowledgeGraph:
             graph.graph.setdefault("schema_version", GRAPH_SCHEMA_VERSION)
             now = time.time()
 
-            def _touch_notebook(notebook_id: str) -> str:
-                notebook_node_id = f"notebook:{notebook_id}"
-                if graph.has_node(notebook_node_id):
-                    node = graph.nodes[notebook_node_id]
-                    node.setdefault("first_seen", now)
-                    node["last_seen"] = now
-                    node["type"] = "notebook"
-                    node.setdefault("label", notebook_id)
-                else:
-                    graph.add_node(
-                        notebook_node_id,
-                        type="notebook",
-                        label=notebook_id,
-                        first_seen=now,
-                        last_seen=now,
-                    )
-                return notebook_node_id
-
-            def _touch_page(page_id: str, notebook_id: str, label: str) -> str:
-                page_node_id = f"page:{page_id}"
-                if graph.has_node(page_node_id):
-                    node = graph.nodes[page_node_id]
-                    node.setdefault("first_seen", now)
-                    node["last_seen"] = now
-                    node["type"] = "page"
-                    if notebook_id and not node.get("notebook_id"):
-                        node["notebook_id"] = notebook_id
-                    node.setdefault("label", label)
-                else:
-                    graph.add_node(
-                        page_node_id,
-                        type="page",
-                        label=label,
-                        notebook_id=notebook_id or None,
-                        first_seen=now,
-                        last_seen=now,
-                    )
-                return page_node_id
-
-            def _add_edge(src: str, dst: str, **attrs: Any) -> None:
-                if graph.has_edge(src, dst):
-                    edge = graph.edges[src, dst]
-                    edge.setdefault("created_at", now)
-                    edge["last_seen"] = now
-                    edge.update(attrs)
-                else:
-                    graph.add_edge(src, dst, created_at=now, last_seen=now, **attrs)
-
-            source_page_node_id = _touch_page(source_page_id, source_notebook_id, source_page_id)
+            source_page_node_id = _touch_page_node(
+                graph, source_page_id, source_notebook_id, source_page_id, now=now
+            )
             if source_notebook_id:
-                source_notebook_node_id = _touch_notebook(source_notebook_id)
-                _add_edge(
+                source_notebook_node_id = _touch_notebook_node(graph, source_notebook_id, now=now)
+                _upsert_graph_edge(
+                    graph,
                     source_notebook_node_id,
                     source_page_node_id,
+                    now=now,
+                    default_created_at=now,
+                    setdefault_created_at=True,
                     relation="contains",
                 )
 
             for target_notebook_id, target_page_id in normalized_links:
-                target_page_node_id = _touch_page(target_page_id, target_notebook_id, "Linked Page")
+                target_page_node_id = _touch_page_node(
+                    graph, target_page_id, target_notebook_id, "Linked Page", now=now
+                )
                 if target_notebook_id:
-                    target_notebook_node_id = _touch_notebook(target_notebook_id)
-                    _add_edge(
+                    target_notebook_node_id = _touch_notebook_node(
+                        graph, target_notebook_id, now=now
+                    )
+                    _upsert_graph_edge(
+                        graph,
                         target_notebook_node_id,
                         target_page_node_id,
+                        now=now,
+                        default_created_at=now,
+                        setdefault_created_at=True,
                         relation="contains",
                     )
 
-                _add_edge(
+                _upsert_graph_edge(
+                    graph,
                     source_page_node_id,
                     target_page_node_id,
+                    now=now,
+                    default_created_at=now,
+                    setdefault_created_at=True,
                     relation="content_link",
                     source="page_content",
                 )
@@ -841,7 +993,7 @@ class KnowledgeGraph:
 
             # Add Project Node (root)
             if not graph.has_node(context.id):
-                graph.add_node(context.id, type="project", label=context.name, first_seen=now)
+                _touch_graph_node(graph, context.id, now=now, type="project", label=context.name)
             graph.nodes[context.id]["last_seen"] = now
 
             # Add Finding Node. Use a hash because content can be long.
@@ -869,37 +1021,33 @@ class KnowledgeGraph:
             if graph.has_edge(context.id, finding_node_id):
                 graph.edges[context.id, finding_node_id]["last_seen"] = now
             else:
-                graph.add_edge(
+                _upsert_graph_edge(
+                    graph,
                     context.id,
                     finding_node_id,
+                    now=now,
+                    default_created_at=now,
                     relation="discovered",
-                    created_at=now,
-                    last_seen=now,
                 )
 
             # Edge: Page -> Finding (provenance) if provided
             if page_id:
                 page_node_id = f"page:{page_id}"
                 if not graph.has_node(page_node_id):
-                    graph.add_node(
-                        page_node_id,
-                        type="page",
-                        label=page_id,
-                        first_seen=now,
-                        last_seen=now,
-                    )
+                    _touch_graph_node(graph, page_node_id, now=now, type="page", label=page_id)
                 else:
                     graph.nodes[page_node_id]["last_seen"] = now
 
                 if graph.has_edge(page_node_id, finding_node_id):
                     graph.edges[page_node_id, finding_node_id]["last_seen"] = now
                 else:
-                    graph.add_edge(
+                    _upsert_graph_edge(
+                        graph,
                         page_node_id,
                         finding_node_id,
+                        now=now,
+                        default_created_at=now,
                         relation="evidence_from",
-                        created_at=now,
-                        last_seen=now,
                     )
 
             # Serialize back
