@@ -75,3 +75,13 @@ Revised in commit `847d949`. The README first mention now defines MCP as an open
 > Final pass: read aloud. Anything that sounds like a chatbot -- delete or rewrite.
 
 Revised in commits `78ebaf3`, `bc5448a`, and `2edee13`. The final wording pass removed promotional language from the paper, README-adjacent docs, one CLI docstring, and one test name, then tightened the Org manuscript source and vector-backend documentation. A repository-wide banned-phrase scan on 26 May 2026 returned no matches.
+
+## Final Reconciliation Pass
+
+On 26 May 2026 a closing reconciliation pass made the following corrections.
+
+- The abstract and Section 1 Overview previously opened with the identical sentence "AI-assisted workflows hold promise for accelerating scientific discovery, ...". Both openings were rewritten in factual language ("AI assistants operating in laboratory contexts can only answer from their model weights and material supplied in the prompt unless ...") to address R2's softer-tone request and to remove the verbatim duplication.
+- The unsupported "widely used commercial ELN" qualifier in Section 1 was reduced to "commercial ELN [@labarchives]".
+- The README citation BibTeX key `brudner2026labarchives` (paired with `year = {2025}`, archive date 2025-12-01) was renamed to `brudner2025labarchives` for year/key consistency.
+- The README Architecture section now embeds `docs/figures/architecture.png` with a short caption, so the component diagram introduced for R2 and R3 is visible in the repository surface as well as the paper.
+- The JORS resubmission cover letter (`jors_cover_letter.md`) was rebuilt to match the current revision state: revision date 26 May 2026, current source-tree version `0.4.0` (concept DOI `10.5281/zenodo.17728440`, archive DOI `10.5281/zenodo.17772522` for `v0.3.2`, current version DOI `10.5281/zenodo.19672568`), and revised local validation numbers (239 passing, 1 skipped, 6 credential-gated integration tests deselected, 74% line coverage). The previous letter cited an out-of-date source tree (`0.3.3`), conflated the concept and archive DOIs, and reported a stale test count (`217 passed`).

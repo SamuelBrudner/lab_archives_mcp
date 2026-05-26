@@ -62,6 +62,10 @@ A **Model Context Protocol (MCP) server** that connects AI assistants to LabArch
 
 ## Architecture
 
+![Component and data-flow architecture: MCP client, FastMCP server tools, LabArchives API, local project state, embedding provider, and vector backend](docs/figures/architecture.png)
+
+*Figure: An MCP client calls the FastMCP server tools, which mediate LabArchives API access, local project-state updates, embedding requests, and vector-index reads and writes. Mermaid source and SVG are committed alongside the PNG under `docs/figures/`.*
+
 - **Language**: Python.
 
 - **Modules**:
@@ -679,7 +683,7 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for:
 If you use this software in your research, please cite:
 
 ```bibtex
-@software{brudner2026labarchives,
+@software{brudner2025labarchives,
   author = {Brudner, Samuel N.},
   title = {LabArchives MCP Server: AI Integration for Electronic Lab Notebooks},
   year = {2025},
