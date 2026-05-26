@@ -9,7 +9,7 @@ import networkx as nx
 import pytest
 
 from labarchives_mcp.models.upload import ProvenanceMetadata
-from labarchives_mcp.state import GRAPH_SCHEMA_VERSION, ProjectContext, StateManager
+from labarchives_mcp.state import GRAPH_SCHEMA_VERSION, ProjectContext, SessionState, StateManager
 
 
 @pytest.fixture  # type: ignore[misc]
@@ -21,7 +21,7 @@ def temp_state_dir(tmp_path: Path) -> Generator[Path, None, None]:
 @pytest.fixture  # type: ignore[misc]
 def state_manager(temp_state_dir: Path) -> StateManager:
     """Provide a StateManager instance using the temp directory."""
-    return StateManager(storage_dir=temp_state_dir)
+    return StateManager.from_path(storage_dir=temp_state_dir)
 
 
 def test_initial_state(state_manager: StateManager) -> None:
@@ -29,6 +29,20 @@ def test_initial_state(state_manager: StateManager) -> None:
     assert state_manager._state.active_context_id is None
     assert state_manager._state.contexts == {}
     assert state_manager.get_active_context() is None
+
+
+def test_constructor_accepts_preloaded_state_without_loading_disk(tmp_path: Path) -> None:
+    """Direct construction should not read or repair files on disk."""
+    state_dir = tmp_path / "state"
+    state_dir.mkdir()
+    state_file = state_dir / "session_state.json"
+    state_file.write_text("{invalid-json", encoding="utf-8")
+
+    preloaded = SessionState()
+    manager = StateManager(state=preloaded, storage_dir=state_dir)
+
+    assert manager._state is preloaded
+    assert not state_file.with_suffix(".json.bak").exists()
 
 
 def test_create_project(state_manager: StateManager) -> None:
@@ -86,7 +100,7 @@ def test_log_visit(state_manager: StateManager) -> None:
     assert visit.title == "Page 1"
 
     # Check persistence
-    state_manager2 = StateManager(storage_dir=state_manager.storage_dir)
+    state_manager2 = StateManager.from_path(storage_dir=state_manager.storage_dir)
     loaded_context = state_manager2.get_active_context()
     assert loaded_context is not None
     assert len(loaded_context.visited_pages) == 1
@@ -195,7 +209,7 @@ def test_graph_migration_adds_version_and_timestamps(temp_state_dir: Path) -> No
     state_file = temp_state_dir / "session_state.json"
     state_file.write_text(json.dumps(old_state))
 
-    migrated_manager = StateManager(storage_dir=temp_state_dir)
+    migrated_manager = StateManager.from_path(storage_dir=temp_state_dir)
     context = migrated_manager.get_active_context()
     assert context is not None
 

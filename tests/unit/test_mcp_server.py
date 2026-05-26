@@ -70,7 +70,7 @@ def _run_server_with_test_state(
     entries_by_page: dict[tuple[str, str], list[dict[str, Any]]] | None = None,
 ) -> tuple[DummyFastMCP, StateManager]:
     mcp_module = cast(Any, mcp_server)
-    state_manager = StateManager(storage_dir=tmp_path)
+    state_manager = StateManager.from_path(storage_dir=tmp_path)
     page_entries = entries_by_page or {}
 
     monkeypatch.setattr(
@@ -79,7 +79,9 @@ def _run_server_with_test_state(
         classmethod(lambda cls: DummyCredentials()),
     )
     monkeypatch.setattr(mcp_module.httpx, "AsyncClient", DummyAsyncClient)
-    monkeypatch.setattr(mcp_module, "StateManager", lambda: state_manager)
+    monkeypatch.setattr(
+        mcp_module.StateManager, "from_path", lambda storage_dir=None: state_manager
+    )
 
     class DummyAuthenticationManager:
         def __init__(self, client: DummyAsyncClient, credentials: DummyCredentials) -> None:
@@ -405,7 +407,7 @@ def test_export_tool_registered_and_matches_state_wrapper(
         async def list_notebooks(self, _uid: str) -> list[Any]:
             return []
 
-    state_manager = StateManager(storage_dir=tmp_path)
+    state_manager = StateManager.from_path(storage_dir=tmp_path)
     context = state_manager.create_project("Proj 1", "Desc")
     metadata = ProvenanceMetadata(
         git_commit_sha="f" * 40,
@@ -437,7 +439,9 @@ def test_export_tool_registered_and_matches_state_wrapper(
 
     monkeypatch.setattr(mcp_module, "AuthenticationManager", DummyAuthenticationManager)
     monkeypatch.setattr(mcp_module, "LabArchivesClient", DummyLabArchivesClient)
-    monkeypatch.setattr(mcp_module, "StateManager", lambda: state_manager)
+    monkeypatch.setattr(
+        mcp_module.StateManager, "from_path", lambda storage_dir=None: state_manager
+    )
 
     fastmcp_instance = DummyFastMCP(
         server_id="labarchives-mcp-pol",

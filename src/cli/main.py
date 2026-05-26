@@ -251,8 +251,9 @@ def _init_state() -> None:
         print(f"State directory already exists at {state_dir.absolute()}")
     else:
         print(f"Initializing state directory at {state_dir.absolute()}...")
-        # StateManager init will create the directory and empty state file
-        StateManager(storage_dir=state_dir)
+        # Explicitly persist the initial empty state.
+        manager = StateManager.from_path(storage_dir=state_dir)
+        manager._save_state()
         print("Done.")
 
 

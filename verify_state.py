@@ -10,7 +10,7 @@ from labarchives_mcp.state import StateManager
 class TestStateManager(unittest.TestCase):
     def setUp(self) -> None:
         self.test_dir = tempfile.mkdtemp()
-        self.state_manager = StateManager(storage_dir=self.test_dir)
+        self.state_manager = StateManager.from_path(storage_dir=self.test_dir)
 
     def tearDown(self) -> None:
         shutil.rmtree(self.test_dir)

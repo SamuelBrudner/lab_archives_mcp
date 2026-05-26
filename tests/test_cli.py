@@ -40,7 +40,7 @@ class _FakeRdflib:
 
 
 def _seed_project(tmp_path: Path) -> tuple[StateManager, str]:
-    manager = StateManager(storage_dir=tmp_path)
+    manager = StateManager.from_path(storage_dir=tmp_path)
     context = manager.create_project("Proj 1", "Desc")
     manager.log_visit("nb1", "p1", "Page 1")
     metadata = ProvenanceMetadata(

@@ -24,7 +24,7 @@ def _build_graph(project_id: str, pages: list[tuple[str, str]]) -> dict[str, Any
 
 @pytest.mark.asyncio()  # type: ignore[misc]
 async def test_validate_graph_respects_max_checks(tmp_path: Path) -> None:
-    manager = StateManager(storage_dir=tmp_path)
+    manager = StateManager.from_path(storage_dir=tmp_path)
     context = manager.create_project("Proj", "Desc")
 
     # Insert pages with a known order: invalid first, then valid
@@ -46,7 +46,7 @@ async def test_validate_graph_respects_max_checks(tmp_path: Path) -> None:
 
 @pytest.mark.asyncio()  # type: ignore[misc]
 async def test_validate_graph_all_contexts(tmp_path: Path) -> None:
-    manager = StateManager(storage_dir=tmp_path)
+    manager = StateManager.from_path(storage_dir=tmp_path)
     ctx1 = manager.create_project("Proj1", "Desc1")
     ctx2 = manager.create_project("Proj2", "Desc2")
 

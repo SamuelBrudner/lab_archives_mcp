@@ -356,7 +356,7 @@ def test_alternate_formats_require_optional_rdflib(
 
 
 def test_state_wrapper_loads_project_from_state(tmp_path: Path) -> None:
-    manager = StateManager(storage_dir=tmp_path)
+    manager = StateManager.from_path(storage_dir=tmp_path)
     context = manager.create_project("Proj 1", "Desc")
     manager.log_visit("nb1", "p1", "Page 1")
     metadata = ProvenanceMetadata(
@@ -395,7 +395,7 @@ def test_state_wrapper_loads_project_from_state(tmp_path: Path) -> None:
 
 
 def test_write_project_jsonld_matches_in_memory_export(tmp_path: Path) -> None:
-    manager = StateManager(storage_dir=tmp_path)
+    manager = StateManager.from_path(storage_dir=tmp_path)
     context = manager.create_project("Proj 1", "Desc")
     manager.log_visit("nb1", "p1", "Page 1")
 

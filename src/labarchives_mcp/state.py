@@ -6,7 +6,7 @@ import json
 import time
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Self
 
 import networkx as nx
 from loguru import logger
@@ -69,17 +69,30 @@ class SessionState(BaseModel):
 
 
 class StateManager:
-    """Manages persistence and modification of agent state."""
+    """Manages persistence and modification of agent state.
+
+    The constructor accepts already-loaded state and performs no disk I/O. Use
+    :meth:`from_path` when state should be loaded from persistent storage.
+    """
 
     MAX_VISITS = 1000
 
-    def __init__(self, storage_dir: Path | str | None = None) -> None:
+    def __init__(
+        self, state: SessionState | None = None, storage_dir: Path | str | None = None
+    ) -> None:
         if storage_dir is None:
             # Default to home directory for cross-repository access
             storage_dir = Path.home() / ".labarchives_state"
         self.storage_dir = Path(storage_dir)
         self.state_file = self.storage_dir / "session_state.json"
-        self._state: SessionState = self._load_state()
+        self._state: SessionState = state if state is not None else SessionState()
+
+    @classmethod
+    def from_path(cls, storage_dir: Path | str | None = None) -> Self:
+        """Create a manager by loading state from disk."""
+        manager = cls(storage_dir=storage_dir)
+        manager._state = manager._load_state()
+        return manager
 
     def _load_state(self) -> SessionState:
         """Load state from disk or create fresh."""
@@ -257,7 +270,7 @@ class StateManager:
         """Normalize timestamps from floats, datetimes, or ISO strings."""
         if value is None:
             return None
-        if isinstance(value, (int, float)):
+        if isinstance(value, int | float):
             return float(value)
         if isinstance(value, datetime):
             return value.timestamp()

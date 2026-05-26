@@ -112,7 +112,7 @@ def _as_isoformat(value: Any) -> str | None:
             .isoformat()
             .replace("+00:00", "Z")
         )
-    if isinstance(value, (int, float)):
+    if isinstance(value, int | float):
         return datetime.fromtimestamp(float(value), tz=UTC).isoformat().replace("+00:00", "Z")
     if isinstance(value, str):
         try:
@@ -363,7 +363,7 @@ def export_project_jsonld(
     inline_context: bool = True,
 ) -> dict[str, Any]:
     """Load one project from state storage and serialize it to JSON-LD."""
-    manager = StateManager(storage_dir=state_dir)
+    manager = StateManager.from_path(storage_dir=state_dir)
     context = manager._state.contexts.get(project_id)
     if context is None:
         raise ValueError(f"Unknown project_id: {project_id}")
