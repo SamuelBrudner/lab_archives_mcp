@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import inspect
-import os
 import sys
 from collections.abc import Callable, Coroutine
 from importlib import metadata
@@ -15,6 +14,7 @@ from loguru import logger
 
 from .auth import AuthenticationManager, Credentials
 from .eln_client import LabArchivesClient
+from .settings import Settings
 from .state import StateManager
 from .tools import ToolContext, register_mcp_surface
 from .tools.utils import _extract_labarchives_page_links, _paginate_items
@@ -29,6 +29,7 @@ __all__ = [
     "FastMCP",
     "AuthenticationManager",
     "Credentials",
+    "Settings",
     "LabArchivesClient",
     "httpx",
     "_extract_labarchives_page_links",
@@ -70,27 +71,17 @@ def _import_fastmcp() -> type[Any]:
     return FastMCP
 
 
-def _is_upload_enabled() -> bool:
-    """Check if upload functionality should be enabled.
-
-    Returns:
-        True if LABARCHIVES_ENABLE_UPLOAD is not set or is "true" (case-insensitive).
-        False if LABARCHIVES_ENABLE_UPLOAD is set to "false" (case-insensitive).
-    """
-    env_value = os.environ.get("LABARCHIVES_ENABLE_UPLOAD", "true")
-    return env_value.lower() != "false"
-
-
-async def run_server() -> None:
+async def run_server(settings: Settings | None = None) -> None:
     """Run the MCP server event loop."""
 
-    credentials = Credentials.from_file()
+    settings = settings or Settings.from_env()
+    credentials = settings.credentials
     fastmcp_class = _import_fastmcp()
 
     async with httpx.AsyncClient(base_url=str(credentials.region)) as http_client:
         auth_manager = AuthenticationManager(http_client, credentials)
         notebook_client = LabArchivesClient(http_client, auth_manager)
-        state_manager = StateManager.from_path()
+        state_manager = StateManager.from_path(storage_dir=settings.state_dir)
 
         server = _instantiate_fastmcp(
             fastmcp_class,
@@ -107,8 +98,9 @@ async def run_server() -> None:
             state_manager=state_manager,
             server_version=__version__,
             service_module=sys.modules[__name__],
+            settings=settings,
         )
-        register_mcp_surface(server, context, upload_enabled=_is_upload_enabled())
+        register_mcp_surface(server, context, upload_enabled=settings.upload_enabled)
 
         asyncio.create_task(validate_graph_task(context))
         await server.run_async()

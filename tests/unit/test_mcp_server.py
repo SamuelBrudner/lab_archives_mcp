@@ -11,6 +11,7 @@ import pytest
 from labarchives_mcp import mcp_server
 from labarchives_mcp.linked_data import export_project_jsonld
 from labarchives_mcp.models.upload import ProvenanceMetadata
+from labarchives_mcp.settings import Settings
 from labarchives_mcp.state import StateManager
 
 
@@ -221,6 +222,59 @@ def test_run_server_uses_region_as_base_url(monkeypatch: pytest.MonkeyPatch) -> 
     assert created_clients, "AsyncClient should be constructed"
     client = created_clients[0]
     assert client.kwargs.get("base_url") == DummyCredentials.region
+
+
+def test_run_server_uses_settings_state_dir(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Configured settings should provide the state directory at startup."""
+
+    mcp_module = cast(Any, mcp_server)
+    configured_state_dir = tmp_path / "configured-state"
+    captured: dict[str, Any] = {}
+    settings = Settings(
+        credentials=DummyCredentials(),
+        secrets_path=tmp_path / "secrets.yml",
+        state_dir=configured_state_dir,
+    )
+
+    monkeypatch.setattr(mcp_module.httpx, "AsyncClient", DummyAsyncClient)
+
+    class DummyAuthenticationManager:
+        def __init__(self, client: DummyAsyncClient, credentials: DummyCredentials) -> None:
+            self._client = client
+            self._credentials = credentials
+
+        async def ensure_uid(self) -> str:
+            return "uid-1"
+
+    class DummyLabArchivesClient:
+        def __init__(self, client: DummyAsyncClient, auth_manager: Any) -> None:
+            self._client = client
+            self._auth_manager = auth_manager
+
+        async def list_notebooks(self, _uid: str) -> list[Any]:
+            return []
+
+    def state_from_path(storage_dir: Path | str | None = None) -> StateManager:
+        captured["storage_dir"] = storage_dir
+        return StateManager(storage_dir=tmp_path / "loaded-state")
+
+    monkeypatch.setattr(mcp_module, "AuthenticationManager", DummyAuthenticationManager)
+    monkeypatch.setattr(mcp_module, "LabArchivesClient", DummyLabArchivesClient)
+    monkeypatch.setattr(mcp_module.StateManager, "from_path", state_from_path)
+
+    fastmcp_instance = DummyFastMCP(
+        server_id="labarchives-mcp-pol",
+        name="",
+        version="",
+        description="",
+    )
+    monkeypatch.setattr(mcp_module, "FastMCP", lambda **kwargs: fastmcp_instance)
+
+    asyncio.run(mcp_server.run_server(settings=settings))
+
+    assert captured["storage_dir"] == configured_state_dir
 
 
 def test_upload_tool_not_registered_when_disabled(monkeypatch: pytest.MonkeyPatch) -> None:

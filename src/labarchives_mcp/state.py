@@ -16,6 +16,8 @@ import networkx as nx
 from loguru import logger
 from pydantic import BaseModel, Field, ValidationError
 
+from .settings import default_state_dir
+
 if TYPE_CHECKING:
     from .models.upload import ProvenanceMetadata
 
@@ -94,8 +96,7 @@ class StateRepository:
 
     def __init__(self, storage_dir: Path | str | None = None) -> None:
         if storage_dir is None:
-            # Default to home directory for cross-repository access
-            storage_dir = Path.home() / ".labarchives_state"
+            storage_dir = default_state_dir()
         self.storage_dir = Path(storage_dir)
         self.state_file = self.storage_dir / "session_state.json"
 

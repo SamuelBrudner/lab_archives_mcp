@@ -208,11 +208,13 @@ def _run_cli(argv: Sequence[str] | None = None) -> int:
 async def _emit_onboard(output_format: str) -> None:
     import httpx
 
-    from labarchives_mcp.auth import AuthenticationManager, Credentials
+    from labarchives_mcp.auth import AuthenticationManager
     from labarchives_mcp.eln_client import LabArchivesClient
     from labarchives_mcp.onboard import OnboardService
+    from labarchives_mcp.settings import Settings
 
-    credentials = Credentials.from_file()
+    settings = Settings.from_env()
+    credentials = settings.credentials
     async with httpx.AsyncClient(base_url=str(credentials.region)) as http_client:
         auth_manager = AuthenticationManager(http_client, credentials)
         notebook_client = LabArchivesClient(http_client, auth_manager)

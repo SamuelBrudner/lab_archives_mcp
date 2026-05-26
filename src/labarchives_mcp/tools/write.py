@@ -185,10 +185,10 @@ _write_notebook_entry = write_notebook_entry
 def register_write_tools(server: Any, context: ToolContext, *, upload_enabled: bool) -> None:
     """Register LabArchives write tools when uploads are enabled."""
     if not upload_enabled:
-        logger.info("Upload functionality is DISABLED (LABARCHIVES_ENABLE_UPLOAD=false)")
+        logger.info("Upload functionality is DISABLED by runtime settings")
         return
 
-    logger.info("Upload functionality is ENABLED (LABARCHIVES_ENABLE_UPLOAD)")
+    logger.info("Upload functionality is ENABLED by runtime settings")
 
     @tool(server)
     async def upload_to_labarchives(

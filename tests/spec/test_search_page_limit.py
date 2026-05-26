@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
 
 import pytest
 
 from labarchives_mcp import mcp_server
+from labarchives_mcp.settings import Settings
 
 
 def _setup_fastmcp_capture(mcp_module: Any) -> dict[str, Any]:
@@ -161,49 +163,24 @@ def mcp_env(monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest) -> 
     fake_openai.AsyncOpenAI = _AsyncOpenAI  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, "openai", fake_openai)
 
-    import yaml  # type: ignore[import-untyped]
-
     import vector_backend.embedding as vbe
     import vector_backend.index as vbi
 
-    # Stub imports used inside search tool
-    fake_aiofiles = types.ModuleType("aiofiles")
-
-    def _fake_open(_path: str) -> Any:  # noqa: ANN001
-        class _C:
-            async def __aenter__(self) -> Any:  # noqa: D401
-                class _F:
-                    async def read(self) -> str:
-                        return "{}"
-
-                return _F()
-
-            async def __aexit__(self, *exc_info: Any) -> None:  # noqa: ANN002
-                return None
-
-        return _C()
-
-    fake_aiofiles.open = _fake_open  # type: ignore[attr-defined]
-    monkeypatch.setitem(sys.modules, "aiofiles", fake_aiofiles)
-
     monkeypatch.setattr(vbe, "create_embedding_client", fake_create_embedding_client)
     monkeypatch.setattr(vbi, "PineconeIndex", DummyIndex)
-    monkeypatch.setattr(
-        yaml,
-        "safe_load",
-        lambda _: {
-            "OPENAI_API_KEY": "x",
-            "PINECONE_API_KEY": "y",
-        },
-    )
 
     # Wire server
-    asyncio.run(mcp_server.run_server())
+    settings = Settings(
+        credentials=DummyCredentials(),
+        secrets_path=Path("conf/secrets.yml"),
+        secrets={"OPENAI_API_KEY": "x", "PINECONE_API_KEY": "y"},
+    )
+    asyncio.run(mcp_server.run_server(settings=settings))
     captured["module"] = mcp_module
 
     # Ensure any modules we stubbed and imports we triggered are reset after tests
     def _cleanup() -> None:
-        for name in ("vector_backend.embedding", "openai", "aiofiles"):
+        for name in ("vector_backend.embedding", "openai"):
             sys.modules.pop(name, None)
 
     request.addfinalizer(_cleanup)
@@ -224,36 +201,11 @@ def test_search_page_limit_dedup(monkeypatch: pytest.MonkeyPatch, mcp_env: dict[
 def test_search_propagates_selected_page_fetch_failure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    import sys
-    import types
-
-    import yaml  # type: ignore[import-untyped]
-
     import vector_backend.config as vbc
     import vector_backend.embedding as vbe
     import vector_backend.index as vbi
     from labarchives_mcp.tools.search import search_labarchives
     from vector_backend import models as vm
-
-    fake_aiofiles = types.ModuleType("aiofiles")
-
-    def _fake_open(_path: str) -> Any:  # noqa: ANN001
-        class _C:
-            async def __aenter__(self) -> Any:  # noqa: D401
-                class _F:
-                    async def read(self) -> str:
-                        return "{}"
-
-                return _F()
-
-            async def __aexit__(self, *exc_info: Any) -> None:  # noqa: ANN002
-                return None
-
-        return _C()
-
-    fake_aiofiles.open = _fake_open  # type: ignore[attr-defined]
-    monkeypatch.setitem(sys.modules, "aiofiles", fake_aiofiles)
-    monkeypatch.setattr(yaml, "safe_load", lambda _: {"PINECONE_API_KEY": "key"})
     monkeypatch.setattr(vbc, "load_config", lambda _name: SimpleNamespace(embedding=object()))
 
     class DummyEmbed:
@@ -306,6 +258,7 @@ def test_search_propagates_selected_page_fetch_failure(
     context = SimpleNamespace(
         auth_manager=DummyAuth(),
         notebook_client=FailingNotebookClient(),
+        settings=SimpleNamespace(secrets={"PINECONE_API_KEY": "key"}),
     )
 
     with pytest.raises(RuntimeError, match="page fetch failed"):

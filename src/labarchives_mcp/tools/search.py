@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -17,9 +16,6 @@ async def search_labarchives(
     context: ToolContext, query: str, limit: int = 5
 ) -> list[dict[str, Any]]:
     """Search indexed LabArchives notebooks semantically."""
-    import aiofiles  # type: ignore[import-untyped]
-    import yaml  # type: ignore[import-untyped]
-
     from vector_backend.config import load_config
     from vector_backend.embedding import create_embedding_client
     from vector_backend.index import PineconeIndex
@@ -28,20 +24,24 @@ async def search_labarchives(
 
     logger.info(f"search_labarchives called: query='{query}', limit={limit}")
 
-    env_path = os.environ.get("LABARCHIVES_CONFIG_PATH")
-    secrets_path = Path(env_path) if env_path else Path("conf/secrets.yml")
-
-    async with aiofiles.open(secrets_path) as f:
-        content = await f.read()
-        secrets = yaml.safe_load(content)
+    if context.settings is None:
+        raise RuntimeError("ToolContext.settings is required for search_labarchives.")
+    secrets = context.settings.secrets
+    try:
+        pinecone_api_key = str(secrets["PINECONE_API_KEY"])
+    except KeyError as exc:
+        raise RuntimeError(
+            "PINECONE_API_KEY is required in the configured secrets file "
+            "for search_labarchives."
+        ) from exc
 
     config = load_config("default")
     embedding_client = create_embedding_client(config.embedding)
 
     index = PineconeIndex(
         index_name="labarchives-test",
-        api_key=secrets["PINECONE_API_KEY"],
-        environment=secrets.get("PINECONE_ENVIRONMENT", "us-east-1"),
+        api_key=pinecone_api_key,
+        environment=str(secrets.get("PINECONE_ENVIRONMENT", "us-east-1")),
         namespace=None,
     )
 

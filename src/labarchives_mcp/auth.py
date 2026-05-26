@@ -5,7 +5,6 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
-import os
 import time
 from pathlib import Path
 from typing import Any, cast
@@ -133,10 +132,7 @@ class Credentials(BaseModel):
     @classmethod
     def from_file(cls, path: Path | str | None = None) -> Credentials:
         """Create credentials from a YAML secrets file located under ``conf/`` by default."""
-        env_path = os.environ.get("LABARCHIVES_CONFIG_PATH")
-        if env_path:
-            location = _resolve_secrets_location(env_path, source="LABARCHIVES_CONFIG_PATH")
-        elif path is not None:
+        if path is not None:
             location = _resolve_secrets_location(path, source="path")
         else:
             location = _resolve_secrets_location("conf/secrets.yml", source="default")

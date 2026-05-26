@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from ..state import StateManager
+
+if TYPE_CHECKING:
+    from ..settings import Settings
 
 
 @dataclass(slots=True)
@@ -18,3 +21,4 @@ class ToolContext:
     state_manager: StateManager
     server_version: str
     service_module: Any
+    settings: Settings | None = None
