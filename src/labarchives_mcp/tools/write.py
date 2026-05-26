@@ -18,6 +18,7 @@ from ..models.upload import (
     UploadResponse,
 )
 from ..schemas.tool_responses import UploadToLabArchivesResponse, WriteNotebookEntryResponse
+from ..transform import markdown_to_html
 from .context import ToolContext
 from .decorators import tool
 
@@ -153,7 +154,7 @@ async def write_notebook_entry(
 
     normalized_format = content_format.strip().lower()
     if normalized_format in {"markdown", "md"}:
-        entry_body = cast(str, context.notebook_client._markdown_to_html(content))
+        entry_body = markdown_to_html(content)
         part_type = "text entry"
     elif normalized_format in {"html", "rich", "rich_text"}:
         entry_body = content

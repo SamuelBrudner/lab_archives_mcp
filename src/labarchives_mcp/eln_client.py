@@ -2,18 +2,15 @@
 
 from __future__ import annotations
 
-import html as _html
-import re
-from collections.abc import Callable
 from datetime import UTC
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 import httpx
 from loguru import logger
 from pydantic import BaseModel, Field, ValidationError
 
 from .auth import AuthenticationManager
-from .transform import NotebookTransformer
+from .transform import markdown_to_html, parse_notebook_xml
 
 if TYPE_CHECKING:
     from .models.upload import (
@@ -69,115 +66,6 @@ class LabArchivesClient:
         self._client = client
         self._auth_manager = auth_manager
 
-    @staticmethod
-    def _markdown_to_html(markdown_text: str, require_lib: bool = False) -> str:
-        """Convert Markdown to HTML.
-
-        Tries to use the `markdown` package if available; falls back to a
-        lightweight converter handling common constructs (headings, lists,
-        bold/italic, code blocks, inline code, paragraphs).
-        """
-        try:
-            import markdown as _md
-        except ModuleNotFoundError as e:
-            if require_lib:
-                raise RuntimeError(
-                    "High-fidelity Markdown conversion requires the 'markdown' package. "
-                    "Install it (e.g., 'pip install markdown' or add to your environment)"
-                ) from e
-            # Fall back to a lightweight converter with a warning
-            logger.warning(
-                f"High-fidelity Markdown conversion not available ({e}); using fallback converter."
-            )
-        else:
-            return str(
-                _md.markdown(
-                    markdown_text,
-                    extensions=[
-                        "fenced_code",
-                        "tables",
-                        "sane_lists",
-                        "toc",
-                        "attr_list",
-                        "codehilite",
-                    ],
-                    output_format=cast(Any, "html5"),
-                )
-            )
-
-        text = markdown_text.replace("\r\n", "\n").replace("\r", "\n")
-
-        # Handle fenced code blocks first to avoid interfering with other rules
-        code_blocks: list[str] = []
-
-        def _codeblock_repl(match: re.Match[str]) -> str:
-            lang = match.group(1) or ""
-            code = match.group(2)
-            escaped = _html.escape(code)
-            code_blocks.append(f'<pre><code class="language-{lang}">{escaped}</code></pre>')
-            return f"[[CODEBLOCK:{len(code_blocks)-1}]]"
-
-        text = re.sub(r"```([\w+-]*)\n([\s\S]*?)\n```", _codeblock_repl, text)
-
-        # Headings
-        def _mk_heading_replacer(level: int) -> Callable[[re.Match[str]], str]:
-            def _repl(m: re.Match[str]) -> str:
-                content = m.group(1).strip()
-                return f"<h{level}>{content}</h{level}>"
-
-            return _repl
-
-        for level in range(6, 0, -1):
-            pattern = re.compile(rf"^{'#' * level} +(.+)$", re.MULTILINE)
-            text = pattern.sub(_mk_heading_replacer(level), text)
-
-        # Unordered lists (simple): group consecutive - or * items
-        lines = text.split("\n")
-        out_lines: list[str] = []
-        in_list = False
-        for line in lines:
-            m = re.match(r"^[\-*] +(.*)$", line)
-            if m:
-                if not in_list:
-                    out_lines.append("<ul>")
-                    in_list = True
-                out_lines.append(f"<li>{m.group(1).strip()}</li>")
-            else:
-                if in_list:
-                    out_lines.append("</ul>")
-                    in_list = False
-                out_lines.append(line)
-        if in_list:
-            out_lines.append("</ul>")
-        text = "\n".join(out_lines)
-
-        # Inline code
-        text = re.sub(r"`([^`]+)`", lambda m: f"<code>{_html.escape(m.group(1))}</code>", text)
-
-        # Bold and italic (basic non-greedy)
-        text = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", text)
-        text = re.sub(r"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)", r"<em>\1</em>", text)
-
-        # Paragraphs: wrap non-HTML lines separated by blank lines
-        blocks = [b.strip() for b in text.split("\n\n")]
-        wrapped_blocks: list[str] = []
-        for b in blocks:
-            if not b:
-                continue
-            if b.startswith("<h") or b.startswith("<ul>") or b.startswith("<pre>"):
-                wrapped_blocks.append(b)
-            else:
-                wrapped_blocks.append(f"<p>{b}</p>")
-        html = "\n\n".join(wrapped_blocks)
-
-        # Restore code blocks placeholders
-        def _restore_code(m: re.Match[str]) -> str:
-            idx = int(m.group(1))
-            return code_blocks[idx]
-
-        html = re.sub(r"\[\[CODEBLOCK:(\d+)\]\]", _restore_code, html)
-        return html
-
     async def list_notebooks(self, uid: str) -> list[NotebookRecord]:
         """Return notebooks for a user uid."""
         auth_params = self._auth_manager._build_auth_params("user_info_via_id")
@@ -190,7 +78,7 @@ class LabArchivesClient:
         response.raise_for_status()
 
         payload = response.text
-        raw_records = self.parse_xml(payload)
+        raw_records = parse_notebook_xml(payload)
         logger.info(f"Retrieved {len(raw_records)} notebooks for user")
 
         notebooks: list[NotebookRecord] = []
@@ -202,12 +90,6 @@ class LabArchivesClient:
                 raise ValueError("Invalid notebook record received from LabArchives") from exc
 
         return notebooks
-
-    @staticmethod
-    def parse_xml(payload: str) -> list[dict[str, Any]]:
-        """Parse LabArchives notebook XML into dictionaries."""
-
-        return NotebookTransformer.parse_notebook_list(payload)
 
     async def get_notebook_tree(
         self, uid: str, nbid: str, parent_tree_id: int | str = 0
@@ -556,7 +438,7 @@ class LabArchivesClient:
                 entry_body = file_text
             elif suffix in {".md", ".markdown"}:
                 part_type = "text entry"
-                entry_body = self._markdown_to_html(file_text, require_lib=True)
+                entry_body = markdown_to_html(file_text, require_lib=True)
             else:
                 part_type = "plain text entry"
                 entry_body = file_text

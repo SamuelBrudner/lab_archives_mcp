@@ -11,6 +11,7 @@ from pydantic import HttpUrl
 
 from labarchives_mcp.auth import AuthenticationManager, Credentials
 from labarchives_mcp.eln_client import LabArchivesClient, NotebookRecord
+from labarchives_mcp.transform import parse_notebook_xml
 
 
 def test_list_notebooks_handles_http_errors(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -60,8 +61,8 @@ def test_notebook_record_model() -> None:
     assert record.modified_at == "2025-01-02T08:30:00Z"
 
 
-def test_parse_xml_hydrates_records() -> None:
-    """Given LabArchives notebook XML from user_info_via_id, when `parse_xml()` runs,
+def test_parse_notebook_xml_hydrates_records() -> None:
+    """Given LabArchives notebook XML from user_info_via_id, when parsing runs,
     then it yields normalized dictionaries."""
     xml_payload = (
         "<users>"
@@ -88,7 +89,7 @@ def test_parse_xml_hydrates_records() -> None:
         "</users>"
     )
 
-    records = LabArchivesClient.parse_xml(xml_payload)
+    records = parse_notebook_xml(xml_payload)
 
     assert records == [
         {
