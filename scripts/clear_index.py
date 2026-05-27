@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Clear all vectors from the Pinecone index."""
+"""Clear all vectors from the default runtime Pinecone index."""
 
 import sys
 from pathlib import Path
@@ -21,7 +21,7 @@ def main() -> None:
 
     # Connect to Pinecone
     pc = Pinecone(api_key=secrets["PINECONE_API_KEY"])
-    index = pc.Index("labarchives-test")
+    index = pc.Index("labarchives-semantic-search")
 
     # Get stats before
     stats = index.describe_index_stats()

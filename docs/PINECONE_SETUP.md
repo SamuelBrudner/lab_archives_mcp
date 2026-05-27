@@ -45,11 +45,11 @@ Expected output:
 ```
 Setting up Pinecone...
 
-Creating index 'labarchives-test'...
+Creating index 'labarchives-semantic-search'...
   - Dimension: 1536
   - Metric: cosine
   - Spec: Serverless (us-east-1)
-Index 'labarchives-test' created successfully.
+Index 'labarchives-semantic-search' created successfully.
 
 Pinecone setup complete.
 ```
@@ -148,7 +148,7 @@ pip install -e ".[vector]"
 ```python
 from pinecone import Pinecone
 pc = Pinecone(api_key="your-key")
-pc.delete_index("labarchives-test")
+pc.delete_index("labarchives-semantic-search")
 ```
 
 Then rerun `scripts/setup_pinecone.py`.
@@ -177,7 +177,7 @@ If the script doesn't work, you can create the index manually:
 1. Visit https://app.pinecone.io/
 2. Click "Create Index"
 3. Settings:
-   - **Name:** `labarchives-test`
+   - **Name:** `labarchives-semantic-search`
    - **Dimensions:** `1536`
    - **Metric:** `cosine`
    - **Cloud:** AWS

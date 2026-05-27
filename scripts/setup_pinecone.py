@@ -1,6 +1,6 @@
-"""Set up Pinecone index for vector backend testing.
+"""Set up the runtime Pinecone index for the vector backend.
 
-This script creates the test index with correct configuration.
+This script creates the default index used by the runtime configuration.
 
 Usage:
     python scripts/setup_pinecone.py
@@ -50,7 +50,7 @@ def main() -> None:
         pc = Pinecone(api_key=api_key)
 
         # Configuration
-        index_name = "labarchives-test"
+        index_name = "labarchives-semantic-search"
         dimension = 1536  # text-embedding-3-small dimension
         metric = "cosine"
 
