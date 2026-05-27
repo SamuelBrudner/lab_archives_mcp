@@ -202,16 +202,15 @@ async def sync_vector_index(
             title = node.get("display_text") or node.get("name") or pid
             entries = await nb_client.get_page_entries(uid, nbid, pid)
 
-            entry_dicts: list[dict[str, Any]] = [dict(entry) for entry in entries]
             selected_entries = (
-                select_incremental_entries(entry_dicts, built_at_dt)
+                select_incremental_entries(entries, built_at_dt)
                 if built_at_dt
-                else entry_dicts
+                else entries
             )
             if not selected_entries:
                 continue
 
-            page_data = {
+            page_data: dict[str, Any] = {
                 "notebook_id": nbid,
                 "notebook_name": notebook_name,
                 "page_id": pid,

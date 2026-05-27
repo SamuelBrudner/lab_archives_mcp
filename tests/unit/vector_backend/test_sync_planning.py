@@ -8,12 +8,19 @@ Covers:
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from typing import TypedDict
 
 from vector_backend.build_state import build_record_from_config, compute_config_fingerprint
 from vector_backend.chunking import ChunkingConfig
 from vector_backend.config import IncrementalUpdateConfig, IndexConfig, VectorSearchConfig
 from vector_backend.embedding import EmbeddingConfig
 from vector_backend.sync import plan_sync, select_incremental_entries
+
+
+class TypedEntry(TypedDict, total=False):
+    eid: str
+    created_at: str | None
+    updated_at: str | None
 
 
 def _config() -> VectorSearchConfig:
@@ -102,7 +109,7 @@ class TestIncrementalSelection:
 
     def test_handles_missing_or_invalid_dates(self) -> None:
         built_at = datetime(2025, 10, 1, 12, 0, 0, tzinfo=UTC)
-        entries: list[dict[str, object]] = [
+        entries: list[TypedEntry] = [
             {"eid": "1", "created_at": None, "updated_at": None},
             {"eid": "2", "created_at": "not-a-date"},
             {"eid": "3", "updated_at": "2025-10-01T12:00:01Z"},

@@ -7,8 +7,9 @@ These pure functions make it easy to TDD the MCP sync behavior:
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime, timedelta
-from typing import Any, TypedDict
+from typing import TypedDict
 
 from vector_backend.build_state import should_rebuild
 from vector_backend.models import BuildRecord
@@ -78,25 +79,25 @@ def plan_sync(
     }
 
 
-def _parse_when(s: str | None) -> datetime | None:
-    if not s:
+def _parse_when(value: object) -> datetime | None:
+    if not isinstance(value, str) or not value:
         return None
     try:
         # Accept Z suffix
-        return datetime.fromisoformat(s.replace("Z", "+00:00"))
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError:
         return None
 
 
 def select_incremental_entries(
-    entries: list[dict[str, Any]], built_after: datetime
-) -> list[dict[str, Any]]:
+    entries: Sequence[Mapping[str, object]], built_after: datetime
+) -> list[Mapping[str, object]]:
     """Return entries whose created_at or updated_at are strictly after built_after.
 
     Entries with missing or invalid timestamps are excluded (conservative default
     to avoid unnecessary re-indexing).
     """
-    selected: list[dict[str, Any]] = []
+    selected: list[Mapping[str, object]] = []
     for e in entries:
         updated = _parse_when(e.get("updated_at"))
         created = _parse_when(e.get("created_at"))
