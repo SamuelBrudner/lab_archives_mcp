@@ -78,6 +78,7 @@ The server will look for `conf/secrets.yml` in the current working directory.
   ```
 - Persist the returned `sticky_context` in your agent memory and include it with every response that references LabArchives content.
 - Start a project context (`create_project`) for multi-session work; state persists to `~/.labarchives_state/session_state.json`. Visits and findings only record when a project is active.
+- Set `LABARCHIVES_STATE_DIR` to an absolute directory path if the agent should store state outside the default `~/.labarchives_state` directory.
 
 ### Generic MCP Client
 
