@@ -47,7 +47,7 @@ Open-source ELNs such as eLabFTW provide self-hosted notebook management with a 
 3. **MCP server (`mcp_server.py`)**
    - Exposes notebook operations as MCP tools using the FastMCP framework [@fastmcp].
    - Publishes tool schemas for MCP clients.
-   - In `v0.4.0`, the FastMCP bootstrap registers 17 user-facing MCP tools plus the `get_onboard_payload` support tool through `tools/registry.py`, 18 total. The user-facing tool surface has five categories: discovery (`list_labarchives_notebooks`, `list_notebook_pages`), reading (`read_notebook_page`), search and indexing (`search_labarchives`, `sync_vector_index`), project state and graph navigation (`create_project`, `list_projects`, `switch_project`, `delete_project`, `log_finding`, `get_current_context`, `get_related_pages`, `trace_provenance`, `suggest_next_steps`, `export_provenance_jsonld`), and write & provenance (`write_notebook_entry`, `upload_to_labarchives`). `write_notebook_entry` writes a rich text entry directly to a LabArchives page, appending to an existing page or creating a page when `page_id` is omitted. `upload_to_labarchives` uploads a file to LabArchives with code provenance metadata, creating a page and storing the file as page text or an attachment. The `get_onboard_payload` support tool returns usage guidance for MCP clients. Setting `LABARCHIVES_ENABLE_UPLOAD=false` disables the two write & provenance tools, leaving 15 user-facing read/search/state tools plus the support tool, 16 total.
+   - In `v0.5.0`, the FastMCP bootstrap registers 17 user-facing MCP tools plus the `get_onboard_payload` support tool through `tools/registry.py`, 18 total. The user-facing tool surface has five categories: discovery (`list_labarchives_notebooks`, `list_notebook_pages`), reading (`read_notebook_page`), search and indexing (`search_labarchives`, `sync_vector_index`), project state and graph navigation (`create_project`, `list_projects`, `switch_project`, `delete_project`, `log_finding`, `get_current_context`, `get_related_pages`, `trace_provenance`, `suggest_next_steps`, `export_provenance_jsonld`), and write & provenance (`write_notebook_entry`, `upload_to_labarchives`). `write_notebook_entry` writes a rich text entry directly to a LabArchives page, appending to an existing page or creating a page when `page_id` is omitted. `upload_to_labarchives` uploads a file to LabArchives with code provenance metadata, creating a page and storing the file as page text or an attachment. The `get_onboard_payload` support tool returns usage guidance for MCP clients. Setting `LABARCHIVES_ENABLE_UPLOAD=false` disables the two write & provenance tools, leaving 15 user-facing read/search/state tools plus the support tool, 16 total.
 
 4. **Vector backend (`vector_backend/`)**
    - Implements a configuration-driven pipeline for semantic search.
@@ -118,7 +118,7 @@ Search-result validation happens in three steps: `SearchRequest` bounds the quer
 
 Manual testing against real LabArchives notebooks follows a six-check protocol: verify UID resolution, list notebooks, traverse one notebook tree, read one page, run one semantic search against an indexed notebook, and write or upload to a designated test page only when `LABARCHIVES_ENABLE_UPLOAD=true`. Lightweight example assets, including `notebooks/`, `docs/onboard_example.json`, `conf/secrets.example.yml`, and the README schema examples, are included to support smoke testing without exposing private ELN content.
 
-End-to-end tool latency on network-bound calls (notebook listing, page reading, semantic search, write, upload) is dominated by the LabArchives API, the OpenAI embedding endpoint, and the Pinecone index, all of which are external to the package. A reproducible microbenchmark (`scripts/benchmark_internal.py`) measures the in-process operations that the package itself contributes; on an Apple M2 Pro running macOS 26.0.1 and Python 3.11, median latencies over 200 iterations were 0.25 ms for `clean_html` on a representative LabArchives page chunk, 1.3 ms for `StateManager.log_visit`, 2.7 ms for `StateManager.log_finding` (including persistence to `~/.labarchives_state/session_state.json`), and 4.5 ms for `export_project_context` JSON-LD serialization over a 200-visit project graph. These numbers indicate that the package's own dispatch and state-management overhead is below 5 ms per tool call at this scale, so observed tool latency in production is driven almost entirely by the configured external services rather than by the MCP server itself.
+End-to-end tool latency on network-bound calls (notebook listing, page reading, semantic search, write, upload) is dominated by the LabArchives API, the OpenAI embedding endpoint, and the Pinecone index, all of which are external to the package. A reproducible microbenchmark (`scripts/benchmark_internal.py`) measures the in-process operations that the package itself contributes; on an Apple M2 Pro running macOS 26.0.1 and Python 3.11, median (p95) latencies over 200 iterations were 0.28 ms (0.32 ms) for `clean_html` on a representative LabArchives page chunk, 1.4 ms (2.1 ms) for `StateManager.log_visit`, 2.9 ms (3.7 ms) for `StateManager.log_finding` (including persistence to `~/.labarchives_state/session_state.json`), and 4.6 ms (4.9 ms) for `export_project_context` JSON-LD serialization over 40 iterations on a 200-visit project graph. These numbers indicate that the package's own dispatch and state-management overhead is below 5 ms per tool call at this scale, so observed tool latency in production is driven almost entirely by the configured external services rather than by the MCP server itself.
 
 # 4. Availability
 
@@ -128,15 +128,18 @@ End-to-end tool latency on network-bound calls (notebook listing, page reading, 
 - **Source code repository**
   - Public Git repository: <https://github.com/SamuelBrudner/lab_archives_mcp>
   - Default development branch: `main`
-  - Current source-tree version: `0.4.0` (2026-04-20)
-  - Current Zenodo version DOI: <https://doi.org/10.5281/zenodo.19672568>
+  - Current source-tree version: `0.5.0` (2026-05-27)
 
-- **Archived JORS version**
-  - Zenodo version DOI: <https://doi.org/10.5281/zenodo.17772522>
+- **Archived JORS resubmission version**
+  - Zenodo version DOI: [to be assigned upon Zenodo deposit]
   - Zenodo concept DOI: <https://doi.org/10.5281/zenodo.17728440>
+  - Git tag: `v0.5.0`
+  - Archived release date: 2026-05-27
+
+- **Original submission archive (historical traceability)**
+  - Zenodo version DOI: <https://doi.org/10.5281/zenodo.17772522>
   - Git tag: `v0.3.2`
   - Archived release date: 2025-12-01
-  - Version note: the JORS resubmission cites the archived `v0.3.2` Zenodo record. The current `main` source tree is `0.4.0`; cite it when referring to linked-data export or other post-archive changes.
 
 - **License**
   - Distributed under the MIT License.
