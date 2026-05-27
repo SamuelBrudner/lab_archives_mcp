@@ -2,9 +2,15 @@
 
 Manuscript: "Integrating AI Assistants with Electronic Lab Notebooks using the LabArchives Model Context Protocol Server"
 
-Revision date: 26 May 2026
+Revision date: 27 May 2026
 
 This document is organised by reviewer. Reviewer 1's structural comments are addressed first, then Reviewer 2's items, then Reviewer 3's compulsory and minor items. Each entry quotes the reviewer's concern, states whether the manuscript or repository was changed, and identifies the manuscript sections that contain the change. Items where no new content was added carry a `Not changed` label and a justification.
+
+---
+
+## Additional engineering improvements
+
+Between the original submission and this resubmission the codebase was substantially refactored. These changes are not responses to specific reviewer comments; they improve modularity and testability and are described in CHANGELOG v0.5.0. The 823-line `StateManager` god object has been decomposed into a `state/` subpackage with six focused services: `ProjectService` for project lifecycle, `KnowledgeGraph` for visit and finding nodes, `ProvenanceService` for upload provenance entries, `GraphValidationService` for graph health checks, `StateRepository` for on-disk persistence, and a `StateManager` facade that coordinates them. The ~1100-line `mcp_server.py` bootstrap function has been split into a 155-line entry point and a `tools/` subpackage with twelve modules, one per tool category. `VectorIndex` is now a `typing.Protocol` enabling swappable backends without inheritance. Tool responses use `TypedDict` definitions for static-analysis-friendly typing. `AuthenticationManager.build_auth_params()` is now a public API. These improvements are reflected in the revised Implementation and Architecture section (Section 2).
 
 ---
 
@@ -56,7 +62,7 @@ The bibliography has been revised to 16 entries with five peer-reviewed addition
 
 > "No empirical evaluation, benchmarking, user study, or performance metrics are provided to assess effectiveness."
 
-The response has two parts: one on performance metrics and one on a user study. On performance metrics: Section 3 (Quality Control) now reports a reproducible in-process microbenchmark (`scripts/benchmark_internal.py`) with measured median latencies on an Apple M2 Pro running macOS 26.0.1 and Python 3.11: 0.25 ms for `clean_html`, 1.3 ms for `StateManager.log_visit`, 2.7 ms for `StateManager.log_finding` (with disk persistence), and 4.5 ms for `export_project_context` JSON-LD serialization on a 200-visit project graph. End-to-end tool latency on network-bound calls is dominated by the external services (LabArchives API, OpenAI embeddings, Pinecone), so the in-process number bounds the package's own contribution at sub-5 ms per call and indicates that the MCP layer does not add meaningful overhead relative to those services. On a user study: a controlled human-subjects evaluation of task completion and error rates with and without the MCP layer is a valuable next step, but a JORS Software Metapaper describes a software artefact rather than a controlled study with human subjects. Such an evaluation would require its own IRB protocol, recruitment, and analysis, and would fit better as a separate research article. Section 8 acknowledges the absence of such a study as a stated limitation (L3) of the present validation.
+The response has two parts: one on performance metrics and one on a user study. On performance metrics: Section 3 (Quality Control) now reports a reproducible in-process microbenchmark (`scripts/benchmark_internal.py`) with measured median (p95) latencies on an Apple M2 Pro running macOS 26.0.1 and Python 3.11: 0.28 ms (0.32 ms) for `clean_html`, 1.4 ms (2.1 ms) for `StateManager.log_visit`, 2.9 ms (3.7 ms) for `StateManager.log_finding` (with disk persistence), and 4.6 ms (4.9 ms) for `export_project_context` JSON-LD serialization over 40 iterations on a 200-visit project graph. End-to-end tool latency on network-bound calls is dominated by the external services (LabArchives API, OpenAI embeddings, Pinecone), so the in-process number bounds the package's own contribution at sub-5 ms per call and indicates that the MCP layer does not add meaningful overhead relative to those services. On a user study: a controlled human-subjects evaluation of task completion and error rates with and without the MCP layer is a valuable next step, but a JORS Software Metapaper describes a software artefact rather than a controlled study with human subjects. Such an evaluation would require its own IRB protocol, recruitment, and analysis, and would fit better as a separate research article. Section 8 acknowledges the absence of such a study as a stated limitation (L3) of the present validation.
 
 ### R1.9 Primarily descriptive
 
@@ -110,7 +116,7 @@ Revised. The paper Availability section now includes one support paragraph with 
 
 > README BibTeX v0.2.4 -> v0.3.2. Grep repo for "0.2.4"; reconcile every occurrence. Confirm Zenodo, paper, README, CITATION.cff, codemeta.json, pyproject.toml all agree.
 
-Revised. The repository now uses one citation policy across README, paper Availability, `CITATION.cff`, `codemeta.json`, and `pyproject.toml`: the Zenodo concept DOI `10.5281/zenodo.17728440` identifies the software family; the reviewed JORS archive is `v0.3.2` at version DOI `10.5281/zenodo.17772522`; and the current source tree is version `0.4.0`, with current version DOI `10.5281/zenodo.19672568` recorded only for post-archive features. The README DOI badge, `CITATION.cff` primary identifier, and `codemeta.json` identifier use the concept DOI; the README BibTeX and `CITATION.cff` preferred citation use the reviewed archive version DOI. The remaining `0.2.4` strings are the historical `CHANGELOG.md` heading and the `notebook_shim` dependency version in `conda-lock.yml`.
+Revised. The repository uses a three-DOI citation policy across README, paper Availability, `CITATION.cff`, `codemeta.json`, and `pyproject.toml`: the Zenodo concept DOI `10.5281/zenodo.17728440` identifies the software family; the JORS resubmission archive is `v0.5.0` at version DOI [to be assigned upon Zenodo deposit]; and the original submission archive `v0.3.2` at version DOI `10.5281/zenodo.17772522` is retained for historical traceability only. The README BibTeX entry, DOI badge, `CITATION.cff` preferred-citation, and `codemeta.json` all reflect the resubmission archive version. The remaining `0.2.4` strings are the historical `CHANGELOG.md` heading and the `notebook_shim` dependency version in `conda-lock.yml`.
 
 ### R3.2 Write and provenance tool surface
 
