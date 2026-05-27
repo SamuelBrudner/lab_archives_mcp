@@ -1,6 +1,6 @@
 {
   "server": "lab_archives_mcp",
-  "version": "0.3.3",
+  "version": "0.4.0",
   "purpose": "Provide experimental context from LabArchives ELN.",
   "banner": "LabArchives MCP • Access experimental notebooks and context.",
   "how_to_use": {
@@ -15,6 +15,7 @@
       "create_project": "Start a new research context to organize your work.",
       "get_related_pages": "Find related pages via project graph or detected content links.",
       "trace_provenance": "Discover the source and derivation history of an entry.",
+      "export_provenance_jsonld": "Export one saved project context as JSON-LD aligned to PROV-O.",
       "suggest_next_steps": "Get lightweight guidance from the current project state.",
       "list_notebooks": "Enumerate notebooks available to the authenticated user.",
       "list_notebook_pages": "Browse notebook structure to locate pages.",
@@ -28,13 +29,13 @@
       {
         "id": "NB-001",
         "title": "Behavioral Assays",
-        "n_pages": 142,
+        "n_pages": 1,
         "last_updated": "2025-10-20T19:12:00Z"
       },
       {
         "id": "NB-002",
         "title": "Optogenetic Stimuli Logs",
-        "n_pages": 87,
+        "n_pages": 1,
         "last_updated": "2025-10-19T15:04:00Z"
       }
     ],
@@ -58,9 +59,8 @@
     ]
   },
   "sticky_context": {
-    "last_notebook_id": "NB-001",
-    "last_page_id": "PG-120",
     "workflow_hint": "ALWAYS start with search_labarchives for content queries. Use create_project() to organize multi-session work."
   },
-  "router_prompt": "Use LabArchives MCP for anything involving experiments, protocols, results, ELN pages, or managing research contexts."
+  "router_prompt": "Use LabArchives MCP for anything involving experiments, protocols, results, ELN pages, or managing research contexts.",
+  "markdown": "## LabArchives MCP Onboarding\n\n### When to Use\n- User mentions experiments, protocols, results, or prior lab work.\n- Prompts reference LabArchives notebooks, pages, figures, or sample IDs.\n- Requests involve lab dates, experiment logs, or ELN provenance.\n- User wants to start a long-running research task or manage a project context.\n\n### Primary Tools\n- `search_labarchives` — Search ALL notebooks with natural language—no ID needed.\n- `create_project` — Start a new research context to organize your work.\n- `get_related_pages` — Find related pages via project graph or detected content links.\n- `trace_provenance` — Discover the source and derivation history of an entry.\n- `export_provenance_jsonld` — Export one saved project context as JSON-LD aligned to PROV-O.\n- `suggest_next_steps` — Get lightweight guidance from the current project state.\n- `list_notebooks` — Enumerate notebooks available to the authenticated user.\n- `list_notebook_pages` — Browse notebook structure to locate pages.\n- `read_notebook_page` — Retrieve full structured content for a given page.\n\n### Notebooks\n- Behavioral Assays (pages: 1, updated: 2025-10-20T19:12:00Z)\n- Optogenetic Stimuli Logs (pages: 1, updated: 2025-10-19T15:04:00Z)\n\n### Recent Activity\n- Behavioral Assays / Arena QC 2025-10-21: QC drift detected; retuned gain and re-ran baseline check. (updated 2025-10-21T13:45:00Z)\n- Optogenetic Stimuli Logs / Odor Ramping Test: Validated new 45s ramp protocol; recorded spike timing metrics. (updated 2025-10-20T22:18:00Z)\n\n### Router Prompt\nUse LabArchives MCP for anything involving experiments, protocols, results, ELN pages, or managing research contexts."
 }

@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from collections.abc import Callable, Coroutine
+from pathlib import Path
 from typing import Any, ParamSpec, TypeVar, cast
 from unittest.mock import AsyncMock, MagicMock
 
@@ -210,8 +212,6 @@ async def test_payload_as_dict_is_serializable(
     onboard_service: OnboardService,
 ) -> None:
     """Test that as_dict() returns JSON-serializable dict."""
-    import json
-
     payload = await onboard_service.get_payload()
     payload_dict = payload.as_dict()
 
@@ -219,6 +219,96 @@ async def test_payload_as_dict_is_serializable(
     json_str = json.dumps(payload_dict)
     assert json_str
     assert isinstance(json_str, str)
+
+
+@async_test
+async def test_checked_in_onboard_example_matches_generated_payload() -> None:
+    """Ensure docs/onboard_example.json tracks the current static payload shape."""
+    mock_auth = MagicMock(spec=AuthenticationManager)
+    mock_auth.ensure_uid = AsyncMock(return_value="example-uid")
+
+    mock_client = MagicMock(spec=LabArchivesClient)
+    mock_client.list_notebooks = AsyncMock(
+        return_value=[
+            NotebookRecord(
+                nbid="NB-001",
+                name="Behavioral Assays",
+                owner="lab@example.edu",
+                owner_email="lab@example.edu",
+                owner_name="Example Lab",
+                created_at="2025-10-01T12:00:00Z",
+                modified_at="2025-10-20T19:12:00Z",
+            ),
+            NotebookRecord(
+                nbid="NB-002",
+                name="Optogenetic Stimuli Logs",
+                owner="lab@example.edu",
+                owner_email="lab@example.edu",
+                owner_name="Example Lab",
+                created_at="2025-10-02T12:00:00Z",
+                modified_at="2025-10-19T15:04:00Z",
+            ),
+        ]
+    )
+    mock_client.get_notebook_tree = AsyncMock(
+        side_effect=[
+            [
+                {
+                    "tree_id": "PG-120",
+                    "display_text": "Arena QC 2025-10-21",
+                    "is_page": True,
+                    "is_folder": False,
+                }
+            ],
+            [
+                {
+                    "tree_id": "PG-087",
+                    "display_text": "Odor Ramping Test",
+                    "is_page": True,
+                    "is_folder": False,
+                }
+            ],
+        ]
+    )
+    mock_client.get_page_entries = AsyncMock(
+        side_effect=[
+            [
+                {
+                    "eid": "E-120",
+                    "part_type": "text_entry",
+                    "content": (
+                        "<p>QC drift detected; retuned gain and re-ran baseline check.</p>"
+                    ),
+                    "created_at": "2025-10-21T13:30:00Z",
+                    "updated_at": "2025-10-21T13:45:00Z",
+                }
+            ],
+            [
+                {
+                    "eid": "E-087",
+                    "part_type": "text_entry",
+                    "content": (
+                        "<p>Validated new 45s ramp protocol; "
+                        "recorded spike timing metrics.</p>"
+                    ),
+                    "created_at": "2025-10-20T22:00:00Z",
+                    "updated_at": "2025-10-20T22:18:00Z",
+                }
+            ],
+        ]
+    )
+
+    service = OnboardService(
+        auth_manager=mock_auth,
+        notebook_client=cast(LabArchivesClient, mock_client),
+        version="0.4.0",
+    )
+    generated = (await service.get_payload()).as_dict()
+
+    example_path = Path(__file__).resolve().parents[2] / "docs" / "onboard_example.json"
+    checked_in = json.loads(example_path.read_text(encoding="utf-8"))
+
+    assert checked_in == generated
 
 
 @async_test
