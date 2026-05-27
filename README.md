@@ -264,7 +264,7 @@ asyncio.run(test())
   - The MCP server is organized into logical modules with clear responsibilities.
   - Unit tests and integration tests cover key functionality, including authentication, notebook navigation, and upload workflows.
   - GitHub Actions runs the non-integration test suite with `pytest --cov=src --cov-report=xml --cov-report=term`, writes the measured line coverage from `coverage.xml` to the job summary, and attempts a non-blocking Codecov upload on the Ubuntu/Python 3.11 job.
-  - The local revision run on Python 3.11 reported 239 passing non-integration tests, one skipped test, six deselected integration tests, and 74% total line coverage. Use the Codecov badge for the current main-branch value.
+  - The local revision run on Python 3.11 reported 262 passing non-integration tests, one skipped test (the `rdflib`-gated linked-data round-trip case), six deselected integration tests, and 81% total line coverage. Use the Codecov badge for the current main-branch value.
 
 - **Security and authentication**
   - The MCP server uses HMAC-SHA512 signing for authentication, with credentials stored securely in environment variables or configuration files.
@@ -683,6 +683,7 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for:
 If you use this software in your research, please cite:
 
 ```bibtex
+% JORS-reviewed archive version; use version 0.4.0 / DOI 10.5281/zenodo.19672568 only for post-archive features.
 @software{brudner2025labarchives,
   author = {Brudner, Samuel N.},
   title = {LabArchives MCP Server: AI Integration for Electronic Lab Notebooks},
