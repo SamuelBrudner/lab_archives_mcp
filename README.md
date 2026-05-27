@@ -661,14 +661,14 @@ See `CONTRIBUTING.md` for versioning, Conventional Commits, and release steps.
 Use this citation policy consistently:
 
 - Software concept DOI: <https://doi.org/10.5281/zenodo.17728440>
-- JORS reviewed archive: `v0.3.2`, version DOI <https://doi.org/10.5281/zenodo.17772522>, Git tag <https://github.com/SamuelBrudner/lab_archives_mcp/releases/tag/v0.3.2>
-- Current source tree: `0.4.0`, version DOI <https://doi.org/10.5281/zenodo.19672568>
+- JORS resubmission archive: `v0.5.0`, version DOI to be assigned upon Zenodo deposit, Git tag <https://github.com/SamuelBrudner/lab_archives_mcp/releases/tag/v0.5.0>
+- Original submission archive (historical traceability): `v0.3.2`, version DOI <https://doi.org/10.5281/zenodo.17772522>
 
 The DOI badge, `CITATION.cff` primary identifier, and `codemeta.json`
 identifier use the concept DOI. The README BibTeX and `CITATION.cff`
-preferred citation use the reviewed `v0.3.2` version DOI for the JORS archive.
-Cite the current `0.4.0` version DOI only when referring specifically to
-linked-data export or other post-archive changes.
+preferred citation point to the `v0.5.0` resubmission archive; the BibTeX
+`doi` field will be updated to the version-specific DOI after Zenodo
+deposit. The `v0.3.2` DOI is retained for historical traceability only.
 
 ## Contributing
 
@@ -684,14 +684,14 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for:
 If you use this software in your research, please cite:
 
 ```bibtex
-% JORS-reviewed archive version; use version 0.4.0 / DOI 10.5281/zenodo.19672568 only for post-archive features.
-@software{brudner2025labarchives,
+% JORS resubmission archive version. Update doi and url to the v0.5.0 version DOI after Zenodo deposit.
+@software{brudner2026labarchives,
   author = {Brudner, Samuel N.},
   title = {LabArchives MCP Server: AI Integration for Electronic Lab Notebooks},
-  year = {2025},
-  doi = {10.5281/zenodo.17772522},
-  url = {https://doi.org/10.5281/zenodo.17772522},
-  version = {0.3.2}
+  year = {2026},
+  doi = {10.5281/zenodo.17728440},
+  url = {https://doi.org/10.5281/zenodo.17728440},
+  version = {0.5.0}
 }
 ```
 

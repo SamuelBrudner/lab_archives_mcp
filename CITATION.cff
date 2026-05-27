@@ -1,14 +1,12 @@
 cff-version: 1.2.0
-message: "Primary identifier is the Zenodo concept DOI for this software. For the JORS reviewed archive, cite the v0.3.2 Zenodo version record: https://doi.org/10.5281/zenodo.17772522. The current v0.4.0 version record is https://doi.org/10.5281/zenodo.19672568."
+message: "Primary identifier is the Zenodo concept DOI for this software. For the JORS resubmission archive, cite the v0.5.0 Zenodo version record (DOI to be assigned upon Zenodo deposit). The original submission archive v0.3.2 is at https://doi.org/10.5281/zenodo.17772522 (historical traceability only)."
 type: software
 title: "LabArchives MCP Server: AI Integration for Electronic Lab Notebooks"
-version: 0.4.0
+version: 0.5.0
 identifiers:
   - type: doi
     value: 10.5281/zenodo.17728440
-  - type: doi
-    value: 10.5281/zenodo.19672568
-date-released: "2026-04-20"
+date-released: "2026-05-27"
 authors:
   - family-names: "Brudner"
     given-names: "Samuel N."
@@ -39,7 +37,8 @@ preferred-citation:
     - family-names: "Brudner"
       given-names: "Samuel N."
       orcid: "https://orcid.org/0000-0002-6043-9328"
-  year: 2025
-  doi: 10.5281/zenodo.17772522
-  version: 0.3.2
+  year: 2026
+  doi: 10.5281/zenodo.17728440
+  version: 0.5.0
   repository-code: "https://github.com/SamuelBrudner/lab_archives_mcp"
+  notes: "Update doi to the v0.5.0 version-specific DOI after Zenodo deposit."
