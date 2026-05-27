@@ -9,6 +9,8 @@ from labarchives_mcp.settings import (
     CONFIG_PATH_ENV,
     STATE_DIR_ENV,
     UPLOAD_ENABLED_ENV,
+    VECTOR_CONFIG_ENV,
+    VECTOR_CONFIG_PATH_ENV,
     Settings,
 )
 
@@ -36,12 +38,16 @@ def test_settings_from_env_centralizes_runtime_config(tmp_path: Path) -> None:
             CONFIG_PATH_ENV: str(secrets_path),
             UPLOAD_ENABLED_ENV: "false",
             STATE_DIR_ENV: str(state_dir),
+            VECTOR_CONFIG_ENV: "ci",
+            VECTOR_CONFIG_PATH_ENV: str(tmp_path / "vector-conf"),
         }
     )
 
     assert settings.secrets_path == secrets_path
     assert settings.state_dir == state_dir
     assert settings.upload_enabled is False
+    assert settings.vector_config_name == "ci"
+    assert settings.vector_config_path == tmp_path / "vector-conf"
     assert isinstance(settings.credentials, Credentials)
     assert settings.credentials.akid == "example-akid"
     assert str(settings.credentials.region) == "https://api.labarchives.com/"

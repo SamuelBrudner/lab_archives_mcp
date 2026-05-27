@@ -257,10 +257,18 @@ def test_search_propagates_selected_page_fetch_failure(
     monkeypatch.setattr(vbe, "create_embedding_client", lambda _cfg: DummyEmbed())
     monkeypatch.setattr(vbi, "PineconeIndex", DummyIndex)
 
+    class DummyVectorRuntime:
+        def get_embedding_client(self) -> DummyEmbed:
+            return DummyEmbed()
+
+        async def get_index(self) -> DummyIndex:
+            return DummyIndex()
+
     context = SimpleNamespace(
         auth_manager=DummyAuth(),
         notebook_client=FailingNotebookClient(),
         settings=SimpleNamespace(secrets={"PINECONE_API_KEY": "key"}),
+        get_vector_runtime=lambda: DummyVectorRuntime(),
     )
 
     with pytest.raises(RuntimeError, match="page fetch failed"):

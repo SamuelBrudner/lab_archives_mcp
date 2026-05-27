@@ -45,11 +45,14 @@ class VectorIndex(Protocol):
         """
         ...
 
-    async def search(self, request: SearchRequest) -> list[SearchResult]:
+    async def search(
+        self, request: SearchRequest, query_vector: list[float] | None = None
+    ) -> list[SearchResult]:
         """Perform semantic search.
 
         Args:
             request: Search query with filters and limits
+            query_vector: Optional pre-computed query vector
 
         Returns:
             List of search results ranked by similarity
@@ -305,7 +308,9 @@ class QdrantIndex:
         """Delete chunks from Qdrant."""
         raise NotImplementedError
 
-    async def search(self, request: SearchRequest) -> list[SearchResult]:
+    async def search(
+        self, request: SearchRequest, query_vector: list[float] | None = None
+    ) -> list[SearchResult]:
         """Search Qdrant collection."""
         raise NotImplementedError
 

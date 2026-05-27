@@ -13,8 +13,11 @@ class StructuralIndex:
     async def delete(self, chunk_ids: list[str]) -> None:
         self.deleted = chunk_ids
 
-    async def search(self, request: SearchRequest) -> list[SearchResult]:
+    async def search(
+        self, request: SearchRequest, query_vector: list[float] | None = None
+    ) -> list[SearchResult]:
         self.last_request = request
+        self.last_query_vector = query_vector
         return []
 
     async def stats(self) -> IndexStats:

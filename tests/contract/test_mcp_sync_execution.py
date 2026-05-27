@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any, cast
 
 import pytest
@@ -10,6 +11,7 @@ from pydantic import HttpUrl
 
 from labarchives_mcp import mcp_server
 from labarchives_mcp.auth import Credentials
+from labarchives_mcp.settings import Settings
 
 
 def _setup_fastmcp_capture(mcp_module: Any) -> dict[str, Any]:
@@ -86,8 +88,14 @@ def mcp_env_exec(monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest
     fake_openai = types.ModuleType("openai")
     sys.modules["openai"] = fake_openai
 
+    settings = Settings(
+        credentials=DummyCredentials(),
+        secrets_path=Path("conf/secrets.yml"),
+        secrets={"OPENAI_API_KEY": "x", "PINECONE_API_KEY": "y"},
+    )
+
     # Wire server (captures tools)
-    asyncio.run(mcp_server.run_server())
+    asyncio.run(mcp_server.run_server(settings=settings))
     captured["module"] = mcp_module
 
     def _cleanup() -> None:
@@ -358,6 +366,9 @@ def test_sync_exec_propagates_page_entry_fetch_failure(
         def __init__(self, *args: Any, **kwargs: Any) -> None:  # noqa: D401, ARG002
             pass
 
+        async def health_check(self) -> bool:  # noqa: D401
+            return True
+
     monkeypatch.setattr(vbe, "create_embedding_client", lambda cfg: DummyEmbed())
     monkeypatch.setattr(vbi, "PineconeIndex", DummyIndex)
 
@@ -399,6 +410,9 @@ def test_sync_exec_propagates_build_record_save_failure(
     class DummyIndex:
         def __init__(self, *args: Any, **kwargs: Any) -> None:  # noqa: D401, ARG002
             pass
+
+        async def health_check(self) -> bool:  # noqa: D401
+            return True
 
     def fail_save(path: Any, record: Any) -> None:  # noqa: ANN401, ARG001
         raise RuntimeError("record save failed")

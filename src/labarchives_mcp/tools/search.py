@@ -8,6 +8,9 @@ from typing import Any
 
 from loguru import logger
 
+from vector_backend.labarchives_indexer import clean_html
+from vector_backend.models import SearchRequest, SearchResult
+
 from ..schemas.tool_responses import (
     NotebookTreeNodeResponse,
     SearchResultResponse,
@@ -21,39 +24,11 @@ async def search_labarchives(
     context: ToolContext, query: str, limit: int = 5
 ) -> list[SearchResultResponse]:
     """Search indexed LabArchives notebooks semantically."""
-    from vector_backend.config import load_config
-    from vector_backend.embedding import create_embedding_client
-    from vector_backend.index import PineconeIndex
-    from vector_backend.labarchives_indexer import clean_html
-    from vector_backend.models import SearchRequest, SearchResult
-
     logger.info(f"search_labarchives called: query='{query}', limit={limit}")
 
-    if context.settings is None:
-        raise RuntimeError("ToolContext.settings is required for search_labarchives.")
-    secrets = context.settings.secrets
-    try:
-        pinecone_api_key = str(secrets["PINECONE_API_KEY"])
-    except KeyError as exc:
-        raise RuntimeError(
-            "PINECONE_API_KEY is required in the configured secrets file "
-            "for search_labarchives."
-        ) from exc
-
-    config = load_config("default")
-    embedding_client = create_embedding_client(config.embedding)
-
-    index = PineconeIndex(
-        index_name="labarchives-test",
-        api_key=pinecone_api_key,
-        environment=str(secrets.get("PINECONE_ENVIRONMENT", "us-east-1")),
-        namespace=None,
-    )
-
-    healthy = await index.health_check()
-    if not healthy:
-        raise RuntimeError("Pinecone index not reachable. Check network, API key, or environment.")
-
+    vector_runtime = context.get_vector_runtime()
+    embedding_client = vector_runtime.get_embedding_client()
+    index = await vector_runtime.get_index()
     logger.debug("Generating query embedding...")
     query_vector = await embedding_client.embed_single(query)
 
@@ -136,13 +111,11 @@ async def sync_vector_index(
         load_build_record,
         save_build_record,
     )
-    from vector_backend.config import load_config
-    from vector_backend.embedding import create_embedding_client
-    from vector_backend.index import PineconeIndex
     from vector_backend.notebook_indexer import NotebookIndexer
     from vector_backend.sync import plan_sync, select_incremental_entries
 
-    config = load_config("default")
+    vector_runtime = context.get_vector_runtime()
+    config = vector_runtime.get_config()
     record_path = Path(config.incremental_updates.last_indexed_file)
     record = load_build_record(record_path)
     current_fp = compute_config_fingerprint(config)
@@ -214,13 +187,8 @@ async def sync_vector_index(
                 "indexed_chunks": 0,
             }
 
-        embed_client = create_embedding_client(config.embedding)
-        index_client = PineconeIndex(
-            index_name=config.index.index_name,
-            api_key=config.index.api_key or "",
-            environment=config.index.environment or "us-east-1",
-            namespace=config.index.namespace,
-        )
+        embed_client = vector_runtime.get_embedding_client()
+        index_client = await vector_runtime.get_index()
         indexer = NotebookIndexer(
             embedding_client=embed_client,
             vector_index=index_client,

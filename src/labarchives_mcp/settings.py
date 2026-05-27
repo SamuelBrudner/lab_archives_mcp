@@ -20,6 +20,8 @@ from .auth_loader import (
 CONFIG_PATH_ENV = "LABARCHIVES_CONFIG_PATH"
 UPLOAD_ENABLED_ENV = "LABARCHIVES_ENABLE_UPLOAD"
 STATE_DIR_ENV = "LABARCHIVES_STATE_DIR"
+VECTOR_CONFIG_ENV = "LABARCHIVES_VECTOR_CONFIG"
+VECTOR_CONFIG_PATH_ENV = "LABARCHIVES_VECTOR_CONFIG_PATH"
 DEFAULT_SECRETS_PATH = Path("conf/secrets.yml")
 
 
@@ -64,6 +66,14 @@ class Settings(BaseModel):
         default=True,
         description="Whether LabArchives write/upload tools should be registered",
     )
+    vector_config_name: str = Field(
+        default="default",
+        description="Hydra vector-search config name to load without the .yaml suffix",
+    )
+    vector_config_path: Path | None = Field(
+        default=None,
+        description="Optional directory containing vector-search Hydra configs",
+    )
     secrets: dict[str, Any] = Field(
         default_factory=dict,
         repr=False,
@@ -105,11 +115,18 @@ class Settings(BaseModel):
             default=True,
             name=UPLOAD_ENABLED_ENV,
         )
+        vector_config_name = env.get(VECTOR_CONFIG_ENV, "default").strip() or "default"
+        vector_config_path_raw = env.get(VECTOR_CONFIG_PATH_ENV)
+        vector_config_path = (
+            _setting_path(vector_config_path_raw) if vector_config_path_raw else None
+        )
 
         return cls(
             credentials=credentials,
             secrets_path=resolved_path,
             state_dir=state_dir,
             upload_enabled=upload_enabled,
+            vector_config_name=vector_config_name,
+            vector_config_path=vector_config_path,
             secrets=secrets,
         )
