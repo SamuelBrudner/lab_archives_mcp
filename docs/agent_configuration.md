@@ -264,4 +264,4 @@ export LABARCHIVES_CONFIG_PATH=/absolute/path/to/conf/secrets.yml
 - **Test connection**: Use MCP Inspector to verify the server works
 - **Configure agent**: Add server to Claude Desktop config
 - **Monitor logs**: Check `logs/` directory for detailed server activity
-- **Extend**: Add LabArchives client methods in `src/labarchives_mcp/eln_client.py` and MCP tools in `src/labarchives_mcp/mcp_server.py`
+- **Extend**: Add LabArchives client methods in `src/labarchives_mcp/eln_client.py`, place MCP tools in `src/labarchives_mcp/tools/`, and wire them through `src/labarchives_mcp/tools/registry.py`
