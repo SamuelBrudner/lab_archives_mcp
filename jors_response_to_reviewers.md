@@ -96,7 +96,7 @@ Revised. The fabricated conversational example was removed from the paper and RE
 
 > Formal, sober. Include one copy-pasteable example invocation (MCP tool call with arguments and abbreviated response). Cut adjectives.
 
-Revised. The abstract now states what the package exposes, defines MCP, and includes a one-line JSON `write_notebook_entry` invocation with an abbreviated response. Promotional phrasing and remaining banned phrasing were removed from the manuscript.
+Revised. The abstract now states what the package exposes, defines MCP, and includes a one-line JSON `write_notebook_entry` invocation with an abbreviated response. Promotional and chatbot-style phrasing was removed from the manuscript.
 
 ### R2.6 Support mechanisms
 
