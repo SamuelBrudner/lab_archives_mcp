@@ -37,6 +37,7 @@ The state is modeled as a directed graph using `networkx`, where nodes represent
 | `uses_notebook` | Project | Notebook | Connects project to notebooks it references. |
 | `contains` | Notebook | Page | Links a notebook to pages within it. |
 | `visited` | Project | Page | Records that a page was accessed during this project. |
+| `content_link` | Page | Page | Records a LabArchives page URL found inside page content. |
 | `tracked` | Project | Activity / Artifact / Page | Marks upload provenance records as part of the project state. |
 | `discovered` | Project | Finding | Connects findings logged during the project. |
 | `evidence_from` | Page | Finding | Provenance link from a page to findings derived from it. |
