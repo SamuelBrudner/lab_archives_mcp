@@ -25,10 +25,10 @@ This project follows standard open-source community guidelines. Be respectful, c
 2. **Create the development environment**:
    ```bash
    # Using conda-lock for reproducible environment
-   conda-lock install --prefix ./conda_envs/dev conda-lock.yml
+   conda-lock install --prefix ./conda_envs/labarchives-mcp-pol conda-lock.yml
 
    # Activate the environment
-   conda activate ./conda_envs/dev
+   conda activate ./conda_envs/labarchives-mcp-pol
    ```
 
 3. **Install the package in editable mode**:
@@ -420,8 +420,8 @@ This automatically:
 If you are using the pinned conda environment, you can also run Commitizen via `conda run` without activating:
 
 ```bash
-conda run -p ./conda_envs/dev cz bump --dry-run --yes
-conda run -p ./conda_envs/dev cz bump --yes
+conda run -p ./conda_envs/labarchives-mcp-pol cz bump --dry-run --yes
+conda run -p ./conda_envs/labarchives-mcp-pol cz bump --yes
 ```
 
 ## Getting Help
