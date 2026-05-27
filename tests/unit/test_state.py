@@ -88,7 +88,7 @@ def test_save_failure_raises_state_save_error(
     def fail_fsync(_fd: int) -> None:
         raise OSError("disk full")
 
-    monkeypatch.setattr("labarchives_mcp.state.os.fsync", fail_fsync)
+    monkeypatch.setattr("labarchives_mcp.state.repository.os.fsync", fail_fsync)
 
     with pytest.raises(StateSaveError):
         state_manager.create_project("Test Project", "Testing description")
@@ -190,7 +190,10 @@ def test_log_visit_graph_failure_raises(
 ) -> None:
     """Visit logging must not report success when graph updates fail."""
     context = state_manager.create_project("Proj 1", "Desc 1")
-    monkeypatch.setattr("labarchives_mcp.state.nx.node_link_graph", lambda *_args, **_kw: [])
+    monkeypatch.setattr(
+        "labarchives_mcp.state.knowledge_graph.nx.node_link_graph",
+        lambda *_args, **_kw: [],
+    )
 
     with pytest.raises(GraphUpdateError):
         state_manager.log_visit("nb1", "p1", "Page 1")
@@ -203,7 +206,10 @@ def test_log_page_content_links_graph_failure_raises(
 ) -> None:
     """Content-link graph failures should propagate to callers."""
     state_manager.create_project("Proj 1", "Desc 1")
-    monkeypatch.setattr("labarchives_mcp.state.nx.node_link_graph", lambda *_args, **_kw: [])
+    monkeypatch.setattr(
+        "labarchives_mcp.state.knowledge_graph.nx.node_link_graph",
+        lambda *_args, **_kw: [],
+    )
 
     with pytest.raises(GraphUpdateError):
         state_manager.log_page_content_links("nb1", "p1", [("nb1", "p2")])
@@ -248,7 +254,10 @@ def test_log_finding_graph_failure_raises(
 ) -> None:
     """Finding graph failures should not be hidden behind a successful save."""
     context = state_manager.create_project("Proj 1", "Desc 1")
-    monkeypatch.setattr("labarchives_mcp.state.nx.node_link_graph", lambda *_args, **_kw: [])
+    monkeypatch.setattr(
+        "labarchives_mcp.state.knowledge_graph.nx.node_link_graph",
+        lambda *_args, **_kw: [],
+    )
 
     with pytest.raises(GraphUpdateError):
         state_manager.log_finding("Fact 1")
@@ -392,7 +401,10 @@ def test_record_upload_provenance_graph_failure_raises(
 ) -> None:
     """Upload provenance graph failures should propagate to the upload tool."""
     state_manager.create_project("Proj", "Desc")
-    monkeypatch.setattr("labarchives_mcp.state.nx.node_link_graph", lambda *_args, **_kw: [])
+    monkeypatch.setattr(
+        "labarchives_mcp.state.provenance.nx.node_link_graph",
+        lambda *_args, **_kw: [],
+    )
 
     with pytest.raises(GraphUpdateError):
         state_manager.record_upload_provenance(

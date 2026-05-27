@@ -1,19 +1,8 @@
 """Persistent state management for LabArchives MCP agent context."""
 
-import os
-
-import networkx as nx
-
 from .constants import GRAPH_SCHEMA_VERSION
 from .exceptions import GraphUpdateError, StateLoadError, StatePersistenceError, StateSaveError
-from .graph_helpers import (
-    GRAPH_UPDATE_ERRORS,
-    _graph_attrs,
-    _touch_graph_node,
-    _touch_notebook_node,
-    _touch_page_node,
-    _upsert_graph_edge,
-)
+from .graph_helpers import GRAPH_UPDATE_ERRORS
 from .knowledge_graph import KnowledgeGraph
 from .manager import StateManager
 from .models import Finding, ProjectContext, SessionState, VisitedPage
@@ -39,11 +28,4 @@ __all__ = [
     "StateRepository",
     "StateSaveError",
     "VisitedPage",
-    "_graph_attrs",
-    "_touch_graph_node",
-    "_touch_notebook_node",
-    "_touch_page_node",
-    "_upsert_graph_edge",
-    "nx",
-    "os",
 ]
