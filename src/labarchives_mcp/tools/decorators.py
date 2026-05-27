@@ -27,7 +27,14 @@ def register_context_tool(
     context: ToolContext,
     handler: Callable[..., Awaitable[Any]],
 ) -> Callable[..., Awaitable[Any]]:
-    """Register a context-first async handler as a FastMCP tool."""
+    """Register a context-first async handler as a FastMCP tool.
+
+    Tool implementations keep ``ToolContext`` as their first argument so tests
+    can call them directly with explicit dependencies. FastMCP should expose
+    only the user-facing parameters, so the bound wrapper preserves the handler
+    name/docstring with ``wraps`` and replaces ``__signature__`` with a version
+    that omits ``context`` for FastMCP introspection.
+    """
     handler_signature = signature(handler)
     parameters = list(handler_signature.parameters.values())
     if not parameters or parameters[0].name != "context":
