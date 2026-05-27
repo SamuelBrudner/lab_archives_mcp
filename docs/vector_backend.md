@@ -1,6 +1,6 @@
 # Vector Backend Module
 
-**Status:** Implemented path supports OpenAI embeddings, Pinecone indexing, and local Parquet persistence (2025-10-01)
+**Status:** As of `v0.4.0`, the implemented path supports OpenAI embeddings, Pinecone indexing, and local Parquet persistence.
 **Tests:** Covered by `tests/unit/vector_backend/`, `tests/integration/vector_backend/`,
 and the repository `pytest` suite.
 **Documentation:** This file is the vector backend guide. MCP onboarding payload examples live in `docs/onboard_example.json`.
@@ -306,7 +306,7 @@ Response (example):
 {
   "action": "incremental",
   "reason": "stale",
-  "built_at": "2025-10-01T12:00:00+00:00",
+  "built_at": "2026-04-20T12:00:00+00:00",
   "dry_run": true
 }
 ```
