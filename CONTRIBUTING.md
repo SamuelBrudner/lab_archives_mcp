@@ -427,6 +427,7 @@ conda run -p ./conda_envs/labarchives-mcp-pol cz bump --yes
 ## Getting Help
 
 - **Issues**: Open an issue on GitHub for bugs or feature requests
+- **Task tracking**: Agents use `bd` for internal implementation tasks; GitHub Issues remains the public user support and feature-request channel
 - **Discussions**: Use GitHub Discussions for questions
 - **Documentation**: Check the [README](README.md) and inline code documentation
 
