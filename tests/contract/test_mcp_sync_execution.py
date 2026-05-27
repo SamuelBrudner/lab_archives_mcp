@@ -81,6 +81,30 @@ def mcp_env_exec(monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest
 
     monkeypatch.setattr(mcp_module, "AuthenticationManager", lambda *_: DummyAuth())
 
+    captured["notebook_client_delegate"] = None
+
+    class DummyLabArchivesClient:
+        def __init__(self, _client: Any, _auth_manager: Any) -> None:
+            pass
+
+        def _delegate(self) -> Any:
+            delegate = captured["notebook_client_delegate"]
+            if delegate is None:
+                raise RuntimeError("Notebook client delegate not configured")
+            return delegate
+
+        async def get_notebook_tree(
+            self, uid: str, nbid: str, parent_tree_id: int | str = 0
+        ) -> list[dict[str, Any]]:
+            return await self._delegate().get_notebook_tree(uid, nbid, parent_tree_id)
+
+        async def get_page_entries(
+            self, uid: str, nbid: str, pid: str
+        ) -> list[dict[str, Any]]:
+            return await self._delegate().get_page_entries(uid, nbid, pid)
+
+    monkeypatch.setattr(mcp_module, "LabArchivesClient", DummyLabArchivesClient)
+
     # Stub openai module to avoid heavy import paths in embedding factory in case it is reached
     import sys
     import types
@@ -174,7 +198,7 @@ def test_sync_incremental_exec_indexes_changed(
                 }
             ]
 
-    mcp_env_exec["module"].LabArchivesClient = lambda *_: NB()
+    mcp_env_exec["notebook_client_delegate"] = NB()
 
     # Stub embedding + index
     import vector_backend.build_state as vbs
@@ -270,7 +294,7 @@ def test_sync_rebuild_exec_indexes_all_and_saves_record(
                 }
             ]
 
-    mcp_env_exec["module"].LabArchivesClient = lambda *_: NB()
+    mcp_env_exec["notebook_client_delegate"] = NB()
 
     # Stub embedding + index
     import vector_backend.build_state as vbs
@@ -353,7 +377,7 @@ def test_sync_exec_propagates_page_entry_fetch_failure(
         ) -> list[dict[str, Any]]:  # noqa: ARG002
             raise RuntimeError("entry fetch failed")
 
-    mcp_env_exec["module"].LabArchivesClient = lambda *_: NB()
+    mcp_env_exec["notebook_client_delegate"] = NB()
 
     import vector_backend.embedding as vbe
     import vector_backend.index as vbi
@@ -397,7 +421,7 @@ def test_sync_exec_propagates_build_record_save_failure(
         ) -> list[dict[str, Any]]:  # noqa: ARG002
             return []
 
-    mcp_env_exec["module"].LabArchivesClient = lambda *_: NB()
+    mcp_env_exec["notebook_client_delegate"] = NB()
 
     import vector_backend.build_state as vbs
     import vector_backend.embedding as vbe

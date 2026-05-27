@@ -47,7 +47,6 @@ def tool_context(tmp_path: Path) -> ToolContext:
         notebook_client=_DummyNotebookClient(),
         state_manager=StateManager.from_path(storage_dir=tmp_path),
         server_version="0.4.0",
-        service_module=SimpleNamespace(),
     )
 
 
@@ -86,7 +85,6 @@ def test_read_page_propagates_tracking_failure(tool_context: ToolContext) -> Non
         notebook_client=tool_context.notebook_client,
         state_manager=FailingStateManager(),
         server_version=tool_context.server_version,
-        service_module=tool_context.service_module,
     )
 
     with pytest.raises(RuntimeError, match="state write failed"):
@@ -106,7 +104,6 @@ def test_trace_provenance_propagates_entry_fetch_failure(tool_context: ToolConte
         notebook_client=FailingNotebookClient(),
         state_manager=tool_context.state_manager,
         server_version=tool_context.server_version,
-        service_module=tool_context.service_module,
     )
 
     with pytest.raises(RuntimeError, match="entry fetch failed"):

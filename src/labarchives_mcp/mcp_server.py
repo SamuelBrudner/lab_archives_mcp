@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import inspect
-import sys
 from collections.abc import Callable, Coroutine
 from importlib import metadata
 from typing import Any, cast
@@ -98,7 +97,6 @@ async def run_server(settings: Settings | None = None) -> None:
             notebook_client=notebook_client,
             state_manager=state_manager,
             server_version=__version__,
-            service_module=sys.modules[__name__],
             settings=settings,
         )
         register_mcp_surface(server, context, upload_enabled=settings.upload_enabled)

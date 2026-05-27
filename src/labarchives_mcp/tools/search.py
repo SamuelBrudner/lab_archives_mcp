@@ -140,95 +140,91 @@ async def sync_vector_index(
     processed_pages = 0
     indexed_chunks = 0
 
-    async with context.service_module.httpx.AsyncClient(
-        base_url=str(context.credentials.region)
-    ) as http_client:
-        auth = context.service_module.AuthenticationManager(http_client, context.credentials)
-        uid = await auth.ensure_uid()
-        nb_client = context.service_module.LabArchivesClient(http_client, auth)
+    uid = await context.auth_manager.ensure_uid()
+    nb_client = context.notebook_client
 
-        built_at_dt = None
-        if action == "incremental":
-            built_at_str = decision.get("built_at")
-            built_at_dt = (
-                datetime.fromisoformat(built_at_str.replace("Z", "+00:00"))
-                if built_at_str
-                else datetime.now()
-            )
-
-        async def _collect_pages(nbid: str) -> list[NotebookTreeNodeResponse]:
-            pages: list[NotebookTreeNodeResponse] = []
-
-            async def _walk(parent: int | str = 0) -> None:
-                parent_id: int | str = parent
-                tree = await nb_client.get_notebook_tree(uid, nbid, parent_tree_id=parent_id)
-                for node in tree:
-                    if node.get("is_page"):
-                        pages.append(node)
-                    elif node.get("is_folder"):
-                        next_parent = node.get("tree_id")
-                        await _walk(str(next_parent) if next_parent is not None else 0)
-
-            await _walk(0)
-            return pages
-
-        target_notebooks: list[str]
-        if notebook_id:
-            target_notebooks = [notebook_id]
-        else:
-            if built_at_dt is not None:
-                _ = select_incremental_entries([], built_at_dt)
-            return {
-                "action": decision["action"],
-                "reason": decision["reason"],
-                "built_at": decision["built_at"],
-                "dry_run": False,
-                "processed_pages": 0,
-                "indexed_chunks": 0,
-            }
-
-        embed_client = vector_runtime.get_embedding_client()
-        index_client = await vector_runtime.get_index()
-        indexer = NotebookIndexer(
-            embedding_client=embed_client,
-            vector_index=index_client,
-            embedding_version=config.embedding.version,
-            chunking_config=config.chunking,
+    built_at_dt = None
+    if action == "incremental":
+        built_at_str = decision.get("built_at")
+        built_at_dt = (
+            datetime.fromisoformat(built_at_str.replace("Z", "+00:00"))
+            if built_at_str
+            else datetime.now()
         )
 
-        base_url = str(context.credentials.region)
+    async def _collect_pages(nbid: str) -> list[NotebookTreeNodeResponse]:
+        pages: list[NotebookTreeNodeResponse] = []
 
-        for nbid in target_notebooks:
-            pages = await _collect_pages(nbid)
-            notebook_name = f"Notebook {nbid}"
-            for node in pages:
-                pid = str(node.get("tree_id"))
-                title = node.get("display_text") or node.get("name") or pid
-                entries = await nb_client.get_page_entries(uid, nbid, pid)
+        async def _walk(parent: int | str = 0) -> None:
+            parent_id: int | str = parent
+            tree = await nb_client.get_notebook_tree(uid, nbid, parent_tree_id=parent_id)
+            for node in tree:
+                if node.get("is_page"):
+                    pages.append(node)
+                elif node.get("is_folder"):
+                    next_parent = node.get("tree_id")
+                    await _walk(str(next_parent) if next_parent is not None else 0)
 
-                entry_dicts: list[dict[str, Any]] = [dict(entry) for entry in entries]
-                selected_entries = (
-                    select_incremental_entries(entry_dicts, built_at_dt)
-                    if built_at_dt
-                    else entry_dicts
-                )
-                if not selected_entries:
-                    continue
+        await _walk(0)
+        return pages
 
-                page_data = {
-                    "notebook_id": nbid,
-                    "notebook_name": notebook_name,
-                    "page_id": pid,
-                    "page_title": title,
-                    "entries": selected_entries,
-                }
-                res = await indexer.index_page(
-                    page_data=page_data,
-                    author="unknown@example.com",
-                    labarchives_url=base_url,
-                )
-                processed_pages += 1
-                indexed_chunks += int(res.get("indexed_count", 0))
+    target_notebooks: list[str]
+    if notebook_id:
+        target_notebooks = [notebook_id]
+    else:
+        if built_at_dt is not None:
+            _ = select_incremental_entries([], built_at_dt)
+        return {
+            "action": decision["action"],
+            "reason": decision["reason"],
+            "built_at": decision["built_at"],
+            "dry_run": False,
+            "processed_pages": 0,
+            "indexed_chunks": 0,
+        }
+
+    embed_client = vector_runtime.get_embedding_client()
+    index_client = await vector_runtime.get_index()
+    indexer = NotebookIndexer(
+        embedding_client=embed_client,
+        vector_index=index_client,
+        embedding_version=config.embedding.version,
+        chunking_config=config.chunking,
+    )
+
+    base_url = str(context.credentials.region)
+
+    for nbid in target_notebooks:
+        pages = await _collect_pages(nbid)
+        notebook_name = f"Notebook {nbid}"
+        for node in pages:
+            pid = str(node.get("tree_id"))
+            title = node.get("display_text") or node.get("name") or pid
+            entries = await nb_client.get_page_entries(uid, nbid, pid)
+
+            entry_dicts: list[dict[str, Any]] = [dict(entry) for entry in entries]
+            selected_entries = (
+                select_incremental_entries(entry_dicts, built_at_dt)
+                if built_at_dt
+                else entry_dicts
+            )
+            if not selected_entries:
+                continue
+
+            page_data = {
+                "notebook_id": nbid,
+                "notebook_name": notebook_name,
+                "page_id": pid,
+                "page_title": title,
+                "entries": selected_entries,
+            }
+            res = await indexer.index_page(
+                page_data=page_data,
+                author="unknown@example.com",
+                labarchives_url=base_url,
+            )
+            processed_pages += 1
+            indexed_chunks += int(res.get("indexed_count", 0))
 
     save_build_record(record_path, build_record_from_config(config))
     return {
