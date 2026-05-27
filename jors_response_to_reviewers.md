@@ -32,7 +32,7 @@ A new Section 1.2 ("Related work") has been added with five new citations coveri
 
 > "There are no architecture diagrams, workflow diagrams, or system overview figures to support the technical description."
 
-Addressed in the previous revision pass. The repository ships a Mermaid source plus rendered SVG and PNG assets at `docs/figures/architecture.{mmd,svg,png}`. Figure 1 in the paper renders the PNG and shows the MCP client, FastMCP server tool layer, LabArchives API, local project state, embedding provider, and vector backend data flow.
+Revised. The repository ships a Mermaid source plus rendered SVG and PNG assets at `docs/figures/architecture.{mmd,svg,png}`. Figure 1 in the paper renders the PNG and shows the MCP client, FastMCP server tool layer, LabArchives API, local project state, embedding provider, and vector backend data flow.
 
 ### R1.5 Research implications
 
@@ -44,7 +44,7 @@ Section 8 (Conclusion) has been expanded with an "implications" paragraph that n
 
 > "The paper ends without a structured conclusion summarizing contributions and limitations."
 
-Section 8 (Conclusion) was added in the previous revision pass. In this pass it has been expanded with explicit implications and three numbered limitations (L1 LabArchives-specific API boundary, L2 dependence on managed embedding and vector services, L3 absence of a controlled user study, noted as outside the scope of a software metapaper).
+Section 8 (Conclusion) now summarizes the package's contributions, explicit implications, and three numbered limitations (L1 LabArchives-specific API boundary, L2 dependence on managed embedding and vector services, L3 absence of a controlled user study, noted as outside the scope of a software metapaper).
 
 ### R1.7 References
 
@@ -66,9 +66,9 @@ The response has two parts: one on performance metrics and one on a user study. 
 
 ---
 
-## Reviewer 2 and Reviewer 3 (revisions from the previous pass)
+## Reviewer 2 and Reviewer 3
 
-The remaining entries record the changes already made for Reviewer 2 and Reviewer 3 in the previous revision pass and have been left in place for the editor's reference.
+The following entries record the changes for Reviewer 2 and Reviewer 3.
 
 ## R3.1 Version Mismatch
 
@@ -92,7 +92,7 @@ Revised. The repository now includes a Mermaid source file plus rendered SVG and
 
 > Add: test coverage % (pytest-cov + Codecov badge), integration test description (what they exercise -- live API or recorded fixtures), error-handling strategy (fail-loud, schema validation points), search-result validation method, manual-testing protocol on real notebooks. Numbers, not adjectives.
 
-Revised, with a follow-up refresh in this revision pass after the test suite grew. The paper Quality Control section now reports the measured local command, 262 passing non-integration tests, one skipped test (the `rdflib`-gated linked-data case), six deselected integration tests, and 81% line coverage. It states that the six Pinecone integration tests are live, credential-gated tests rather than recorded fixtures, lists the operations they exercise, and records the local skip result when `PINECONE_API_KEY` was absent. The same section now describes schema validation, write-path failures, LabArchives fault translation, search-result reconstruction and deduplication, and the six-check manual testing protocol.
+Revised. The paper Quality Control section now reports the measured local command, 262 passing non-integration tests, one skipped test (the `rdflib`-gated linked-data case), six deselected integration tests, and 81% line coverage. It states that the six Pinecone integration tests are live, credential-gated tests rather than recorded fixtures, lists the operations they exercise, and records the local skip result when `PINECONE_API_KEY` was absent. The same section now describes schema validation, write-path failures, LabArchives fault translation, search-result reconstruction and deduplication, and the six-check manual testing protocol.
 
 ## R2 Reuse Section
 
@@ -110,7 +110,7 @@ Revised. The fabricated conversational example was removed from the paper and RE
 
 > Formal, sober. Include one copy-pasteable example invocation (MCP tool call with arguments and abbreviated response). Cut adjectives.
 
-Revised. The abstract now states what the package exposes, defines MCP, and includes a one-line JSON `write_notebook_entry` invocation with an abbreviated response. Promotional phrasing was removed, and a later cleanup pass removed remaining banned phrasing from the manuscript.
+Revised. The abstract now states what the package exposes, defines MCP, and includes a one-line JSON `write_notebook_entry` invocation with an abbreviated response. Promotional phrasing and remaining banned phrasing were removed from the manuscript.
 
 ## R2 Support Mechanisms
 
@@ -122,7 +122,7 @@ Revised. The paper Availability section now includes one support paragraph with 
 
 > One paragraph stating exactly what leaves the institution for Pinecone and Qdrant: vectors only, or vectors plus chunk text -- verify in code -- plus which metadata fields, and what stays local.
 
-Revised. The security and governance text now states that OpenAI receives chunk text and query text for embeddings, Pinecone receives embedding vectors plus chunk text and the specific metadata fields stored in `PineconeIndex.upsert`, and Qdrant receives no data in the current release because `QdrantIndex` raises `NotImplementedError`. It also states that local Parquet persistence stores text, vectors, and metadata on disk, while credentials and project graph state remain local unless copied elsewhere. The follow-up pass removed wording that implied a fully local embedding runtime path and updated vector-backend docs to describe Qdrant and local embeddings as extension points only.
+Revised. The security and governance text now states that OpenAI receives chunk text and query text for embeddings, Pinecone receives embedding vectors plus chunk text and the specific metadata fields stored in `PineconeIndex.upsert`, and Qdrant receives no data in the current release because `QdrantIndex` raises `NotImplementedError`. It also states that local Parquet persistence stores text, vectors, and metadata on disk, while credentials and project graph state remain local unless copied elsewhere. The vector-backend docs describe Qdrant and local embeddings as extension points only.
 
 ## R3 Minor Sample Data Reference
 
