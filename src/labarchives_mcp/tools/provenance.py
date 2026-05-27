@@ -17,7 +17,7 @@ from ..schemas.tool_responses import (
 )
 from .context import ToolContext
 from .decorators import register_context_tool
-from .utils import _extract_labarchives_page_links, _paginate_items
+from .utils import extract_labarchives_page_links, paginate_items
 
 
 async def get_related_pages(
@@ -57,7 +57,7 @@ async def get_related_pages(
     entries = await context.notebook_client.get_page_entries(
         uid, notebook_id, page_id, include_data=True
     )
-    content_links = _extract_labarchives_page_links(entries)
+    content_links = extract_labarchives_page_links(entries)
     context.state_manager.log_page_content_links(notebook_id, page_id, content_links)
     active_context = context.state_manager.get_active_context() or active_context
 
@@ -112,7 +112,7 @@ async def get_related_pages(
     for _target_notebook_id, target_page_id in content_links:
         _add_related_page(target_page_id, "Linked Page", "content_link")
 
-    items, meta = _paginate_items(related_pages, limit=limit, offset=offset)
+    items, meta = paginate_items(related_pages, limit=limit, offset=offset)
     return {"items": items, "meta": meta}
 
 

@@ -14,7 +14,7 @@ from ..schemas.tool_responses import (
 )
 from .context import ToolContext
 from .decorators import register_context_tool
-from .utils import _extract_labarchives_page_links
+from .utils import extract_labarchives_page_links
 
 
 def _notebook_response(notebook: NotebookRecord) -> NotebookResponse:
@@ -98,7 +98,7 @@ async def read_notebook_page(
         context.state_manager.log_page_content_links(
             notebook_id,
             page_id,
-            _extract_labarchives_page_links(entries),
+            extract_labarchives_page_links(entries),
         )
         tracked = True
 

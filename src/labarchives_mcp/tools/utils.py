@@ -19,7 +19,7 @@ _LABARCHIVES_SHARE_URL_RE = re.compile(
 T = TypeVar("T")
 
 
-def _extract_labarchives_page_links(
+def extract_labarchives_page_links(
     entries: Sequence[Mapping[str, object]],
 ) -> list[tuple[str, str]]:
     """Return unique (notebook_id, page_id) links detected in LabArchives entry content."""
@@ -47,7 +47,7 @@ def _extract_labarchives_page_links(
     return links
 
 
-def _paginate_items(
+def paginate_items(
     items: Sequence[T], limit: int | None = None, offset: int = 0
 ) -> tuple[list[T], PaginationMetaResponse]:
     """Slice items with limit/offset and emit truncation metadata."""

@@ -16,7 +16,6 @@ from .eln_client import LabArchivesClient
 from .settings import Settings
 from .state import StateManager
 from .tools import ToolContext, register_mcp_surface
-from .tools.utils import _extract_labarchives_page_links, _paginate_items
 from .tools.validation import validate_graph_task
 
 # Lazy import keeps FastMCP monkeypatchable in tests and preserves a clear missing-dependency error.
@@ -33,8 +32,6 @@ __all__ = [
     "Settings",
     "LabArchivesClient",
     "httpx",
-    "_extract_labarchives_page_links",
-    "_paginate_items",
 ]
 
 
