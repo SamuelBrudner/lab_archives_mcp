@@ -20,12 +20,14 @@ if TYPE_CHECKING:
 class StateManager:
     """Facade over persistent state, project lifecycle, and graph services.
 
+    This facade is retained as the stable compatibility surface for CLI, MCP
+    tools, and linked-data exporters that already depend on
+    ``labarchives_mcp.state.StateManager``. The focused service classes own
+    implementation details inside this package.
+
     The constructor accepts already-loaded state and performs no disk I/O. Use
     :meth:`from_path` when state should be loaded from persistent storage.
     """
-
-    # Bound each project history to recent context while keeping state files small.
-    MAX_VISITS = 1000
 
     def __init__(
         self, state: SessionState | None = None, storage_dir: Path | str | None = None
@@ -58,31 +60,10 @@ class StateManager:
         self._knowledge_graph = KnowledgeGraph(
             self.get_active_context,
             self._save_state,
-            self.MAX_VISITS,
         )
-
-    def _load_state(self) -> SessionState:
-        return self._repository.load()
 
     def _save_state(self) -> None:
         self._repository.save(self._state)
-
-    def _migrate_state_dict(self, data: dict[str, Any]) -> dict[str, Any]:
-        return self._repository.migrate_state_dict(data)
-
-    def _migrate_graph_data(
-        self, graph_data: dict[str, Any], default_ts: float | None = None
-    ) -> dict[str, Any]:
-        return self._repository.migrate_graph_data(graph_data, default_ts)
-
-    async def _prune_context_graph(
-        self, context: ProjectContext, check_page_exists: Any, max_checks: int
-    ) -> dict[str, int]:
-        return await self._graph_validation._prune_context_graph(
-            context,
-            check_page_exists,
-            max_checks,
-        )
 
     async def validate_graph(
         self, check_page_exists: Any, max_checks: int = 10, include_all_contexts: bool = False
@@ -92,10 +73,6 @@ class StateManager:
             max_checks=max_checks,
             include_all_contexts=include_all_contexts,
         )
-
-    @staticmethod
-    def _coerce_timestamp(value: Any) -> float | None:
-        return ProvenanceService._coerce_timestamp(value)
 
     def record_upload_provenance(
         self,
@@ -146,9 +123,6 @@ class StateManager:
 
     def list_projects(self) -> list[dict[str, Any]]:
         return self._project_service.list_projects()
-
-    def _ensure_default_context(self) -> ProjectContext:
-        return self._project_service._ensure_default_context()
 
     def log_visit(self, notebook_id: str, page_id: str, title: str) -> None:
         self._knowledge_graph.log_visit(notebook_id, page_id, title)

@@ -12,6 +12,7 @@ from labarchives_mcp.models.upload import ProvenanceMetadata
 from labarchives_mcp.state import (
     GRAPH_SCHEMA_VERSION,
     GraphUpdateError,
+    KnowledgeGraph,
     ProjectContext,
     SessionState,
     StateLoadError,
@@ -329,13 +330,13 @@ def test_list_projects(state_manager: StateManager) -> None:
 
 
 def test_visited_pages_capped(state_manager: StateManager) -> None:
-    """Ensure visited_pages history is capped at MAX_VISITS."""
+    """Ensure visited_pages history is capped at the graph service policy."""
     context = state_manager.create_project("Proj", "Desc")
     for i in range(1100):
         state_manager.log_visit("nb", f"p{i}", f"Page {i}")
 
-    assert len(context.visited_pages) == state_manager.MAX_VISITS
-    # Should retain the most recent MAX_VISITS
+    assert len(context.visited_pages) == KnowledgeGraph.DEFAULT_MAX_VISITS
+    # Should retain the most recent bounded-history window.
     assert context.visited_pages[0].page_id == "p100"
     assert context.visited_pages[-1].page_id == "p1099"
 

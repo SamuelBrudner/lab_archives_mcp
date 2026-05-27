@@ -24,15 +24,18 @@ from .models import Finding, ProjectContext, VisitedPage
 class KnowledgeGraph:
     """Records visits, content links, and findings in project graphs."""
 
+    # Bound each project history to recent context while keeping state files small.
+    DEFAULT_MAX_VISITS = 1000
+
     def __init__(
         self,
         get_active_context: Callable[[], ProjectContext | None],
         save_state: Callable[[], None],
-        max_visits: int,
+        max_visits: int = DEFAULT_MAX_VISITS,
     ) -> None:
         self._get_active_context = get_active_context
         self._save_state_callback = save_state
-        self.MAX_VISITS = max_visits
+        self.max_visits = max_visits
 
     def get_active_context(self) -> ProjectContext | None:
         return self._get_active_context()
@@ -56,10 +59,10 @@ class KnowledgeGraph:
         # 1. Add to visited_pages list
         visit = VisitedPage(page_id=page_id, title=title, notebook_id=notebook_id)
         context.visited_pages.append(visit)
-        if len(context.visited_pages) > self.MAX_VISITS:
-            removed = len(context.visited_pages) - self.MAX_VISITS
-            context.visited_pages = context.visited_pages[-self.MAX_VISITS :]
-            logger.warning(f"Pruned visited_pages history by {removed} to cap at {self.MAX_VISITS}")
+        if len(context.visited_pages) > self.max_visits:
+            removed = len(context.visited_pages) - self.max_visits
+            context.visited_pages = context.visited_pages[-self.max_visits :]
+            logger.warning(f"Pruned visited_pages history by {removed} to cap at {self.max_visits}")
 
         # 2. Update Graph
         try:

@@ -84,31 +84,3 @@ class ProjectService:
             }
             for ctx in self._state.contexts.values()
         ]
-
-    def _ensure_default_context(self) -> ProjectContext:
-        """Get or create the singleton default project context.
-
-        Returns the same default context every time, preventing proliferation.
-        """
-        # Check if default already exists
-        default_id = "default-research-context"
-        if default_id in self._state.contexts:
-            context = self._state.contexts[default_id]
-            # Ensure it's active
-            if self._state.active_context_id != default_id:
-                self._state.active_context_id = default_id
-                self._save_state()
-            return context
-
-        # Create it for the first time with a fixed ID
-        context = ProjectContext(
-            id=default_id,
-            name="Default Research Context",
-            description="Auto-created context for tracking work",
-            status="active",
-        )
-        self._state.contexts[default_id] = context
-        self._state.active_context_id = default_id
-        self._save_state()
-        logger.info("Created singleton default project context")
-        return context
