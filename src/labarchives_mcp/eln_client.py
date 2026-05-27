@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 from datetime import UTC
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import httpx
 from loguru import logger
 from pydantic import BaseModel, Field, ValidationError
 
 from .auth import AuthenticationManager
+from .schemas.tool_responses import NotebookTreeNodeResponse, PageEntryResponse
 from .transform import markdown_to_html, parse_notebook_xml
 
 if TYPE_CHECKING:
@@ -93,7 +94,7 @@ class LabArchivesClient:
 
     async def get_notebook_tree(
         self, uid: str, nbid: str, parent_tree_id: int | str = 0
-    ) -> list[dict[str, Any]]:
+    ) -> list[NotebookTreeNodeResponse]:
         """Get one level of the notebook tree structure.
 
         Args:
@@ -120,18 +121,18 @@ class LabArchivesClient:
         logger.debug(f"Parsed {len(nodes)} nodes from XML response")
 
         return [
-            {
-                "tree_id": node.findtext("tree-id"),
-                "display_text": node.findtext("display-text"),
-                "is_page": node.findtext("is-page") == "true",
-                "is_folder": node.findtext("is-page") != "true",
-            }
+            NotebookTreeNodeResponse(
+                tree_id=node.findtext("tree-id"),
+                display_text=node.findtext("display-text"),
+                is_page=node.findtext("is-page") == "true",
+                is_folder=node.findtext("is-page") != "true",
+            )
             for node in nodes
         ]
 
     async def get_page_entries(
         self, uid: str, nbid: str, page_tree_id: int | str, include_data: bool = True
-    ) -> list[dict[str, Any]]:
+    ) -> list[PageEntryResponse]:
         """Get all entries for a specific page with their content.
 
         Args:
@@ -167,14 +168,14 @@ class LabArchivesClient:
         entry_elements = root.findall(".//entry")
         logger.debug(f"Parsed {len(entry_elements)} entries from XML response")
 
-        entries = []
+        entries: list[PageEntryResponse] = []
         for entry in entry_elements:
-            entry_dict = {
-                "eid": entry.findtext("eid"),
-                "part_type": entry.findtext("part-type"),
-                "created_at": entry.findtext("created-at"),
-                "updated_at": entry.findtext("updated-at"),
-            }
+            entry_dict = PageEntryResponse(
+                eid=entry.findtext("eid"),
+                part_type=entry.findtext("part-type"),
+                created_at=entry.findtext("created-at"),
+                updated_at=entry.findtext("updated-at"),
+            )
             if include_data:
                 entry_data = entry.find("entry-data")
                 if entry_data is not None and entry_data.text:

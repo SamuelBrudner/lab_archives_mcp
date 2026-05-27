@@ -10,7 +10,6 @@ from ..eln_client import NotebookRecord
 from ..schemas.tool_responses import (
     NotebookPageResponse,
     NotebookResponse,
-    PageEntryResponse,
     ReadNotebookPageResponse,
 )
 from .context import ToolContext
@@ -55,8 +54,8 @@ async def list_notebook_pages(
 
     result: list[NotebookPageResponse] = [
         {
-            "tree_id": cast(str | None, node["tree_id"]),
-            "title": cast(str | None, node["display_text"]),
+            "tree_id": node["tree_id"],
+            "title": node["display_text"],
             "is_page": bool(node["is_page"]),
             "is_folder": bool(node["is_folder"]),
         }
@@ -80,11 +79,8 @@ async def read_notebook_page(
     logger.debug(f"Obtained UID: {uid[:20]}...")
 
     logger.debug(f"Fetching entries for page {page_id} in notebook {notebook_id}")
-    entries = cast(
-        list[PageEntryResponse],
-        await context.notebook_client.get_page_entries(
-            uid, notebook_id, page_id, include_data=True
-        ),
+    entries = await context.notebook_client.get_page_entries(
+        uid, notebook_id, page_id, include_data=True
     )
     logger.info(f"Retrieved {len(entries)} entries from page")
 

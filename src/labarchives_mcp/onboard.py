@@ -99,7 +99,7 @@ class OnboardService:
                 if len(activity_items) >= self._recent_activity_limit:
                     break
                 page_id = node.get("tree_id")
-                page_title = node.get("display_text", "Untitled")
+                page_title = node.get("display_text") or "Untitled"
                 try:
                     entries = await self._notebook_client.get_page_entries(
                         uid, notebook.nbid, str(page_id), include_data=True

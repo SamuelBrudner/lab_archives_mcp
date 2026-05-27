@@ -4,13 +4,12 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 from loguru import logger
 
 from ..schemas.tool_responses import (
     NotebookTreeNodeResponse,
-    PageEntryResponse,
     SearchResultResponse,
     SyncVectorIndexResponse,
 )
@@ -86,11 +85,8 @@ async def search_labarchives(
         chunk = result.chunk
         metadata = chunk.metadata
 
-        entries = cast(
-            list[PageEntryResponse],
-            await context.notebook_client.get_page_entries(
-                uid, metadata.notebook_id, metadata.page_id
-            ),
+        entries = await context.notebook_client.get_page_entries(
+            uid, metadata.notebook_id, metadata.page_id
         )
 
         full_text: list[str] = []
@@ -192,10 +188,7 @@ async def sync_vector_index(
 
             async def _walk(parent: int | str = 0) -> None:
                 parent_id: int | str = parent
-                tree = cast(
-                    list[NotebookTreeNodeResponse],
-                    await nb_client.get_notebook_tree(uid, nbid, parent_tree_id=parent_id),
-                )
+                tree = await nb_client.get_notebook_tree(uid, nbid, parent_tree_id=parent_id)
                 for node in tree:
                     if node.get("is_page"):
                         pages.append(node)
@@ -243,12 +236,9 @@ async def sync_vector_index(
             for node in pages:
                 pid = str(node.get("tree_id"))
                 title = node.get("display_text") or node.get("name") or pid
-                entries = cast(
-                    list[PageEntryResponse],
-                    await nb_client.get_page_entries(uid, nbid, pid),
-                )
+                entries = await nb_client.get_page_entries(uid, nbid, pid)
 
-                entry_dicts = cast(list[dict[str, Any]], entries)
+                entry_dicts: list[dict[str, Any]] = [dict(entry) for entry in entries]
                 selected_entries = (
                     select_incremental_entries(entry_dicts, built_at_dt)
                     if built_at_dt

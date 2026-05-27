@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 import re
-from typing import Any, cast
+from typing import Any
 
 import networkx as nx
 
 from ..schemas.tool_responses import (
     JsonObject,
-    PageEntryResponse,
     ProvenanceSourceResponse,
     RelatedPageResponse,
     RelatedPagesResponse,
@@ -55,11 +54,8 @@ async def get_related_pages(
 
     content_links: list[tuple[str, str]] = []
     uid = await context.auth_manager.ensure_uid()
-    entries = cast(
-        list[PageEntryResponse],
-        await context.notebook_client.get_page_entries(
-            uid, notebook_id, page_id, include_data=True
-        ),
+    entries = await context.notebook_client.get_page_entries(
+        uid, notebook_id, page_id, include_data=True
     )
     content_links = _extract_labarchives_page_links(entries)
     context.state_manager.log_page_content_links(notebook_id, page_id, content_links)
@@ -128,11 +124,8 @@ async def trace_provenance(
     metadata: JsonObject = {}
 
     uid = await context.auth_manager.ensure_uid()
-    entries = cast(
-        list[PageEntryResponse],
-        await context.notebook_client.get_page_entries(
-            uid, notebook_id, page_id, include_data=True
-        ),
+    entries = await context.notebook_client.get_page_entries(
+        uid, notebook_id, page_id, include_data=True
     )
 
     target_entry = next((entry for entry in entries if entry.get("eid") == entry_id), None)
