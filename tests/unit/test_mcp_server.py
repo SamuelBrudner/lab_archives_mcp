@@ -279,6 +279,68 @@ def test_run_server_uses_settings_state_dir(
     assert captured["storage_dir"] == configured_state_dir
 
 
+def test_run_server_logs_background_validation_failure(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Background graph validation failures should be observed and logged."""
+
+    mcp_module = cast(Any, mcp_server)
+    settings = Settings(
+        credentials=DummyCredentials(),
+        secrets_path=tmp_path / "secrets.yml",
+        state_dir=tmp_path / "state",
+    )
+    captured: dict[str, Any] = {}
+
+    monkeypatch.setattr(mcp_module.httpx, "AsyncClient", DummyAsyncClient)
+
+    class DummyAuthenticationManager:
+        def __init__(self, client: DummyAsyncClient, credentials: DummyCredentials) -> None:
+            self._client = client
+            self._credentials = credentials
+
+    class DummyLabArchivesClient:
+        def __init__(self, client: DummyAsyncClient, auth_manager: Any) -> None:
+            self._client = client
+            self._auth_manager = auth_manager
+
+    class ObservingFastMCP(DummyFastMCP):
+        async def run_async(self) -> None:
+            await asyncio.sleep(0)
+            await asyncio.sleep(0)
+            await self.serve()
+
+    async def failing_validation(_context: Any) -> None:
+        raise RuntimeError("validation failed")
+
+    class CapturingLogger:
+        def opt(self, *, exception: BaseException) -> CapturingLogger:
+            captured["exception"] = exception
+            return self
+
+        def error(self, message: str) -> None:
+            captured["message"] = message
+
+    monkeypatch.setattr(mcp_module, "AuthenticationManager", DummyAuthenticationManager)
+    monkeypatch.setattr(mcp_module, "LabArchivesClient", DummyLabArchivesClient)
+    monkeypatch.setattr(mcp_module, "validate_graph_task", failing_validation)
+    monkeypatch.setattr(mcp_module, "logger", CapturingLogger())
+
+    fastmcp_instance = ObservingFastMCP(
+        server_id="labarchives-mcp-pol",
+        name="",
+        version="",
+        description="",
+    )
+    monkeypatch.setattr(mcp_module, "FastMCP", lambda **kwargs: fastmcp_instance)
+
+    asyncio.run(mcp_server.run_server(settings=settings))
+
+    assert isinstance(captured["exception"], RuntimeError)
+    assert str(captured["exception"]) == "validation failed"
+    assert captured["message"] == "Background task 'validate-graph' failed"
+
+
 def test_upload_tool_not_registered_when_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
     """Given LABARCHIVES_ENABLE_UPLOAD=false, when the server initializes,
     then the upload_to_labarchives tool should not be registered."""

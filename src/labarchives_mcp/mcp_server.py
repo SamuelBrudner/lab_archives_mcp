@@ -21,6 +21,7 @@ from .tools.validation import validate_graph_task
 
 # Lazy import keeps FastMCP monkeypatchable in tests and preserves a clear missing-dependency error.
 FastMCP: type[Any] | None = None
+_background_tasks: set[asyncio.Task[None]] = set()
 
 __all__ = [
     "run_server",
@@ -101,7 +102,10 @@ async def run_server(settings: Settings | None = None) -> None:
         )
         register_mcp_surface(server, context, upload_enabled=settings.upload_enabled)
 
-        asyncio.create_task(validate_graph_task(context))
+        _supervise_background_task(
+            validate_graph_task(context),
+            name="validate-graph",
+        )
         await server.run_async()
 
 
@@ -132,3 +136,23 @@ def _instantiate_fastmcp(class_: type[Any], **metadata: Any) -> Any:
         filtered = metadata
 
     return class_(**filtered)
+
+
+def _supervise_background_task(
+    coroutine: Coroutine[Any, Any, None],
+    *,
+    name: str,
+) -> asyncio.Task[None]:
+    """Schedule a background task while retaining and logging its lifetime."""
+    task = asyncio.create_task(coroutine, name=name)
+    _background_tasks.add(task)
+
+    def _observe_completion(completed: asyncio.Task[None]) -> None:
+        _background_tasks.discard(completed)
+        if completed.cancelled():
+            return
+        if exc := completed.exception():
+            logger.opt(exception=exc).error(f"Background task {name!r} failed")
+
+    task.add_done_callback(_observe_completion)
+    return task
