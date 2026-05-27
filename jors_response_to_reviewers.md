@@ -135,9 +135,3 @@ Revised. The paper now has a Sample Data section naming `notebooks/`, `docs/onbo
 > First mention of MCP gets one defining sentence for non-specialists.
 
 Revised. The README first mention now defines MCP as an open protocol that lets AI clients call external tools and data sources through structured requests. The paper abstract also defines MCP on first use.
-
-## Final Style Pass
-
-> Final pass: read aloud. Anything that sounds like a chatbot -- delete or rewrite.
-
-Revised. The final wording pass removed promotional language from the paper, README-adjacent docs, one CLI docstring, and one test name, then tightened the Org manuscript source and vector-backend documentation. A repository-wide banned-phrase scan on 26 May 2026 returned no matches.
