@@ -73,10 +73,11 @@ A **Model Context Protocol (MCP) server** that connects AI assistants to LabArch
   - `auth.py` – credential loading, HMAC signing, UID resolution.
   - `eln_client.py` – notebook navigation, page entry retrieval, upload orchestration.
 - `models/upload.py` – Pydantic contracts for uploads and provenance metadata.
-- `state.py` – persistent project contexts, graph construction, related-page heuristics, and next-step suggestions.
+- `state/` – persistent project contexts, graph construction, related-page heuristics, and next-step suggestions.
 - `linked_data/` – JSON-LD export for legacy and enriched provenance graphs.
 - `transform.py` – XML→JSON transforms and API fault translation.
-- `mcp_server.py` – MCP server wiring and tool registration.
+- `mcp_server.py` – MCP server startup and FastMCP bootstrap.
+- `tools/` – MCP tool handlers, shared decorators, and registry wiring.
 - `vector_backend/` – semantic search indexing with Pinecone and local Parquet persistence; Qdrant is a placeholder extension point.
 
 ---

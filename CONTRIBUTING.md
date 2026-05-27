@@ -292,9 +292,11 @@ lab_archives_mcp/
 │   ├── labarchives_mcp/       # Core MCP server
 │   │   ├── auth.py            # Authentication & signing
 │   │   ├── eln_client.py      # LabArchives API client
-│   │   ├── mcp_server.py      # FastMCP server
+│   │   ├── mcp_server.py      # FastMCP startup/bootstrap
+│   │   ├── tools/             # MCP tool handlers and registry
+│   │   ├── state/             # Project context and graph services
 │   │   ├── transform.py       # XML→JSON transformation
-│   │   └── upload_client.py   # Upload functionality
+│   │   └── models/            # Upload/provenance contracts
 │   └── vector_backend/        # Semantic search
 │       ├── models.py          # Pydantic models
 │       ├── chunking.py        # Text chunking
@@ -325,15 +327,18 @@ To add a new tool to the MCP server:
        return parse_response(response)
    ```
 
-2. Add the tool to `mcp_server.py`:
+2. Add the tool implementation to the appropriate module in `src/labarchives_mcp/tools/`
+   and register it through that module's registrar:
    ```python
-   @mcp.tool()
-   async def my_new_tool(param: str) -> MyResultType:
+   async def my_new_tool(context: ToolContext, param: str) -> MyResultType:
        """Tool description for AI agents."""
-       return await client.my_new_method(param)
+       return await context.notebook_client.my_new_method(param)
    ```
 
-3. Write unit tests in `tests/unit/`:
+3. Ensure `src/labarchives_mcp/tools/registry.py` calls the registrar so the tool is
+   included in the MCP surface.
+
+4. Write unit tests in `tests/unit/`:
    ```python
    @pytest.mark.asyncio
    async def test_my_new_method():
@@ -341,7 +346,7 @@ To add a new tool to the MCP server:
        pass
    ```
 
-4. Update documentation in `README.md`
+5. Update documentation in `README.md`
 
 ### 2. New API Endpoint
 
