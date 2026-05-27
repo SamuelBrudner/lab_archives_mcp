@@ -26,7 +26,7 @@ The state is modeled as a directed graph using `networkx`, where nodes represent
 | **Page** | A LabArchives page that has been visited or created. | `page_id`, `title`, `notebook_id`, `page_url` |
 | **Finding** | A key fact or insight logged by the user/agent. | `content`, `source_url`, `timestamp` |
 | **Artifact** | Uploaded content associated with a page. | `entry_id`, `filename`, `file_size_bytes` |
-| **Activity** | A recorded upload/provenance event. | `executed_at`, Git metadata, Python/environment metadata |
+| **Activity** | A recorded upload/provenance event. | `activity_type` (for example, `upload_to_labarchives`), `executed_at`, Git metadata, Python/environment metadata |
 | **User** | The authenticated LabArchives user. | `uid` |
 | **Software Agent** | The MCP server that executed the upload. | `identifier`, `server_version` |
 
