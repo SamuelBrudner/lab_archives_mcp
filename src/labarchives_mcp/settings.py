@@ -9,12 +9,12 @@ from typing import Any, Self
 
 from pydantic import BaseModel, Field
 
-from .auth import (
-    Credentials,
-    _credentials_kwargs,
-    _load_normalized_secrets,
-    _require_secrets,
-    _resolve_secrets_location,
+from .auth import Credentials
+from .auth_loader import (
+    credentials_kwargs,
+    load_normalized_secrets,
+    require_secrets,
+    resolve_secrets_location,
 )
 
 CONFIG_PATH_ENV = "LABARCHIVES_CONFIG_PATH"
@@ -57,7 +57,7 @@ def _secrets_spec(
 class Settings(BaseModel):
     """Inspectable runtime settings loaded once at server startup."""
 
-    credentials: Any = Field(description="LabArchives API credentials")
+    credentials: Credentials = Field(description="LabArchives API credentials")
     secrets_path: Path = Field(description="Resolved path to the secrets file")
     state_dir: Path = Field(default_factory=default_state_dir, description="State storage path")
     upload_enabled: bool = Field(
@@ -82,7 +82,7 @@ class Settings(BaseModel):
         secrets_spec, source = _secrets_spec(env, credentials_path)
 
         try:
-            resolved_path = _resolve_secrets_location(secrets_spec, source=source)
+            resolved_path = resolve_secrets_location(secrets_spec, source=source)
         except FileNotFoundError:
             # Preserve test and extension points that monkeypatch Credentials.from_file
             # while still failing loudly for the real loader.
@@ -94,9 +94,9 @@ class Settings(BaseModel):
             resolved_path = _setting_path(secrets_spec)
             secrets: dict[str, Any] = {}
         else:
-            secrets = _load_normalized_secrets(resolved_path)
-            _require_secrets(secrets)
-            credentials = Credentials(**_credentials_kwargs(secrets))
+            secrets = load_normalized_secrets(resolved_path)
+            require_secrets(secrets)
+            credentials = Credentials(**credentials_kwargs(secrets))
 
         state_dir_raw = env.get(STATE_DIR_ENV)
         state_dir = _setting_path(state_dir_raw) if state_dir_raw else default_state_dir()
@@ -113,6 +113,3 @@ class Settings(BaseModel):
             upload_enabled=upload_enabled,
             secrets=secrets,
         )
-
-
-AppSettings = Settings

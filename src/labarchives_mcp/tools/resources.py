@@ -19,7 +19,7 @@ async def list_notebooks_resource(context: ToolContext) -> NotebooksResourceResp
     """Return the LabArchives notebooks resource payload."""
     uid = await context.auth_manager.ensure_uid()
     try:
-        notebooks = cast(list[NotebookRecord], await context.notebook_client.list_notebooks(uid))
+        notebooks = await context.notebook_client.list_notebooks(uid)
     except LabArchivesAPIError as error:
         translated = translate_labarchives_fault(error)
         return {

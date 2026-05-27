@@ -7,8 +7,10 @@ from types import SimpleNamespace
 from typing import Any, cast
 
 import pytest
+from pydantic import HttpUrl
 
 from labarchives_mcp import mcp_server
+from labarchives_mcp.auth import Credentials
 from labarchives_mcp.settings import Settings
 
 
@@ -57,10 +59,10 @@ def mcp_env(monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest) -> 
     mcp_module = cast(Any, mcp_server)
     captured = _setup_fastmcp_capture(mcp_module)
 
-    class DummyCredentials:
-        akid = "AKID"
-        password = "PW"
-        region = "https://example.com"
+    class DummyCredentials(Credentials):
+        akid: str = "AKID"
+        password: str = "PW"
+        region: HttpUrl = cast(HttpUrl, "https://example.com")
 
     monkeypatch.setattr(
         mcp_module.Credentials, "from_file", classmethod(lambda cls: DummyCredentials())

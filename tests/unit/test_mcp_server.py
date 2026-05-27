@@ -7,18 +7,20 @@ from pathlib import Path
 from typing import Any, cast
 
 import pytest
+from pydantic import HttpUrl
 
 from labarchives_mcp import mcp_server
+from labarchives_mcp.auth import Credentials
 from labarchives_mcp.linked_data import export_project_jsonld
 from labarchives_mcp.models.upload import ProvenanceMetadata
 from labarchives_mcp.settings import Settings
 from labarchives_mcp.state import StateManager
 
 
-class DummyCredentials:
-    akid = "AKID"
-    password = "secret"
-    region = "https://example.com"
+class DummyCredentials(Credentials):
+    akid: str = "AKID"
+    password: str = "secret"
+    region: HttpUrl = cast(HttpUrl, "https://example.com")
 
 
 class DummyAsyncClient:
@@ -221,7 +223,7 @@ def test_run_server_uses_region_as_base_url(monkeypatch: pytest.MonkeyPatch) -> 
 
     assert created_clients, "AsyncClient should be constructed"
     client = created_clients[0]
-    assert client.kwargs.get("base_url") == DummyCredentials.region
+    assert client.kwargs.get("base_url") == str(DummyCredentials().region)
 
 
 def test_run_server_uses_settings_state_dir(

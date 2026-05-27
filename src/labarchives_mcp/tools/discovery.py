@@ -25,7 +25,7 @@ def _notebook_response(notebook: NotebookRecord) -> NotebookResponse:
 async def list_labarchives_notebooks(context: ToolContext) -> list[NotebookResponse]:
     """List all LabArchives notebooks for the authenticated user."""
     uid = await context.auth_manager.ensure_uid()
-    notebooks = cast(list[NotebookRecord], await context.notebook_client.list_notebooks(uid))
+    notebooks = await context.notebook_client.list_notebooks(uid)
     return [_notebook_response(notebook) for notebook in notebooks]
 
 

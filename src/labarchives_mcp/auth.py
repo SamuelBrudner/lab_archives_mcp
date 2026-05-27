@@ -11,85 +11,14 @@ from typing import Any, cast
 
 import httpx
 from lxml import etree
-from omegaconf import OmegaConf
 from pydantic import BaseModel, Field, HttpUrl
 
-
-def _repo_root() -> Path:
-    return Path(__file__).resolve().parents[2]
-
-
-def _candidate_paths(raw: Path) -> tuple[Path, ...]:
-    if raw.is_absolute():
-        return (raw,)
-    return (Path.cwd() / raw, _repo_root() / raw)
-
-
-def _existing_unique_paths(candidates: tuple[Path, ...]) -> tuple[Path, ...]:
-    existing: list[Path] = []
-    seen: set[Path] = set()
-    for candidate in candidates:
-        if not candidate.exists():
-            continue
-        resolved = candidate.resolve()
-        if resolved in seen:
-            continue
-        seen.add(resolved)
-        existing.append(resolved)
-    return tuple(existing)
-
-
-def _missing_secrets_message(raw: Path, source: str, candidates: tuple[Path, ...]) -> str:
-    checked = "\n".join(str(candidate) for candidate in candidates)
-    return f"Secrets file not found for {source}: {raw}\nChecked:\n{checked}"
-
-
-def _multiple_secrets_message(raw: Path, source: str, existing: tuple[Path, ...]) -> str:
-    joined = ", ".join(str(path) for path in existing)
-    return f"Multiple secrets files found for {source}: {raw}. Candidates: {joined}"
-
-
-def _resolve_secrets_location(spec: Path | str, *, source: str) -> Path:
-    raw = Path(spec).expanduser()
-    candidates = _candidate_paths(raw)
-    existing = _existing_unique_paths(candidates)
-    if len(existing) == 1:
-        return existing[0]
-    if not existing:
-        raise FileNotFoundError(_missing_secrets_message(raw, source, candidates))
-    raise RuntimeError(_multiple_secrets_message(raw, source, existing))
-
-
-def _load_normalized_secrets(location: Path) -> dict[str, Any]:
-    raw_config = OmegaConf.load(location)
-    config = OmegaConf.to_container(raw_config, resolve=True)
-    if not isinstance(config, dict):
-        raise ValueError("Secrets file must contain a mapping of credential keys.")
-    return {str(key).upper(): value for key, value in config.items()}
-
-
-def _require_secrets(normalized: dict[str, Any]) -> None:
-    required_keys = ["LABARCHIVES_AKID", "LABARCHIVES_PASSWORD", "LABARCHIVES_REGION"]
-    missing = [key for key in required_keys if not normalized.get(key)]
-    if missing:
-        joined = ", ".join(missing)
-        raise ValueError(f"Missing LabArchives secrets: {joined}")
-
-
-def _optional_str(normalized: dict[str, Any], key: str) -> str | None:
-    value = normalized.get(key)
-    return str(value) if value else None
-
-
-def _credentials_kwargs(normalized: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "akid": str(normalized["LABARCHIVES_AKID"]),
-        "password": str(normalized["LABARCHIVES_PASSWORD"]),
-        "region": cast(HttpUrl, str(normalized["LABARCHIVES_REGION"])),
-        "uid": _optional_str(normalized, "LABARCHIVES_UID"),
-        "auth_email": _optional_str(normalized, "LABARCHIVES_AUTH_EMAIL"),
-        "auth_code": _optional_str(normalized, "LABARCHIVES_AUTH_CODE"),
-    }
+from .auth_loader import (
+    credentials_kwargs,
+    load_normalized_secrets,
+    require_secrets,
+    resolve_secrets_location,
+)
 
 
 class Credentials(BaseModel):
@@ -133,13 +62,13 @@ class Credentials(BaseModel):
     def from_file(cls, path: Path | str | None = None) -> Credentials:
         """Create credentials from a YAML secrets file located under ``conf/`` by default."""
         if path is not None:
-            location = _resolve_secrets_location(path, source="path")
+            location = resolve_secrets_location(path, source="path")
         else:
-            location = _resolve_secrets_location("conf/secrets.yml", source="default")
+            location = resolve_secrets_location("conf/secrets.yml", source="default")
 
-        normalized = _load_normalized_secrets(location)
-        _require_secrets(normalized)
-        return cls(**_credentials_kwargs(normalized))
+        normalized = load_normalized_secrets(location)
+        require_secrets(normalized)
+        return cls(**credentials_kwargs(normalized))
 
 
 class AuthenticationManager:

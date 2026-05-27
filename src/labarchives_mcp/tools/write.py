@@ -6,17 +6,11 @@ import asyncio
 import platform
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 from loguru import logger
 
-from ..models.upload import (
-    PageCreationRequest,
-    PageCreationResult,
-    ProvenanceMetadata,
-    UploadRequest,
-    UploadResponse,
-)
+from ..models.upload import PageCreationRequest, ProvenanceMetadata, UploadRequest
 from ..schemas.tool_responses import UploadToLabArchivesResponse, WriteNotebookEntryResponse
 from ..transform import markdown_to_html
 from .context import ToolContext
@@ -80,10 +74,7 @@ async def upload_to_labarchives(
         create_as_text=as_page_text,
     )
 
-    result = cast(
-        UploadResponse,
-        await context.notebook_client.upload_to_labarchives(uid, upload_request),
-    )
+    result = await context.notebook_client.upload_to_labarchives(uid, upload_request)
     context.state_manager.record_upload_provenance(
         uid=uid,
         notebook_id=notebook_id,
@@ -146,10 +137,7 @@ async def write_notebook_entry(
             display_text=page_title,
             is_folder=False,
         )
-        page_result = cast(
-            PageCreationResult,
-            await context.notebook_client.insert_node(uid, page_request),
-        )
+        page_result = await context.notebook_client.insert_node(uid, page_request)
         page_tree_id = page_result.tree_id
 
     normalized_format = content_format.strip().lower()
@@ -165,17 +153,14 @@ async def write_notebook_entry(
     else:
         raise ValueError("content_format must be one of: markdown, html, plain")
 
-    created = cast(
-        dict[str, str],
-        await context.notebook_client.add_entry(
-            uid=uid,
-            notebook_id=notebook_id,
-            page_tree_id=page_tree_id,
-            part_type=part_type,
-            entry_data=entry_body,
-            caption=caption,
-            change_description=change_description,
-        ),
+    created = await context.notebook_client.add_entry(
+        uid=uid,
+        notebook_id=notebook_id,
+        page_tree_id=page_tree_id,
+        part_type=part_type,
+        entry_data=entry_body,
+        caption=caption,
+        change_description=change_description,
     )
 
     created_at = created.get("created_at")
