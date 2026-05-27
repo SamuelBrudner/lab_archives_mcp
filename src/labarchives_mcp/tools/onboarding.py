@@ -7,7 +7,7 @@ from typing import Any
 from .. import onboard
 from ..schemas.tool_responses import OnboardPayloadResponse
 from .context import ToolContext
-from .decorators import tool
+from .decorators import register_context_tool
 
 
 async def get_onboard_payload(
@@ -25,13 +25,6 @@ async def get_onboard_payload(
     return payload.as_dict()
 
 
-_get_onboard_payload = get_onboard_payload
-
-
 def register_onboarding_tools(server: Any, context: ToolContext) -> None:
     """Register onboarding tools."""
-
-    @tool(server)
-    async def get_onboard_payload(format: str = "json") -> OnboardPayloadResponse | str:
-        """Return the onboarding payload (json or markdown)."""
-        return await _get_onboard_payload(context, format=format)
+    register_context_tool(server, context, get_onboard_payload)

@@ -14,7 +14,7 @@ from ..models.upload import PageCreationRequest, ProvenanceMetadata, UploadReque
 from ..schemas.tool_responses import UploadToLabArchivesResponse, WriteNotebookEntryResponse
 from ..transform import markdown_to_html
 from .context import ToolContext
-from .decorators import tool
+from .decorators import register_context_tool
 
 
 async def upload_to_labarchives(
@@ -180,10 +180,6 @@ async def write_notebook_entry(
     }
 
 
-_upload_to_labarchives = upload_to_labarchives
-_write_notebook_entry = write_notebook_entry
-
-
 def register_write_tools(server: Any, context: ToolContext, *, upload_enabled: bool) -> None:
     """Register LabArchives write tools when uploads are enabled."""
     if not upload_enabled:
@@ -191,63 +187,5 @@ def register_write_tools(server: Any, context: ToolContext, *, upload_enabled: b
         return
 
     logger.info("Upload functionality is ENABLED by runtime settings")
-
-    @tool(server)
-    async def upload_to_labarchives(
-        notebook_id: str,
-        page_title: str,
-        file_path: str,
-        git_commit_sha: str,
-        git_branch: str,
-        git_repo_url: str,
-        python_version: str,
-        executed_at: str,
-        parent_folder_id: str | None = None,
-        caption: str | None = None,
-        git_is_dirty: bool = False,
-        allow_dirty_git: bool = False,
-        dependencies: dict[str, str] | None = None,
-        as_page_text: bool = True,
-    ) -> UploadToLabArchivesResponse:
-        """Upload a file to LabArchives with code provenance metadata."""
-        return await _upload_to_labarchives(
-            context,
-            notebook_id,
-            page_title,
-            file_path,
-            git_commit_sha,
-            git_branch,
-            git_repo_url,
-            python_version,
-            executed_at,
-            parent_folder_id=parent_folder_id,
-            caption=caption,
-            git_is_dirty=git_is_dirty,
-            allow_dirty_git=allow_dirty_git,
-            dependencies=dependencies,
-            as_page_text=as_page_text,
-        )
-
-    @tool(server)
-    async def write_notebook_entry(
-        notebook_id: str,
-        content: str,
-        page_id: str | None = None,
-        page_title: str | None = None,
-        parent_folder_id: str | None = None,
-        content_format: str = "markdown",
-        caption: str | None = None,
-        change_description: str | None = None,
-    ) -> WriteNotebookEntryResponse:
-        """Write a rich text entry directly to a LabArchives page."""
-        return await _write_notebook_entry(
-            context,
-            notebook_id,
-            content,
-            page_id=page_id,
-            page_title=page_title,
-            parent_folder_id=parent_folder_id,
-            content_format=content_format,
-            caption=caption,
-            change_description=change_description,
-        )
+    for handler in (upload_to_labarchives, write_notebook_entry):
+        register_context_tool(server, context, handler)

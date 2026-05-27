@@ -13,7 +13,7 @@ from ..schemas.tool_responses import (
     ReadNotebookPageResponse,
 )
 from .context import ToolContext
-from .decorators import tool
+from .decorators import register_context_tool
 from .utils import _extract_labarchives_page_links
 
 
@@ -113,51 +113,7 @@ async def read_notebook_page(
     }
 
 
-_list_labarchives_notebooks = list_labarchives_notebooks
-_list_notebook_pages = list_notebook_pages
-_read_notebook_page = read_notebook_page
-
-
 def register_discovery_tools(server: Any, context: ToolContext) -> None:
     """Register notebook discovery and reading tools."""
-
-    @tool(server)
-    async def list_labarchives_notebooks() -> list[NotebookResponse]:
-        """List all LabArchives notebooks for the authenticated user.
-
-        Returns a list of notebooks with metadata including:
-        - nbid: Notebook ID
-        - name: Notebook name
-        - owner: Owner email
-        - owner_name: Owner full name
-        - created_at: Creation timestamp (ISO 8601)
-        - modified_at: Last modification timestamp (ISO 8601)
-        """
-        return await _list_labarchives_notebooks(context)
-
-    @tool(server)
-    async def list_notebook_pages(
-        notebook_id: str, folder_id: str | None = None
-    ) -> list[NotebookPageResponse]:
-        """List all pages and folders in a LabArchives notebook.
-
-        Shows the table of contents at the specified level. Pass folder_id to navigate
-        into folders and see their contents.
-        """
-        return await _list_notebook_pages(context, notebook_id, folder_id)
-
-    @tool(server)
-    async def read_notebook_page(
-        notebook_id: str,
-        page_id: str,
-        track_visit: bool = True,
-        dry_run: bool = False,
-    ) -> ReadNotebookPageResponse:
-        """Read all entries from a specific page in a LabArchives notebook."""
-        return await _read_notebook_page(
-            context,
-            notebook_id,
-            page_id,
-            track_visit=track_visit,
-            dry_run=dry_run,
-        )
+    for handler in (list_labarchives_notebooks, list_notebook_pages, read_notebook_page):
+        register_context_tool(server, context, handler)

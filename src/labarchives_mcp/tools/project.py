@@ -16,7 +16,7 @@ from ..schemas.tool_responses import (
 )
 from ..state import ProjectContext
 from .context import ToolContext
-from .decorators import tool
+from .decorators import register_context_tool
 
 
 def _project_context_response(context: ProjectContext) -> ProjectContextResponse:
@@ -144,71 +144,15 @@ async def export_provenance_jsonld(
     return cast(ProvenanceJsonLdResponse, export_project_context(project_context))
 
 
-_create_project = create_project
-_delete_project = delete_project
-_switch_project = switch_project
-_list_projects = list_projects
-_log_finding = log_finding
-_get_current_context = get_current_context
-_export_provenance_jsonld = export_provenance_jsonld
-
-
 def register_project_tools(server: Any, context: ToolContext) -> None:
     """Register project and state-management tools."""
-
-    @tool(server)
-    async def create_project(
-        name: str,
-        description: str,
-        linked_notebook_ids: list[str] | None = None,
-        dry_run: bool = False,
-    ) -> CreateProjectResponse:
-        """Start a new project context."""
-        return await _create_project(
-            context,
-            name,
-            description,
-            linked_notebook_ids=linked_notebook_ids,
-            dry_run=dry_run,
-        )
-
-    @tool(server)
-    async def delete_project(project_id: str, dry_run: bool = False) -> DeleteProjectResponse:
-        """Delete a project context and its history."""
-        return await _delete_project(context, project_id, dry_run=dry_run)
-
-    @tool(server)
-    async def switch_project(project_id: str, dry_run: bool = False) -> SwitchProjectResponse:
-        """Switch the active context to an existing project."""
-        return await _switch_project(context, project_id, dry_run=dry_run)
-
-    @tool(server)
-    async def list_projects() -> list[ProjectSummaryResponse]:
-        """List all projects and their status."""
-        return await _list_projects(context)
-
-    @tool(server)
-    async def log_finding(
-        content: str,
-        source_url: str | None = None,
-        page_id: str | None = None,
-        dry_run: bool = False,
-    ) -> LogFindingResponse:
-        """Record a key fact or finding in the current project context."""
-        return await _log_finding(
-            context,
-            content,
-            source_url=source_url,
-            page_id=page_id,
-            dry_run=dry_run,
-        )
-
-    @tool(server)
-    async def get_current_context() -> CurrentContextResponse:
-        """Retrieve the full state of the active project (findings, history)."""
-        return await _get_current_context(context)
-
-    @tool(server)
-    async def export_provenance_jsonld(project_id: str) -> ProvenanceJsonLdResponse:
-        """Serialize one project context as JSON-LD aligned to PROV-O + schema.org."""
-        return await _export_provenance_jsonld(context, project_id)
+    for handler in (
+        create_project,
+        delete_project,
+        switch_project,
+        list_projects,
+        log_finding,
+        get_current_context,
+        export_provenance_jsonld,
+    ):
+        register_context_tool(server, context, handler)

@@ -16,7 +16,7 @@ from ..schemas.tool_responses import (
     TraceProvenanceResponse,
 )
 from .context import ToolContext
-from .decorators import tool
+from .decorators import register_context_tool
 from .utils import _extract_labarchives_page_links, _paginate_items
 
 
@@ -219,31 +219,7 @@ async def suggest_next_steps(context: ToolContext) -> SuggestNextStepsResponse:
     }
 
 
-_get_related_pages = get_related_pages
-_trace_provenance = trace_provenance
-_suggest_next_steps = suggest_next_steps
-
-
 def register_provenance_tools(server: Any, context: ToolContext) -> None:
     """Register graph provenance tools."""
-
-    @tool(server)
-    async def get_related_pages(
-        notebook_id: str, page_id: str, limit: int | None = 20, offset: int = 0
-    ) -> RelatedPagesResponse:
-        """Find pages related to the given page using the project graph and content links."""
-        return await _get_related_pages(
-            context, notebook_id, page_id, limit=limit, offset=offset
-        )
-
-    @tool(server)
-    async def trace_provenance(
-        notebook_id: str, page_id: str, entry_id: str
-    ) -> TraceProvenanceResponse:
-        """Trace the provenance of a specific entry."""
-        return await _trace_provenance(context, notebook_id, page_id, entry_id)
-
-    @tool(server)
-    async def suggest_next_steps() -> SuggestNextStepsResponse:
-        """Provide lightweight heuristics on next actions based on current project state."""
-        return await _suggest_next_steps(context)
+    for handler in (get_related_pages, trace_provenance, suggest_next_steps):
+        register_context_tool(server, context, handler)

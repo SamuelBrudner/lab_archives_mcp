@@ -17,7 +17,7 @@ from ..schemas.tool_responses import (
     SyncVectorIndexResponse,
 )
 from .context import ToolContext
-from .decorators import tool
+from .decorators import register_context_tool
 
 
 async def search_labarchives(
@@ -236,31 +236,7 @@ async def sync_vector_index(
     }
 
 
-_search_labarchives = search_labarchives
-_sync_vector_index = sync_vector_index
-
-
 def register_search_tools(server: Any, context: ToolContext) -> None:
     """Register search and vector sync tools."""
-
-    @tool(server)
-    async def search_labarchives(query: str, limit: int = 5) -> list[SearchResultResponse]:
-        """Search your indexed LabArchives notebooks semantically."""
-        return await _search_labarchives(context, query, limit)
-
-    @tool(server)
-    async def sync_vector_index(
-        *,
-        force: bool = False,
-        dry_run: bool = False,
-        max_age_hours: int | None = None,
-        notebook_id: str | None = None,
-    ) -> SyncVectorIndexResponse:
-        """Plan and (optionally) execute a vector-index sync."""
-        return await _sync_vector_index(
-            context,
-            force=force,
-            dry_run=dry_run,
-            max_age_hours=max_age_hours,
-            notebook_id=notebook_id,
-        )
+    for handler in (search_labarchives, sync_vector_index):
+        register_context_tool(server, context, handler)

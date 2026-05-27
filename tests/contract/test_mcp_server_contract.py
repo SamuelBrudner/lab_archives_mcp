@@ -7,6 +7,7 @@ from typing import Any, cast
 import pytest
 
 from labarchives_mcp import mcp_server
+from labarchives_mcp.auth import Credentials
 from labarchives_mcp.transform import LabArchivesAPIError
 
 
@@ -16,15 +17,16 @@ def test_run_server_contract(monkeypatch: pytest.MonkeyPatch) -> None:
     mcp_module = cast(Any, mcp_server)
     captured: dict[str, Any] = {}
 
-    class DummyCredentials:
-        akid = "AKID"
-        password = "secret"
-        region = "https://example.com"
+    dummy_credentials = Credentials(
+        akid="AKID",
+        password="secret",
+        region="https://example.com",
+    )
 
     monkeypatch.setattr(
         mcp_module.Credentials,
         "from_file",
-        classmethod(lambda cls: DummyCredentials()),
+        classmethod(lambda cls: dummy_credentials),
     )
 
     class DummyAsyncClient:
@@ -71,7 +73,7 @@ def test_run_server_contract(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(mcp_module, "LabArchivesClient", DummyLabArchivesClient)
 
     class DummyAuthenticationManager:
-        def __init__(self, http_client: DummyAsyncClient, credentials: DummyCredentials) -> None:
+        def __init__(self, http_client: DummyAsyncClient, credentials: Credentials) -> None:
             captured["auth_init"] = {
                 "client": http_client,
                 "credentials": credentials,
@@ -161,15 +163,16 @@ def test_run_server_maps_labarchives_errors(monkeypatch: pytest.MonkeyPatch) -> 
     mcp_module = cast(Any, mcp_server)
     captured: dict[str, Any] = {}
 
-    class DummyCredentials:
-        akid = "AKID"
-        password = "secret"
-        region = "https://example.com"
+    dummy_credentials = Credentials(
+        akid="AKID",
+        password="secret",
+        region="https://example.com",
+    )
 
     monkeypatch.setattr(
         mcp_module.Credentials,
         "from_file",
-        classmethod(lambda cls: DummyCredentials()),
+        classmethod(lambda cls: dummy_credentials),
     )
 
     class DummyAsyncClient:
