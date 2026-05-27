@@ -22,7 +22,7 @@ def mock_client() -> MagicMock:
 def mock_auth_manager() -> MagicMock:
     """Create a mock authentication manager."""
     auth = MagicMock()
-    auth._build_auth_params = MagicMock(
+    auth.build_auth_params = MagicMock(
         return_value={"akid": "test", "expires": "123", "sig": "abc"}
     )
     return auth

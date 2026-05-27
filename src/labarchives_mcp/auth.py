@@ -99,7 +99,7 @@ class AuthenticationManager:
         self._uid = None
 
     async def _fetch_uid_via_user_access_info(self) -> str:
-        params = self._build_auth_params(self.USER_ACCESS_METHOD)
+        params = self.build_auth_params(self.USER_ACCESS_METHOD)
         payload = {
             "login_or_email": cast(str, self._credentials.auth_email),
             "password": cast(str, self._credentials.auth_code),
@@ -148,7 +148,8 @@ class AuthenticationManager:
         else:
             raise RuntimeError("LabArchives user_access_info failed: missing uid")
 
-    def _build_auth_params(self, method: str) -> dict[str, str]:
+    def build_auth_params(self, method: str) -> dict[str, str]:
+        """Build signed LabArchives request parameters for an API operation."""
         expires = str(int(time.time() * 1000) + 120_000)
         message = f"{self._credentials.akid}{method}{expires}".encode()
         digest = hmac.new(

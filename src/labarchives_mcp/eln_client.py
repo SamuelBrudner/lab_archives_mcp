@@ -69,7 +69,7 @@ class LabArchivesClient:
 
     async def list_notebooks(self, uid: str) -> list[NotebookRecord]:
         """Return notebooks for a user uid."""
-        auth_params = self._auth_manager._build_auth_params("user_info_via_id")
+        auth_params = self._auth_manager.build_auth_params("user_info_via_id")
         params = {"uid": uid, **auth_params}
 
         response = await self._client.get(
@@ -104,7 +104,7 @@ class LabArchivesClient:
         """
         logger.debug(f"get_notebook_tree: nbid={nbid}, parent_tree_id={parent_tree_id}")
 
-        auth_params = self._auth_manager._build_auth_params("get_tree_level")
+        auth_params = self._auth_manager.build_auth_params("get_tree_level")
         params = {"uid": uid, "nbid": nbid, "parent_tree_id": str(parent_tree_id), **auth_params}
 
         url = "https://api.labarchives.com/api/tree_tools/get_tree_level"
@@ -146,7 +146,7 @@ class LabArchivesClient:
             f"include_data={include_data}"
         )
 
-        auth_params = self._auth_manager._build_auth_params("get_entries_for_page")
+        auth_params = self._auth_manager.build_auth_params("get_entries_for_page")
         params = {
             "uid": uid,
             "nbid": nbid,
@@ -201,7 +201,7 @@ class LabArchivesClient:
             f"parent={request.parent_tree_id}, display_text={request.display_text}"
         )
 
-        auth_params = self._auth_manager._build_auth_params("insert_node")
+        auth_params = self._auth_manager.build_auth_params("insert_node")
         params = {
             "uid": uid,
             "nbid": request.notebook_id,
@@ -254,7 +254,7 @@ class LabArchivesClient:
         file_content = request.file_path.read_bytes()
         file_size = len(file_content)
 
-        auth_params = self._auth_manager._build_auth_params("add_attachment")
+        auth_params = self._auth_manager.build_auth_params("add_attachment")
         # Default filename to file_path.name if not provided
         filename = request.filename or request.file_path.name
         params = {
@@ -328,7 +328,7 @@ class LabArchivesClient:
         """
         logger.debug(f"add_entry: nbid={notebook_id}, pid={page_tree_id}, type={part_type}")
 
-        auth_params = self._auth_manager._build_auth_params("add_entry")
+        auth_params = self._auth_manager.build_auth_params("add_entry")
         params = {
             "uid": uid,
             "nbid": notebook_id,
