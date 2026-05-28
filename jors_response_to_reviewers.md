@@ -102,7 +102,7 @@ Revised. The previous illustrative example, which was not produced by running th
 
 > Formal, sober. Include one copy-pasteable example invocation (MCP tool call with arguments and abbreviated response). Cut adjectives.
 
-Revised. The abstract now states what the package exposes, defines MCP, and includes a one-line JSON `write_notebook_entry` invocation with an abbreviated response. Promotional and chatbot-style phrasing was removed from the manuscript.
+Revised. The abstract now states what the package exposes, defines MCP, and includes a one-line JSON `write_notebook_entry` invocation with an abbreviated response. Promotional phrasing was removed from the manuscript.
 
 ### R2.6 Support mechanisms
 
