@@ -131,7 +131,7 @@ End-to-end tool latency on network-bound calls (notebook listing, page reading, 
   - Current source-tree version: `0.5.0` (2026-05-27)
 
 - **Archived JORS resubmission version**
-  - Zenodo version DOI: [to be assigned upon Zenodo deposit]
+  - Zenodo version DOI: <https://doi.org/10.5281/zenodo.20421239>
   - Zenodo concept DOI: <https://doi.org/10.5281/zenodo.17728440>
   - Git tag: `v0.5.0`
   - Archived release date: 2026-05-27
