@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Feat
 
 - refactor: decompose 823-line `StateManager` god object into `state/` subpackage with six focused services (`ProjectService`, `KnowledgeGraph`, `ProvenanceService`, `GraphValidationService`, `StateRepository`, `StateManager` facade)
-- refactor: split ~1100-line `mcp_server.py` bootstrap into 155-line entry point and `tools/` subpackage with twelve modules, one per tool category
+- refactor: split ~1100-line `mcp_server.py` bootstrap into 155-line entry point and `tools/` subpackage with thirteen modules (six tool-category modules plus seven shared-infrastructure modules)
 - refactor: introduce `VectorIndex` as a `typing.Protocol` enabling swappable backends without inheritance
 - refactor: add `TypedDict` definitions for tool responses throughout the tool layer
 - refactor: make `AuthenticationManager.build_auth_params()` part of the public API
