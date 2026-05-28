@@ -21,11 +21,11 @@ trap 'rm -f "$TMP_META" "$TMP_RESP"' EXIT
 
 # Metapaper: citations + bibliography
 pandoc jors_metapaper.md --citeproc --bibliography=paper.bib -t markdown -o "$TMP_META"
-pandoc "$TMP_META" --pdf-engine=typst -V mainfont="$FONT" -o jors_metapaper.pdf
+pandoc "$TMP_META" --from=markdown --pdf-engine=typst -V mainfont="$FONT" -o jors_metapaper.pdf
 
 # Response to reviewers: citations + bibliography
 pandoc jors_response_to_reviewers.md --citeproc --bibliography=paper.bib -t markdown -o "$TMP_RESP"
-pandoc "$TMP_RESP" --pdf-engine=typst -V mainfont="$FONT" -o jors_response_to_reviewers.pdf
+pandoc "$TMP_RESP" --from=markdown --pdf-engine=typst -V mainfont="$FONT" -o jors_response_to_reviewers.pdf
 
 # Cover letter: no citations
 pandoc jors_cover_letter.md --pdf-engine=typst -V mainfont="$FONT" -o jors_cover_letter.pdf

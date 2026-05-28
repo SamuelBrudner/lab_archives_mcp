@@ -126,18 +126,18 @@ End-to-end tool latency on network-bound calls (notebook listing, page reading, 
   - Implemented in Python (3.11+), with automated testing on Linux and macOS.
 
 - **Source code repository**
-  - Public Git repository: <https://github.com/SamuelBrudner/lab_archives_mcp>
+  - Public Git repository: https://github.com/SamuelBrudner/lab_archives_mcp
   - Default development branch: `main`
   - Current source-tree version: `0.5.1` (2026-05-27)
 
 - **Archived JORS resubmission version**
-  - Zenodo version DOI: <https://doi.org/10.5281/zenodo.20421457>
-  - Zenodo concept DOI: <https://doi.org/10.5281/zenodo.17728440>
+  - Zenodo version DOI: https://doi.org/10.5281/zenodo.20421457
+  - Zenodo concept DOI: https://doi.org/10.5281/zenodo.17728440
   - Git tag: `v0.5.1`
   - Archived release date: 2026-05-27
 
 - **Original submission archive (historical traceability)**
-  - Zenodo version DOI: <https://doi.org/10.5281/zenodo.17772522>
+  - Zenodo version DOI: https://doi.org/10.5281/zenodo.17772522
   - Git tag: `v0.3.2`
   - Archived release date: 2025-12-01
 
@@ -145,7 +145,7 @@ End-to-end tool latency on network-bound calls (notebook listing, page reading, 
   - Distributed under the MIT License.
 
 - **Support and contributions**
-  - Support requests and bug reports should be filed at <https://github.com/SamuelBrudner/lab_archives_mcp/issues>; the maintainer can be contacted at <samuel.brudner@yale.edu> for security-sensitive or access-specific questions. The maintainer aims to respond to actionable issues within 14 calendar days. Contribution guidance, including setup, testing, and pull-request expectations, is maintained in <https://github.com/SamuelBrudner/lab_archives_mcp/blob/main/CONTRIBUTING.md>.
+  - Support requests and bug reports should be filed at https://github.com/SamuelBrudner/lab_archives_mcp/issues; the maintainer can be contacted at samuel.brudner@yale.edu for security-sensitive or access-specific questions. The maintainer aims to respond to actionable issues within 14 calendar days. Contribution guidance, including setup, testing, and pull-request expectations, is maintained at https://github.com/SamuelBrudner/lab_archives_mcp/blob/main/CONTRIBUTING.md.
 
 # 5. Sample Data
 
