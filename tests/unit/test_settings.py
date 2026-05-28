@@ -17,15 +17,13 @@ from labarchives_mcp.settings import (
 
 def _write_secrets(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        """
+    path.write_text("""
 LABARCHIVES_AKID: example-akid
 LABARCHIVES_PASSWORD: example-pass
 LABARCHIVES_REGION: https://api.labarchives.com
 PINECONE_API_KEY: pinecone-key
 PINECONE_ENVIRONMENT: us-west1-gcp
-""".strip()
-    )
+""".strip())
 
 
 def test_settings_from_env_centralizes_runtime_config(tmp_path: Path) -> None:

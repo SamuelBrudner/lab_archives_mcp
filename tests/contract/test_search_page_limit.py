@@ -208,6 +208,7 @@ def test_search_propagates_selected_page_fetch_failure(
     import vector_backend.index as vbi
     from labarchives_mcp.tools.search import search_labarchives
     from vector_backend import models as vm
+
     monkeypatch.setattr(vbc, "load_config", lambda _name: SimpleNamespace(embedding=object()))
 
     class DummyEmbed:

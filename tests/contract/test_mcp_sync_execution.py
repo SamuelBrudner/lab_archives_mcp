@@ -98,9 +98,7 @@ def mcp_env_exec(monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest
         ) -> list[dict[str, Any]]:
             return await self._delegate().get_notebook_tree(uid, nbid, parent_tree_id)
 
-        async def get_page_entries(
-            self, uid: str, nbid: str, pid: str
-        ) -> list[dict[str, Any]]:
+        async def get_page_entries(self, uid: str, nbid: str, pid: str) -> list[dict[str, Any]]:
             return await self._delegate().get_page_entries(uid, nbid, pid)
 
     monkeypatch.setattr(mcp_module, "LabArchivesClient", DummyLabArchivesClient)

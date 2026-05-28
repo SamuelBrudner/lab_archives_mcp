@@ -32,9 +32,7 @@ async def list_notebook_pages(
     context: ToolContext, notebook_id: str, folder_id: str | None = None
 ) -> list[NotebookPageResponse]:
     """List all pages and folders in a LabArchives notebook."""
-    logger.info(
-        f"list_notebook_pages called with notebook_id={notebook_id}, folder_id={folder_id}"
-    )
+    logger.info(f"list_notebook_pages called with notebook_id={notebook_id}, folder_id={folder_id}")
 
     uid = await context.auth_manager.ensure_uid()
     logger.debug(f"Obtained UID: {uid[:20]}...")

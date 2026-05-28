@@ -35,6 +35,7 @@ async def list_notebooks_resource(context: ToolContext) -> NotebooksResourceResp
 
 def register_resources(server: Any, context: ToolContext) -> None:
     """Register MCP resources."""
+
     @resource(server, "labarchives://notebooks")
     async def list_notebooks_resource_handler() -> NotebooksResourceResponse:
         return await list_notebooks_resource(context)

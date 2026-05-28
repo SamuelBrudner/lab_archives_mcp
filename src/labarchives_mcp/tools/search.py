@@ -203,9 +203,7 @@ async def sync_vector_index(
             entries = await nb_client.get_page_entries(uid, nbid, pid)
 
             selected_entries = (
-                select_incremental_entries(entries, built_at_dt)
-                if built_at_dt
-                else entries
+                select_incremental_entries(entries, built_at_dt) if built_at_dt else entries
             )
             if not selected_entries:
                 continue

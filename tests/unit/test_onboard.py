@@ -288,8 +288,7 @@ async def test_checked_in_onboard_example_matches_generated_payload() -> None:
                     "eid": "E-087",
                     "part_type": "text_entry",
                     "content": (
-                        "<p>Validated new 45s ramp protocol; "
-                        "recorded spike timing metrics.</p>"
+                        "<p>Validated new 45s ramp protocol; " "recorded spike timing metrics.</p>"
                     ),
                     "created_at": "2025-10-20T22:00:00Z",
                     "updated_at": "2025-10-20T22:18:00Z",

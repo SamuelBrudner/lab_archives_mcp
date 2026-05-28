@@ -190,9 +190,7 @@ class TraceProvenanceMissingResponse(TypedDict):
     error: str
 
 
-TraceProvenanceResponse: TypeAlias = (
-    TraceProvenanceFoundResponse | TraceProvenanceMissingResponse
-)
+TraceProvenanceResponse: TypeAlias = TraceProvenanceFoundResponse | TraceProvenanceMissingResponse
 
 
 class SuggestionStatsResponse(TypedDict):

@@ -44,7 +44,5 @@ def register_context_tool(
     async def bound_handler(*args: Any, **kwargs: Any) -> Any:
         return await handler(context, *args, **kwargs)
 
-    cast(Any, bound_handler).__signature__ = handler_signature.replace(
-        parameters=parameters[1:]
-    )
+    cast(Any, bound_handler).__signature__ = handler_signature.replace(parameters=parameters[1:])
     return tool(server)(bound_handler)
