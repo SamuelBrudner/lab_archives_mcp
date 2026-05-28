@@ -259,21 +259,16 @@ asyncio.run(test())
 - **Data and code versioning**
   - The MCP server is intended to be used in conjunction with Git-based workflows (and optionally DVC or similar tools) so that raw data, processed data, and analysis code can be versioned in tandem with ELN entries.
 
-## For reviewers and editors
+## Testing and continuous integration
 
-- **Code organization and testing**
-  - The MCP server is organized into logical modules with clear responsibilities.
-  - Unit tests and integration tests cover key functionality, including authentication, notebook navigation, and upload workflows.
-  - GitHub Actions runs the non-integration test suite with `pytest --cov=src --cov-report=xml --cov-report=term`, writes the measured line coverage from `coverage.xml` to the job summary, and attempts a non-blocking Codecov upload on the Ubuntu/Python 3.11 job.
-  - The local revision run on Python 3.11 reported 262 passing non-integration tests, one skipped test (the `rdflib`-gated linked-data round-trip case), six deselected integration tests, and 81% total line coverage. Use the Codecov badge for the current main-branch value.
+- Unit tests and integration tests cover key functionality, including authentication, notebook navigation, and upload workflows.
+- GitHub Actions runs the non-integration test suite with `pytest --cov=src --cov-report=xml --cov-report=term`, writes the measured line coverage from `coverage.xml` to the job summary, and attempts a non-blocking Codecov upload on the Ubuntu/Python 3.11 job.
+- The local revision run on Python 3.11 reported 262 passing non-integration tests, one skipped test (the `rdflib`-gated linked-data round-trip case), six deselected integration tests, and 81% total line coverage. Use the Codecov badge for the current main-branch value.
 
-- **Security and authentication**
-  - The MCP server uses HMAC-SHA512 signing for authentication, with credentials stored securely in environment variables or configuration files.
-  - API keys and access tokens are never stored in plaintext or committed to version control.
+## Security
 
-- **Vector backend and search**
-  - The semantic search and embedding layers are designed to be modular and extensible.
-  - Institutions can choose to use external vector stores or implement their own on-premise solutions.
+- The MCP server uses HMAC-SHA512 signing for authentication, with credentials stored securely in environment variables or configuration files.
+- API keys and access tokens are never stored in plaintext or committed to version control.
 
 ## Project state, graph navigation, and heuristics
 
