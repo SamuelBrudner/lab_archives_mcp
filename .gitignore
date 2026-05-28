@@ -12,6 +12,7 @@ conda_env/
 conda_envs/
 AGENTS.md
 CLAUDE.md
+.beads/
 
 # Tooling caches and coverage artefacts
 .mypy_cache/
