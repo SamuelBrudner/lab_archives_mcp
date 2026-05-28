@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## v0.5.1 (2026-05-27)
+
+### Docs
+
+- jors: correct `tools/` subpackage module count claim from twelve to thirteen (six tool-category modules plus seven shared-infrastructure modules) in cover letter, response, and changelog
+- jors: fix stale test path `tests/spec/test_search_page_limit.py` → `tests/contract/test_search_page_limit.py` in metapaper §3
+- jors: substitute v0.5.1 Zenodo version DOI across metapaper §4, cover letter, response R3.1, README citation policy, README BibTeX, CITATION.cff, and codemeta.json
+
+### Note
+
+This patch release exists so that the Zenodo archive reviewers download
+matches the final submitted documents. The v0.5.0 archive
+(DOI 10.5281/zenodo.20421239) was deposited before the final-review
+doc fixes landed and is retained for traceability.
+
 ## v0.5.0 (2026-05-27)
 
 ### Feat

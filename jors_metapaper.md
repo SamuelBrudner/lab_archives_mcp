@@ -47,7 +47,7 @@ Open-source ELNs such as eLabFTW provide self-hosted notebook management with a 
 3. **MCP server (`mcp_server.py`)**
    - Exposes notebook operations as MCP tools using the FastMCP framework [@fastmcp].
    - Publishes tool schemas for MCP clients.
-   - In `v0.5.0`, the FastMCP bootstrap registers 17 user-facing MCP tools plus the `get_onboard_payload` support tool through `tools/registry.py`, 18 total. The user-facing tool surface has five categories: discovery (`list_labarchives_notebooks`, `list_notebook_pages`), reading (`read_notebook_page`), search and indexing (`search_labarchives`, `sync_vector_index`), project state and graph navigation (`create_project`, `list_projects`, `switch_project`, `delete_project`, `log_finding`, `get_current_context`, `get_related_pages`, `trace_provenance`, `suggest_next_steps`, `export_provenance_jsonld`), and write & provenance (`write_notebook_entry`, `upload_to_labarchives`). `write_notebook_entry` writes a rich text entry directly to a LabArchives page, appending to an existing page or creating a page when `page_id` is omitted. `upload_to_labarchives` uploads a file to LabArchives with code provenance metadata, creating a page and storing the file as page text or an attachment. The `get_onboard_payload` support tool returns usage guidance for MCP clients. Setting `LABARCHIVES_ENABLE_UPLOAD=false` disables the two write & provenance tools, leaving 15 user-facing read/search/state tools plus the support tool, 16 total.
+   - In `v0.5.1`, the FastMCP bootstrap registers 17 user-facing MCP tools plus the `get_onboard_payload` support tool through `tools/registry.py`, 18 total. The user-facing tool surface has five categories: discovery (`list_labarchives_notebooks`, `list_notebook_pages`), reading (`read_notebook_page`), search and indexing (`search_labarchives`, `sync_vector_index`), project state and graph navigation (`create_project`, `list_projects`, `switch_project`, `delete_project`, `log_finding`, `get_current_context`, `get_related_pages`, `trace_provenance`, `suggest_next_steps`, `export_provenance_jsonld`), and write & provenance (`write_notebook_entry`, `upload_to_labarchives`). `write_notebook_entry` writes a rich text entry directly to a LabArchives page, appending to an existing page or creating a page when `page_id` is omitted. `upload_to_labarchives` uploads a file to LabArchives with code provenance metadata, creating a page and storing the file as page text or an attachment. The `get_onboard_payload` support tool returns usage guidance for MCP clients. Setting `LABARCHIVES_ENABLE_UPLOAD=false` disables the two write & provenance tools, leaving 15 user-facing read/search/state tools plus the support tool, 16 total.
 
 4. **Vector backend (`vector_backend/`)**
    - Implements a configuration-driven pipeline for semantic search.
@@ -128,12 +128,12 @@ End-to-end tool latency on network-bound calls (notebook listing, page reading, 
 - **Source code repository**
   - Public Git repository: <https://github.com/SamuelBrudner/lab_archives_mcp>
   - Default development branch: `main`
-  - Current source-tree version: `0.5.0` (2026-05-27)
+  - Current source-tree version: `0.5.1` (2026-05-27)
 
 - **Archived JORS resubmission version**
-  - Zenodo version DOI: <https://doi.org/10.5281/zenodo.20421239>
+  - Zenodo version DOI: [to be assigned upon Zenodo deposit]
   - Zenodo concept DOI: <https://doi.org/10.5281/zenodo.17728440>
-  - Git tag: `v0.5.0`
+  - Git tag: `v0.5.1`
   - Archived release date: 2026-05-27
 
 - **Original submission archive (historical traceability)**

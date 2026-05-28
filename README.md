@@ -661,14 +661,15 @@ See `CONTRIBUTING.md` for versioning, Conventional Commits, and release steps.
 Use this citation policy consistently:
 
 - Software concept DOI: <https://doi.org/10.5281/zenodo.17728440>
-- JORS resubmission archive: `v0.5.0`, version DOI <https://doi.org/10.5281/zenodo.20421239>, Git tag <https://github.com/SamuelBrudner/lab_archives_mcp/releases/tag/v0.5.0>
+- JORS resubmission archive: `v0.5.1`, version DOI to be assigned upon Zenodo deposit, Git tag <https://github.com/SamuelBrudner/lab_archives_mcp/releases/tag/v0.5.1>
+- Previous v0.5.0 archive (superseded by v0.5.1 for doc-only fixes): version DOI <https://doi.org/10.5281/zenodo.20421239>
 - Original submission archive (historical traceability): `v0.3.2`, version DOI <https://doi.org/10.5281/zenodo.17772522>
 
 The DOI badge, `CITATION.cff` primary identifier, and `codemeta.json`
 identifier use the concept DOI. The README BibTeX and `CITATION.cff`
-preferred citation point to the `v0.5.0` resubmission archive; the BibTeX
+preferred citation point to the `v0.5.1` resubmission archive; the BibTeX
 `doi` field will be updated to the version-specific DOI after Zenodo
-deposit. The `v0.3.2` DOI is retained for historical traceability only.
+deposit. The `v0.5.0` and `v0.3.2` DOIs are retained for historical traceability only.
 
 ## Contributing
 
@@ -684,13 +685,14 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for:
 If you use this software in your research, please cite:
 
 ```bibtex
+% JORS resubmission archive version. Update doi and url to the v0.5.1 version DOI after Zenodo deposit.
 @software{brudner2026labarchives,
   author = {Brudner, Samuel N.},
   title = {LabArchives MCP Server: AI Integration for Electronic Lab Notebooks},
   year = {2026},
-  doi = {10.5281/zenodo.20421239},
-  url = {https://doi.org/10.5281/zenodo.20421239},
-  version = {0.5.0}
+  doi = {10.5281/zenodo.17728440},
+  url = {https://doi.org/10.5281/zenodo.17728440},
+  version = {0.5.1}
 }
 ```
 
