@@ -116,7 +116,7 @@ Revised. The paper Availability section now includes one support paragraph with 
 
 > README BibTeX v0.2.4 -> v0.3.2. Grep repo for "0.2.4"; reconcile every occurrence. Confirm Zenodo, paper, README, CITATION.cff, codemeta.json, pyproject.toml all agree.
 
-Revised. The repository uses a three-DOI citation policy across README, paper Availability, `CITATION.cff`, `codemeta.json`, and `pyproject.toml`: the Zenodo concept DOI `10.5281/zenodo.17728440` identifies the software family; the JORS resubmission archive is `v0.5.1` at version DOI [to be assigned upon Zenodo deposit]; and the original submission archive `v0.3.2` at version DOI `10.5281/zenodo.17772522` is retained for historical traceability only. The README BibTeX entry, DOI badge, `CITATION.cff` preferred-citation, and `codemeta.json` all reflect the resubmission archive version. The remaining `0.2.4` strings are the historical `CHANGELOG.md` heading and the `notebook_shim` dependency version in `conda-lock.yml`.
+Revised. The repository uses a three-DOI citation policy across README, paper Availability, `CITATION.cff`, `codemeta.json`, and `pyproject.toml`: the Zenodo concept DOI `10.5281/zenodo.17728440` identifies the software family; the JORS resubmission archive is `v0.5.1` at version DOI `10.5281/zenodo.20421457`; and the original submission archive `v0.3.2` at version DOI `10.5281/zenodo.17772522` is retained for historical traceability only. The README BibTeX entry, DOI badge, `CITATION.cff` preferred-citation, and `codemeta.json` all reflect the resubmission archive version. The remaining `0.2.4` strings are the historical `CHANGELOG.md` heading and the `notebook_shim` dependency version in `conda-lock.yml`.
 
 ### R3.2 Write and provenance tool surface
 

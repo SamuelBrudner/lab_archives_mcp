@@ -1,11 +1,13 @@
 cff-version: 1.2.0
-message: "For the JORS resubmission archive (v0.5.1) cite the v0.5.1 Zenodo version record (DOI to be assigned upon Zenodo deposit). The concept DOI https://doi.org/10.5281/zenodo.17728440 always resolves to the latest version. Earlier archives v0.5.0 (https://doi.org/10.5281/zenodo.20421239) and v0.3.2 (https://doi.org/10.5281/zenodo.17772522) are retained for historical traceability only."
+message: "For the JORS resubmission archive (v0.5.1) cite https://doi.org/10.5281/zenodo.20421457. The concept DOI https://doi.org/10.5281/zenodo.17728440 always resolves to the latest version. Earlier archives v0.5.0 (https://doi.org/10.5281/zenodo.20421239) and v0.3.2 (https://doi.org/10.5281/zenodo.17772522) are retained for historical traceability only."
 type: software
 title: "LabArchives MCP Server: AI Integration for Electronic Lab Notebooks"
 version: 0.5.1
 identifiers:
   - type: doi
     value: 10.5281/zenodo.17728440
+  - type: doi
+    value: 10.5281/zenodo.20421457
   - type: doi
     value: 10.5281/zenodo.20421239
 date-released: "2026-05-27"
@@ -40,7 +42,6 @@ preferred-citation:
       given-names: "Samuel N."
       orcid: "https://orcid.org/0000-0002-6043-9328"
   year: 2026
-  doi: 10.5281/zenodo.17728440
+  doi: 10.5281/zenodo.20421457
   version: 0.5.1
   repository-code: "https://github.com/SamuelBrudner/lab_archives_mcp"
-  notes: "Update doi to the v0.5.1 version-specific DOI after Zenodo deposit."

@@ -661,7 +661,7 @@ See `CONTRIBUTING.md` for versioning, Conventional Commits, and release steps.
 Use this citation policy consistently:
 
 - Software concept DOI: <https://doi.org/10.5281/zenodo.17728440>
-- JORS resubmission archive: `v0.5.1`, version DOI to be assigned upon Zenodo deposit, Git tag <https://github.com/SamuelBrudner/lab_archives_mcp/releases/tag/v0.5.1>
+- JORS resubmission archive: `v0.5.1`, version DOI <https://doi.org/10.5281/zenodo.20421457>, Git tag <https://github.com/SamuelBrudner/lab_archives_mcp/releases/tag/v0.5.1>
 - Previous v0.5.0 archive (superseded by v0.5.1 for doc-only fixes): version DOI <https://doi.org/10.5281/zenodo.20421239>
 - Original submission archive (historical traceability): `v0.3.2`, version DOI <https://doi.org/10.5281/zenodo.17772522>
 
@@ -685,13 +685,12 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for:
 If you use this software in your research, please cite:
 
 ```bibtex
-% JORS resubmission archive version. Update doi and url to the v0.5.1 version DOI after Zenodo deposit.
 @software{brudner2026labarchives,
   author = {Brudner, Samuel N.},
   title = {LabArchives MCP Server: AI Integration for Electronic Lab Notebooks},
   year = {2026},
-  doi = {10.5281/zenodo.17728440},
-  url = {https://doi.org/10.5281/zenodo.17728440},
+  doi = {10.5281/zenodo.20421457},
+  url = {https://doi.org/10.5281/zenodo.20421457},
   version = {0.5.1}
 }
 ```
