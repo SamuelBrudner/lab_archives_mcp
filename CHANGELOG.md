@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## v0.5.0 (2026-05-27)
+
+### Feat
+
+- refactor: decompose 823-line `StateManager` god object into `state/` subpackage with six focused services (`ProjectService`, `KnowledgeGraph`, `ProvenanceService`, `GraphValidationService`, `StateRepository`, `StateManager` facade)
+- refactor: split ~1100-line `mcp_server.py` bootstrap into 155-line entry point and `tools/` subpackage with twelve modules, one per tool category
+- refactor: introduce `VectorIndex` as a `typing.Protocol` enabling swappable backends without inheritance
+- refactor: add `TypedDict` definitions for tool responses throughout the tool layer
+- refactor: make `AuthenticationManager.build_auth_params()` part of the public API
+- benchmark: add `scripts/benchmark_internal.py` reporting median and p95 in-process latencies
+
+### Docs
+
+- jors: restructure Section 1 into §1.1 Motivation and objectives (O1–O3) and §1.2 Related work (five new peer-reviewed citations)
+- jors: add architecture diagram (`docs/figures/architecture.{mmd,svg,png}`) rendered in manuscript Figure 1
+- jors: update §3 benchmark to median (p95) latencies; update §4 Availability to three-DOI citation policy with v0.5.0 as JORS resubmission archive
+- jors: add engineering improvements preamble and update R1.8 and R3.1 in response document
+- jors: rewrite cover letter with structured paragraphs covering Section 1 changes, engineering improvements, updated QC numbers, and three-DOI policy
+- citation: update README BibTeX to `brudner2026labarchives` (year 2026, version 0.5.0); update `CITATION.cff` preferred-citation to year 2026 / version 0.5.0
+- audit: fix 23 documentation consistency issues identified across README, metapaper, and configuration files
+
 ## v0.4.0 (2026-04-20)
 
 ### Feat

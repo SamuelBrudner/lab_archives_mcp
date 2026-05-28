@@ -10,7 +10,7 @@ import yaml
 
 
 def test_release_metadata_files_distinguish_source_tree_and_jors_archive() -> None:
-    """Keep current release metadata separate from the reviewed JORS archive."""
+    """Enforce consistent citation policy: preferred-citation tracks the current version."""
 
     repo_root = Path(__file__).resolve().parents[2]
     pyproject = tomllib.loads((repo_root / "pyproject.toml").read_text())
@@ -33,11 +33,12 @@ def test_release_metadata_files_distinguish_source_tree_and_jors_archive() -> No
     assert concept_doi_url in codemeta["relatedLink"]
     assert archived_doi_url in codemeta["relatedLink"]
 
-    assert archived["version"] == "0.3.2"
-    assert archived["year"] == 2025
+    # preferred-citation tracks the current JORS resubmission archive version
+    assert archived["version"] == version
+    assert archived["year"] == 2026
 
     assert f"[![DOI](https://zenodo.org/badge/DOI/{concept_doi}.svg)]({concept_doi_url})" in readme
-    assert f"Current source tree: `{version}`" in readme
+    assert f"JORS resubmission archive: `v{version}`" in readme
     assert f"year = {{{archived['year']}}}" in readme
     assert f"doi = {{{archived['doi']}}}" in readme
     assert f"url = {{{archived_doi_url}}}" in readme

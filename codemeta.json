@@ -7,9 +7,9 @@
   "codeRepository": "https://github.com/SamuelBrudner/lab_archives_mcp",
   "issueTracker": "https://github.com/SamuelBrudner/lab_archives_mcp/issues",
   "license": "https://spdx.org/licenses/MIT",
-  "version": "0.4.0",
-  "datePublished": "2026-04-20",
-  "dateModified": "2026-04-20",
+  "version": "0.5.0",
+  "datePublished": "2026-05-27",
+  "dateModified": "2026-05-27",
   "programmingLanguage": [
     {
       "@type": "ComputerLanguage",
@@ -76,7 +76,6 @@
   ],
   "citation": "https://github.com/SamuelBrudner/lab_archives_mcp/blob/main/CITATION.cff",
   "relatedLink": [
-    "https://doi.org/10.5281/zenodo.19672568",
     "https://doi.org/10.5281/zenodo.17728440",
     "https://doi.org/10.5281/zenodo.17772522"
   ],

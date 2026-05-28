@@ -17,7 +17,7 @@ Usage:
     >>> results = await index.search(SearchRequest(query="protein aggregation", limit=10))
 """
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"
 
 from vector_backend.index import PineconeIndex, QdrantIndex, VectorIndex
 from vector_backend.models import (

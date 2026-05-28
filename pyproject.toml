@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "labarchives-mcp-pol"
-version = "0.4.0"
+version = "0.5.0"
 description = "Model Context Protocol server for LabArchives electronic lab notebooks with vector search, project-scoped state, and provenance tracking."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -137,7 +137,7 @@ asyncio_mode = "auto"
 
 [tool.commitizen]
 name = "cz_conventional_commits"
-version = "0.4.0"
+version = "0.5.0"
 version_files = [
   "pyproject.toml:^version",
   "src/vector_backend/__init__.py:^__version__\\s*=\\s*\"\\d+\\.\\d+\\.\\d+\"",
