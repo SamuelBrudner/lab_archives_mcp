@@ -305,7 +305,7 @@ async def test_checked_in_onboard_example_matches_generated_payload() -> None:
     )
     generated = (await service.get_payload()).as_dict()
 
-    example_path = Path(__file__).resolve().parents[2] / "docs" / "onboard_example.json"
+    example_path = Path(__file__).parents[2] / "docs" / "onboard_example.json"
     checked_in = json.loads(example_path.read_text(encoding="utf-8"))
 
     assert checked_in == generated
