@@ -96,7 +96,7 @@ Revised. The paper Reuse section now has exactly three subsections: Other applic
 
 > Replace any example not produced by the actual software with a real captured transcript. Verify by re-running.
 
-Revised. The fabricated conversational example was removed from the paper and README. The replacement transcript was captured by re-running the registered `write_notebook_entry` MCP tool in a local smoke harness with LabArchives network calls replaced by test doubles, yielding the shown `page_tree_id`, `entry_id`, URL, timestamp, and `part_type` response.
+Revised. The previous illustrative example, which was not produced by running the software, was removed from the paper and README. The replacement transcript was captured by re-running the registered `write_notebook_entry` MCP tool in a local smoke harness with LabArchives network calls replaced by test doubles, yielding the shown `page_tree_id`, `entry_id`, URL, timestamp, and `part_type` response.
 
 ### R2.5 Abstract rewrite
 
