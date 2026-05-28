@@ -19,12 +19,25 @@ TMP_META=$(mktemp -t jors_metapaper.XXXXXX.md)
 TMP_RESP=$(mktemp -t jors_response.XXXXXX.md)
 trap 'rm -f "$TMP_META" "$TMP_RESP"' EXIT
 
+# Strip <URL> autolinks from a markdown file in place.
+# Typst's PDF renderer drops <https://...> autolinks entirely, so we
+# convert them to bare URLs which Typst renders as plain text. This
+# matters for bibliography URLs that citeproc emits as autolinks.
+strip_autolinks() {
+  local file="$1"
+  # macOS sed: -i '' for in-place, BRE syntax
+  sed -i '' -E 's#<(https?://[^>]+)>#\1#g' "$file"
+  sed -i '' -E 's#<(mailto:[^>]+)>#\1#g' "$file"
+}
+
 # Metapaper: citations + bibliography
 pandoc jors_metapaper.md --citeproc --bibliography=paper.bib -t markdown -o "$TMP_META"
+strip_autolinks "$TMP_META"
 pandoc "$TMP_META" --from=markdown --pdf-engine=typst -V mainfont="$FONT" -o jors_metapaper.pdf
 
 # Response to reviewers: citations + bibliography
 pandoc jors_response_to_reviewers.md --citeproc --bibliography=paper.bib -t markdown -o "$TMP_RESP"
+strip_autolinks "$TMP_RESP"
 pandoc "$TMP_RESP" --from=markdown --pdf-engine=typst -V mainfont="$FONT" -o jors_response_to_reviewers.pdf
 
 # Cover letter: no citations
