@@ -9,7 +9,8 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime, timedelta
-from typing import TypedDict
+
+from typing_extensions import TypedDict
 
 from vector_backend.build_state import should_rebuild
 from vector_backend.models import BuildRecord

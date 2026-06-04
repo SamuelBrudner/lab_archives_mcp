@@ -1,11 +1,11 @@
 """Typed response contracts for LabArchives MCP tools."""
 
-from __future__ import annotations
+from typing import Literal, TypeAlias
 
-from typing import Literal, NotRequired, Required, TypeAlias, TypedDict
+from pydantic import JsonValue
+from typing_extensions import NotRequired, Required, TypedDict
 
 JsonScalar: TypeAlias = str | int | float | bool | None
-JsonValue: TypeAlias = JsonScalar | list["JsonValue"] | dict[str, "JsonValue"]
 JsonObject: TypeAlias = dict[str, JsonValue]
 
 
